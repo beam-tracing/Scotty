@@ -432,6 +432,66 @@ def find_d2H_dKZ_dZ(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_f
     return d2H_dKZ_dZ
 
 
+
+
+# Functions (interface)
+    # For going from vacuum to plasma (Will one day implement going from plasma to vacuum)
+def find_d_poloidal_flux_dR(q_R, q_Z, delta_R, interp_poloidal_flux):
+    
+    poloidal_flux_plus  = interp_poloidal_flux(q_R+delta_R, q_Z)
+    poloidal_flux_minus = interp_poloidal_flux(q_R-delta_R, q_Z)
+    d_poloidal_flux_dR = (poloidal_flux_plus - poloidal_flux_minus) / (2 * delta_R)
+    return d_poloidal_flux_dR
+
+def find_d_poloidal_flux_dZ(q_R, q_Z, delta_Z, interp_poloidal_flux):
+    
+    poloidal_flux_plus  = interp_poloidal_flux(q_R, q_Z+delta_Z)
+    poloidal_flux_minus = interp_poloidal_flux(q_R, q_Z-delta_Z)
+    d_poloidal_flux_dZ = (poloidal_flux_plus - poloidal_flux_minus) / (2 * delta_Z)
+    return d_poloidal_flux_dZ
+    
+def find_Psi_3D_plasma(Psi_v_R_R, Psi_v_R_Z, Psi_v_R_zeta, 
+                       Psi_v_Z_Z, Psi_v_Z_zeta, Psi_v_zeta_zeta,
+                       g_R, g_Z, g_zeta,
+                       dH_dR, dH_dZ,
+                       d_poloidal_flux_d_R, d_poloidal_flux_d_Z):
+    # When beam is entering plasma from vacuum    
+    interface_matrix = np.zeros([6,6])
+    interface_matrix[0][5] = 1
+    interface_matrix[1][0] = d_poloidal_flux_d_Z**2
+    interface_matrix[1][1] = - 2 * d_poloidal_flux_d_R * d_poloidal_flux_d_Z
+    interface_matrix[1][3] = d_poloidal_flux_d_R**2
+    interface_matrix[2][2] = - d_poloidal_flux_d_Z
+    interface_matrix[2][4] = d_poloidal_flux_d_R
+    interface_matrix[3][0] = g_R
+    interface_matrix[3][1] = g_Z
+    interface_matrix[3][2] = g_zeta
+    interface_matrix[4][1] = g_R
+    interface_matrix[4][3] = g_Z
+    interface_matrix[4][4] = g_zeta
+    interface_matrix[5][2] = g_R
+    interface_matrix[5][4] = g_Z
+    interface_matrix[5][5] = g_zeta
+    
+    interface_matrix_inverse = np.linalg.inv(interface_matrix)
+    
+    [
+     Psi_p_R_R, Psi_p_R_Z, Psi_p_R_zeta, 
+     Psi_p_Z_Z, Psi_p_Z_zeta, Psi_p_zeta_zeta
+    ] = np.matmul (interface_matrix_inverse, [
+            Psi_v_zeta_zeta, 
+            Psi_v_R_R * d_poloidal_flux_d_Z**2 - 2 * Psi_v_R_Z * d_poloidal_flux_d_R * d_poloidal_flux_d_Z + Psi_v_Z_Z * d_poloidal_flux_d_R **2, 
+            - Psi_v_R_zeta * d_poloidal_flux_d_Z + Psi_v_Z_zeta * d_poloidal_flux_d_R, 
+            dH_dR, 
+            dH_dZ, 
+            0          
+           ] )
+    return Psi_p_R_R, Psi_p_R_Z, Psi_p_R_zeta, Psi_p_Z_Z, Psi_p_Z_zeta, Psi_p_zeta_zeta
+# -----------------
+
+
+
+
 # Functions (analysis)
     # These are not strictly necessary for beam tracing, but useful for analysis of DBS
 def find_dbhat_dR(q_R, q_Z, delta_R, interp_B_R, interp_B_T, interp_B_Z): 

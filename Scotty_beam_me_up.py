@@ -57,6 +57,7 @@ from Scotty_fun import find_d2H_dKR2, find_d2H_dKR_dKzeta, find_d2H_dKR_dKz, fin
 from Scotty_fun import find_d2H_dKR_dR, find_d2H_dKR_dZ, find_d2H_dKzeta_dR, find_d2H_dKzeta_dZ, find_d2H_dKZ_dR, find_d2H_dKZ_dZ # \nabla_K \nabla H
 from Scotty_fun import find_normalised_plasma_freq, find_normalised_gyro_freq
 from Scotty_fun import find_dbhat_dR, find_dbhat_dZ
+from Scotty_fun import find_d_poloidal_flux_dR, find_d_poloidal_flux_dZ,find_Psi_3D_plasma
 
 def beam_me_up(tau_step,
                numberOfTauPoints,
@@ -150,12 +151,13 @@ def beam_me_up(tau_step,
     #input_files_path ='C:\\Users\\chenv\\Dropbox\\VHChen2018\\Code - Torbeam\\Benchmark-7\\'
 #    input_files_path ='C:\\Users\\chenv\\Dropbox\\VHChen2018\\Data\\Input_Files_29Apr2019\\'
 
-#    input_files_path ='D:\\Dropbox\\VHChen2018\\Data\\Input_Files_29Apr2019\\'
+    input_files_path ='D:\\Dropbox\\VHChen2018\\Data\\Input_Files_29Apr2019\\'
 #    input_files_path ='D:\\Dropbox\\VHChen2019\\Code - Scotty\\Benchmark_8\\Torbeam\\'
 
 #    input_files_path ='C:\\Users\\chenv\\Dropbox\\VHChen2018\\Data\\Input_Files_29Apr2019\\'
+#    input_files_path ='D:\\Dropbox\\VHChen2019\\Code - Scotty\\'
 
-    input_files_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
+#    input_files_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
 
 
 #    input_files_path ='C:\\Users\\chenv\\Dropbox\\VHChen2018\\Code - Torbeam\\torbeam_ccfe_val_test\\'
@@ -167,8 +169,8 @@ def beam_me_up(tau_step,
     # Importing data from input files
     # ne.dat, topfile
     # Others: inbeam.dat, Te.dat (not currently used in this code)
-#    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_smoothed.dat'
-    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '.dat'
+    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_smoothed.dat'
+#    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '.dat'
 
     topfile_filename = input_files_path + 'topfile' +input_filename_suffix
 
@@ -190,7 +192,7 @@ def beam_me_up(tau_step,
 
     ne_data_length = int(ne_data[0])
     ne_data_density_array = ne_data[2::2] # in units of 10.0**19 m-3
-    #print('Warninig: Scale factor of 1.05 used')
+#    print('Warninig: Scale factor of 1.05 used')
     ne_data_radialcoord_array = ne_data[1::2]
     ne_data_fludata_X_coord = ne_data_radialcoord_array**2
 #    ne_data_fludata_X_coord = ne_data[1::2] # My new IDL file outputs the flux density directly, instead of radialcoord
@@ -407,6 +409,8 @@ def beam_me_up(tau_step,
     epsilon_perp_output = np.zeros(numberOfDataPoints)
     epsilon_g_output = np.zeros(numberOfDataPoints)
     poloidal_flux_output = np.zeros(numberOfDataPoints)
+    d_poloidal_flux_dR_output = np.zeros(numberOfDataPoints)
+    d_poloidal_flux_dZ_output = np.zeros(numberOfDataPoints)
     normalised_gyro_freq_output = np.zeros(numberOfDataPoints)
     normalised_plasma_freq_output = np.zeros(numberOfDataPoints)
 
@@ -660,9 +664,9 @@ def beam_me_up(tau_step,
 
             B_total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
             b_hat = np.array([B_R,B_T,B_Z]) / B_total
-            g_magnitude = (dH_dKzeta_output[output_counter]**2 + dH_dKzeta_output[output_counter]**2 + dH_dKZ_output[output_counter]**2)**0.5
+            g_magnitude = (q_R_buffer[current_marker-1]**2 * dH_dKzeta_output[output_counter]**2 + dH_dKR_output[output_counter]**2 + dH_dKZ_output[output_counter]**2)**0.5
             g_hat_R     = dH_dKR_output[output_counter]    / g_magnitude
-            g_hat_zeta  = dH_dKzeta_output[output_counter] / g_magnitude
+            g_hat_zeta  = q_R_buffer[current_marker-1] * dH_dKzeta_output[output_counter] / g_magnitude
             g_hat_Z     = dH_dKZ_output[output_counter]    / g_magnitude
             g_hat = np.asarray([g_hat_R,g_hat_zeta,g_hat_Z])
             y_hat = np.cross(b_hat,g_hat) / (np.linalg.norm(np.cross(b_hat,g_hat)))
@@ -679,8 +683,10 @@ def beam_me_up(tau_step,
             dbhat_dZ = find_dbhat_dZ(q_R_buffer[current_marker-1], q_Z_buffer[current_marker-1], delta_Z, interp_B_R, interp_B_T, interp_B_Z)
 
             grad_bhat_output[:,0,output_counter] = dbhat_dR
-            grad_bhat_output[:,1,output_counter] = dbhat_dZ
-
+            grad_bhat_output[:,2,output_counter] = dbhat_dZ
+            grad_bhat_output[1,1,output_counter] = B_R / (B_total * q_R_buffer[current_marker-1])
+            grad_bhat_output[0,1,output_counter] = - B_T / (B_total * q_R_buffer[current_marker-1])
+            
             xhat_dot_grad_bhat_dot_xhat_output[output_counter] = np.dot(x_hat,np.dot(grad_bhat_output[:,:,output_counter],x_hat))
             xhat_dot_grad_bhat_dot_yhat_output[output_counter] = np.dot(x_hat,np.dot(grad_bhat_output[:,:,output_counter],y_hat))
             xhat_dot_grad_bhat_dot_ghat_output[output_counter] = np.dot(x_hat,np.dot(grad_bhat_output[:,:,output_counter],g_hat))
@@ -712,7 +718,9 @@ def beam_me_up(tau_step,
             normalised_plasma_freq_output[output_counter] = find_normalised_plasma_freq(electron_density,launch_angular_frequency)
 
             poloidal_flux_output[output_counter] = poloidal_flux
-
+            d_poloidal_flux_dR_output[output_counter] = find_d_poloidal_flux_dR(q_R_buffer[current_marker-1], q_Z_buffer[current_marker-1], delta_R, interp_poloidal_flux)
+            d_poloidal_flux_dZ_output[output_counter] = find_d_poloidal_flux_dZ(q_R_buffer[current_marker-1], q_Z_buffer[current_marker-1], delta_R, interp_poloidal_flux)
+            
             output_counter += 1
 
         tau_current += tau_step
@@ -721,7 +729,28 @@ def beam_me_up(tau_step,
     # -------------------
 
 
-
+    np.savez('data_output_alt' + output_filename_suffix, tau_array=tau_array, q_R_array=q_R_array, q_zeta_array=q_zeta_array, q_Z_array=q_Z_array,
+             K_R_array=K_R_array, K_zeta_array=K_zeta_array, K_Z_array=K_Z_array,
+             Psi_3D_output=Psi_3D_output,
+             g_hat_output=g_hat_output,
+             b_hat_Cartesian_output=b_hat_Cartesian_output,B_total_output=B_total_output,
+             x_hat_Cartesian_output=x_hat_Cartesian_output,y_hat_Cartesian_output=y_hat_Cartesian_output,
+             x_hat_output=x_hat_output,y_hat_output=y_hat_output,
+             xhat_dot_grad_bhat_dot_xhat_output=xhat_dot_grad_bhat_dot_xhat_output,
+             xhat_dot_grad_bhat_dot_yhat_output=xhat_dot_grad_bhat_dot_yhat_output,
+             xhat_dot_grad_bhat_dot_ghat_output=xhat_dot_grad_bhat_dot_ghat_output,
+             yhat_dot_grad_bhat_dot_xhat_output=yhat_dot_grad_bhat_dot_xhat_output,
+             yhat_dot_grad_bhat_dot_yhat_output=yhat_dot_grad_bhat_dot_yhat_output,
+             yhat_dot_grad_bhat_dot_ghat_output=yhat_dot_grad_bhat_dot_ghat_output,
+             grad_bhat_output=grad_bhat_output,
+             kappa_dot_xhat_output=kappa_dot_xhat_output,
+             kappa_dot_yhat_output=kappa_dot_yhat_output,
+             d_xhat_d_tau_dot_yhat_output=d_xhat_d_tau_dot_yhat_output,
+             d_theta_d_tau_output=d_theta_d_tau_output,
+             d_poloidal_flux_dR_output=d_poloidal_flux_dR_output,
+             d_poloidal_flux_dZ_output=d_poloidal_flux_dZ_output,
+             dH_dR_output=dH_dR_output, dH_dZ_output=dH_dZ_output
+             )
 
 
 
@@ -1333,7 +1362,6 @@ def beam_me_up(tau_step,
     kappa_dot_yhat_output = ( ray_curvature_kappa_output[0,:]*y_hat_output[0,:]
                             + ray_curvature_kappa_output[1,:]*y_hat_output[1,:]
                             + ray_curvature_kappa_output[2,:]*y_hat_output[2,:] ) # Can't get dot product to work properly
-
     K_magnitude_array = ( K_X_array**2 + K_Y_array**2 + K_Z_array**2 )**0.5
     K_magnitude_min = min(K_magnitude_array)
 
@@ -1350,6 +1378,7 @@ def beam_me_up(tau_step,
 
     poloidal_flux_search = 0.95
     search_condition = 0
+    tau_search_end_index = -1     # So the code does not fail if the beam does not leave the plasma
     for ii in range(0,len(poloidal_flux_output)):
         if search_condition == 0 and poloidal_flux_output[ii] <= poloidal_flux_search:
             tau_search_start_index = ii
@@ -1601,25 +1630,22 @@ def beam_me_up(tau_step,
     np.arccos(np.dot(b_hat_0,g_hat_Cartesian_0))
     np.arcsin(np.dot(b_hat_0,g_hat_Cartesian_0))
 
-    mismath_angle_0 = np.sign(sin_mismatch_angle_0)*np.arcsin(abs(sin_mismatch_angle_0))
-
-#    mismatch_piece = np.exp(np.real(
-#            -1j / Psi_w_inverse_yy_0 * (
-#                    (2*K_a_0 + k_perp_1_0*sin_theta_output_0)*Psi_w_inverse_xy_0)**2
-#            -1j / 4 * (2*K_a_0 + k_perp_1_0*sin_theta_output_0)**2*Psi_w_inverse_xx_0
+    mismatch_angle_0 = np.sign(sin_mismatch_angle_0)*np.arcsin(abs(sin_mismatch_angle_0))
+    mismatch_attenuation = 1 / (np.sqrt(2)*K_magnitude_0) * ( np.imag(Psi_w_inverse_yy_0) / ((np.imag(Psi_w_inverse_xy_0))**2 - np.imag(Psi_w_inverse_xx_0)*np.imag(Psi_w_inverse_yy_0)) )**(0.5)
+    mismatch_attenuation_wrong = 1 / (np.sqrt(2)*K_magnitude_0) * (- np.imag(1/Psi_w_xx_0) )**(-0.5)
+#    mismatch_piece_wrong = np.exp(np.real(
+#            -1j * K_magnitude_0**2 * mismatch_angle_0**2 / Psi_w_xx_0
 #            ))
-#
-#    mismatch_piece_reduced = np.exp(np.real(
-#            -1j * K_magnitude_0**2 * mismath_angle_0**2 / Psi_w_xx_0
-#            ))
-
-    mismatch_piece = np.exp(np.real(
-            -1j * K_magnitude_0**2 * mismath_angle_0**2 / Psi_w_xx_0
-            ))
+    mismatch_piece_wrong = np.exp( - mismatch_angle_0**2 / mismatch_attenuation_wrong**2 )
+    mismatch_piece = np.exp( - mismatch_angle_0**2 / mismatch_attenuation**2 )
 
     print("tau_0 =",tau_0)
-    print("mismatch_piece =",mismatch_piece)
-    print("mismath_angle_0 =",mismath_angle_0)
+    print("K_magnitude_0 =",K_magnitude_0)
+    print("mismatch_piece =", mismatch_piece)
+    print("mismatch_piece_wrong =", mismatch_piece_wrong)
+    print("mismatch_angle_0 =", mismatch_angle_0)
+    print("mismatch_attenuation =", mismatch_attenuation)
+    print("mismatch_attenuation_wrong =", mismatch_attenuation_wrong)
 
     # Calculating some quantities from what we already know
     d_K_g_d_tau_array = np.gradient(K_g_array,tau_array)
@@ -1638,12 +1664,15 @@ def beam_me_up(tau_step,
              q_X_array=q_X_array,q_Y_array=q_Y_array,K_X_array=K_X_array,K_Y_array=K_Y_array,
              Psi_w_xx_array=Psi_w_xx_array, Psi_w_xy_array=Psi_w_xy_array, Psi_w_yy_array=Psi_w_yy_array,
              Psi_3D_output_Cartesian=Psi_3D_output_Cartesian,
+             Psi_3D_output=Psi_3D_output,
              tau_0=tau_0, tau_start=tau_start,tau_end=tau_end,
              tau_0_index=tau_0_index,
              tau_nu=tau_nu,tau_nu_index=tau_nu_index,
+             g_hat_output=g_hat_output,
              g_hat_Cartesian_output=g_hat_Cartesian_output,g_magnitude_output=g_magnitude_output,
              b_hat_Cartesian_output=b_hat_Cartesian_output,B_total_output=B_total_output,
              x_hat_Cartesian_output=x_hat_Cartesian_output,y_hat_Cartesian_output=y_hat_Cartesian_output,
+             x_hat_output=x_hat_output,y_hat_output=y_hat_output,
              sin_mismatch_angle_array=sin_mismatch_angle_array,cos_mismatch_angle_array=cos_mismatch_angle_array,
              theta_output=theta_output,K_g_array=K_g_array,
              xhat_dot_grad_bhat_dot_xhat_output=xhat_dot_grad_bhat_dot_xhat_output,
@@ -1658,7 +1687,10 @@ def beam_me_up(tau_step,
              d_xhat_d_tau_dot_yhat_output=d_xhat_d_tau_dot_yhat_output,
              d_theta_d_tau_output=d_theta_d_tau_output,
              d_theta_m_d_tau_array=d_theta_m_d_tau_array,
-             d_K_g_d_tau_array=d_K_g_d_tau_array
+             d_K_g_d_tau_array=d_K_g_d_tau_array,
+             d_poloidal_flux_dR_output=d_poloidal_flux_dR_output,
+             d_poloidal_flux_dZ_output=d_poloidal_flux_dZ_output,
+             dH_dR_output=dH_dR_output, dH_dZ_output=dH_dZ_output
              )
 
     np.savez('data_input' + output_filename_suffix, tau_step=tau_step, data_poloidal_flux_grid=data_poloidal_flux_grid,
