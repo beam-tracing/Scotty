@@ -16,6 +16,7 @@ input_filename_suffix = '_29908_200'
 tau_step = 1.0
 numberOfTauPoints = 2001
 saveInterval = 1  # saves every n time steps
+figure_flag = True
 
 poloidal_launch_angle_Torbeam = 4.0 # deg
 toroidal_launch_angle_Torbeam = -8.0 # deg
@@ -42,6 +43,7 @@ beam_me_up(tau_step,
            launch_beam_curvature,
            launch_position,
            input_filename_suffix,
-           output_filename_suffix='')
+           output_filename_suffix='',
+           figure_flag)
 
 
