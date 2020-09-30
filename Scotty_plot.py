@@ -24,11 +24,16 @@ K_magnitude_array = loadfile['K_magnitude_array']
 Psi_w_xx_array = loadfile['Psi_w_xx_array']
 Psi_w_xy_array = loadfile['Psi_w_xy_array']
 Psi_w_yy_array = loadfile['Psi_w_yy_array']
+Psi_3D_output = loadfile['Psi_3D_output']
 x_hat_Cartesian_output = loadfile['x_hat_Cartesian_output']
 y_hat_Cartesian_output = loadfile['y_hat_Cartesian_output']
 b_hat_Cartesian_output = loadfile['b_hat_Cartesian_output']
+x_hat_output = loadfile['x_hat_output']
+y_hat_output = loadfile['y_hat_output']
 B_total_output = loadfile['B_total_output']
+grad_bhat_output = loadfile['grad_bhat_output']
 g_hat_Cartesian_output = loadfile['g_hat_Cartesian_output']
+g_hat_output = loadfile['g_hat_output']
 g_magnitude_output = loadfile['g_magnitude_output']
 theta_output = loadfile['theta_output']
 d_theta_d_tau_output = loadfile['d_theta_d_tau_output']
@@ -48,6 +53,7 @@ tau_nu_index=loadfile['tau_nu_index']
 tau_0_index=loadfile['tau_0_index']
 K_g_array = loadfile['K_g_array']
 d_K_g_d_tau_array = loadfile['d_K_g_d_tau_array']
+B_total_output = loadfile['B_total_output']
 loadfile.close()
 
 loadfile = np.load('data_input.npz')
@@ -67,6 +73,120 @@ loadfile.close()
 #R_yy_array = K_magnitude_array/np.real(Psi_w_yy_array)
 
 
+# Checking gradients of bhat
+
+    #Input data from Generation_Input7
+aspect_ratio = 1.5 # major_radius/minor_radius
+minor_radius = 0.5 # in meters    
+B_toroidal_max = 1.00 # in Tesla (?)
+B_poloidal_max = 0.1 # in Tesla
+
+major_radius = aspect_ratio * minor_radius
+
+d_1overabsB_d_R_analytic = - (B_total_output)**(-3) * (B_poloidal_max**2*(q_R_array-major_radius)/minor_radius**2 - B_toroidal_max**2 * q_R_array**(-3) * major_radius**2) #\frac{\partial}{\partial R} \frac{1}{abs(B)}
+d_1overabsB_d_z_analytic = - (B_total_output)**(-3) * (B_poloidal_max**2*q_Z_array/minor_radius**2)
+
+d_bhat_R_d_R_analytic = B_poloidal_max * q_Z_array / minor_radius * d_1overabsB_d_R_analytic
+d_bhat_T_d_R_analytic = - B_toroidal_max/B_total_output * major_radius/(q_R_array**2) + B_toroidal_max*major_radius/(q_R_array) * d_1overabsB_d_R_analytic
+d_bhat_Z_d_R_analytic = 1/minor_radius * B_poloidal_max / B_total_output + B_poloidal_max*(q_R_array-major_radius)/minor_radius * d_1overabsB_d_R_analytic
+d_bhat_R_d_z_analytic = B_poloidal_max/(minor_radius*B_total_output) + B_poloidal_max/(minor_radius)*q_Z_array*d_1overabsB_d_z_analytic
+d_bhat_T_d_z_analytic = B_toroidal_max * major_radius/q_R_array * d_1overabsB_d_z_analytic
+d_bhat_Z_d_z_analytic = B_poloidal_max * (q_R_array-major_radius) / minor_radius * d_1overabsB_d_z_analytic
+
+numberOfDataPoints = np.size(d_bhat_Z_d_R_analytic)
+grad_bhat_analytic = np.zeros([3,3,numberOfDataPoints])
+grad_bhat_analytic[0,0,:] = d_bhat_R_d_R_analytic
+grad_bhat_analytic[1,0,:] = d_bhat_T_d_R_analytic
+grad_bhat_analytic[2,0,:] = d_bhat_Z_d_R_analytic
+grad_bhat_analytic[0,2,:] = d_bhat_R_d_z_analytic
+grad_bhat_analytic[1,2,:] = d_bhat_T_d_z_analytic
+grad_bhat_analytic[2,2,:] = d_bhat_Z_d_z_analytic
+grad_bhat_analytic[1,1,:] = B_poloidal_max *  q_Z_array / (q_R_array * minor_radius * B_total_output) #b_R / R
+grad_bhat_analytic[0,1,:] = - B_toroidal_max * major_radius / (q_R_array**2 * B_total_output) #- b_zeta / R
+
+xhat_dot_grad_bhat_dot_xhat_analytic = np.zeros(numberOfDataPoints)
+xhat_dot_grad_bhat_dot_yhat_analytic = np.zeros(numberOfDataPoints)
+xhat_dot_grad_bhat_dot_ghat_analytic = np.zeros(numberOfDataPoints)
+yhat_dot_grad_bhat_dot_xhat_analytic = np.zeros(numberOfDataPoints)
+yhat_dot_grad_bhat_dot_yhat_analytic = np.zeros(numberOfDataPoints)
+yhat_dot_grad_bhat_dot_ghat_analytic = np.zeros(numberOfDataPoints)
+for ii in range(0,numberOfDataPoints):
+    xhat_dot_grad_bhat_dot_xhat_analytic[ii] = np.dot(x_hat_output[:,ii],np.dot(grad_bhat_analytic[:,:,ii],x_hat_output[:,ii]))
+    xhat_dot_grad_bhat_dot_yhat_analytic[ii] = np.dot(x_hat_output[:,ii],np.dot(grad_bhat_analytic[:,:,ii],y_hat_output[:,ii]))
+    xhat_dot_grad_bhat_dot_ghat_analytic[ii] = np.dot(x_hat_output[:,ii],np.dot(grad_bhat_analytic[:,:,ii],g_hat_output[:,ii]))
+    yhat_dot_grad_bhat_dot_xhat_analytic[ii] = np.dot(y_hat_output[:,ii],np.dot(grad_bhat_analytic[:,:,ii],x_hat_output[:,ii]))
+    yhat_dot_grad_bhat_dot_yhat_analytic[ii] = np.dot(y_hat_output[:,ii],np.dot(grad_bhat_analytic[:,:,ii],y_hat_output[:,ii]))
+    yhat_dot_grad_bhat_dot_ghat_analytic[ii] = np.dot(y_hat_output[:,ii],np.dot(grad_bhat_analytic[:,:,ii],g_hat_output[:,ii]))
+
+
+plt.figure()
+plt.subplot(3,2,1)
+plt.plot(tau_array,xhat_dot_grad_bhat_dot_xhat_analytic,color='k')
+plt.plot(tau_array,xhat_dot_grad_bhat_dot_xhat_output,color='r')
+plt.subplot(3,2,2)
+plt.plot(tau_array,xhat_dot_grad_bhat_dot_yhat_analytic,color='k')
+plt.plot(tau_array,xhat_dot_grad_bhat_dot_yhat_output,color='r')
+plt.subplot(3,2,3)
+plt.plot(tau_array,xhat_dot_grad_bhat_dot_ghat_analytic,color='k')
+plt.plot(tau_array,xhat_dot_grad_bhat_dot_ghat_output,color='r')
+plt.subplot(3,2,4)
+plt.plot(tau_array,yhat_dot_grad_bhat_dot_xhat_analytic,color='k')
+plt.plot(tau_array,yhat_dot_grad_bhat_dot_xhat_output,color='r')
+plt.subplot(3,2,5)
+plt.plot(tau_array,yhat_dot_grad_bhat_dot_yhat_analytic,color='k')
+plt.plot(tau_array,yhat_dot_grad_bhat_dot_yhat_output,color='r')
+plt.subplot(3,2,6)
+plt.plot(tau_array,yhat_dot_grad_bhat_dot_ghat_analytic,color='k')
+plt.plot(tau_array,yhat_dot_grad_bhat_dot_ghat_output,color='r')
+
+plt.figure()
+plt.subplot(3,3,1)
+plt.plot(tau_array,grad_bhat_analytic[0,0,:],color='k')
+plt.plot(tau_array,grad_bhat_output[0,0,:],color='r')
+plt.axvline(tau_start,color='k')
+plt.axvline(tau_end,color='k')
+plt.subplot(3,3,2)
+plt.plot(tau_array,grad_bhat_analytic[1,0,:],color='k')
+plt.plot(tau_array,grad_bhat_output[1,0,:],color='r')
+plt.axvline(tau_start,color='k')
+plt.axvline(tau_end,color='k')
+plt.subplot(3,3,3)
+plt.plot(tau_array,grad_bhat_analytic[2,0,:],color='k')
+plt.plot(tau_array,grad_bhat_output[2,0,:],color='r')
+plt.axvline(tau_start,color='k')
+plt.axvline(tau_end,color='k')
+plt.subplot(3,3,4)
+plt.plot(tau_array,grad_bhat_analytic[0,1,:],color='k')
+plt.plot(tau_array,grad_bhat_output[0,1,:],color='r')
+plt.axvline(tau_start,color='k')
+plt.axvline(tau_end,color='k')
+plt.subplot(3,3,5)
+plt.plot(tau_array,grad_bhat_analytic[1,1,:],color='k')
+plt.plot(tau_array,grad_bhat_output[1,1,:],color='r')
+plt.axvline(tau_start,color='k')
+plt.axvline(tau_end,color='k')
+plt.subplot(3,3,6)
+plt.plot(tau_array,grad_bhat_analytic[2,1,:],color='k')
+plt.plot(tau_array,grad_bhat_output[2,1,:],color='r')
+plt.axvline(tau_start,color='k')
+plt.axvline(tau_end,color='k')
+plt.subplot(3,3,7)
+plt.plot(tau_array,grad_bhat_analytic[0,2,:],color='k')
+plt.plot(tau_array,grad_bhat_output[0,2,:],color='r')
+plt.axvline(tau_start,color='k')
+plt.axvline(tau_end,color='k')
+plt.subplot(3,3,8)
+plt.plot(tau_array,grad_bhat_analytic[1,2,:],color='k')
+plt.plot(tau_array,grad_bhat_output[1,2,:],color='r')
+plt.axvline(tau_start,color='k')
+plt.axvline(tau_end,color='k')
+plt.subplot(3,3,9)
+plt.plot(tau_array,grad_bhat_analytic[2,2,:],color='k')
+plt.plot(tau_array,grad_bhat_output[2,2,:],color='r')
+plt.axvline(tau_start,color='k')
+plt.axvline(tau_end,color='k')
+
+# ------------
 
 
 # Checking vacuum propagation. Assumes circular beam
@@ -105,44 +225,44 @@ plt.plot(distance_along_line,np.imag(Psi_w_yy_array),'k')
 #ray_curvature_z = g_magnitude_output*np.gradient(g_hat_Cartesian_output[2,:],tau_array)
 #
 ## --
-
 k1s = - 2 * K_g_array / np.cos(theta_output)
 
 xx_k1_1 = np.sin(theta_output) / g_magnitude_output * d_theta_d_tau_output
 xx_k1_2 = kappa_dot_xhat_output * np.sin(theta_output) 
 xx_k1_3 = xhat_dot_grad_bhat_dot_ghat_output
-xx_k1_4 = xhat_dot_grad_bhat_dot_xhat_output / np.cos(theta_output) 
+xx_k1_4 = xhat_dot_grad_bhat_dot_xhat_output * np.tan(theta_output) 
 xx_k2_1 = np.tan(theta_output) / g_magnitude_output * d_xhat_d_tau_dot_yhat_output
 xx_k2_2 = xhat_dot_grad_bhat_dot_yhat_output / np.cos(theta_output) 
 xy_k1_1 = kappa_dot_yhat_output * np.sin(theta_output) 
-xy_k1_2 = yhat_dot_grad_bhat_dot_ghat_output
-xy_k1_3 = yhat_dot_grad_bhat_dot_xhat_output / np.cos(theta_output) 
+xy_k1_2 = np.sin(theta_output) * np.tan(theta_output) / g_magnitude_output * d_xhat_d_tau_dot_yhat_output
+xy_k1_3 = yhat_dot_grad_bhat_dot_ghat_output
+xy_k1_4 = yhat_dot_grad_bhat_dot_xhat_output * np.tan(theta_output) 
 xy_k2_1 = yhat_dot_grad_bhat_dot_yhat_output / np.cos(theta_output) 
 
 plt.figure()
 plt.subplot(2,2,1)
-plt.plot(tau_array,xx_k1_1)
-plt.plot(tau_array,xx_k1_2)
-plt.plot(tau_array,xx_k1_3)
-plt.plot(tau_array,xx_k1_4)
+plt.plot(tau_array,xx_k1_1,color='b')
+plt.plot(tau_array,xx_k1_2,color='g')
+plt.plot(tau_array,xx_k1_3,color='r')
+plt.plot(tau_array,xx_k1_4,color='c')
 plt.axvline(tau_start,color='k')
 plt.axvline(tau_end,color='k')
 plt.title('xx k1')
 plt.subplot(2,2,2)
-plt.plot(tau_array,xx_k2_1)
-plt.plot(tau_array,xx_k2_2)
+plt.plot(tau_array,xx_k2_1,color='b')
+plt.plot(tau_array,xx_k2_2,color='g')
 plt.axvline(tau_start,color='k')
 plt.axvline(tau_end,color='k')
 plt.title('xx k2')
 plt.subplot(2,2,3)
-plt.plot(tau_array,xy_k1_1)
-plt.plot(tau_array,xy_k1_2)
-plt.plot(tau_array,xy_k1_3)
+plt.plot(tau_array,xy_k1_1,color='b')
+plt.plot(tau_array,xy_k1_2,color='g')
+plt.plot(tau_array,xy_k1_3,color='r')
 plt.axvline(tau_start,color='k')
 plt.axvline(tau_end,color='k')
 plt.title('xy k1')
 plt.subplot(2,2,4)
-plt.plot(tau_array,xy_k2_1)
+plt.plot(tau_array,xy_k2_1,color='b')
 plt.axvline(tau_start,color='k')
 plt.axvline(tau_end,color='k')
 plt.title('xy k2')
@@ -151,23 +271,30 @@ plt.title('xy k2')
 plt.figure()
 plt.subplot(2,1,1)
 plt.plot(tau_array,np.real(Psi_w_xx_array),'k')
-plt.plot(tau_array,k1s/2*xx_k1_1)
-plt.plot(tau_array,k1s/2*xx_k1_2)
-plt.plot(tau_array,k1s/2*xx_k1_3)
-plt.plot(tau_array,k1s/2*xx_k1_4)
+plt.plot(tau_array,k1s/2*xx_k1_1,color='b')
+plt.plot(tau_array,k1s/2*xx_k1_2,color='g')
+plt.plot(tau_array,k1s/2*xx_k1_3,color='r')
+plt.plot(tau_array,k1s/2*xx_k1_4,color='c')
 plt.axvline(tau_start,color='k')
 plt.axvline(tau_end,color='k')
 #plt.ylim([-10**3,10**3])
 plt.title('xx')
 plt.subplot(2,1,2)
 plt.plot(tau_array,np.real(Psi_w_xy_array),'k')
-plt.plot(tau_array,k1s/2*xy_k1_1)
-plt.plot(tau_array,k1s/2*xy_k1_2)
-plt.plot(tau_array,k1s/2*xy_k1_3)
+plt.plot(tau_array,k1s/2*xy_k1_1,color='b')
+plt.plot(tau_array,k1s/2*xy_k1_2,color='g')
+plt.plot(tau_array,k1s/2*xy_k1_3,color='r')
 plt.axvline(tau_start,color='k')
 plt.axvline(tau_end,color='k')
 #plt.ylim([-10**3,10**3])
 plt.title('xy')
+
+plt.figure()
+plt.plot(tau_array,b_hat_Cartesian_output[0,:],color='b')
+plt.plot(tau_array,b_hat_Cartesian_output[1,:],color='g')
+plt.plot(tau_array,b_hat_Cartesian_output[2,:],color='r')
+
+
 # -------------
 
 # Calculations of spherical vs conventional

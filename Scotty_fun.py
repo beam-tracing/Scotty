@@ -29,6 +29,33 @@ def find_nearest(array,  value): #returns the index
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return int(idx)
+
+def contract_special(arg_a,arg_b):
+    # Takes a matrix of TxMxN and a vector of TxN  or TxM
+    # For each T, contract the matrix with the vector
+    # Or two vectors of size TxN
+    # For each T, contract the indices N 
+    # Covers the case that matmul and dot don't do very elegantly
+    # Avoids having to use a for loop to iterate over T
+    if (np.ndim(arg_a) == 3 and np.ndim(arg_b) == 2): # arg_a is the matrix and arg_b is the vector
+        matrix = arg_a
+        vector = arg_b
+        intermediate_result = np.tensordot(matrix,vector, ((2), (1)))
+        result = np.diagonal(intermediate_result, offset=0, axis1=0, axis2=2).transpose()
+    elif (np.ndim(arg_a) == 2 and np.ndim(arg_b) == 3): # arg_a is the vector and arg_b is the matrix
+        vector = arg_a
+        matrix = arg_b
+        intermediate_result = np.tensordot(matrix,vector, ((1), (1)))
+        result = np.diagonal(intermediate_result, offset=0, axis1=0, axis2=2).transpose()
+    elif (np.ndim(arg_a) == 2 and np.ndim(arg_b) == 2): # arg_a is the vector and arg_b is a vector
+        vector1 = arg_a
+        vector2 = arg_b
+        intermediate_result = np.tensordot(vector1,vector2, ((1), (1)))
+        result = np.diagonal(intermediate_result, offset=0, axis1=0, axis2=1).transpose()
+    else: 
+        print('Error: Invalid dimensions')
+    return result
+
 #----------------------------------
     
 # Functions (beam tracing 1)
@@ -432,6 +459,66 @@ def find_d2H_dKZ_dZ(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_f
     return d2H_dKZ_dZ
 
 
+
+
+# Functions (interface)
+    # For going from vacuum to plasma (Will one day implement going from plasma to vacuum)
+def find_d_poloidal_flux_dR(q_R, q_Z, delta_R, interp_poloidal_flux):
+    
+    poloidal_flux_plus  = interp_poloidal_flux(q_R+delta_R, q_Z)
+    poloidal_flux_minus = interp_poloidal_flux(q_R-delta_R, q_Z)
+    d_poloidal_flux_dR = (poloidal_flux_plus - poloidal_flux_minus) / (2 * delta_R)
+    return d_poloidal_flux_dR
+
+def find_d_poloidal_flux_dZ(q_R, q_Z, delta_Z, interp_poloidal_flux):
+    
+    poloidal_flux_plus  = interp_poloidal_flux(q_R, q_Z+delta_Z)
+    poloidal_flux_minus = interp_poloidal_flux(q_R, q_Z-delta_Z)
+    d_poloidal_flux_dZ = (poloidal_flux_plus - poloidal_flux_minus) / (2 * delta_Z)
+    return d_poloidal_flux_dZ
+    
+def find_Psi_3D_plasma(Psi_v_R_R, Psi_v_R_Z, Psi_v_R_zeta, 
+                       Psi_v_Z_Z, Psi_v_Z_zeta, Psi_v_zeta_zeta,
+                       g_R, g_Z, g_zeta,
+                       dH_dR, dH_dZ,
+                       d_poloidal_flux_d_R, d_poloidal_flux_d_Z):
+    # When beam is entering plasma from vacuum    
+    interface_matrix = np.zeros([6,6])
+    interface_matrix[0][5] = 1
+    interface_matrix[1][0] = d_poloidal_flux_d_Z**2
+    interface_matrix[1][1] = - 2 * d_poloidal_flux_d_R * d_poloidal_flux_d_Z
+    interface_matrix[1][3] = d_poloidal_flux_d_R**2
+    interface_matrix[2][2] = - d_poloidal_flux_d_Z
+    interface_matrix[2][4] = d_poloidal_flux_d_R
+    interface_matrix[3][0] = g_R
+    interface_matrix[3][1] = g_Z
+    interface_matrix[3][2] = g_zeta
+    interface_matrix[4][1] = g_R
+    interface_matrix[4][3] = g_Z
+    interface_matrix[4][4] = g_zeta
+    interface_matrix[5][2] = g_R
+    interface_matrix[5][4] = g_Z
+    interface_matrix[5][5] = g_zeta
+    
+    interface_matrix_inverse = np.linalg.inv(interface_matrix)
+    
+    [
+     Psi_p_R_R, Psi_p_R_Z, Psi_p_R_zeta, 
+     Psi_p_Z_Z, Psi_p_Z_zeta, Psi_p_zeta_zeta
+    ] = np.matmul (interface_matrix_inverse, [
+            Psi_v_zeta_zeta, 
+            Psi_v_R_R * d_poloidal_flux_d_Z**2 - 2 * Psi_v_R_Z * d_poloidal_flux_d_R * d_poloidal_flux_d_Z + Psi_v_Z_Z * d_poloidal_flux_d_R **2, 
+            - Psi_v_R_zeta * d_poloidal_flux_d_Z + Psi_v_Z_zeta * d_poloidal_flux_d_R, 
+            dH_dR, 
+            dH_dZ, 
+            0          
+           ] )
+    return Psi_p_R_R, Psi_p_R_Z, Psi_p_R_zeta, Psi_p_Z_Z, Psi_p_Z_zeta, Psi_p_zeta_zeta
+# -----------------
+
+
+
+
 # Functions (analysis)
     # These are not strictly necessary for beam tracing, but useful for analysis of DBS
 def find_dbhat_dR(q_R, q_Z, delta_R, interp_B_R, interp_B_T, interp_B_Z): 
@@ -483,4 +570,29 @@ def find_distance_from_waist(width, wavenumber, curvature): #Finds how far you a
     distance_from_waist = np.sign(curvature)*np.sqrt((width**2 - waist**2)*waist**2*wavenumber**2/4)
     return distance_from_waist
 
+def find_g_magnitude(q_R,q_Z,K_R,K_zeta,K_Z,launch_angular_frequency,mode_flag,delta_K_R,delta_K_zeta,delta_K_Z,
+                     interp_poloidal_flux,interp_density_1D,interp_B_R,interp_B_T,interp_B_Z): # Finds the magnitude of the group velocity. This method is slow, do not use in main loop.\
+    dH_dKR   = find_dH_dKR(
+                           q_R,q_Z,
+                           K_R,K_zeta,K_Z,
+                           launch_angular_frequency,mode_flag,delta_K_R,
+                           interp_poloidal_flux,interp_density_1D,
+                           interp_B_R,interp_B_T,interp_B_Z
+                          )
+    dH_dKzeta = find_dH_dKzeta(
+                               q_R,q_Z,
+                               K_R,K_zeta,K_Z,
+                               launch_angular_frequency,mode_flag,delta_K_zeta,
+                               interp_poloidal_flux,interp_density_1D,
+                               interp_B_R,interp_B_T,interp_B_Z
+                              )
+    dH_dKZ    = find_dH_dKZ(
+                            q_R,q_Z,
+                            K_R,K_zeta,K_Z,
+                            launch_angular_frequency,mode_flag,delta_K_Z,
+                            interp_poloidal_flux,interp_density_1D,
+                            interp_B_R,interp_B_T,interp_B_Z
+                           )    
+    g_magnitude = (q_R**2 * dH_dKzeta**2 + dH_dKR**2 + dH_dKZ**2)**0.5       
+    return g_magnitude
 #----------------------------------
