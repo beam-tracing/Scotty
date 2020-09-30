@@ -29,6 +29,33 @@ def find_nearest(array,  value): #returns the index
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return int(idx)
+
+def contract_special(arg_a,arg_b):
+    # Takes a matrix of TxMxN and a vector of TxN  or TxM
+    # For each T, contract the matrix with the vector
+    # Or two vectors of size TxN
+    # For each T, contract the indices N 
+    # Covers the case that matmul and dot don't do very elegantly
+    # Avoids having to use a for loop to iterate over T
+    if (np.ndim(arg_a) == 3 and np.ndim(arg_b) == 2): # arg_a is the matrix and arg_b is the vector
+        matrix = arg_a
+        vector = arg_b
+        intermediate_result = np.tensordot(matrix,vector, ((2), (1)))
+        result = np.diagonal(intermediate_result, offset=0, axis1=0, axis2=2).transpose()
+    elif (np.ndim(arg_a) == 2 and np.ndim(arg_b) == 3): # arg_a is the vector and arg_b is the matrix
+        vector = arg_a
+        matrix = arg_b
+        intermediate_result = np.tensordot(matrix,vector, ((1), (1)))
+        result = np.diagonal(intermediate_result, offset=0, axis1=0, axis2=2).transpose()
+    elif (np.ndim(arg_a) == 2 and np.ndim(arg_b) == 2): # arg_a is the vector and arg_b is a vector
+        vector1 = arg_a
+        vector2 = arg_b
+        intermediate_result = np.tensordot(vector1,vector2, ((1), (1)))
+        result = np.diagonal(intermediate_result, offset=0, axis1=0, axis2=1).transpose()
+    else: 
+        print('Error: Invalid dimensions')
+    return result
+
 #----------------------------------
     
 # Functions (beam tracing 1)
@@ -543,4 +570,29 @@ def find_distance_from_waist(width, wavenumber, curvature): #Finds how far you a
     distance_from_waist = np.sign(curvature)*np.sqrt((width**2 - waist**2)*waist**2*wavenumber**2/4)
     return distance_from_waist
 
+def find_g_magnitude(q_R,q_Z,K_R,K_zeta,K_Z,launch_angular_frequency,mode_flag,delta_K_R,delta_K_zeta,delta_K_Z,
+                     interp_poloidal_flux,interp_density_1D,interp_B_R,interp_B_T,interp_B_Z): # Finds the magnitude of the group velocity. This method is slow, do not use in main loop.\
+    dH_dKR   = find_dH_dKR(
+                           q_R,q_Z,
+                           K_R,K_zeta,K_Z,
+                           launch_angular_frequency,mode_flag,delta_K_R,
+                           interp_poloidal_flux,interp_density_1D,
+                           interp_B_R,interp_B_T,interp_B_Z
+                          )
+    dH_dKzeta = find_dH_dKzeta(
+                               q_R,q_Z,
+                               K_R,K_zeta,K_Z,
+                               launch_angular_frequency,mode_flag,delta_K_zeta,
+                               interp_poloidal_flux,interp_density_1D,
+                               interp_B_R,interp_B_T,interp_B_Z
+                              )
+    dH_dKZ    = find_dH_dKZ(
+                            q_R,q_Z,
+                            K_R,K_zeta,K_Z,
+                            launch_angular_frequency,mode_flag,delta_K_Z,
+                            interp_poloidal_flux,interp_density_1D,
+                            interp_B_R,interp_B_T,interp_B_Z
+                           )    
+    g_magnitude = (q_R**2 * dH_dKzeta**2 + dH_dKR**2 + dH_dKZ**2)**0.5       
+    return g_magnitude
 #----------------------------------
