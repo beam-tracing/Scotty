@@ -56,6 +56,16 @@ def contract_special(arg_a,arg_b):
         print('Error: Invalid dimensions')
     return result
 
+def find_inverse_2D(matrix_2D):
+    # Finds the inverse of a 2x2 matrix
+    matrix_2D_inverse = np.zeros([2,2],dtype='complex128')
+    determinant = matrix_2D[0,0]*matrix_2D[1,1] - matrix_2D[0,1]**2
+    matrix_2D_inverse[0,0] =   matrix_2D[1,1] / determinant
+    matrix_2D_inverse[1,1] =   matrix_2D[0,0] / determinant
+    matrix_2D_inverse[0,1] = - matrix_2D[0,1] / determinant
+    matrix_2D_inverse[1,0] = - matrix_2D[0,1] / determinant
+    return matrix_2D_inverse
+
 #----------------------------------
     
 # Functions (beam tracing 1)
