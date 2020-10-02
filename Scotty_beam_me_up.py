@@ -48,7 +48,7 @@ from scipy import constants as constants
 import matplotlib.pyplot as plt
 import os
 
-from Scotty_fun import read_floats_into_list_until, find_nearest, contract_special, find_H
+from Scotty_fun import read_floats_into_list_until, find_nearest, contract_special, find_inverse_2D, find_H
 from Scotty_fun import find_dH_dR, find_dH_dZ # \nabla H
 from Scotty_fun import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta # \nabla_K H
 from Scotty_fun import find_d2H_dR2, find_d2H_dZ2, find_d2H_dR_dZ # \nabla \nabla H
@@ -142,16 +142,16 @@ def beam_me_up(tau_step,
     # Experimental Profile----------
 
 
-    input_files_path ='D:\\Dropbox\\VHChen2018\\Data\\Input_Files_29Apr2019\\'
+    input_files_path ='D:\\Dropbox\\VHChen2019\\Code - Scotty\\Benchmark_9\\Torbeam\\'
 #    input_files_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
 
 
 
     # Importing data from input files
     # ne.dat, topfile
-    # Others: inbeam.dat, Te.dat (not currently used in this code)
-    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_smoothed.dat'
-#    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '.dat'
+#     Others: inbeam.dat, Te.dat (not currently used in this code)
+#    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_smoothed.dat'
+    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '.dat'
 
     topfile_filename = input_files_path + 'topfile' +input_filename_suffix
 
@@ -221,14 +221,15 @@ def beam_me_up(tau_step,
             [ 0, 1]
             ]
             )    
-    
-    Psi_w_beam_inverse_launch_cartersian = np.linalg.inv(Psi_w_beam_launch_cartersian)
-    
+
+    Psi_w_beam_inverse_launch_cartersian = find_inverse_2D(Psi_w_beam_launch_cartersian)
+   
     # Finds entry point
-    search_Z_end = launch_position[1] - launch_position[0]*np.tan(np.radians(poloidal_launch_angle_Torbeam))
+    search_Z_end = launch_position[2] - launch_position[0]*np.tan(np.radians(poloidal_launch_angle_Torbeam))
+    print(search_Z_end)
     numberOfCoarseSearchPoints = 50
     R_coarse_search_array = np.linspace(launch_position[0],0,numberOfCoarseSearchPoints)
-    Z_coarse_search_array = np.linspace(launch_position[1],search_Z_end,numberOfCoarseSearchPoints)
+    Z_coarse_search_array = np.linspace(launch_position[2],search_Z_end,numberOfCoarseSearchPoints)
     poloidal_flux_coarse_search_array = np.zeros(numberOfCoarseSearchPoints)
     for ii in range(0,numberOfCoarseSearchPoints):
         poloidal_flux_coarse_search_array[ii] = interp_poloidal_flux(R_coarse_search_array[ii],Z_coarse_search_array[ii])
@@ -238,15 +239,28 @@ def beam_me_up(tau_step,
     first_inside_index = indices_inside_for_sure_array[0]
     numberOfFineSearchPoints = 1000
     R_fine_search_array = np.linspace(launch_position[0],R_coarse_search_array[first_inside_index],numberOfFineSearchPoints)
-    Z_fine_search_array = np.linspace(launch_position[1],Z_coarse_search_array[first_inside_index],numberOfFineSearchPoints)
+    Z_fine_search_array = np.linspace(launch_position[2],Z_coarse_search_array[first_inside_index],numberOfFineSearchPoints)
     poloidal_fine_search_array = np.zeros(numberOfFineSearchPoints)
     for ii in range(0,numberOfFineSearchPoints):
         poloidal_fine_search_array[ii] = interp_poloidal_flux(R_fine_search_array[ii],Z_fine_search_array[ii])
     entry_index = find_nearest(poloidal_fine_search_array,poloidal_flux_enter)
-    entry_position = np.zeros(2) # R,Z
+    entry_position = np.zeros(3) # R,Z
     entry_position[0] = R_fine_search_array[entry_index]
-    entry_position[1] = Z_fine_search_array[entry_index]
-    distance_from_launch_to_entry = np.sqrt((launch_position[0] - entry_position[0])**2 + (launch_position[1] - entry_position[1])**2)
+    entry_position[1] = K_zeta_launch/K_R_launch * ( 1/launch_position[0] - 1/entry_position[0] )
+    entry_position[2] = Z_fine_search_array[entry_index]
+    distance_from_launch_to_entry = np.sqrt(
+                                            launch_position[0]**2 
+                                            + entry_position[0]**2 
+                                            - 2 * launch_position[0] * entry_position[0] * np.cos(entry_position[1] - launch_position[1])
+                                            + (launch_position[2] - entry_position[2])**2
+                                            )
+    print(distance_from_launch_to_entry)
+    print(launch_position)
+    print(entry_position)
+    
+    print(K_R_launch)
+    print(K_zeta_launch)
+    print(K_Z_launch)
     # Entry point found
     
     
@@ -257,9 +271,8 @@ def beam_me_up(tau_step,
     K_Z_entry    = K_Z_launch # K_z
 
     Psi_w_beam_inverse_entry_cartersian = distance_from_launch_to_entry/(wavenumber_K0)*identity_matrix_2D + Psi_w_beam_inverse_launch_cartersian
-    Psi_w_beam_entry_cartersian = np.linalg.inv(Psi_w_beam_inverse_entry_cartersian)
-    print(Psi_w_beam_entry_cartersian)
-    
+    Psi_w_beam_entry_cartersian = find_inverse_2D(Psi_w_beam_inverse_entry_cartersian)
+
     Psi_3D_beam_entry_cartersian = np.zeros([3,3])
     Psi_3D_beam_entry_cartersian = np.array([
             [ Psi_w_beam_entry_cartersian[0][0], Psi_w_beam_entry_cartersian[1][0], 0 ],
@@ -348,7 +361,6 @@ def beam_me_up(tau_step,
     q_Z_array  = np.zeros(numberOfDataPoints)
 
     K_R_array = np.zeros(numberOfDataPoints)
-    K_zeta_array = np.zeros(numberOfDataPoints)
     K_Z_array = np.zeros(numberOfDataPoints)
 
     psi_array = np.zeros(numberOfDataPoints)
@@ -391,8 +403,8 @@ def beam_me_up(tau_step,
 
     for index in range(0,bufferSize):
         q_R_buffer[index]        = entry_position[0] #
-        q_zeta_buffer[index]     = 0 #TODO: Fix q_zeta throughout the code
-        q_Z_buffer[index]        = entry_position[1] # r_Z
+        q_zeta_buffer[index]     = entry_position[1]
+        q_Z_buffer[index]        = entry_position[2] # r_Z
         K_R_buffer[index]        = K_R_initial # K_R
         K_Z_buffer[index]        = K_Z_initial # K_z
         Psi_3D_buffer[index,:,:] = Psi_3D_lab_initial
@@ -467,7 +479,7 @@ def beam_me_up(tau_step,
         poloidal_flux = interp_poloidal_flux(q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1])
         electron_density = interp_density_1D(poloidal_flux)
     #    K_zeta = q_R_buffer[current_marker-1] * K_zeta_initial
-        K_zeta = K_zeta_entry
+        K_zeta = K_zeta_initial
 
         # \nabla H
         dH_dR_buffer[current_marker-1] = find_dH_dR(
@@ -645,11 +657,11 @@ def beam_me_up(tau_step,
         Psi_3D_buffer[current_marker,:,:] = Psi_3D_buffer[current_marker-1,:,:]
 
 
-
+        
         for coefficient_index in range(0,bufferSize-1):
-            q_R_buffer[current_marker]    += coefficient_array[coefficient_index] * dH_dKR_buffer[current_marker-1-coefficient_index] * tau_step
-            q_zeta_buffer[current_marker] += coefficient_array[coefficient_index] * dH_dKzeta_buffer[current_marker-1-coefficient_index] * tau_step
-            q_Z_buffer[current_marker]    += coefficient_array[coefficient_index] * dH_dKZ_buffer[current_marker-1-coefficient_index] * tau_step
+            q_R_buffer[current_marker]    +=  coefficient_array[coefficient_index] * dH_dKR_buffer[current_marker-1-coefficient_index] * tau_step
+            q_zeta_buffer[current_marker] +=  coefficient_array[coefficient_index] * dH_dKzeta_buffer[current_marker-1-coefficient_index] * tau_step
+            q_Z_buffer[current_marker]    +=  coefficient_array[coefficient_index] * dH_dKZ_buffer[current_marker-1-coefficient_index] * tau_step
             K_R_buffer[current_marker]    += -coefficient_array[coefficient_index] * dH_dR_buffer[current_marker-1-coefficient_index] * tau_step
             K_Z_buffer[current_marker]    += -coefficient_array[coefficient_index] * dH_dZ_buffer[current_marker-1-coefficient_index] * tau_step
 
@@ -758,7 +770,7 @@ def beam_me_up(tau_step,
     #K_zeta_array[:] = K_zeta_initial / q_R_array [:]
     print('Main loop complete')
     # -------------------
-
+    print(q_R_array[0])
 
     ## -------------------
     ## This saves the data generated by the main loop and the input data
@@ -771,14 +783,17 @@ def beam_me_up(tau_step,
              tau_array=tau_array, q_R_array=q_R_array, q_zeta_array=q_zeta_array, q_Z_array=q_Z_array,
              K_R_array=K_R_array, K_zeta_initial=K_zeta_initial, K_Z_array=K_Z_array,
              Psi_3D_output=Psi_3D_output,
+             distance_from_launch_to_entry=distance_from_launch_to_entry,
              g_hat_output=g_hat_output,g_magnitude_output=g_magnitude_output,
              B_total_output=B_total_output,
              x_hat_output=x_hat_output,y_hat_output=y_hat_output,
              b_hat_output=b_hat_output,
              grad_bhat_output=grad_bhat_output,
+             dH_dKR_output=dH_dKR_output,dH_dKzeta_output=dH_dKzeta_output,dH_dKZ_output=dH_dKZ_output,
+             dH_dR_output=dH_dR_output,dH_dZ_output=dH_dZ_output,
+             grad_grad_H_output=grad_grad_H_output,gradK_grad_H_output=gradK_grad_H_output,gradK_gradK_H_output=gradK_gradK_H_output,
              d_poloidal_flux_dR_output=d_poloidal_flux_dR_output,
              d_poloidal_flux_dZ_output=d_poloidal_flux_dZ_output,
-             dH_dR_output=dH_dR_output, dH_dZ_output=dH_dZ_output
              )
     np.savez('data_input' + output_filename_suffix, tau_step=tau_step, data_poloidal_flux_grid=data_poloidal_flux_grid,
              data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
@@ -792,8 +807,6 @@ def beam_me_up(tau_step,
              )    
     print('Data saved')
     # -------------------
-
-
 
 
 
@@ -858,7 +871,7 @@ def beam_me_up(tau_step,
     print(delta_theta_m[cutoff_index])
     
     sin_theta_m_analysis = np.zeros(numberOfDataPoints)
-    sin_theta_m_analysis[:] = - (b_hat_output[:,0]*K_R_array[:] + b_hat_output[:,0]*K_zeta_initial/q_R_array[:] + b_hat_output[:,0]*K_Z_array[:]) / (K_magnitude_array[:])
+    sin_theta_m_analysis[:] = - (b_hat_output[:,0]*K_R_array[:] + b_hat_output[:,1]*K_zeta_initial/q_R_array[:] + b_hat_output[:,2]*K_Z_array[:]) / (K_magnitude_array[:])
     theta_m_output = np.sign(sin_theta_m_analysis)*np.arcsin(abs(sin_theta_m_analysis))
     print(theta_m_output[cutoff_index])
     print(cutoff_index)
@@ -869,6 +882,34 @@ def beam_me_up(tau_step,
     d_K_d_tau_analysis = np.gradient(K_magnitude_array,tau_array)
     localisation_piece = g_magnitude_launch**2/abs(g_magnitude_output*d_K_d_tau_analysis)
     # -------------------
+
+
+
+    ## -------------------
+    ## Cartesian check
+    ## -------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -924,8 +965,7 @@ def beam_me_up(tau_step,
         plt.savefig('Ray1_' + output_filename_suffix)
         plt.close()
         
-        plt.figure()
-        plt.plot(tau_array,theta_m_output)
+
         print('Figures have been saved')
     ## -------------------
 
