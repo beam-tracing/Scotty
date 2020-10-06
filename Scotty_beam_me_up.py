@@ -49,7 +49,7 @@ from scipy import constants as constants
 import matplotlib.pyplot as plt
 import os
 
-from Scotty_fun import read_floats_into_list_until, find_nearest, contract_special, find_inverse_2D, find_H
+from Scotty_fun import read_floats_into_list_until, find_nearest, contract_special, find_inverse_2D, find_Psi_3D_lab, find_H
 from Scotty_fun import find_dH_dR, find_dH_dZ # \nabla H
 from Scotty_fun import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta # \nabla_K H
 from Scotty_fun import find_d2H_dR2, find_d2H_dZ2, find_d2H_dR_dZ # \nabla \nabla H
@@ -66,13 +66,17 @@ def beam_me_up(tau_step,
                toroidal_launch_angle_Torbeam,
                launch_freq_GHz,
                mode_flag,
+               vacuumLaunch_flag,
                launch_beam_width,
                launch_beam_curvature,
                launch_position,
                poloidal_flux_enter,
                input_filename_suffix='',
                output_filename_suffix='',
-               figure_flag=True):
+               figure_flag=True,
+               plasmaLaunch_K=np.zeros(3),
+               plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3,3])
+               ):
 
 
     numberOfDataPoints = (numberOfTauPoints) // saveInterval
@@ -199,139 +203,140 @@ def beam_me_up(tau_step,
                                              fill_value=0, assume_sorted=False) # density is 0 outside the LCFS, hence the fill_value
 
 
+
+
+
+
+
+
+
+
+
+
+
+
     ## -------------------
     ## Launch parameters    
     ## -------------------
-    K_R_launch    = -wavenumber_K0 * np.cos( toroidal_launch_angle_Torbeam/180.0*math.pi ) * np.cos( poloidal_launch_angle_Torbeam/180.0*math.pi ) # K_R
-    K_zeta_launch = -wavenumber_K0 * np.sin( toroidal_launch_angle_Torbeam/180.0*math.pi ) * np.cos( poloidal_launch_angle_Torbeam/180.0*math.pi ) * launch_position[0]# K_zeta
-    K_Z_launch    = -wavenumber_K0 * np.sin( poloidal_launch_angle_Torbeam/180.0*math.pi ) # K_z    
- 
-    poloidal_launch_angle_Rz = (180.0+poloidal_launch_angle_Torbeam)/180.0*np.pi
-    poloidal_rotation_angle = (90.0+poloidal_launch_angle_Torbeam)/180.0*np.pi
-    toroidal_launch_angle_Rz = (180.0+toroidal_launch_angle_Torbeam)/180.0*np.pi 
-
-    Psi_w_beam_launch_cartersian = np.array(
-            [
-            [ wavenumber_K0/launch_beam_curvature+2j*launch_beam_width**(-2), 0],
-            [ 0, wavenumber_K0/launch_beam_curvature+2j*launch_beam_width**(-2)]
-            ]
-            )    
-    identity_matrix_2D = np.array(
-            [
-            [ 1, 0],
-            [ 0, 1]
-            ]
-            )    
-
-    Psi_w_beam_inverse_launch_cartersian = find_inverse_2D(Psi_w_beam_launch_cartersian)
-   
-    # Finds entry point
-    search_Z_end = launch_position[2] - launch_position[0]*np.tan(np.radians(poloidal_launch_angle_Torbeam))
-    print(search_Z_end)
-    numberOfCoarseSearchPoints = 50
-    R_coarse_search_array = np.linspace(launch_position[0],0,numberOfCoarseSearchPoints)
-    Z_coarse_search_array = np.linspace(launch_position[2],search_Z_end,numberOfCoarseSearchPoints)
-    poloidal_flux_coarse_search_array = np.zeros(numberOfCoarseSearchPoints)
-    for ii in range(0,numberOfCoarseSearchPoints):
-        poloidal_flux_coarse_search_array[ii] = interp_poloidal_flux(R_coarse_search_array[ii],Z_coarse_search_array[ii])
-    meets_flux_condition_array = poloidal_flux_coarse_search_array < 0.9*poloidal_flux_enter
-    dummy_array = np.array(range(numberOfCoarseSearchPoints))
-    indices_inside_for_sure_array = dummy_array[meets_flux_condition_array]
-    first_inside_index = indices_inside_for_sure_array[0]
-    numberOfFineSearchPoints = 1000
-    R_fine_search_array = np.linspace(launch_position[0],R_coarse_search_array[first_inside_index],numberOfFineSearchPoints)
-    Z_fine_search_array = np.linspace(launch_position[2],Z_coarse_search_array[first_inside_index],numberOfFineSearchPoints)
-    poloidal_fine_search_array = np.zeros(numberOfFineSearchPoints)
-    for ii in range(0,numberOfFineSearchPoints):
-        poloidal_fine_search_array[ii] = interp_poloidal_flux(R_fine_search_array[ii],Z_fine_search_array[ii])
-    entry_index = find_nearest(poloidal_fine_search_array,poloidal_flux_enter)
-    entry_position = np.zeros(3) # R,Z
-    entry_position[0] = R_fine_search_array[entry_index]
-    entry_position[1] = K_zeta_launch/K_R_launch * ( 1/launch_position[0] - 1/entry_position[0] )
-    entry_position[2] = Z_fine_search_array[entry_index]
-    distance_from_launch_to_entry = np.sqrt(
-                                            launch_position[0]**2 
-                                            + entry_position[0]**2 
-                                            - 2 * launch_position[0] * entry_position[0] * np.cos(entry_position[1] - launch_position[1])
-                                            + (launch_position[2] - entry_position[2])**2
-                                            )
-    print(distance_from_launch_to_entry)
-    print(launch_position)
-    print(entry_position)
+    if vacuumLaunch_flag:
+        print('Beam launched from outside the plasma')
+        
+        K_R_launch    = -wavenumber_K0 * np.cos( toroidal_launch_angle_Torbeam/180.0*math.pi ) * np.cos( poloidal_launch_angle_Torbeam/180.0*math.pi ) # K_R
+        K_zeta_launch = -wavenumber_K0 * np.sin( toroidal_launch_angle_Torbeam/180.0*math.pi ) * np.cos( poloidal_launch_angle_Torbeam/180.0*math.pi ) * launch_position[0]# K_zeta
+        K_Z_launch    = -wavenumber_K0 * np.sin( poloidal_launch_angle_Torbeam/180.0*math.pi ) # K_z    
+     
+        poloidal_launch_angle_Rz = (180.0+poloidal_launch_angle_Torbeam)/180.0*np.pi
+        poloidal_rotation_angle = (90.0+poloidal_launch_angle_Torbeam)/180.0*np.pi
+        toroidal_launch_angle_Rz = (180.0+toroidal_launch_angle_Torbeam)/180.0*np.pi 
     
-    print(K_R_launch)
-    print(K_zeta_launch)
-    print(K_Z_launch)
-    # Entry point found
+        Psi_w_beam_launch_cartersian = np.array(
+                [
+                [ wavenumber_K0/launch_beam_curvature+2j*launch_beam_width**(-2), 0],
+                [ 0, wavenumber_K0/launch_beam_curvature+2j*launch_beam_width**(-2)]
+                ]
+                )    
+        identity_matrix_2D = np.array(
+                [
+                [ 1, 0],
+                [ 0, 1]
+                ]
+                )    
+    
+        Psi_w_beam_inverse_launch_cartersian = find_inverse_2D(Psi_w_beam_launch_cartersian)
+       
+        # Finds entry point
+        search_Z_end = launch_position[2] - launch_position[0]*np.tan(np.radians(poloidal_launch_angle_Torbeam))
+        print(search_Z_end)
+        numberOfCoarseSearchPoints = 50
+        R_coarse_search_array = np.linspace(launch_position[0],0,numberOfCoarseSearchPoints)
+        Z_coarse_search_array = np.linspace(launch_position[2],search_Z_end,numberOfCoarseSearchPoints)
+        poloidal_flux_coarse_search_array = np.zeros(numberOfCoarseSearchPoints)
+        for ii in range(0,numberOfCoarseSearchPoints):
+            poloidal_flux_coarse_search_array[ii] = interp_poloidal_flux(R_coarse_search_array[ii],Z_coarse_search_array[ii])
+        meets_flux_condition_array = poloidal_flux_coarse_search_array < 0.9*poloidal_flux_enter
+        dummy_array = np.array(range(numberOfCoarseSearchPoints))
+        indices_inside_for_sure_array = dummy_array[meets_flux_condition_array]
+        first_inside_index = indices_inside_for_sure_array[0]
+        numberOfFineSearchPoints = 1000
+        R_fine_search_array = np.linspace(launch_position[0],R_coarse_search_array[first_inside_index],numberOfFineSearchPoints)
+        Z_fine_search_array = np.linspace(launch_position[2],Z_coarse_search_array[first_inside_index],numberOfFineSearchPoints)
+        poloidal_fine_search_array = np.zeros(numberOfFineSearchPoints)
+        for ii in range(0,numberOfFineSearchPoints):
+            poloidal_fine_search_array[ii] = interp_poloidal_flux(R_fine_search_array[ii],Z_fine_search_array[ii])
+        entry_index = find_nearest(poloidal_fine_search_array,poloidal_flux_enter)
+        entry_position = np.zeros(3) # R,Z
+        entry_position[0] = R_fine_search_array[entry_index]
+        entry_position[1] = K_zeta_launch/K_R_launch * ( 1/launch_position[0] - 1/entry_position[0] )
+        entry_position[2] = Z_fine_search_array[entry_index]
+        distance_from_launch_to_entry = np.sqrt(
+                                                launch_position[0]**2 
+                                                + entry_position[0]**2 
+                                                - 2 * launch_position[0] * entry_position[0] * np.cos(entry_position[1] - launch_position[1])
+                                                + (launch_position[2] - entry_position[2])**2
+                                                )
+        # Entry point found
+        
+        
+        # Calculate entry parameters from launch parameters
+        # That is, find beam at start of plasma given its parameters at the antenna
+        K_R_entry    = K_R_launch # K_R
+        K_zeta_entry = K_zeta_launch
+        K_Z_entry    = K_Z_launch # K_z
+    
+        Psi_w_beam_inverse_entry_cartersian = distance_from_launch_to_entry/(wavenumber_K0)*identity_matrix_2D + Psi_w_beam_inverse_launch_cartersian
+        Psi_w_beam_entry_cartersian = find_inverse_2D(Psi_w_beam_inverse_entry_cartersian)
+    
+        Psi_3D_beam_entry_cartersian = np.zeros([3,3])
+        Psi_3D_beam_entry_cartersian = np.array([
+                [ Psi_w_beam_entry_cartersian[0][0], Psi_w_beam_entry_cartersian[1][0], 0 ],
+                [ Psi_w_beam_entry_cartersian[0][1], Psi_w_beam_entry_cartersian[1][1], 0 ],
+                [ 0, 0, 0 ]
+                ])
+        
+        rotation_matrix_pol = np.array( [
+                [ np.cos(poloidal_rotation_angle), 0, np.sin(poloidal_rotation_angle) ],
+                [ 0, 1, 0 ],
+                [ -np.sin(poloidal_rotation_angle), 0, np.cos(poloidal_rotation_angle) ]
+                ] )
+    
+        rotation_matrix_tor = np.array( [
+                [ np.cos(toroidal_launch_angle_Torbeam/180.0*math.pi), np.sin(toroidal_launch_angle_Torbeam/180.0*math.pi), 0 ],
+                [ -np.sin(toroidal_launch_angle_Torbeam/180.0*math.pi), np.cos(toroidal_launch_angle_Torbeam/180.0*math.pi), 0 ],
+                [ 0,0,1 ]
+                ] )
+    
+        rotation_matrix         = np.matmul(rotation_matrix_pol,rotation_matrix_tor)
+        rotation_matrix_inverse = np.transpose(rotation_matrix)
+    
+        Psi_3D_lab_entry_cartersian = np.matmul( rotation_matrix_inverse, np.matmul(Psi_3D_beam_entry_cartersian, rotation_matrix) )
     
     
-    # Calculate entry parameters from launch parameters
-    # That is, find beam at start of plasma given its parameters at the antenna
-    K_R_entry    = K_R_launch # K_R
-    K_zeta_entry = K_zeta_launch
-    K_Z_entry    = K_Z_launch # K_z
+        # Convert to cylindrical coordinates
+        Psi_3D_lab_entry = find_Psi_3D_lab(Psi_3D_lab_entry_cartersian,entry_position[0],K_R_entry,K_zeta_entry)
 
-    Psi_w_beam_inverse_entry_cartersian = distance_from_launch_to_entry/(wavenumber_K0)*identity_matrix_2D + Psi_w_beam_inverse_launch_cartersian
-    Psi_w_beam_entry_cartersian = find_inverse_2D(Psi_w_beam_inverse_entry_cartersian)
-
-    Psi_3D_beam_entry_cartersian = np.zeros([3,3])
-    Psi_3D_beam_entry_cartersian = np.array([
-            [ Psi_w_beam_entry_cartersian[0][0], Psi_w_beam_entry_cartersian[1][0], 0 ],
-            [ Psi_w_beam_entry_cartersian[0][1], Psi_w_beam_entry_cartersian[1][1], 0 ],
-            [ 0, 0, 0 ]
-            ])
-    
-    rotation_matrix_pol = np.array( [
-            [ np.cos(poloidal_rotation_angle), 0, np.sin(poloidal_rotation_angle) ],
-            [ 0, 1, 0 ],
-            [ -np.sin(poloidal_rotation_angle), 0, np.cos(poloidal_rotation_angle) ]
-            ] )
-
-    rotation_matrix_tor = np.array( [
-            [ np.cos(toroidal_launch_angle_Torbeam/180.0*math.pi), np.sin(toroidal_launch_angle_Torbeam/180.0*math.pi), 0 ],
-            [ -np.sin(toroidal_launch_angle_Torbeam/180.0*math.pi), np.cos(toroidal_launch_angle_Torbeam/180.0*math.pi), 0 ],
-            [ 0,0,1 ]
-            ] )
-
-    rotation_matrix         = np.matmul(rotation_matrix_pol,rotation_matrix_tor)
-    rotation_matrix_inverse = np.transpose(rotation_matrix)
-
-    Psi_3D_lab_entry_cartersian = np.matmul( rotation_matrix_inverse, np.matmul(Psi_3D_beam_entry_cartersian, rotation_matrix) )
-
-
-    # Convert to cylindrical coordinates
-    Psi_3D_lab_entry = np.zeros([3,3],dtype='complex128')
-    Psi_3D_lab_entry[0][0] = Psi_3D_lab_entry_cartersian[0][0]
-    Psi_3D_lab_entry[1][1] = Psi_3D_lab_entry_cartersian[1][1]* entry_position[0]**2 - K_R_entry*entry_position[0]
-    Psi_3D_lab_entry[2][2] = Psi_3D_lab_entry_cartersian[2][2]
-
-    Psi_3D_lab_entry[0][1] = Psi_3D_lab_entry_cartersian[0][1]* entry_position[0] + K_zeta_entry / entry_position[0]
-    Psi_3D_lab_entry[1][0] = Psi_3D_lab_entry[0][1]
-
-    Psi_3D_lab_entry[0][2] = Psi_3D_lab_entry_cartersian[0][2]
-    Psi_3D_lab_entry[2][0] = Psi_3D_lab_entry[0][2]
-    Psi_3D_lab_entry[1][2] = Psi_3D_lab_entry_cartersian[1][2]* entry_position[0]
-    Psi_3D_lab_entry[2][1] = Psi_3D_lab_entry[1][2]
-
-
-    # -------------------
-    # Find initial parameters in plasma
-    # -------------------
-    Psi_3D_lab_initial = Psi_3D_lab_entry
-    K_R_initial        = K_R_entry
-    K_zeta_initial     = K_zeta_entry
-    K_Z_initial        = K_Z_entry
-
-
-
-
-    #Checks
-#    entry_position = launch_position
-
-
-
-
-
+        # -------------------
+        # Find initial parameters in plasma
+        # -------------------
+        Psi_3D_lab_initial = Psi_3D_lab_entry
+        K_R_initial        = K_R_entry
+        K_zeta_initial     = K_zeta_entry
+        K_Z_initial        = K_Z_entry
+        initial_position   = entry_position
+    else:
+        print('Beam launched from inside the plasma')
+        K_R_launch = plasmaLaunch_K[0]
+        K_zeta_launch = plasmaLaunch_K[1]
+        K_Z_launch = plasmaLaunch_K[2]
+        
+        Psi_3D_lab_initial = find_Psi_3D_lab(plasmaLaunch_Psi_3D_lab_Cartesian,launch_position[0],plasmaLaunch_K[0],plasmaLaunch_K[1])
+        K_R_initial        = K_R_launch
+        K_zeta_initial     = K_zeta_launch
+        K_Z_initial        = K_Z_launch
+        initial_position   = launch_position
+        
+        print(K_R_initial)
+        print(K_zeta_launch)
+        print(K_Z_launch)
 
 
 
@@ -403,9 +408,9 @@ def beam_me_up(tau_step,
 
 
     for index in range(0,bufferSize):
-        q_R_buffer[index]        = entry_position[0] #
-        q_zeta_buffer[index]     = entry_position[1]
-        q_Z_buffer[index]        = entry_position[2] # r_Z
+        q_R_buffer[index]        = initial_position[0] #
+        q_zeta_buffer[index]     = initial_position[1]
+        q_Z_buffer[index]        = initial_position[2] # r_Z
         K_R_buffer[index]        = K_R_initial # K_R
         K_Z_buffer[index]        = K_Z_initial # K_z
         Psi_3D_buffer[index,:,:] = Psi_3D_lab_initial
@@ -660,11 +665,11 @@ def beam_me_up(tau_step,
 
         
         for coefficient_index in range(0,bufferSize-1):
-            q_R_buffer[current_marker]    +=  coefficient_array[coefficient_index] * dH_dKR_buffer[current_marker-1-coefficient_index] * tau_step
+            q_R_buffer[current_marker]    +=  coefficient_array[coefficient_index] * dH_dKR_buffer[current_marker-1-coefficient_index]    * tau_step
             q_zeta_buffer[current_marker] +=  coefficient_array[coefficient_index] * dH_dKzeta_buffer[current_marker-1-coefficient_index] * tau_step
-            q_Z_buffer[current_marker]    +=  coefficient_array[coefficient_index] * dH_dKZ_buffer[current_marker-1-coefficient_index] * tau_step
-            K_R_buffer[current_marker]    += -coefficient_array[coefficient_index] * dH_dR_buffer[current_marker-1-coefficient_index] * tau_step
-            K_Z_buffer[current_marker]    += -coefficient_array[coefficient_index] * dH_dZ_buffer[current_marker-1-coefficient_index] * tau_step
+            q_Z_buffer[current_marker]    +=  coefficient_array[coefficient_index] * dH_dKZ_buffer[current_marker-1-coefficient_index]    * tau_step
+            K_R_buffer[current_marker]    += -coefficient_array[coefficient_index] * dH_dR_buffer[current_marker-1-coefficient_index]     * tau_step
+            K_Z_buffer[current_marker]    += -coefficient_array[coefficient_index] * dH_dZ_buffer[current_marker-1-coefficient_index]     * tau_step
 
             Psi_3D_buffer[current_marker,:,:] += coefficient_array[coefficient_index] * (
                     - grad_grad_H_buffer[current_marker-1-coefficient_index,:,:]
@@ -780,35 +785,62 @@ def beam_me_up(tau_step,
     ## Just in case the analysis fails to run, at least one can get the data from the main loop
     ## -------------------
     print('Saving data')
-    np.savez('data_output' + output_filename_suffix, 
-             tau_array=tau_array, q_R_array=q_R_array, q_zeta_array=q_zeta_array, q_Z_array=q_Z_array,
-             K_R_array=K_R_array, K_zeta_initial=K_zeta_initial, K_Z_array=K_Z_array,
-             Psi_3D_output=Psi_3D_output,
-             distance_from_launch_to_entry=distance_from_launch_to_entry,
-             g_hat_output=g_hat_output,g_magnitude_output=g_magnitude_output,
-             B_total_output=B_total_output,
-             x_hat_output=x_hat_output,y_hat_output=y_hat_output,
-             b_hat_output=b_hat_output,
-             grad_bhat_output=grad_bhat_output,
-             dH_dKR_output=dH_dKR_output,dH_dKzeta_output=dH_dKzeta_output,dH_dKZ_output=dH_dKZ_output,
-             dH_dR_output=dH_dR_output,dH_dZ_output=dH_dZ_output,
-             grad_grad_H_output=grad_grad_H_output,gradK_grad_H_output=gradK_grad_H_output,gradK_gradK_H_output=gradK_gradK_H_output,
-             d_poloidal_flux_dR_output=d_poloidal_flux_dR_output,
-             d_poloidal_flux_dZ_output=d_poloidal_flux_dZ_output,
-             )
-    np.savez('data_input' + output_filename_suffix, tau_step=tau_step, data_poloidal_flux_grid=data_poloidal_flux_grid,
-             data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
-             poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
-             toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
-             launch_freq_GHz=launch_freq_GHz,
-             mode_flag=mode_flag,
-             launch_beam_width=launch_beam_width,
-             launch_beam_curvature=launch_beam_curvature,
-             launch_position=launch_position
-             )    
+
+    
+    if vacuumLaunch_flag:
+        np.savez('data_input' + output_filename_suffix, tau_step=tau_step, data_poloidal_flux_grid=data_poloidal_flux_grid,
+                 data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
+                 poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
+                 toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
+                 launch_freq_GHz=launch_freq_GHz,
+                 mode_flag=mode_flag,
+                 launch_beam_width=launch_beam_width,
+                 launch_beam_curvature=launch_beam_curvature,
+                 launch_position=launch_position
+                 )    
+        np.savez('data_output' + output_filename_suffix, 
+                 tau_array=tau_array, q_R_array=q_R_array, q_zeta_array=q_zeta_array, q_Z_array=q_Z_array,
+                 K_R_array=K_R_array, K_zeta_initial=K_zeta_initial, K_Z_array=K_Z_array,
+                 Psi_3D_output=Psi_3D_output,
+                 distance_from_launch_to_entry=distance_from_launch_to_entry,
+                 g_hat_output=g_hat_output,g_magnitude_output=g_magnitude_output,
+                 B_total_output=B_total_output,
+                 x_hat_output=x_hat_output,y_hat_output=y_hat_output,
+                 b_hat_output=b_hat_output,
+                 grad_bhat_output=grad_bhat_output,
+                 dH_dKR_output=dH_dKR_output,dH_dKzeta_output=dH_dKzeta_output,dH_dKZ_output=dH_dKZ_output,
+                 dH_dR_output=dH_dR_output,dH_dZ_output=dH_dZ_output,
+                 grad_grad_H_output=grad_grad_H_output,gradK_grad_H_output=gradK_grad_H_output,gradK_gradK_H_output=gradK_gradK_H_output,
+                 d_poloidal_flux_dR_output=d_poloidal_flux_dR_output,
+                 d_poloidal_flux_dZ_output=d_poloidal_flux_dZ_output,
+                 )
+    else:
+         np.savez('data_input' + output_filename_suffix, tau_step=tau_step, data_poloidal_flux_grid=data_poloidal_flux_grid,
+                 data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
+                 launch_freq_GHz=launch_freq_GHz,
+                 mode_flag=mode_flag,
+                 launch_position=launch_position,
+                 plasmaLaunch_K=plasmaLaunch_K,
+                 plasmaLaunch_Psi_3D_lab_Cartesian=plasmaLaunch_Psi_3D_lab_Cartesian
+                 )  
+         np.savez('data_output' + output_filename_suffix, 
+                  tau_array=tau_array, q_R_array=q_R_array, q_zeta_array=q_zeta_array, q_Z_array=q_Z_array,
+                  K_R_array=K_R_array, K_zeta_initial=K_zeta_initial, K_Z_array=K_Z_array,
+                  Psi_3D_output=Psi_3D_output,
+                  g_hat_output=g_hat_output,g_magnitude_output=g_magnitude_output,
+                  B_total_output=B_total_output,
+                  x_hat_output=x_hat_output,y_hat_output=y_hat_output,
+                  b_hat_output=b_hat_output,
+                  grad_bhat_output=grad_bhat_output,
+                  dH_dKR_output=dH_dKR_output,dH_dKzeta_output=dH_dKzeta_output,dH_dKZ_output=dH_dKZ_output,
+                  dH_dR_output=dH_dR_output,dH_dZ_output=dH_dZ_output,
+                  grad_grad_H_output=grad_grad_H_output,gradK_grad_H_output=gradK_grad_H_output,gradK_gradK_H_output=gradK_gradK_H_output,
+                  d_poloidal_flux_dR_output=d_poloidal_flux_dR_output,
+                  d_poloidal_flux_dZ_output=d_poloidal_flux_dZ_output,
+                  )     
+        
     print('Data saved')
     # -------------------
-
 
 
 
@@ -956,8 +988,8 @@ def beam_me_up(tau_step,
         CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels)
         plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
         plt.plot(
-                np.concatenate([[launch_position[0],entry_position[0]],q_R_array ]),
-                np.concatenate([[launch_position[1],entry_position[1]],q_Z_array ]),
+                np.concatenate([[launch_position[0],initial_position[0]],q_R_array ]),
+                np.concatenate([[launch_position[2],initial_position[2]],q_Z_array ]),
                 '--.k') # Central (reference) ray
         #cutoff_contour = plt.contour(x_grid, z_grid, normalised_plasma_freq_grid,
         #                             levels=1,vmin=1,vmax=1,linewidths=5,colors='grey')

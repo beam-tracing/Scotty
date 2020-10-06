@@ -68,6 +68,73 @@ def find_inverse_2D(matrix_2D):
 
 #----------------------------------
     
+# Functions (Coordinate transformations)
+def find_q_lab_Cartesian(q_lab):
+    q_R    = q_lab[0]
+    q_zeta = q_lab[1]
+    q_Z    = q_lab[2]
+    
+    q_lab_Cartesian = np.zeros(3)
+    q_lab_Cartesian[0] = q_R * np.cos(q_zeta)
+    q_lab_Cartesian[1] = q_R * np.sin(q_zeta)
+    q_lab_Cartesian[2] = q_Z
+    return q_lab_Cartesian
+
+def find_q_lab(q_lab_Cartesian):
+    q_X = q_lab_Cartesian[0]
+    q_Y = q_lab_Cartesian[1]
+    q_Z = q_lab_Cartesian[2]
+    
+    q_lab = np.zeros(3)
+    q_lab[0] = np.sqrt(q_X**2 + q_Y**2)
+    q_lab[1] = np.arctan2(q_Y,q_X)
+    q_lab[2] = q_Z    
+    return q_lab
+    
+def find_K_lab_Cartesian(K_lab,q_lab):
+    K_R    = K_lab[0]
+    K_zeta = K_lab[1]
+    K_Z    = K_lab[2]
+    q_R    = q_lab[0]
+    q_zeta = q_lab[1]
+    
+    K_lab_Cartesian = np.zeros(3)
+    K_lab_Cartesian[0] = K_R*np.cos( q_zeta ) - K_zeta*np.sin( q_zeta ) / q_R #K_X
+    K_lab_Cartesian[1] = K_R*np.sin( q_zeta ) + K_zeta*np.cos( q_zeta ) / q_R #K_Y
+    K_lab_Cartesian[2] = K_Z
+    return K_lab_Cartesian    
+    
+def find_K_lab(K_lab_Cartesian,q_lab_Cartesian):
+    K_X = K_lab_Cartesian[0]
+    K_Y = K_lab_Cartesian[1]
+    K_Z = K_lab_Cartesian[2]
+    
+    [q_R,q_zeta,q_Z] = find_q_lab(q_lab_Cartesian)
+    print(q_zeta)
+    K_lab = np.zeros(3)
+    K_lab[0] =   K_X*np.cos(q_zeta) + K_Y*np.sin(q_zeta) #K_R
+    K_lab[1] = (-K_X*np.sin(q_zeta) + K_Y*np.cos(q_zeta))*q_R #K_zeta
+    K_lab[2] =   K_Z
+    return K_lab
+
+def find_Psi_3D_lab(Psi_3D_lab_Cartesian, q_R, K_R, K_zeta):
+    # Converts Psi_3D from Cartesian to cylindrical coordinates
+    Psi_3D_lab = np.zeros([3,3],dtype='complex128')
+    Psi_3D_lab[0][0] = Psi_3D_lab_Cartesian[0][0]
+    Psi_3D_lab[1][1] = Psi_3D_lab_Cartesian[1][1]* q_R**2 - K_R    * q_R
+    Psi_3D_lab[2][2] = Psi_3D_lab_Cartesian[2][2]
+    
+    Psi_3D_lab[0][1] = Psi_3D_lab_Cartesian[0][1]* q_R    + K_zeta / q_R
+    Psi_3D_lab[1][0] = Psi_3D_lab[0][1]
+    
+    Psi_3D_lab[0][2] = Psi_3D_lab_Cartesian[0][2]
+    Psi_3D_lab[2][0] = Psi_3D_lab[0][2]
+    Psi_3D_lab[1][2] = Psi_3D_lab_Cartesian[1][2]* q_R
+    Psi_3D_lab[2][1] = Psi_3D_lab[1][2]
+    return Psi_3D_lab
+    
+#----------------------------------
+    
 # Functions (beam tracing 1)
 def find_normalised_plasma_freq(electron_density, launch_angular_frequency):
     
