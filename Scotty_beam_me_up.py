@@ -49,13 +49,15 @@ from scipy import constants as constants
 import matplotlib.pyplot as plt
 import os
 
-from Scotty_fun import read_floats_into_list_until, find_nearest, contract_special, find_inverse_2D, find_Psi_3D_lab, find_H
+from Scotty_fun import read_floats_into_list_until, find_nearest, contract_special, find_H
+from Scotty_fun import find_inverse_2D, find_Psi_3D_lab, find_q_lab_Cartesian, find_K_lab_Cartesian, find_K_lab
 from Scotty_fun import find_dH_dR, find_dH_dZ # \nabla H
 from Scotty_fun import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta # \nabla_K H
 from Scotty_fun import find_d2H_dR2, find_d2H_dZ2, find_d2H_dR_dZ # \nabla \nabla H
 from Scotty_fun import find_d2H_dKR2, find_d2H_dKR_dKzeta, find_d2H_dKR_dKz, find_d2H_dKzeta2, find_d2H_dKzeta_dKz, find_d2H_dKZ2 # \nabla_K \nabla_K H
 from Scotty_fun import find_d2H_dKR_dR, find_d2H_dKR_dZ, find_d2H_dKzeta_dR, find_d2H_dKzeta_dZ, find_d2H_dKZ_dR, find_d2H_dKZ_dZ # \nabla_K \nabla H
 from Scotty_fun import find_normalised_plasma_freq, find_normalised_gyro_freq
+from Scotty_fun import find_epsilon_para, find_epsilon_perp,find_epsilon_g
 from Scotty_fun import find_dbhat_dR, find_dbhat_dZ
 from Scotty_fun import find_d_poloidal_flux_dR, find_d_poloidal_flux_dZ,find_Psi_3D_plasma, find_g_magnitude
 
@@ -70,7 +72,8 @@ def beam_me_up(tau_step,
                launch_beam_width,
                launch_beam_curvature,
                launch_position,
-               poloidal_flux_enter,
+               vacuum_propagation_flag=False,
+               poloidal_flux_enter=None,
                input_filename_suffix='',
                output_filename_suffix='',
                figure_flag=True,
@@ -146,8 +149,8 @@ def beam_me_up(tau_step,
 
     # Experimental Profile----------
 
-
-    input_files_path ='D:\\Dropbox\\VHChen2019\\Code - Scotty\\Benchmark_9\\Torbeam\\'
+    input_files_path ='D:\\Dropbox\\VHChen2018\\Data\\Input_Files_29Apr2019\\'
+#    input_files_path ='D:\\Dropbox\\VHChen2019\\Code - Scotty\\Benchmark_9\\Torbeam\\'
 #    input_files_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
 
 
@@ -155,8 +158,8 @@ def beam_me_up(tau_step,
     # Importing data from input files
     # ne.dat, topfile
 #     Others: inbeam.dat, Te.dat (not currently used in this code)
-#    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_smoothed.dat'
-    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '.dat'
+    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_smoothed.dat'
+#    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '.dat'
 
     topfile_filename = input_files_path + 'topfile' +input_filename_suffix
 
@@ -224,7 +227,7 @@ def beam_me_up(tau_step,
         K_R_launch    = -wavenumber_K0 * np.cos( toroidal_launch_angle_Torbeam/180.0*math.pi ) * np.cos( poloidal_launch_angle_Torbeam/180.0*math.pi ) # K_R
         K_zeta_launch = -wavenumber_K0 * np.sin( toroidal_launch_angle_Torbeam/180.0*math.pi ) * np.cos( poloidal_launch_angle_Torbeam/180.0*math.pi ) * launch_position[0]# K_zeta
         K_Z_launch    = -wavenumber_K0 * np.sin( poloidal_launch_angle_Torbeam/180.0*math.pi ) # K_z    
-     
+             
         poloidal_launch_angle_Rz = (180.0+poloidal_launch_angle_Torbeam)/180.0*np.pi
         poloidal_rotation_angle = (90.0+poloidal_launch_angle_Torbeam)/180.0*np.pi
         toroidal_launch_angle_Rz = (180.0+toroidal_launch_angle_Torbeam)/180.0*np.pi 
@@ -241,87 +244,114 @@ def beam_me_up(tau_step,
                 [ 0, 1]
                 ]
                 )    
-    
-        Psi_w_beam_inverse_launch_cartersian = find_inverse_2D(Psi_w_beam_launch_cartersian)
-       
-        # Finds entry point
-        search_Z_end = launch_position[2] - launch_position[0]*np.tan(np.radians(poloidal_launch_angle_Torbeam))
-        print(search_Z_end)
-        numberOfCoarseSearchPoints = 50
-        R_coarse_search_array = np.linspace(launch_position[0],0,numberOfCoarseSearchPoints)
-        Z_coarse_search_array = np.linspace(launch_position[2],search_Z_end,numberOfCoarseSearchPoints)
-        poloidal_flux_coarse_search_array = np.zeros(numberOfCoarseSearchPoints)
-        for ii in range(0,numberOfCoarseSearchPoints):
-            poloidal_flux_coarse_search_array[ii] = interp_poloidal_flux(R_coarse_search_array[ii],Z_coarse_search_array[ii])
-        meets_flux_condition_array = poloidal_flux_coarse_search_array < 0.9*poloidal_flux_enter
-        dummy_array = np.array(range(numberOfCoarseSearchPoints))
-        indices_inside_for_sure_array = dummy_array[meets_flux_condition_array]
-        first_inside_index = indices_inside_for_sure_array[0]
-        numberOfFineSearchPoints = 1000
-        R_fine_search_array = np.linspace(launch_position[0],R_coarse_search_array[first_inside_index],numberOfFineSearchPoints)
-        Z_fine_search_array = np.linspace(launch_position[2],Z_coarse_search_array[first_inside_index],numberOfFineSearchPoints)
-        poloidal_fine_search_array = np.zeros(numberOfFineSearchPoints)
-        for ii in range(0,numberOfFineSearchPoints):
-            poloidal_fine_search_array[ii] = interp_poloidal_flux(R_fine_search_array[ii],Z_fine_search_array[ii])
-        entry_index = find_nearest(poloidal_fine_search_array,poloidal_flux_enter)
-        entry_position = np.zeros(3) # R,Z
-        entry_position[0] = R_fine_search_array[entry_index]
-        entry_position[1] = K_zeta_launch/K_R_launch * ( 1/launch_position[0] - 1/entry_position[0] )
-        entry_position[2] = Z_fine_search_array[entry_index]
-        distance_from_launch_to_entry = np.sqrt(
-                                                launch_position[0]**2 
-                                                + entry_position[0]**2 
-                                                - 2 * launch_position[0] * entry_position[0] * np.cos(entry_position[1] - launch_position[1])
-                                                + (launch_position[2] - entry_position[2])**2
-                                                )
-        # Entry point found
-        
-        
-        # Calculate entry parameters from launch parameters
-        # That is, find beam at start of plasma given its parameters at the antenna
-        K_R_entry    = K_R_launch # K_R
-        K_zeta_entry = K_zeta_launch
-        K_Z_entry    = K_Z_launch # K_z
-    
-        Psi_w_beam_inverse_entry_cartersian = distance_from_launch_to_entry/(wavenumber_K0)*identity_matrix_2D + Psi_w_beam_inverse_launch_cartersian
-        Psi_w_beam_entry_cartersian = find_inverse_2D(Psi_w_beam_inverse_entry_cartersian)
-    
-        Psi_3D_beam_entry_cartersian = np.zeros([3,3])
-        Psi_3D_beam_entry_cartersian = np.array([
-                [ Psi_w_beam_entry_cartersian[0][0], Psi_w_beam_entry_cartersian[1][0], 0 ],
-                [ Psi_w_beam_entry_cartersian[0][1], Psi_w_beam_entry_cartersian[1][1], 0 ],
-                [ 0, 0, 0 ]
-                ])
         
         rotation_matrix_pol = np.array( [
                 [ np.cos(poloidal_rotation_angle), 0, np.sin(poloidal_rotation_angle) ],
                 [ 0, 1, 0 ],
                 [ -np.sin(poloidal_rotation_angle), 0, np.cos(poloidal_rotation_angle) ]
                 ] )
-    
+        
         rotation_matrix_tor = np.array( [
                 [ np.cos(toroidal_launch_angle_Torbeam/180.0*math.pi), np.sin(toroidal_launch_angle_Torbeam/180.0*math.pi), 0 ],
                 [ -np.sin(toroidal_launch_angle_Torbeam/180.0*math.pi), np.cos(toroidal_launch_angle_Torbeam/180.0*math.pi), 0 ],
                 [ 0,0,1 ]
                 ] )
-    
+        
         rotation_matrix         = np.matmul(rotation_matrix_pol,rotation_matrix_tor)
         rotation_matrix_inverse = np.transpose(rotation_matrix)
-    
-        Psi_3D_lab_entry_cartersian = np.matmul( rotation_matrix_inverse, np.matmul(Psi_3D_beam_entry_cartersian, rotation_matrix) )
-    
-    
-        # Convert to cylindrical coordinates
-        Psi_3D_lab_entry = find_Psi_3D_lab(Psi_3D_lab_entry_cartersian,entry_position[0],K_R_entry,K_zeta_entry)
+            
+        if vacuum_propagation_flag:
+            Psi_w_beam_inverse_launch_cartersian = find_inverse_2D(Psi_w_beam_launch_cartersian)
+           
+            # Finds entry point
+            search_Z_end = launch_position[2] - launch_position[0]*np.tan(np.radians(poloidal_launch_angle_Torbeam))
+            print(search_Z_end)
+            numberOfCoarseSearchPoints = 50
+            R_coarse_search_array = np.linspace(launch_position[0],0,numberOfCoarseSearchPoints)
+            Z_coarse_search_array = np.linspace(launch_position[2],search_Z_end,numberOfCoarseSearchPoints)
+            poloidal_flux_coarse_search_array = np.zeros(numberOfCoarseSearchPoints)
+            for ii in range(0,numberOfCoarseSearchPoints):
+                poloidal_flux_coarse_search_array[ii] = interp_poloidal_flux(R_coarse_search_array[ii],Z_coarse_search_array[ii])
+            meets_flux_condition_array = poloidal_flux_coarse_search_array < 0.9*poloidal_flux_enter
+            dummy_array = np.array(range(numberOfCoarseSearchPoints))
+            indices_inside_for_sure_array = dummy_array[meets_flux_condition_array]
+            first_inside_index = indices_inside_for_sure_array[0]
+            numberOfFineSearchPoints = 1000
+            R_fine_search_array = np.linspace(launch_position[0],R_coarse_search_array[first_inside_index],numberOfFineSearchPoints)
+            Z_fine_search_array = np.linspace(launch_position[2],Z_coarse_search_array[first_inside_index],numberOfFineSearchPoints)
+            poloidal_fine_search_array = np.zeros(numberOfFineSearchPoints)
+            for ii in range(0,numberOfFineSearchPoints):
+                poloidal_fine_search_array[ii] = interp_poloidal_flux(R_fine_search_array[ii],Z_fine_search_array[ii])
+            entry_index = find_nearest(poloidal_fine_search_array,poloidal_flux_enter)
+            entry_position = np.zeros(3) # R,Z
+            entry_position[0] = R_fine_search_array[entry_index]
+            entry_position[1] = K_zeta_launch/K_R_launch * ( 1/launch_position[0] - 1/entry_position[0] )
+            entry_position[2] = Z_fine_search_array[entry_index]
+            distance_from_launch_to_entry = np.sqrt(
+                                                    launch_position[0]**2 
+                                                    + entry_position[0]**2 
+                                                    - 2 * launch_position[0] * entry_position[0] * np.cos(entry_position[1] - launch_position[1])
+                                                    + (launch_position[2] - entry_position[2])**2
+                                                    )
+            # Entry point found
+            
+            
+            # Calculate entry parameters from launch parameters
+            # That is, find beam at start of plasma given its parameters at the antenna
+            K_lab_launch = np.array([K_R_launch,K_zeta_launch,K_Z_launch])
+            K_lab_Cartesian_launch = find_K_lab_Cartesian(K_lab_launch,launch_position)
+            K_lab_Cartesian_entry = K_lab_Cartesian_launch
+            entry_position_Cartesian = find_q_lab_Cartesian(entry_position)
+            K_lab_entry = find_K_lab(K_lab_Cartesian_entry,entry_position_Cartesian)
+            
+            K_R_entry    = K_lab_entry[0] # K_R
+            K_zeta_entry = K_lab_entry[1]
+            K_Z_entry    = K_lab_entry[2] # K_z
+        
+            Psi_w_beam_inverse_entry_cartersian = distance_from_launch_to_entry/(wavenumber_K0)*identity_matrix_2D + Psi_w_beam_inverse_launch_cartersian
+            Psi_w_beam_entry_cartersian = find_inverse_2D(Psi_w_beam_inverse_entry_cartersian)
+        
+            Psi_3D_beam_entry_cartersian = np.zeros([3,3])
+            Psi_3D_beam_entry_cartersian = np.array([
+                    [ Psi_w_beam_entry_cartersian[0][0], Psi_w_beam_entry_cartersian[1][0], 0 ],
+                    [ Psi_w_beam_entry_cartersian[0][1], Psi_w_beam_entry_cartersian[1][1], 0 ],
+                    [ 0, 0, 0 ]
+                    ])
+            
+        
+            Psi_3D_lab_entry_cartersian = np.matmul( rotation_matrix_inverse, np.matmul(Psi_3D_beam_entry_cartersian, rotation_matrix) )
+        
+        
+            # Convert to cylindrical coordinates
+            Psi_3D_lab_entry = find_Psi_3D_lab(Psi_3D_lab_entry_cartersian,entry_position[0],entry_position[1],K_R_entry,K_zeta_entry)
 
-        # -------------------
-        # Find initial parameters in plasma
-        # -------------------
-        Psi_3D_lab_initial = Psi_3D_lab_entry
-        K_R_initial        = K_R_entry
-        K_zeta_initial     = K_zeta_entry
-        K_Z_initial        = K_Z_entry
-        initial_position   = entry_position
+            # -------------------
+            # Find initial parameters in plasma
+            # -------------------
+            Psi_3D_lab_initial = Psi_3D_lab_entry
+            K_R_initial        = K_R_entry
+            K_zeta_initial     = K_zeta_entry
+            K_Z_initial        = K_Z_entry
+            initial_position   = entry_position
+            
+        else: #Run solver from the launch position, no analytical vacuum propagation
+            Psi_3D_beam_initial_cartersian = np.array([
+                    [ Psi_w_beam_launch_cartersian[0][0], Psi_w_beam_launch_cartersian[1][0], 0 ],
+                    [ Psi_w_beam_launch_cartersian[0][1], Psi_w_beam_launch_cartersian[1][1], 0 ],
+                    [ 0, 0, 0 ]
+                    ])
+
+            Psi_3D_lab_initial_cartersian = np.matmul( rotation_matrix_inverse, np.matmul(Psi_3D_beam_initial_cartersian, rotation_matrix) )
+
+            Psi_3D_lab_initial = find_Psi_3D_lab(Psi_3D_lab_initial_cartersian,launch_position[0],launch_position[1],K_R_launch,K_zeta_launch)
+            K_R_initial        = K_R_launch
+            K_zeta_initial     = K_zeta_launch
+            K_Z_initial        = K_Z_launch
+            initial_position   = launch_position            
+            
+            distance_from_launch_to_entry=None
+            
+
     else:
         print('Beam launched from inside the plasma')
         K_R_launch = plasmaLaunch_K[0]
@@ -368,8 +398,6 @@ def beam_me_up(tau_step,
 
     K_R_array = np.zeros(numberOfDataPoints)
     K_Z_array = np.zeros(numberOfDataPoints)
-
-    psi_array = np.zeros(numberOfDataPoints)
     # -------------------
 
 
@@ -758,9 +786,9 @@ def beam_me_up(tau_step,
     #        Booker_beta_output[output_counter] = find_Booker_beta(electron_density,B_total,cos_theta_sq,launch_angular_frequency)
     #        Booker_gamma_output[output_counter] = find_Booker_gamma(electron_density,B_total,launch_angular_frequency)
     #
-#            epsilon_para_output[output_counter]  = find_epsilon_para(electron_density,launch_angular_frequency)
-#            epsilon_perp_output[output_counter]  = find_epsilon_perp(electron_density,B_total,launch_angular_frequency)
-#            epsilon_g_output[output_counter]  = find_epsilon_g(electron_density,B_total,launch_angular_frequency)
+            epsilon_para_output[output_counter]  = find_epsilon_para(electron_density,launch_angular_frequency)
+            epsilon_perp_output[output_counter]  = find_epsilon_perp(electron_density,B_total,launch_angular_frequency)
+            epsilon_g_output[output_counter]  = find_epsilon_g(electron_density,B_total,launch_angular_frequency)
 
             normalised_gyro_freq_output[output_counter]   = find_normalised_gyro_freq(B_total,launch_angular_frequency)
             normalised_plasma_freq_output[output_counter] = find_normalised_plasma_freq(electron_density,launch_angular_frequency)
@@ -786,7 +814,7 @@ def beam_me_up(tau_step,
     ## -------------------
     print('Saving data')
 
-    
+
     if vacuumLaunch_flag:
         np.savez('data_input' + output_filename_suffix, tau_step=tau_step, data_poloidal_flux_grid=data_poloidal_flux_grid,
                  data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
@@ -796,7 +824,8 @@ def beam_me_up(tau_step,
                  mode_flag=mode_flag,
                  launch_beam_width=launch_beam_width,
                  launch_beam_curvature=launch_beam_curvature,
-                 launch_position=launch_position
+                 launch_position=launch_position,
+                 ne_data_density_array=ne_data_density_array,ne_data_radialcoord_array=ne_data_radialcoord_array
                  )    
         np.savez('data_output' + output_filename_suffix, 
                  tau_array=tau_array, q_R_array=q_R_array, q_zeta_array=q_zeta_array, q_Z_array=q_Z_array,
@@ -813,6 +842,8 @@ def beam_me_up(tau_step,
                  grad_grad_H_output=grad_grad_H_output,gradK_grad_H_output=gradK_grad_H_output,gradK_gradK_H_output=gradK_gradK_H_output,
                  d_poloidal_flux_dR_output=d_poloidal_flux_dR_output,
                  d_poloidal_flux_dZ_output=d_poloidal_flux_dZ_output,
+                 epsilon_para_output=epsilon_para_output,epsilon_perp_output=epsilon_perp_output,epsilon_g_output=epsilon_g_output,
+                 electron_density_output=electron_density_output
                  )
     else:
          np.savez('data_input' + output_filename_suffix, tau_step=tau_step, data_poloidal_flux_grid=data_poloidal_flux_grid,
@@ -821,7 +852,8 @@ def beam_me_up(tau_step,
                  mode_flag=mode_flag,
                  launch_position=launch_position,
                  plasmaLaunch_K=plasmaLaunch_K,
-                 plasmaLaunch_Psi_3D_lab_Cartesian=plasmaLaunch_Psi_3D_lab_Cartesian
+                 plasmaLaunch_Psi_3D_lab_Cartesian=plasmaLaunch_Psi_3D_lab_Cartesian,
+                 ne_data_density_array=ne_data_density_array,ne_data_radialcoord_array=ne_data_radialcoord_array
                  )  
          np.savez('data_output' + output_filename_suffix, 
                   tau_array=tau_array, q_R_array=q_R_array, q_zeta_array=q_zeta_array, q_Z_array=q_Z_array,
@@ -837,6 +869,8 @@ def beam_me_up(tau_step,
                   grad_grad_H_output=grad_grad_H_output,gradK_grad_H_output=gradK_grad_H_output,gradK_gradK_H_output=gradK_gradK_H_output,
                   d_poloidal_flux_dR_output=d_poloidal_flux_dR_output,
                   d_poloidal_flux_dZ_output=d_poloidal_flux_dZ_output,
+                  epsilon_para_output=epsilon_para_output,epsilon_perp_output=epsilon_perp_output,epsilon_g_output=epsilon_g_output,
+                  electron_density_output=electron_density_output
                   )     
         
     print('Data saved')
@@ -850,6 +884,10 @@ def beam_me_up(tau_step,
     print('Analysing data')
     
         # Calculates various useful stuff
+    [q_X_array,q_Y_array,_] = find_q_lab_Cartesian([q_R_array,q_zeta_array,q_Z_array])
+    point_spacing =  ( (np.diff(q_X_array))**2 + (np.diff(q_Y_array))**2 + (np.diff(q_Z_array))**2  )**0.5
+    distance_along_line =  np.cumsum(point_spacing)
+    distance_along_line = np.append(0,distance_along_line)
     RZ_point_spacing = ( (np.diff(q_Z_array))**2 + (np.diff(q_R_array))**2  )**0.5
     RZ_distance_along_line =  np.cumsum(RZ_point_spacing)
     RZ_distance_along_line = np.append(0,RZ_distance_along_line)
@@ -859,6 +897,15 @@ def beam_me_up(tau_step,
     K_magnitude_array = (K_R_array**2 + K_zeta_initial**2/q_R_array**2 + K_Z_array**2)**(0.5)        
         
     cutoff_index = find_nearest(abs(K_magnitude_array),  0) # Index of the cutoff, at the minimum value of K, use this with other arrays
+
+        # Calculates when the beam 'enters' and 'leaves' the plasma
+        # Here entry and exit refer to cross the LCFS, poloidal_flux = 1.0
+    in_out_poloidal_flux = 1.0
+    poloidal_flux_a = poloidal_flux_output[0:cutoff_index]
+    poloidal_flux_b = poloidal_flux_output[cutoff_index::]
+    in_index = find_nearest(poloidal_flux_a,in_out_poloidal_flux)
+    out_index = cutoff_index + find_nearest(poloidal_flux_b,in_out_poloidal_flux)
+
 
     
         # Calcuating the corrections to make M from Psi
@@ -904,8 +951,8 @@ def beam_me_up(tau_step,
     print(delta_theta_m[cutoff_index])
     
     sin_theta_m_analysis = np.zeros(numberOfDataPoints)
-    sin_theta_m_analysis[:] = - (b_hat_output[:,0]*K_R_array[:] + b_hat_output[:,1]*K_zeta_initial/q_R_array[:] + b_hat_output[:,2]*K_Z_array[:]) / (K_magnitude_array[:])
-    theta_m_output = np.sign(sin_theta_m_analysis)*np.arcsin(abs(sin_theta_m_analysis))
+    sin_theta_m_analysis[:] = (b_hat_output[:,0]*K_R_array[:] + b_hat_output[:,1]*K_zeta_initial/q_R_array[:] + b_hat_output[:,2]*K_Z_array[:]) / (K_magnitude_array[:]) # B \cdot K / (abs (B) abs(K))
+    theta_m_output = np.sign(sin_theta_m_analysis)*np.arcsin(abs(sin_theta_m_analysis)) # Assumes the mismatch angle is never smaller than -90deg or bigger than 90deg
     print(theta_m_output[cutoff_index])
     print(cutoff_index)
     
@@ -965,8 +1012,9 @@ def beam_me_up(tau_step,
              theta_m_output=theta_m_output,
              localisation_piece=localisation_piece,
              RZ_distance_along_line=RZ_distance_along_line,
+             distance_along_line=distance_along_line,
              k_perp_1_backscattered = k_perp_1_backscattered,K_magnitude_array=K_magnitude_array,
-             cutoff_index=cutoff_index
+             cutoff_index=cutoff_index,in_index=in_index,out_index=out_index
              )
 #    print('Analysis data saved')
     # -------------------

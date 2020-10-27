@@ -91,5 +91,41 @@ plt.xlim(1,1.5)
 plt.ylim(-0.7,0.2)
 plt.tight_layout()
 plt.savefig('StationaryPhase', bbox_inches='tight')
-plt.savefig('StationaryPhase.eps', format='eps', bbox_inches='tight')
+#plt.savefig('StationaryPhase.eps', format='eps', bbox_inches='tight')
+plt.savefig('StationaryPhase.jpg', format='jpg', bbox_inches='tight')
+
+
+
+
+
+
+
+plt.figure(figsize=(8.0, 5.0))
+plt.title('Rz')
+plt.xlabel('R / m') # x-direction
+plt.ylabel('z / m')
+   
+contour_levels = np.linspace(0,1,11)
+CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels)
+plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
+plt.plot(
+#        np.concatenate([[launch_position[0],entry_position[0]],q_R_array ]),
+#        np.concatenate([[launch_position[1],entry_position[1]],q_Z_array ]),
+        q_R_array, q_Z_array,
+        '--.k') # Central (reference) ray
+        #cutoff_contour = plt.contour(x_grid, z_grid, normalised_plasma_freq_grid,
+        #                             levels=1,vmin=1,vmax=1,linewidths=5,colors='grey')
+plt.plot(q_R_array[cutoff_index], q_Z_array[cutoff_index], marker='o', markersize=10, color="g")
+plt.plot(q_R_array[index_a], q_Z_array[index_a], marker='o', markersize=10, color="cyan")
+plt.plot(q_R_array[index_b], q_Z_array[index_b], marker='o', markersize=10, color="cyan")
+#plt.xlim(data_R_coord[0],data_R_coord[-1])
+#plt.ylim(data_Z_coord[0],data_Z_coord[-1])
+plt.xlim(1,1.5)
+plt.ylim(-0.7,0.2)
+plt.tight_layout()
+plt.savefig('StationaryPhaseAlt.jpg', format='jpg', bbox_inches='tight')
+
+
+
+
 #plt.close()
