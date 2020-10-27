@@ -68,6 +68,80 @@ def find_inverse_2D(matrix_2D):
 
 #----------------------------------
     
+# Functions (Coordinate transformations)
+def find_q_lab_Cartesian(q_lab):
+    q_R    = q_lab[0]
+    q_zeta = q_lab[1]
+    q_Z    = q_lab[2]
+    
+    q_lab_Cartesian = np.zeros(np.shape(q_lab))
+    q_lab_Cartesian[0] = q_R * np.cos(q_zeta)
+    q_lab_Cartesian[1] = q_R * np.sin(q_zeta)
+    q_lab_Cartesian[2] = q_Z
+    return q_lab_Cartesian
+
+def find_q_lab(q_lab_Cartesian):
+    q_X = q_lab_Cartesian[0]
+    q_Y = q_lab_Cartesian[1]
+    q_Z = q_lab_Cartesian[2]
+    
+    q_lab = np.zeros(3)
+    q_lab[0] = np.sqrt(q_X**2 + q_Y**2)
+    q_lab[1] = np.arctan2(q_Y,q_X)
+    q_lab[2] = q_Z    
+    return q_lab
+    
+def find_K_lab_Cartesian(K_lab,q_lab):
+    K_R    = K_lab[0]
+    K_zeta = K_lab[1]
+    K_Z    = K_lab[2]
+    q_R    = q_lab[0]
+    q_zeta = q_lab[1]
+    
+    K_lab_Cartesian = np.zeros(3)
+    K_lab_Cartesian[0] = K_R*np.cos( q_zeta ) - K_zeta*np.sin( q_zeta ) / q_R #K_X
+    K_lab_Cartesian[1] = K_R*np.sin( q_zeta ) + K_zeta*np.cos( q_zeta ) / q_R #K_Y
+    K_lab_Cartesian[2] = K_Z
+    return K_lab_Cartesian    
+    
+def find_K_lab(K_lab_Cartesian,q_lab_Cartesian):
+    K_X = K_lab_Cartesian[0]
+    K_Y = K_lab_Cartesian[1]
+    K_Z = K_lab_Cartesian[2]
+    
+    [q_R,q_zeta,q_Z] = find_q_lab(q_lab_Cartesian)
+    print(q_zeta)
+    K_lab = np.zeros(3)
+    K_lab[0] =   K_X*np.cos(q_zeta) + K_Y*np.sin(q_zeta) #K_R
+    K_lab[1] = (-K_X*np.sin(q_zeta) + K_Y*np.cos(q_zeta))*q_R #K_zeta
+    K_lab[2] =   K_Z
+    return K_lab
+
+def find_Psi_3D_lab(Psi_3D_lab_Cartesian, q_R, q_zeta, K_R, K_zeta):
+    # Converts Psi_3D from Cartesian to cylindrical coordinates
+    cos_zeta = np.cos(q_zeta)
+    sin_zeta = np.sin(q_zeta)
+    
+    Psi_3D_lab = np.zeros([3,3],dtype='complex128')
+    Psi_3D_lab[0][0] = (
+                            Psi_3D_lab_Cartesian[0][0]*cos_zeta**2 
+                        + 2*Psi_3D_lab_Cartesian[0][1]*sin_zeta*cos_zeta 
+                        +   Psi_3D_lab_Cartesian[1][1]*sin_zeta**2 
+                       ) #Psi_RR
+    Psi_3D_lab[1][1] = Psi_3D_lab_Cartesian[1][1]* q_R**2 - K_R    * q_R #Psi_zetazeta
+    Psi_3D_lab[2][2] = Psi_3D_lab_Cartesian[2][2] #Psi_ZZ
+    
+    Psi_3D_lab[0][1] = Psi_3D_lab_Cartesian[0][1]* q_R    + K_zeta / q_R
+    Psi_3D_lab[1][0] = Psi_3D_lab[0][1]
+    
+    Psi_3D_lab[0][2] = Psi_3D_lab_Cartesian[0][2]
+    Psi_3D_lab[2][0] = Psi_3D_lab[0][2]
+    Psi_3D_lab[1][2] = Psi_3D_lab_Cartesian[1][2]* q_R
+    Psi_3D_lab[2][1] = Psi_3D_lab[1][2]
+    return Psi_3D_lab
+    
+#----------------------------------
+    
 # Functions (beam tracing 1)
 def find_normalised_plasma_freq(electron_density, launch_angular_frequency):
     
@@ -89,6 +163,7 @@ def find_normalised_gyro_freq(B_Total, launch_angular_frequency):
 
 
 def find_epsilon_para(electron_density, launch_angular_frequency):
+    # also called epsilon_bb in my paper
     
     normalised_plasma_freq = find_normalised_plasma_freq(electron_density, launch_angular_frequency)
     epsilon_para = 1 - normalised_plasma_freq**2
@@ -97,7 +172,8 @@ def find_epsilon_para(electron_density, launch_angular_frequency):
 
 
 def find_epsilon_perp(electron_density, B_Total, launch_angular_frequency):
-    
+    # also called epsilon_11 in my paper
+   
     normalised_plasma_freq = find_normalised_plasma_freq(electron_density, launch_angular_frequency)
     normalised_gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)     
     epsilon_perp = 1 - normalised_plasma_freq**2 / (1 - normalised_gyro_freq**2)
@@ -106,31 +182,32 @@ def find_epsilon_perp(electron_density, B_Total, launch_angular_frequency):
 
 
 def find_epsilon_g(electron_density, B_Total, launch_angular_frequency):
+    # also called epsilon_12 in my paper
     
     normalised_plasma_freq = find_normalised_plasma_freq(electron_density, launch_angular_frequency)
     normalised_gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)     
-    epsilon_g = - (normalised_plasma_freq**2) * normalised_gyro_freq / (1 - normalised_gyro_freq**2)
+    epsilon_g = (normalised_plasma_freq**2) * normalised_gyro_freq / (1 - normalised_gyro_freq**2)
     
     return epsilon_g
     
 
-def find_Booker_alpha(electron_density, B_Total, cos_theta_sq, launch_angular_frequency):
+def find_Booker_alpha(electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency):
     
     epsilon_para = find_epsilon_para(electron_density, launch_angular_frequency)
     epsilon_perp = find_epsilon_perp(electron_density, B_Total, launch_angular_frequency)
-    Booker_alpha = epsilon_para*cos_theta_sq + epsilon_perp*(1-cos_theta_sq)
+    Booker_alpha = epsilon_para*sin_theta_m_sq + epsilon_perp*(1-sin_theta_m_sq)
     
     return Booker_alpha
 
 
-def find_Booker_beta(electron_density, B_Total, cos_theta_sq, launch_angular_frequency):
+def find_Booker_beta(electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency):
     
     epsilon_perp = find_epsilon_perp(electron_density, B_Total, launch_angular_frequency)
     epsilon_para = find_epsilon_para(electron_density, launch_angular_frequency)
     epsilon_g = find_epsilon_g(electron_density, B_Total, launch_angular_frequency)
     Booker_beta = (
-            - epsilon_perp * epsilon_para * (1+cos_theta_sq)
-            - (epsilon_perp**2 - epsilon_g**2) * (1-cos_theta_sq)
+            - epsilon_perp * epsilon_para * (1+sin_theta_m_sq)
+            - (epsilon_perp**2 - epsilon_g**2) * (1-sin_theta_m_sq)
                    )
     
     return Booker_beta
@@ -167,10 +244,10 @@ def find_H(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag,
     B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
     b_hat = np.array([B_R, B_T, B_Z]) / B_Total
     K_hat = np.array([K_R, K_zeta/q_R, K_Z]) / K_magnitude
-    cos_theta_sq = (np.dot(b_hat, K_hat))**2
+    sin_theta_m_sq = (np.dot(b_hat, K_hat))**2 #square of the mismatch angle
  
-    Booker_alpha = find_Booker_alpha(electron_density, B_Total, cos_theta_sq, launch_angular_frequency)
-    Booker_beta = find_Booker_beta(electron_density, B_Total, cos_theta_sq, launch_angular_frequency)
+    Booker_alpha = find_Booker_alpha(electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency)
+    Booker_beta = find_Booker_beta(electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency)
     Booker_gamma = find_Booker_gamma(electron_density, B_Total, launch_angular_frequency)
     
     H = (K_magnitude/wavenumber_K0)**2 + (
@@ -605,4 +682,42 @@ def find_g_magnitude(q_R,q_Z,K_R,K_zeta,K_Z,launch_angular_frequency,mode_flag,d
                            )    
     g_magnitude = (q_R**2 * dH_dKzeta**2 + dH_dKR**2 + dH_dKZ**2)**0.5       
     return g_magnitude
+
+def find_H_Cardano(K_magnitude,launch_angular_frequency,epsilon_para,epsilon_perp,epsilon_g,theta_m):  
+    # This function is designed to be evaluated in post-procesing, hence it uses different inputs from the usual H
+
+    wavenumber_K0 = launch_angular_frequency / constants.c
+    n_ref_index = K_magnitude/wavenumber_K0
+    sin_theta_m = np.sin(theta_m)
+    cos_theta_m = np.cos(theta_m)
+    
+    
+    D_11_component = epsilon_perp - n_ref_index**2*sin_theta_m**2
+    D_22_component = epsilon_perp - n_ref_index**2
+    D_bb_component = epsilon_para - n_ref_index**2*cos_theta_m**2
+    D_12_component = epsilon_g
+    D_1b_component = n_ref_index**2*sin_theta_m*cos_theta_m
+    
+    h_2_coefficient = - D_11_component - D_22_component - D_bb_component
+    h_1_coefficient = D_11_component*D_bb_component + D_11_component*D_22_component + D_22_component*D_bb_component - D_12_component**2 - D_1b_component**2
+    h_0_coefficient = D_22_component*D_1b_component**2 + D_bb_component*D_12_component**2 - D_11_component*D_22_component*D_bb_component
+    
+    h_t_coefficient = (
+                            -2*h_2_coefficient**3
+                            +9*h_2_coefficient*h_1_coefficient
+                            -27*h_0_coefficient
+                            +3*np.sqrt(3)*np.sqrt(
+                                4*h_2_coefficient**3 * h_0_coefficient
+                                -h_2_coefficient**2 * h_1_coefficient**2
+                                -18*h_2_coefficient * h_1_coefficient * h_0_coefficient
+                                +4*h_1_coefficient**3
+                                +27*h_0_coefficient**2
+                                +0j #to make the argument of the np.sqrt complex, so that the sqrt evaluates negative functions
+                            )
+                        )**(1/3)
+    
+    H_1_Cardano = h_t_coefficient/(3*2**(1/3)) - 2**(1/3) *(3*h_1_coefficient - h_2_coefficient**2)/(3*h_t_coefficient) - h_2_coefficient/3
+    H_2_Cardano = - (1 - 1j*np.sqrt(3))/(6*2**(1/3))*h_t_coefficient + (1 + 1j*np.sqrt(3))*(3*h_1_coefficient - h_2_coefficient**2)/(3*2**(2/3)*h_t_coefficient) - h_2_coefficient/3
+    H_3_Cardano = - (1 + 1j*np.sqrt(3))/(6*2**(1/3))*h_t_coefficient + (1 - 1j*np.sqrt(3))*(3*h_1_coefficient - h_2_coefficient**2)/(3*2**(2/3)*h_t_coefficient) - h_2_coefficient/3
+    return H_1_Cardano, H_2_Cardano, H_3_Cardano
 #----------------------------------

@@ -14,6 +14,7 @@ Useful for benchmarking with Torbeam
 
 import matplotlib.pyplot as plt
 import numpy as np
+from Scotty_fun import find_q_lab_Cartesian, find_q_lab, find_K_lab_Cartesian, find_K_lab
 
 loadfile = np.load('data_output.npz')
 tau_array = loadfile['tau_array']
@@ -31,7 +32,7 @@ dH_dKZ_output = loadfile['dH_dKZ_output']
 dH_dR_output = loadfile['dH_dR_output']
 dH_dZ_output = loadfile['dH_dZ_output']
 Psi_3D_output = loadfile['Psi_3D_output']
-distance_from_launch_to_entry = loadfile['distance_from_launch_to_entry']
+#distance_from_launch_to_entry = loadfile['distance_from_launch_to_entry']
 loadfile.close()
 
 loadfile = np.load('data_input.npz')
@@ -46,10 +47,14 @@ launch_position_Cartesian=np.zeros(3) # Note that we have Y=0, zeta=0 at launch,
 launch_position_Cartesian[0] = launch_position[0]
 launch_position_Cartesian[1] = launch_position[1]
 launch_position_Cartesian[2] = launch_position[2]
-q_X_array = q_R_array *np.cos(q_zeta_array )
-q_Y_array = q_R_array *np.sin(q_zeta_array )
-K_X_array = K_R_array*np.cos(q_zeta_array ) - K_zeta_initial*np.sin(q_zeta_array ) / q_R_array
-K_Y_array = K_R_array*np.sin(q_zeta_array ) + K_zeta_initial*np.cos(q_zeta_array ) / q_R_array
+#q_X_array = q_R_array *np.cos(q_zeta_array )
+#q_Y_array = q_R_array *np.sin(q_zeta_array )
+#K_X_array = K_R_array*np.cos(q_zeta_array ) - K_zeta_initial*np.sin(q_zeta_array ) / q_R_array
+#K_Y_array = K_R_array*np.sin(q_zeta_array ) + K_zeta_initial*np.cos(q_zeta_array ) / q_R_array
+q_X_array = np.zeros(numberOfDataPoints)
+q_Y_array = np.zeros(numberOfDataPoints)
+K_X_array = np.zeros(numberOfDataPoints)
+K_Y_array = np.zeros(numberOfDataPoints)
 
 b_hat_Cartesian_output = np.zeros(np.shape(b_hat_output))
 b_hat_Cartesian_output[:,0] = b_hat_output[:,0]*np.cos(q_zeta_array ) - b_hat_output[:,1]*np.sin(q_zeta_array )
@@ -69,6 +74,12 @@ gradK_gradK_H_output_Cartesian = np.zeros(np.shape(Psi_3D_output))
 sin_mismatch_angle_array=np.zeros(numberOfDataPoints)
 
 for step in range(0,numberOfDataPoints):
+    q_lab = np.squeeze(np.array([q_R_array[step],q_zeta_array[step],q_Z_array[step]]))
+    K_lab = np.squeeze(np.array([K_R_array[step],K_zeta_initial,K_Z_array[step]]))
+
+    [q_X_array[step],q_Y_array[step],_] = find_q_lab_Cartesian(q_lab)
+    [K_X_array[step],K_Y_array[step],_] = find_K_lab_Cartesian(K_lab,q_lab)
+    
     temp_matrix_for_Psi[0][0] = Psi_3D_output[step][0][0]
     temp_matrix_for_Psi[0][1] = Psi_3D_output[step][0][1]/q_R_array [step] - K_zeta_initial/q_R_array[step]**2
     temp_matrix_for_Psi[0][2] = Psi_3D_output[step][0][2]
