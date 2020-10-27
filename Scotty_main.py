@@ -11,15 +11,15 @@ from Scotty_beam_me_up import beam_me_up
 from Scotty_fun import find_q_lab_Cartesian, find_q_lab, find_K_lab_Cartesian, find_K_lab
 import numpy as np
 
-#input_filename_suffix = '_29908_200'
-input_filename_suffix = ''
+input_filename_suffix = '_29908_200'
+#input_filename_suffix = ''
 
 tau_step = 1.0
-numberOfTauPoints = 751
+numberOfTauPoints = 2501
 saveInterval = 1  # saves every n time steps
 
 poloidal_launch_angle_Torbeam = 4.0 # deg
-toroidal_launch_angle_Torbeam = -1.0 # deg
+toroidal_launch_angle_Torbeam = -5.5 # deg
 #toroidal_launch_angle_Torbeam_scan = np.linspace(-3,-8,51)
 
 launch_freq_GHz = 55.0
@@ -29,8 +29,8 @@ launch_beam_curvature = -192 # in m. negative because launched BEFORE the beam w
 vacuumLaunch_flag = True # If true, the launch_position is in vacuum. If false, the launch_position is in plasma.
 
 
-vacuum_propagation_flag = True #TODO: If true, use analytical propagation until poloidal_flux_enter is reached. If false, start propagating numerically straight away.
-poloidal_flux_enter = 1.2 
+vacuum_propagation_flag = True #If true, use analytical propagation until poloidal_flux_enter is reached. If false, start propagating numerically straight away.
+poloidal_flux_enter = 1.2
 
 
 
@@ -63,9 +63,10 @@ beam_me_up(tau_step,
            launch_beam_width,
            launch_beam_curvature,
            launch_position,
+           vacuum_propagation_flag,
            poloidal_flux_enter,
            input_filename_suffix,
-           output_filename_suffix='',
+           output_filename_suffix='3',
            figure_flag= True)
 
 #for ii in range(0,51):
