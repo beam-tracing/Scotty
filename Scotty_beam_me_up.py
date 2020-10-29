@@ -48,17 +48,18 @@ from scipy import constants as constants
 import matplotlib.pyplot as plt
 import os
 
-from Scotty_fun import read_floats_into_list_until, find_nearest, contract_special, find_H
-from Scotty_fun import find_inverse_2D, find_Psi_3D_lab, find_q_lab_Cartesian, find_K_lab_Cartesian, find_K_lab
-from Scotty_fun import find_dH_dR, find_dH_dZ # \nabla H
-from Scotty_fun import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta # \nabla_K H
-from Scotty_fun import find_d2H_dR2, find_d2H_dZ2, find_d2H_dR_dZ # \nabla \nabla H
-from Scotty_fun import find_d2H_dKR2, find_d2H_dKR_dKzeta, find_d2H_dKR_dKz, find_d2H_dKzeta2, find_d2H_dKzeta_dKz, find_d2H_dKZ2 # \nabla_K \nabla_K H
-from Scotty_fun import find_d2H_dKR_dR, find_d2H_dKR_dZ, find_d2H_dKzeta_dR, find_d2H_dKzeta_dZ, find_d2H_dKZ_dR, find_d2H_dKZ_dZ # \nabla_K \nabla H
-from Scotty_fun import find_normalised_plasma_freq, find_normalised_gyro_freq
-from Scotty_fun import find_epsilon_para, find_epsilon_perp,find_epsilon_g
-from Scotty_fun import find_dbhat_dR, find_dbhat_dZ
-from Scotty_fun import find_d_poloidal_flux_dR, find_d_poloidal_flux_dZ,find_Psi_3D_plasma, find_g_magnitude
+from Scotty_fun_general import read_floats_into_list_until, find_nearest, contract_special, find_H
+from Scotty_fun_general import find_inverse_2D, find_Psi_3D_lab, find_q_lab_Cartesian, find_K_lab_Cartesian, find_K_lab
+from Scotty_fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq
+from Scotty_fun_general import find_epsilon_para, find_epsilon_perp,find_epsilon_g
+from Scotty_fun_general import find_dbhat_dR, find_dbhat_dZ
+from Scotty_fun_general import find_d_poloidal_flux_dR, find_d_poloidal_flux_dZ,find_Psi_3D_plasma
+
+from Scotty_fun_CFD import find_dH_dR, find_dH_dZ # \nabla H
+from Scotty_fun_CFD import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta # \nabla_K H
+from Scotty_fun_CFD import find_d2H_dR2, find_d2H_dZ2, find_d2H_dR_dZ # \nabla \nabla H
+from Scotty_fun_CFD import find_d2H_dKR2, find_d2H_dKR_dKzeta, find_d2H_dKR_dKz, find_d2H_dKzeta2, find_d2H_dKzeta_dKz, find_d2H_dKZ2 # \nabla_K \nabla_K H
+from Scotty_fun_CFD import find_d2H_dKR_dR, find_d2H_dKR_dZ, find_d2H_dKzeta_dR, find_d2H_dKzeta_dZ, find_d2H_dKZ_dR, find_d2H_dKZ_dZ # \nabla_K \nabla H
 
 def beam_me_up(tau_step,
                numberOfTauPoints,
@@ -72,6 +73,7 @@ def beam_me_up(tau_step,
                launch_beam_curvature,
                launch_position,
                vacuum_propagation_flag=False,
+               Psi_BC_flag = False,
                poloidal_flux_enter=None,
                input_filename_suffix='',
                output_filename_suffix='',
@@ -327,11 +329,18 @@ def beam_me_up(tau_step,
             # -------------------
             # Find initial parameters in plasma
             # -------------------
-            Psi_3D_lab_initial = Psi_3D_lab_entry
             K_R_initial        = K_R_entry
             K_zeta_initial     = K_zeta_entry
             K_Z_initial        = K_Z_entry
             initial_position   = entry_position
+            if Psi_BC_flag: # Use BCs
+                Psi_3D_lab_initial = find_Psi_3D_plasma(Psi_v_R_R, Psi_v_R_Z, Psi_v_R_zeta, 
+                                                        Psi_v_Z_Z, Psi_v_Z_zeta, Psi_v_zeta_zeta,
+                                                        g_R, g_Z, g_zeta,
+                                                        dH_dR, dH_dZ,
+                                                        d_poloidal_flux_d_R, d_poloidal_flux_d_Z)
+            else: # Do not use BCs
+                Psi_3D_lab_initial = Psi_3D_lab_entry
             
         else: #Run solver from the launch position, no analytical vacuum propagation
             Psi_3D_beam_initial_cartersian = np.array([
@@ -955,11 +964,11 @@ def beam_me_up(tau_step,
     print(theta_m_output[cutoff_index])
     print(cutoff_index)
     
-    g_magnitude_launch = find_g_magnitude(launch_position[0],launch_position[1],K_R_launch,K_zeta_launch,K_Z_launch,
-                                          launch_angular_frequency,mode_flag,delta_K_R,delta_K_zeta,delta_K_Z,
-                                          interp_poloidal_flux,interp_density_1D,interp_B_R,interp_B_T,interp_B_Z)
-    d_K_d_tau_analysis = np.gradient(K_magnitude_array,tau_array)
-    localisation_piece = g_magnitude_launch**2/abs(g_magnitude_output*d_K_d_tau_analysis)
+#    g_magnitude_launch = find_g_magnitude(launch_position[0],launch_position[1],K_R_launch,K_zeta_launch,K_Z_launch,
+#                                          launch_angular_frequency,mode_flag,delta_K_R,delta_K_zeta,delta_K_Z,
+#                                          interp_poloidal_flux,interp_density_1D,interp_B_R,interp_B_T,interp_B_Z)
+#    d_K_d_tau_analysis = np.gradient(K_magnitude_array,tau_array)
+#    localisation_piece = g_magnitude_launch**2/abs(g_magnitude_output*d_K_d_tau_analysis)
     # -------------------
 
 
@@ -1009,7 +1018,6 @@ def beam_me_up(tau_step,
              kappa_dot_yhat_output=kappa_dot_yhat_output,
              delta_k_perp_2=delta_k_perp_2, delta_theta_m=delta_theta_m,
              theta_m_output=theta_m_output,
-             localisation_piece=localisation_piece,
              RZ_distance_along_line=RZ_distance_along_line,
              distance_along_line=distance_along_line,
              k_perp_1_backscattered = k_perp_1_backscattered,K_magnitude_array=K_magnitude_array,
