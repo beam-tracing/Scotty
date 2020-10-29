@@ -8,7 +8,7 @@ valerian.chen@gmail.com
 
 """
 from Scotty_beam_me_up import beam_me_up
-from Scotty_fun import find_q_lab_Cartesian, find_q_lab, find_K_lab_Cartesian, find_K_lab
+from Scotty_fun_general import find_q_lab_Cartesian, find_q_lab, find_K_lab_Cartesian, find_K_lab
 import numpy as np
 
 input_filename_suffix = '_29908_200'
@@ -30,9 +30,9 @@ vacuumLaunch_flag = True # If true, the launch_position is in vacuum. If false, 
 
 
 vacuum_propagation_flag = True #If true, use analytical propagation until poloidal_flux_enter is reached. If false, start propagating numerically straight away.
-poloidal_flux_enter = 1.2
+poloidal_flux_enter = 1.6
 
-
+Psi_BC_flag = False # Currently only implemented if vacuum_propagation_flag = True. This solves the boundary conditions for the 3D matrix Psi, which is necessary if there is a discontinuity in the first derivative of density (or B field)
 
 
 
@@ -64,6 +64,7 @@ beam_me_up(tau_step,
            launch_beam_curvature,
            launch_position,
            vacuum_propagation_flag,
+           Psi_BC_flag,
            poloidal_flux_enter,
            input_filename_suffix,
            output_filename_suffix='3',
