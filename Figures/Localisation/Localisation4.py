@@ -151,7 +151,7 @@ launch_freq_GHz =loadfile['launch_freq_GHz']
 loadfile.close()
 
 loadfile = np.load('analysis_output.npz')
-localisation_piece = loadfile['localisation_piece']
+#localisation_piece = loadfile['localisation_piece']
 cutoff_index = loadfile['cutoff_index']
 RZ_distance_along_line = loadfile['RZ_distance_along_line']
 distance_along_line = loadfile['distance_along_line']
