@@ -33,12 +33,17 @@ def find_nearest(array,  value): #returns the index
     return int(idx)
 
 def contract_special(arg_a,arg_b):
-    # Takes a matrix of TxMxN and a vector of TxN  or TxM
-    # For each T, contract the matrix with the vector
-    # Or two vectors of size TxN
-    # For each T, contract the indices N 
-    # Covers the case that matmul and dot don't do very elegantly
-    # Avoids having to use a for loop to iterate over T
+    """
+    Takes 
+    Either:
+        matrix of TxMxN and a vector of TxN  or TxM
+        For each T, contract the matrix with the vector
+    Or:
+        two vectors of size TxN
+    For each T, contract the indices N 
+    Covers the case that matmul and dot don't do very elegantly
+    Avoids having to use a for loop to iterate over T
+    """
     if (np.ndim(arg_a) == 3 and np.ndim(arg_b) == 2): # arg_a is the matrix and arg_b is the vector
         matrix = arg_a
         vector = arg_b
@@ -61,11 +66,11 @@ def contract_special(arg_a,arg_b):
 def find_inverse_2D(matrix_2D):
     # Finds the inverse of a 2x2 matrix
     matrix_2D_inverse = np.zeros([2,2],dtype='complex128')
-    determinant = matrix_2D[0,0]*matrix_2D[1,1] - matrix_2D[0,1]**2
+    determinant = matrix_2D[0,0]*matrix_2D[1,1] - matrix_2D[0,1]*matrix_2D[1,0]
     matrix_2D_inverse[0,0] =   matrix_2D[1,1] / determinant
     matrix_2D_inverse[1,1] =   matrix_2D[0,0] / determinant
     matrix_2D_inverse[0,1] = - matrix_2D[0,1] / determinant
-    matrix_2D_inverse[1,0] = - matrix_2D[0,1] / determinant
+    matrix_2D_inverse[1,0] = - matrix_2D[1,0] / determinant
     return matrix_2D_inverse
 
 #----------------------------------
@@ -112,7 +117,7 @@ def find_K_lab(K_lab_Cartesian,q_lab_Cartesian):
     K_Z = K_lab_Cartesian[2]
     
     [q_R,q_zeta,q_Z] = find_q_lab(q_lab_Cartesian)
-    print(q_zeta)
+
     K_lab = np.zeros(3)
     K_lab[0] =   K_X*np.cos(q_zeta) + K_Y*np.sin(q_zeta) #K_R
     K_lab[1] = (-K_X*np.sin(q_zeta) + K_Y*np.cos(q_zeta))*q_R #K_zeta
@@ -120,28 +125,116 @@ def find_K_lab(K_lab_Cartesian,q_lab_Cartesian):
     return K_lab
 
 def find_Psi_3D_lab(Psi_3D_lab_Cartesian, q_R, q_zeta, K_R, K_zeta):
-    # Converts Psi_3D from Cartesian to cylindrical coordinates
+    """
+    Converts Psi_3D from Cartesian to cylindrical coordinates, both in the lab frame (not the beam frame)
+    """
     cos_zeta = np.cos(q_zeta)
     sin_zeta = np.sin(q_zeta)
     
+    Psi_XX = Psi_3D_lab_Cartesian[0][0]
+    Psi_YY = Psi_3D_lab_Cartesian[1][1]
+    Psi_ZZ = Psi_3D_lab_Cartesian[2][2]
+    Psi_XY = Psi_3D_lab_Cartesian[0][1]
+    Psi_XZ = Psi_3D_lab_Cartesian[0][2]
+    Psi_YZ = Psi_3D_lab_Cartesian[1][2]
+
     Psi_3D_lab = np.zeros([3,3],dtype='complex128')
-    Psi_3D_lab[0][0] = (
-                            Psi_3D_lab_Cartesian[0][0]*cos_zeta**2 
-                        + 2*Psi_3D_lab_Cartesian[0][1]*sin_zeta*cos_zeta 
-                        +   Psi_3D_lab_Cartesian[1][1]*sin_zeta**2 
-                       ) #Psi_RR
-    Psi_3D_lab[1][1] = Psi_3D_lab_Cartesian[1][1]* q_R**2 - K_R    * q_R #Psi_zetazeta
-    Psi_3D_lab[2][2] = Psi_3D_lab_Cartesian[2][2] #Psi_ZZ
     
-    Psi_3D_lab[0][1] = Psi_3D_lab_Cartesian[0][1]* q_R    + K_zeta / q_R
+    Psi_3D_lab[0][0] = (
+                            Psi_XX * cos_zeta**2 
+                        + 2*Psi_XY * sin_zeta * cos_zeta 
+                        +   Psi_YY * sin_zeta**2 
+                       ) #Psi_RR
+    Psi_3D_lab[1][1] = (
+                           Psi_XX * sin_zeta**2
+                       - 2*Psi_XY * sin_zeta * cos_zeta
+                       +   Psi_YY * cos_zeta**2
+                       )* q_R**2 - K_R    * q_R #Psi_zetazeta
+    Psi_3D_lab[2][2] = Psi_ZZ #Psi_ZZ
+    
+    Psi_3D_lab[0][1] = (
+                       -   Psi_XX * sin_zeta * cos_zeta
+                       +   Psi_XY * (cos_zeta**2 - sin_zeta**2)
+                       +   Psi_YY * sin_zeta * cos_zeta
+                       )* q_R    + K_zeta / q_R #Psi_Rzeta
     Psi_3D_lab[1][0] = Psi_3D_lab[0][1]
     
-    Psi_3D_lab[0][2] = Psi_3D_lab_Cartesian[0][2]
+    Psi_3D_lab[0][2] = (
+                           Psi_XZ * cos_zeta
+                       +   Psi_YZ * sin_zeta
+                       ) #Psi_RZ
     Psi_3D_lab[2][0] = Psi_3D_lab[0][2]
-    Psi_3D_lab[1][2] = Psi_3D_lab_Cartesian[1][2]* q_R
+    Psi_3D_lab[1][2] = (
+                       -   Psi_XZ * sin_zeta
+                       +   Psi_YZ * cos_zeta
+                       )* q_R #Psi_zetaZ
     Psi_3D_lab[2][1] = Psi_3D_lab[1][2]
     return Psi_3D_lab
     
+def find_Psi_3D_lab_Cartesian(Psi_3D_lab, q_R, q_zeta, K_R, K_zeta):
+    """
+    Converts Psi_3D from cylindrical to Cartesian coordinates, both in the lab frame (not the beam frame)
+    The shape of Psi_3D_lab must be either [3,3] or [numberOfDataPoints,3,3]
+    """
+    if Psi_3D_lab.ndim == 2: # A single matrix of Psi
+        Psi_RR       = Psi_3D_lab[0,0]
+        Psi_zetazeta = Psi_3D_lab[1,1]
+        Psi_ZZ       = Psi_3D_lab[2,2]
+        Psi_Rzeta    = Psi_3D_lab[0,1]
+        Psi_RZ       = Psi_3D_lab[0,2]
+        Psi_zetaZ    = Psi_3D_lab[1,2]
+        
+        temp_matrix_for_Psi = np.zeros(np.shape(Psi_3D_lab),dtype='complex128')
+
+        temp_matrix_for_Psi[0,0] = Psi_RR
+        temp_matrix_for_Psi[0,1] = Psi_Rzeta   /q_R - K_zeta/q_R**2
+        temp_matrix_for_Psi[0,2] = Psi_RZ
+        temp_matrix_for_Psi[1,1] = Psi_zetazeta/q_R**2 + K_R/q_R
+        temp_matrix_for_Psi[1,2] = Psi_zetaZ   /q_R
+        temp_matrix_for_Psi[2,2] = Psi_ZZ
+        temp_matrix_for_Psi[1,0] = temp_matrix_for_Psi[0,1]
+        temp_matrix_for_Psi[2,0] = temp_matrix_for_Psi[0,2]
+        temp_matrix_for_Psi[2,1] = temp_matrix_for_Psi[1,2]
+    elif Psi_3D_lab.ndim == 3: # Matrices of Psi, residing in the first index
+        Psi_RR       = Psi_3D_lab[:,0,0]
+        Psi_zetazeta = Psi_3D_lab[:,1,1]
+        Psi_ZZ       = Psi_3D_lab[:,2,2]
+        Psi_Rzeta    = Psi_3D_lab[:,0,1]
+        Psi_RZ       = Psi_3D_lab[:,0,2]
+        Psi_zetaZ    = Psi_3D_lab[:,1,2]
+        
+        temp_matrix_for_Psi = np.zeros(np.shape(Psi_3D_lab),dtype='complex128')
+
+        temp_matrix_for_Psi[:,0,0] = Psi_RR
+        temp_matrix_for_Psi[:,0,1] = Psi_Rzeta   /q_R - K_zeta/q_R**2
+        temp_matrix_for_Psi[:,0,2] = Psi_RZ
+        temp_matrix_for_Psi[:,1,1] = Psi_zetazeta/q_R**2 + K_R/q_R
+        temp_matrix_for_Psi[:,1,2] = Psi_zetaZ   /q_R
+        temp_matrix_for_Psi[:,2,2] = Psi_ZZ
+        temp_matrix_for_Psi[:,1,0] = temp_matrix_for_Psi[:,0,1]
+        temp_matrix_for_Psi[:,2,0] = temp_matrix_for_Psi[:,0,2]
+        temp_matrix_for_Psi[:,2,1] = temp_matrix_for_Psi[:,1,2]
+    else:
+        print('Error: Psi_3D_lab has an invalid number of dimensions')
+        
+
+
+    rotation_matrix_xi = np.array( [
+        [ np.cos(q_zeta), -np.sin(q_zeta), np.zeros_like(q_zeta) ],
+        [ np.sin(q_zeta),  np.cos(q_zeta), np.zeros_like(q_zeta) ],
+        [ np.zeros_like(q_zeta),np.zeros_like(q_zeta),np.ones_like(q_zeta) ]
+        ] )
+    rotation_matrix_xi_inverse = np.swapaxes(rotation_matrix_xi,0,1)
+
+    if Psi_3D_lab.ndim == 3: # Matrices of Psi, residing in the last index
+        # To change the rotation matrices from [3,3,numberOfDataPoints] to [numberOfDataPoints,3,3]
+        # Ensures that matmul will broadcast correctly
+        rotation_matrix_xi = np.moveaxis(rotation_matrix_xi,-1,0)
+        rotation_matrix_xi_inverse = np.moveaxis(rotation_matrix_xi_inverse,-1,0)
+
+    Psi_3D_lab_Cartesian = np.matmul(np.matmul(rotation_matrix_xi,temp_matrix_for_Psi),rotation_matrix_xi_inverse)
+    return Psi_3D_lab_Cartesian
+
 #----------------------------------
     
 # Functions (beam tracing 1)
@@ -264,20 +357,24 @@ def find_H(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag,
     # For going from vacuum to plasma (Will one day implement going from plasma to vacuum)
 def find_d_poloidal_flux_dR(q_R, q_Z, delta_R, interp_poloidal_flux):
     
-    poloidal_flux_plus  = interp_poloidal_flux(q_R+delta_R, q_Z)
-    poloidal_flux_minus = interp_poloidal_flux(q_R-delta_R, q_Z)
-    d_poloidal_flux_dR = (poloidal_flux_plus - poloidal_flux_minus) / (2 * delta_R)
+    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
+    poloidal_flux_1 = interp_poloidal_flux(q_R+delta_R, q_Z) 
+    poloidal_flux_2 = interp_poloidal_flux(q_R+2*delta_R, q_Z)
+    d_poloidal_flux_dR = ( (-3/2)*poloidal_flux_0 + (2)*poloidal_flux_1 + (-1/2)*poloidal_flux_2 ) / (delta_R)
+    
     return d_poloidal_flux_dR
 
 def find_d_poloidal_flux_dZ(q_R, q_Z, delta_Z, interp_poloidal_flux):
     
-    poloidal_flux_plus  = interp_poloidal_flux(q_R, q_Z+delta_Z)
-    poloidal_flux_minus = interp_poloidal_flux(q_R, q_Z-delta_Z)
-    d_poloidal_flux_dZ = (poloidal_flux_plus - poloidal_flux_minus) / (2 * delta_Z)
+    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
+    poloidal_flux_1 = interp_poloidal_flux(q_R, q_Z+delta_Z)
+    poloidal_flux_2 = interp_poloidal_flux(q_R, q_Z+2*delta_Z)
+    d_poloidal_flux_dZ = ( (-3/2)*poloidal_flux_0 + (2)*poloidal_flux_1 + (-1/2)*poloidal_flux_2 ) / (delta_Z)
+    
     return d_poloidal_flux_dZ
     
 def find_Psi_3D_plasma(Psi_vacuum_3D,
-                       g_R, g_Z, g_zeta,
+                       dH_dKR, dH_dKzeta, dH_dKZ,
                        dH_dR, dH_dZ,
                        d_poloidal_flux_d_R, d_poloidal_flux_d_Z):
     # When beam is entering plasma from vacuum    
@@ -295,15 +392,15 @@ def find_Psi_3D_plasma(Psi_vacuum_3D,
     interface_matrix[1][3] = d_poloidal_flux_d_R**2
     interface_matrix[2][2] = - d_poloidal_flux_d_Z
     interface_matrix[2][4] = d_poloidal_flux_d_R
-    interface_matrix[3][0] = g_R
-    interface_matrix[3][1] = g_Z
-    interface_matrix[3][2] = g_zeta
-    interface_matrix[4][1] = g_R
-    interface_matrix[4][3] = g_Z
-    interface_matrix[4][4] = g_zeta
-    interface_matrix[5][2] = g_R
-    interface_matrix[5][4] = g_Z
-    interface_matrix[5][5] = g_zeta
+    interface_matrix[3][0] = dH_dKR
+    interface_matrix[3][1] = dH_dKZ
+    interface_matrix[3][2] = dH_dKzeta
+    interface_matrix[4][1] = dH_dKR
+    interface_matrix[4][3] = dH_dKZ
+    interface_matrix[4][4] = dH_dKzeta
+    interface_matrix[5][2] = dH_dKR
+    interface_matrix[5][4] = dH_dKZ
+    interface_matrix[5][5] = dH_dKzeta
     
     interface_matrix_inverse = np.linalg.inv(interface_matrix)
     
@@ -318,7 +415,19 @@ def find_Psi_3D_plasma(Psi_vacuum_3D,
             dH_dZ, 
             0          
            ] )
-    return Psi_p_R_R, Psi_p_R_Z, Psi_p_R_zeta, Psi_p_Z_Z, Psi_p_Z_zeta, Psi_p_zeta_zeta
+    
+    Psi_3D_plasma = np.zeros([3,3],dtype='complex128')
+    Psi_3D_plasma[0,0] = Psi_p_R_R
+    Psi_3D_plasma[1,1] = Psi_p_zeta_zeta
+    Psi_3D_plasma[2,2] = Psi_p_Z_Z
+    Psi_3D_plasma[0,1] = Psi_p_R_zeta
+    Psi_3D_plasma[1,0] = Psi_3D_plasma[0,1]
+    Psi_3D_plasma[0,2] = Psi_p_R_Z
+    Psi_3D_plasma[2,0] = Psi_3D_plasma[0,2]
+    Psi_3D_plasma[1,2] = Psi_p_Z_zeta
+    Psi_3D_plasma[2,1] = Psi_3D_plasma[1,2]
+    
+    return Psi_3D_plasma
 # -----------------
 
 
@@ -439,7 +548,7 @@ def find_H_Cardano(K_magnitude,launch_angular_frequency,epsilon_para,epsilon_per
     H_3_Cardano = - (1 + 1j*np.sqrt(3))/(6*2**(1/3))*h_t_coefficient + (1 - 1j*np.sqrt(3))*(3*h_1_coefficient - h_2_coefficient**2)/(3*2**(2/3)*h_t_coefficient) - h_2_coefficient/3
     return H_1_Cardano, H_2_Cardano, H_3_Cardano
 
-def find_widths_and_curvatures(Psi_xx, Psi_xy, Psi_yy,K_magnitude):
+def find_widths_and_curvatures(Psi_xx, Psi_xy, Psi_yy, K_magnitude):
     Psi_w_real = np.array(np.real([
                     [Psi_xx,Psi_xy],
                     [Psi_xy,Psi_yy]
@@ -456,5 +565,5 @@ def find_widths_and_curvatures(Psi_xx, Psi_xy, Psi_yy,K_magnitude):
     widths = np.sqrt(2/Psi_w_imag_eigvals)
     curvatures = Psi_w_real_eigvals/K_magnitude # curvature = 1/radius_of_curvature
     
-    return widths, curvatures
+    return widths, Psi_w_imag_eigvecs, curvatures, Psi_w_real_eigvecs
 #----------------------------------
