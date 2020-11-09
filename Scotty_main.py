@@ -15,11 +15,11 @@ input_filename_suffix = '_29908_200'
 #input_filename_suffix = ''
 
 tau_step = 1.0
-numberOfTauPoints = 2501
+numberOfTauPoints = 751
 saveInterval = 1  # saves every n time steps
 
-poloidal_launch_angle_Torbeam = 4.0 # deg
-toroidal_launch_angle_Torbeam = -5.5 # deg
+poloidal_launch_angle_Torbeam = 10.0 # deg
+toroidal_launch_angle_Torbeam = 0.0 # deg
 #toroidal_launch_angle_Torbeam_scan = np.linspace(-3,-8,51)
 
 launch_freq_GHz = 55.0
@@ -30,9 +30,9 @@ vacuumLaunch_flag = True # If true, the launch_position is in vacuum. If false, 
 
 
 vacuum_propagation_flag = True #If true, use analytical propagation until poloidal_flux_enter is reached. If false, start propagating numerically straight away.
-poloidal_flux_enter = 1.6
+poloidal_flux_enter = 1.23
 
-Psi_BC_flag = False # Currently only implemented if vacuum_propagation_flag = True. This solves the boundary conditions for the 3D matrix Psi, which is necessary if there is a discontinuity in the first derivative of density (or B field)
+Psi_BC_flag = True # This solves the boundary conditions for the 3D matrix Psi, which is necessary if there is a discontinuity in the first derivative of density (or B field)
 
 
 
@@ -67,7 +67,7 @@ beam_me_up(tau_step,
            Psi_BC_flag,
            poloidal_flux_enter,
            input_filename_suffix,
-           output_filename_suffix='3',
+           output_filename_suffix='0',
            figure_flag= True)
 
 #for ii in range(0,51):
