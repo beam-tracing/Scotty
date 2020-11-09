@@ -18,7 +18,7 @@ tau_step = 1.0
 numberOfTauPoints = 751
 saveInterval = 1  # saves every n time steps
 
-poloidal_launch_angle_Torbeam = 0.0 # deg
+poloidal_launch_angle_Torbeam = 10.0 # deg
 toroidal_launch_angle_Torbeam = 0.0 # deg
 #toroidal_launch_angle_Torbeam_scan = np.linspace(-3,-8,51)
 
