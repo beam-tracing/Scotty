@@ -360,7 +360,7 @@ def beam_me_up(tau_step,
                                             launch_angular_frequency, mode_flag, delta_Z, 
                                             interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z)
                 d_poloidal_flux_d_R_boundary = find_d_poloidal_flux_dR(initial_position[0], initial_position[2], delta_R, interp_poloidal_flux)
-                d_poloidal_flux_d_Z_boundary = find_d_poloidal_flux_dR(initial_position[0], initial_position[2], delta_R, interp_poloidal_flux)
+                d_poloidal_flux_d_Z_boundary = find_d_poloidal_flux_dZ(initial_position[0], initial_position[2], delta_R, interp_poloidal_flux)
                 
                 Psi_3D_lab_initial = find_Psi_3D_plasma(Psi_3D_lab_entry,
                                                         dH_dKR_initial, dH_dKzeta_initial, dH_dKZ_initial,
@@ -377,7 +377,7 @@ def beam_me_up(tau_step,
             initial_position   = launch_position            
             
             distance_from_launch_to_entry=None
-            Psi_3D_lab_entry_cartersian = np.full_like(Psi_3D_lab_launch,fill_value=None)
+            Psi_3D_lab_entry_cartersian = np.full_like(Psi_3D_lab_launch,fill_value=np.nan)
             
 
     else:
@@ -1078,7 +1078,7 @@ def beam_me_up(tau_step,
         plt.xlabel('R / m') # x-direction
         plt.ylabel('z / m')
     
-        contour_levels = np.linspace(0,1,11)
+        contour_levels = np.linspace(0,1.3,27)
         CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels)
         plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
         plt.plot(

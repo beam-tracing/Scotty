@@ -411,11 +411,19 @@ def find_Psi_3D_plasma(Psi_vacuum_3D,
             Psi_v_zeta_zeta, 
             Psi_v_R_R * d_poloidal_flux_d_Z**2 - 2 * Psi_v_R_Z * d_poloidal_flux_d_R * d_poloidal_flux_d_Z + Psi_v_Z_Z * d_poloidal_flux_d_R **2, 
             - Psi_v_R_zeta * d_poloidal_flux_d_Z + Psi_v_zeta_Z * d_poloidal_flux_d_R, 
-            dH_dR, 
-            dH_dZ, 
+            -dH_dR, 
+            -dH_dZ, 
             0          
            ] )
-    
+    print(interface_matrix)
+    print(np.array([
+            Psi_v_zeta_zeta, 
+            Psi_v_R_R * d_poloidal_flux_d_Z**2 - 2 * Psi_v_R_Z * d_poloidal_flux_d_R * d_poloidal_flux_d_Z + Psi_v_Z_Z * d_poloidal_flux_d_R **2, 
+            - Psi_v_R_zeta * d_poloidal_flux_d_Z + Psi_v_zeta_Z * d_poloidal_flux_d_R, 
+            -dH_dR, 
+            -dH_dZ, 
+            0          
+           ] ))
     Psi_3D_plasma = np.zeros([3,3],dtype='complex128')
     Psi_3D_plasma[0,0] = Psi_p_R_R
     Psi_3D_plasma[1,1] = Psi_p_zeta_zeta
