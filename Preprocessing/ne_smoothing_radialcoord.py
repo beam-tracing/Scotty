@@ -20,7 +20,7 @@ from scipy import signal as signal
 input_files_path ='D:\\Dropbox\\VHChen2018\\Data\\Input_Files_29Apr2019\\'
 torbeam_directory_path = 'D:\\Dropbox\\VHChen2018\\Data\\Input_Files_29Apr2019\\'
 
-suffix = '_29908_200'
+suffix = '_29905_200'
 ne_filename = input_files_path + 'ne' +suffix+ '.dat'
 
 ne_data = np.fromfile(ne_filename,dtype=float, sep='   ') # electron density as a function of poloidal flux label
@@ -31,7 +31,7 @@ ne_data_density_array = ne_data[2::2] # in units of 10.0**19 m-3
 #ne_data_flux_array = ne_data_radialcoord_array**2
 ne_data_flux_array = ne_data[1::2] # My new IDL file outputs the flux density directly, instead of radialcoord
 
-interp_length = 201
+interp_length = 2001
 psi_end = 2.0
 flux_interp_array = np.linspace(0,psi_end,interp_length)
 
@@ -49,7 +49,7 @@ interp_cubic2 = interpolate.interp1d(ne_data_flux_array, 1.05*ne_data_density_ar
                                     fill_value=(core_density,0), kind='cubic', bounds_error=False)
 density_interp_array2 = interp_cubic2(flux_interp_array)
 
-window_length_interp = 41
+window_length_interp = 401
 polyorder_interp = 3
 density_smoothed_array = signal.savgol_filter(density_interp_array, window_length_interp, 
                                               polyorder_interp, deriv=0, delta=1.0, 
