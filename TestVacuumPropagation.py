@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 
 
-loadfile = np.load('data_output1.npz')
+loadfile = np.load('data_output.npz')
 q_R_array1 = loadfile['q_R_array']
 q_zeta_array1 = loadfile['q_zeta_array']
 q_Z_array1 = loadfile['q_Z_array']
@@ -24,10 +24,18 @@ dH_dKZ_output1 = loadfile['dH_dKZ_output']
 dH_dR_output1 = loadfile['dH_dR_output']
 dH_dZ_output1 = loadfile['dH_dZ_output']
 distance_from_launch_to_entry1 = loadfile['distance_from_launch_to_entry']
+grad_grad_H_output1 = loadfile['grad_grad_H_output']
+gradK_grad_H_output1 = loadfile['gradK_grad_H_output']
+gradK_gradK_H_output1 = loadfile['gradK_gradK_H_output']
 loadfile.close()
 
 loadfile = np.load('analysis_output1.npz')
 distance_along_line1 = loadfile['distance_along_line']
+in_index = loadfile['in_index']
+out_index = loadfile['out_index']
+Psi_xx_output1 = loadfile['Psi_xx_output']
+Psi_xy_output1 = loadfile['Psi_xy_output']
+Psi_yy_output1 = loadfile['Psi_yy_output']
 loadfile.close()
 
 loadfile = np.load('data_output2.npz')
@@ -43,12 +51,16 @@ dH_dKZ_output2 = loadfile['dH_dKZ_output']
 dH_dR_output2 = loadfile['dH_dR_output']
 dH_dZ_output2 = loadfile['dH_dZ_output']
 distance_from_launch_to_entry2 = loadfile['distance_from_launch_to_entry']
+grad_grad_H_output2 = loadfile['grad_grad_H_output']
+gradK_grad_H_output2 = loadfile['gradK_grad_H_output']
+gradK_gradK_H_output2 = loadfile['gradK_gradK_H_output']
 loadfile.close()
 
 loadfile = np.load('analysis_output2.npz')
 distance_along_line2 = loadfile['distance_along_line']
-in_index = loadfile['in_index']
-out_index = loadfile['out_index']
+Psi_xx_output2 = loadfile['Psi_xx_output']
+Psi_xy_output2 = loadfile['Psi_xy_output']
+Psi_yy_output2 = loadfile['Psi_yy_output']
 loadfile.close()
 
 loadfile = np.load('data_output3.npz')
@@ -64,10 +76,16 @@ dH_dKZ_output3 = loadfile['dH_dKZ_output']
 dH_dR_output3 = loadfile['dH_dR_output']
 dH_dZ_output3 = loadfile['dH_dZ_output']
 distance_from_launch_to_entry3 = loadfile['distance_from_launch_to_entry']
+grad_grad_H_output3 = loadfile['grad_grad_H_output']
+gradK_grad_H_output3 = loadfile['gradK_grad_H_output']
+gradK_gradK_H_output3 = loadfile['gradK_gradK_H_output']
 loadfile.close()
 
 loadfile = np.load('analysis_output3.npz')
 distance_along_line3 = loadfile['distance_along_line']
+Psi_xx_output3 = loadfile['Psi_xx_output']
+Psi_xy_output3 = loadfile['Psi_xy_output']
+Psi_yy_output3 = loadfile['Psi_yy_output']
 loadfile.close()
 
 plt.figure()
@@ -180,6 +198,194 @@ plt.title('dH_dKZ')
 
 
 
+
+
+
+
+plt.figure()
+plt.subplot(2,2,1)
+plt.plot(distance_along_line1,np.real(Psi_xx_output1),'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,np.real(Psi_xx_output2),'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,np.real(Psi_xx_output3),'b')
+#plt.axvline(distance_along_line1[in_index],color='k')
+#plt.axvline(distance_along_line1[out_index],color='k')
+plt.title('Re [Psi_xx]')
+
+plt.subplot(2,2,2)
+plt.plot(distance_along_line1,np.real(Psi_xy_output1),'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,np.real(Psi_xy_output2),'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,np.real(Psi_xy_output3),'b')
+#plt.axvline(distance_along_line1[in_index],color='k')
+#plt.axvline(distance_along_line1[out_index],color='k')
+plt.title('Re [Psi_xy]')
+
+plt.subplot(2,2,3)
+
+
+plt.subplot(2,2,4)
+plt.plot(distance_along_line1,np.real(Psi_yy_output1),'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,np.real(Psi_yy_output2),'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,np.real(Psi_yy_output3),'b')
+#plt.axvline(distance_along_line1[in_index],color='k')
+#plt.axvline(distance_along_line1[out_index],color='k')
+plt.title('Re [Psi_yy]')
+
+
+
+
+plt.figure()
+plt.subplot(2,2,1)
+plt.plot(distance_along_line1,np.imag(Psi_xx_output1),'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,np.imag(Psi_xx_output2),'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,np.imag(Psi_xx_output3),'b')
+#plt.axvline(distance_along_line1[in_index],color='k')
+#plt.axvline(distance_along_line1[out_index],color='k')
+plt.title('Im [Psi_xx]')
+
+plt.subplot(2,2,2)
+plt.plot(distance_along_line1,np.imag(Psi_xy_output1),'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,np.imag(Psi_xy_output2),'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,np.imag(Psi_xy_output3),'b')
+#plt.axvline(distance_along_line1[in_index],color='k')
+#plt.axvline(distance_along_line1[out_index],color='k')
+plt.title('Im [Psi_xy]')
+
+plt.subplot(2,2,3)
+
+
+plt.subplot(2,2,4)
+plt.plot(distance_along_line1,np.imag(Psi_yy_output1),'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,np.imag(Psi_yy_output2),'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,np.imag(Psi_yy_output3),'b')
+#plt.axvline(distance_along_line1[in_index],color='k')
+#plt.axvline(distance_along_line1[out_index],color='k')
+plt.title('Im [Psi_yy]')
+
+
+
+plt.figure()
+plt.subplot(3,3,1)
+plt.plot(distance_along_line1,grad_grad_H_output1[:,0,0],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,grad_grad_H_output2[:,0,0],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,grad_grad_H_output3[:,0,0],'b')
+
+plt.subplot(3,3,2)
+
+plt.subplot(3,3,3)
+plt.plot(distance_along_line1,grad_grad_H_output1[:,0,2],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,grad_grad_H_output2[:,0,2],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,grad_grad_H_output3[:,0,2],'b')
+
+plt.subplot(3,3,4)
+
+plt.subplot(3,3,5)
+
+plt.subplot(3,3,6)
+
+plt.subplot(3,3,7)
+#plt.plot(distance_along_line1,grad_grad_H_output1[:,2,0],'r')
+#plt.plot(distance_along_line2+distance_from_launch_to_entry2,grad_grad_H_output2[:,2,0],'g')
+#plt.plot(distance_along_line3+distance_from_launch_to_entry3,grad_grad_H_output3[:,2,0],'b')
+
+plt.subplot(3,3,8)
+
+plt.subplot(3,3,9)
+plt.plot(distance_along_line1,grad_grad_H_output1[:,2,2],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,grad_grad_H_output2[:,2,2],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,grad_grad_H_output3[:,2,2],'b')
+
+
+
+
+
+plt.figure()
+plt.subplot(3,3,1)
+plt.plot(distance_along_line1,gradK_grad_H_output1[:,0,0],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_grad_H_output2[:,0,0],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_grad_H_output3[:,0,0],'b')
+
+plt.subplot(3,3,2)
+
+plt.subplot(3,3,3)
+plt.plot(distance_along_line1,gradK_grad_H_output1[:,0,2],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_grad_H_output2[:,0,2],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_grad_H_output3[:,0,2],'b')
+
+plt.subplot(3,3,4)
+plt.plot(distance_along_line1,gradK_grad_H_output1[:,1,0],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_grad_H_output2[:,1,0],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_grad_H_output3[:,1,0],'b')
+
+plt.subplot(3,3,5)
+
+plt.subplot(3,3,6)
+plt.plot(distance_along_line1,gradK_grad_H_output1[:,1,2],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_grad_H_output2[:,1,2],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_grad_H_output3[:,1,2],'b')
+
+plt.subplot(3,3,7)
+plt.plot(distance_along_line1,gradK_grad_H_output1[:,2,0],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_grad_H_output2[:,2,0],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_grad_H_output3[:,2,0],'b')
+
+plt.subplot(3,3,8)
+
+plt.subplot(3,3,9)
+plt.plot(distance_along_line1,gradK_grad_H_output1[:,2,2],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_grad_H_output2[:,2,2],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_grad_H_output3[:,2,2],'b')
+
+
+
+plt.figure()
+plt.subplot(3,3,1)
+plt.plot(distance_along_line1,gradK_gradK_H_output1[:,0,0],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_gradK_H_output2[:,0,0],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_gradK_H_output3[:,0,0],'b')
+
+plt.subplot(3,3,2)
+plt.plot(distance_along_line1,gradK_gradK_H_output1[:,0,1],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_gradK_H_output2[:,0,1],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_gradK_H_output3[:,0,1],'b')
+
+plt.subplot(3,3,3)
+plt.plot(distance_along_line1,gradK_gradK_H_output1[:,0,2],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_gradK_H_output2[:,0,2],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_gradK_H_output3[:,0,2],'b')
+
+plt.subplot(3,3,4)
+#plt.plot(distance_along_line1,gradK_gradK_H_output1[:,1,0],'r')
+#plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_gradK_H_output2[:,1,0],'g')
+#plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_gradK_H_output3[:,1,0],'b')
+
+plt.subplot(3,3,5)
+plt.plot(distance_along_line1,gradK_gradK_H_output1[:,1,1],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_gradK_H_output2[:,1,1],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_gradK_H_output3[:,1,1],'b')
+
+plt.subplot(3,3,6)
+plt.plot(distance_along_line1,gradK_gradK_H_output1[:,1,2],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_gradK_H_output2[:,1,2],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_gradK_H_output3[:,1,2],'b')
+
+plt.subplot(3,3,7)
+#plt.plot(distance_along_line1,gradK_gradK_H_output1[:,2,0],'r')
+#plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_gradK_H_output2[:,2,0],'g')
+#plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_gradK_H_output3[:,2,0],'b')
+
+plt.subplot(3,3,8)
+#plt.plot(distance_along_line1,gradK_gradK_H_output1[:,2,1],'r')
+#plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_gradK_H_output2[:,2,1],'g')
+#plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_gradK_H_output3[:,2,1],'b')
+
+plt.subplot(3,3,9)
+plt.plot(distance_along_line1,gradK_gradK_H_output1[:,2,2],'r')
+plt.plot(distance_along_line2+distance_from_launch_to_entry2,gradK_gradK_H_output2[:,2,2],'g')
+plt.plot(distance_along_line3+distance_from_launch_to_entry3,gradK_gradK_H_output3[:,2,2],'b')
+
+
+
+
 #numberOfDataPoints = len(distance_along_line1)
 #point_spacing1_cyl = np.zeros(numberOfDataPoints)
 #point_spacing2_cyl = np.zeros(numberOfDataPoints)
@@ -212,10 +418,11 @@ plt.title('dH_dKZ')
 #
 #    
 #    
+##    
 #    
-    
-    
-    
-    
-    
+#    
+#for ii in range(0,numberOfDataPoints):
+#    find_widths_and_curvatures(Psi_xx, Psi_xy, Psi_yy,K_magnitude)
+#    
+#    
     
