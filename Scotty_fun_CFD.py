@@ -50,18 +50,6 @@ def find_dH_dKR(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag,
     return dH_dKR
 
 
-def find_dH_dKZ(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag, delta_K_Z, 
-                interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z):
-    
-    H_plus  = find_H(q_R, q_Z, K_R, K_zeta, K_Z+delta_K_Z, launch_angular_frequency, mode_flag, 
-                     interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z)
-    H_minus = find_H(q_R, q_Z, K_R, K_zeta, K_Z-delta_K_Z, launch_angular_frequency, mode_flag, 
-                     interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z)
-    dH_dKZ = (H_plus - H_minus) / (2 * delta_K_Z)
-    
-    return dH_dKZ
-
-
 def find_dH_dKzeta(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag, delta_K_zeta, 
                    interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z):
     
@@ -73,6 +61,18 @@ def find_dH_dKzeta(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_fl
     
     return dH_dKzeta
       
+
+def find_dH_dKZ(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag, delta_K_Z, 
+                interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z):
+    
+    H_plus  = find_H(q_R, q_Z, K_R, K_zeta, K_Z+delta_K_Z, launch_angular_frequency, mode_flag, 
+                     interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z)
+    H_minus = find_H(q_R, q_Z, K_R, K_zeta, K_Z-delta_K_Z, launch_angular_frequency, mode_flag, 
+                     interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z)
+    dH_dKZ = (H_plus - H_minus) / (2 * delta_K_Z)
+    
+    return dH_dKZ
+
 
 def find_d2H_dR2(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag, delta_R, 
                  interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z):
@@ -148,7 +148,7 @@ def find_d2H_dKR_dKzeta(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mo
     return d2H_dKR_dKzeta
 
 
-def find_d2H_dKR_dKz(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag, delta_K_R, delta_K_Z, 
+def find_d2H_dKR_dKZ(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag, delta_K_R, delta_K_Z, 
                      interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z):
     
     H_plus_K_R_plus_K_z   = find_H(q_R, q_Z, K_R+delta_K_R, K_zeta, K_Z+delta_K_Z, launch_angular_frequency, mode_flag, 
@@ -177,7 +177,7 @@ def find_d2H_dKzeta2(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_
     
     return d2H_dKzeta2
 
-def find_d2H_dKzeta_dKz(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag, delta_K_zeta, delta_K_Z, 
+def find_d2H_dKzeta_dKZ(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag, delta_K_zeta, delta_K_Z, 
                         interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z):
     
     H_plus_K_zeta_plus_K_z   = find_H(q_R, q_Z, K_R, K_zeta+delta_K_zeta, K_Z+delta_K_Z, launch_angular_frequency, mode_flag, 
