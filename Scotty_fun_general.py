@@ -81,7 +81,7 @@ def find_q_lab_Cartesian(q_lab):
     q_zeta = q_lab[1]
     q_Z    = q_lab[2]
     
-    q_lab_Cartesian = np.zeros(np.shape(q_lab))
+    q_lab_Cartesian = np.zeros_like(q_lab)
     q_lab_Cartesian[0] = q_R * np.cos(q_zeta)
     q_lab_Cartesian[1] = q_R * np.sin(q_zeta)
     q_lab_Cartesian[2] = q_Z
@@ -92,7 +92,7 @@ def find_q_lab(q_lab_Cartesian):
     q_Y = q_lab_Cartesian[1]
     q_Z = q_lab_Cartesian[2]
     
-    q_lab = np.zeros(3)
+    q_lab = np.zeros_like(q_lab_Cartesian)
     q_lab[0] = np.sqrt(q_X**2 + q_Y**2)
     q_lab[1] = np.arctan2(q_Y,q_X)
     q_lab[2] = q_Z    
@@ -413,17 +413,9 @@ def find_Psi_3D_plasma(Psi_vacuum_3D,
             - Psi_v_R_zeta * d_poloidal_flux_d_Z + Psi_v_zeta_Z * d_poloidal_flux_d_R, 
             -dH_dR, 
             -dH_dZ, 
-            0          
+            0        
            ] )
-    print(interface_matrix)
-    print(np.array([
-            Psi_v_zeta_zeta, 
-            Psi_v_R_R * d_poloidal_flux_d_Z**2 - 2 * Psi_v_R_Z * d_poloidal_flux_d_R * d_poloidal_flux_d_Z + Psi_v_Z_Z * d_poloidal_flux_d_R **2, 
-            - Psi_v_R_zeta * d_poloidal_flux_d_Z + Psi_v_zeta_Z * d_poloidal_flux_d_R, 
-            -dH_dR, 
-            -dH_dZ, 
-            0          
-           ] ))
+
     Psi_3D_plasma = np.zeros([3,3],dtype='complex128')
     Psi_3D_plasma[0,0] = Psi_p_R_R
     Psi_3D_plasma[1,1] = Psi_p_zeta_zeta
