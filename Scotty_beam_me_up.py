@@ -861,7 +861,7 @@ def beam_me_up(tau_step,
                  tau_array=tau_array, q_R_array=q_R_array, q_zeta_array=q_zeta_array, q_Z_array=q_Z_array,
                  K_R_array=K_R_array, K_zeta_initial=K_zeta_initial, K_Z_array=K_Z_array,
                  Psi_3D_output=Psi_3D_output, Psi_3D_lab_launch=Psi_3D_lab_launch,
-#                 Psi_3D_lab_entry=Psi_3D_lab_entry,
+                 Psi_3D_lab_entry=Psi_3D_lab_entry,
                  distance_from_launch_to_entry=distance_from_launch_to_entry,
                  g_hat_output=g_hat_output,g_magnitude_output=g_magnitude_output,
                  B_total_output=B_total_output,
@@ -1007,6 +1007,12 @@ def beam_me_up(tau_step,
 #                                          interp_poloidal_flux,interp_density_1D,interp_B_R,interp_B_T,interp_B_Z)
 #    d_K_d_tau_analysis = np.gradient(K_magnitude_array,tau_array)
 #    localisation_piece = g_magnitude_launch**2/abs(g_magnitude_output*d_K_d_tau_analysis)
+    
+    R_midplane_points = np.linspace(data_R_coord[0],data_R_coord[-1],1000)
+    poloidal_flux_on_midplane = np.zeros_like(R_midplane_points)
+    for ii in range(0,1000):
+        poloidal_flux_on_midplane[ii] = interp_poloidal_flux(R_midplane_points[ii],0) # poloidal flux at R and z=0
+        
     # -------------------
 
 
@@ -1046,6 +1052,7 @@ def beam_me_up(tau_step,
     np.savez('analysis_output' + output_filename_suffix, 
              Psi_xx_output = Psi_xx_output, Psi_xy_output = Psi_xy_output, Psi_yy_output = Psi_yy_output,
              Psi_xx_entry=Psi_xx_entry, Psi_xy_entry=Psi_xy_entry, Psi_yy_entry=Psi_yy_entry,
+             Psi_3D_Cartesian=Psi_3D_Cartesian,
              M_xx_output = M_xx_output, M_xy_output = M_xy_output, M_yy_output = M_yy_output,
              xhat_dot_grad_bhat_dot_xhat_output=xhat_dot_grad_bhat_dot_xhat_output,
              xhat_dot_grad_bhat_dot_yhat_output=xhat_dot_grad_bhat_dot_yhat_output,
@@ -1060,7 +1067,8 @@ def beam_me_up(tau_step,
              RZ_distance_along_line=RZ_distance_along_line,
              distance_along_line=distance_along_line,
              k_perp_1_backscattered = k_perp_1_backscattered,K_magnitude_array=K_magnitude_array,
-             cutoff_index=cutoff_index,in_index=in_index,out_index=out_index
+             cutoff_index=cutoff_index,in_index=in_index,out_index=out_index,
+             poloidal_flux_on_midplane=poloidal_flux_on_midplane,R_midplane_points=R_midplane_points
              )
 #    print('Analysis data saved')
     # -------------------
@@ -1072,14 +1080,16 @@ def beam_me_up(tau_step,
     if figure_flag:
         print('Making figures')
         
-        # Plots the beam path on the R Z plane
+        """
+        Plots the beam path on the R Z plane
+        """
         plt.figure()
         plt.title('Rz')
         plt.xlabel('R / m') # x-direction
         plt.ylabel('z / m')
     
-        contour_levels = np.linspace(0,1.3,27)
-        CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels)
+        contour_levels = np.linspace(0,1.0,11)
+        CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels,vmin=0,vmax=1,cmap='plasma_r')
         plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
         plt.plot(
                 np.concatenate([[launch_position[0],initial_position[0]],q_R_array ]),
@@ -1092,7 +1102,57 @@ def beam_me_up(tau_step,
         plt.savefig('Ray1_' + output_filename_suffix)
         plt.close()
         
+        """
+        Plots Psi before and after the BCs are applied 
+        """
+        K_magnitude_entry = np.sqrt(K_R_entry**2 + K_zeta_entry**2 * entry_position[0]**2 + K_Z_entry**2)
+        
+        Psi_w_entry = np.array([
+        [Psi_xx_entry,Psi_xy_entry],
+        [Psi_xy_entry,Psi_yy_entry]
+        ])
+        
+        Psi_w_initial = np.array([
+                [Psi_xx_output[0],Psi_xy_output[0]],
+                [Psi_xy_output[0],Psi_yy_output[0]]
+                ])
+        
+        [Psi_w_entry_real_eigval_a, Psi_w_entry_real_eigval_b], [Psi_w_entry_real_eigvec_a, Psi_w_entry_real_eigvec_b] = np.linalg.eig(np.real(Psi_w_entry))
+        [Psi_w_entry_imag_eigval_a, Psi_w_entry_imag_eigval_b], [Psi_w_entry_imag_eigvec_a, Psi_w_entry_imag_eigvec_b] = np.linalg.eig(np.imag(Psi_w_entry))
+        
+        [Psi_w_initial_real_eigval_a, Psi_w_initial_real_eigval_b], [Psi_w_initial_real_eigvec_a, Psi_w_initial_real_eigvec_b] = np.linalg.eig(np.real(Psi_w_initial))
+        [Psi_w_initial_imag_eigval_a, Psi_w_initial_imag_eigval_b], [Psi_w_initial_imag_eigvec_a, Psi_w_initial_imag_eigvec_b] = np.linalg.eig(np.imag(Psi_w_initial))
+        
+        
+        numberOfPlotPoints = 50
+        sin_array = np.sin(np.linspace(0,2*np.pi,numberOfPlotPoints))
+        cos_array = np.cos(np.linspace(0,2*np.pi,numberOfPlotPoints))
+        
+        width_ellipse_entry = np.zeros([numberOfPlotPoints,2])
+        width_ellipse_initial = np.zeros([numberOfPlotPoints,2])
+        rad_curv_ellipse_entry = np.zeros([numberOfPlotPoints,2])
+        rad_curv_ellipse_initial = np.zeros([numberOfPlotPoints,2])
+        for ii in range(0,numberOfPlotPoints):
+            width_ellipse_entry[ii,:] = np.sqrt(2/Psi_w_entry_imag_eigval_a)*Psi_w_entry_imag_eigvec_a*sin_array[ii] + np.sqrt(2/Psi_w_entry_imag_eigval_b)*Psi_w_entry_imag_eigvec_b*cos_array[ii]
+            width_ellipse_initial[ii,:] = np.sqrt(2/Psi_w_initial_imag_eigval_a)*Psi_w_initial_imag_eigvec_a*sin_array[ii] + np.sqrt(2/Psi_w_initial_imag_eigval_b)*Psi_w_initial_imag_eigvec_b*cos_array[ii]
+        
+            rad_curv_ellipse_entry[ii,:] = (K_magnitude_entry/Psi_w_entry_real_eigval_a)*Psi_w_entry_real_eigvec_a*sin_array[ii] + (K_magnitude_entry/Psi_w_entry_real_eigval_b)*Psi_w_entry_real_eigvec_b*cos_array[ii]
+            rad_curv_ellipse_initial[ii,:] = (K_magnitude_array[0]/Psi_w_initial_real_eigval_a)*Psi_w_initial_real_eigvec_a*sin_array[ii] + (K_magnitude_array[0]/Psi_w_initial_real_eigval_b)*Psi_w_initial_real_eigvec_b*cos_array[ii]
 
+        
+        plt.figure()
+        plt.subplot(1,2,1)
+        plt.plot(width_ellipse_entry[:,0],width_ellipse_entry[:,1])
+        plt.plot(width_ellipse_initial[:,0],width_ellipse_initial[:,1])
+        plt.gca().set_aspect('equal', adjustable='box')
+        
+        plt.subplot(1,2,2)
+        plt.plot(rad_curv_ellipse_entry[:,0],rad_curv_ellipse_entry[:,1])
+        plt.plot(rad_curv_ellipse_initial[:,0],rad_curv_ellipse_initial[:,1])
+        plt.gca().set_aspect('equal', adjustable='box')
+        plt.savefig('BC_' + output_filename_suffix)
+        plt.close()
+        
         print('Figures have been saved')
     ## -------------------
 
