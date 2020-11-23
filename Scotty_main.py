@@ -11,16 +11,16 @@ from Scotty_beam_me_up import beam_me_up
 from Scotty_fun_general import find_q_lab_Cartesian, find_q_lab, find_K_lab_Cartesian, find_K_lab
 import numpy as np
 
-input_filename_suffix = '_29908_200'
+input_filename_suffix = '_29910_190'
 #input_filename_suffix = ''
 
 tau_step = 1.0
-numberOfTauPoints = 751
+numberOfTauPoints = 1251
 saveInterval = 1  # saves every n time steps
 
-poloidal_launch_angle_Torbeam = 10.0 # deg
-toroidal_launch_angle_Torbeam = 5.0 # deg
-#toroidal_launch_angle_Torbeam_scan = np.linspace(-3,-8,51)
+poloidal_launch_angle_Torbeam = 4.0 # deg
+toroidal_launch_angle_Torbeam = -5.25 # deg
+#toroidal_launch_angle_Torbeam_scan = np.linspace(2,-6,41)
 
 launch_freq_GHz = 55.0
 mode_flag = 1 # O-mode (1) or X-mode (-1)
@@ -30,7 +30,7 @@ vacuumLaunch_flag = True # If true, the launch_position is in vacuum. If false, 
 
 
 vacuum_propagation_flag = True #If true, use analytical propagation until poloidal_flux_enter is reached. If false, start propagating numerically straight away.
-poloidal_flux_enter = 1.23
+poloidal_flux_enter = 1.2612056746393183
 
 Psi_BC_flag = True # This solves the boundary conditions for the 3D matrix Psi, which is necessary if there is a discontinuity in the first derivative of density (or B field)
 
@@ -67,10 +67,10 @@ beam_me_up(tau_step,
            Psi_BC_flag,
            poloidal_flux_enter,
            input_filename_suffix,
-           output_filename_suffix='0',
+           output_filename_suffix='1',
            figure_flag= True)
 
-#for ii in range(0,51):
+#for ii in range(0,41):
 #    print('Iteration number: ' + str(ii))
 #    
 #    toroidal_launch_angle_Torbeam = toroidal_launch_angle_Torbeam_scan[ii]
@@ -82,9 +82,12 @@ beam_me_up(tau_step,
 #               toroidal_launch_angle_Torbeam,
 #               launch_freq_GHz,
 #               mode_flag,
+#               vacuumLaunch_flag,
 #               launch_beam_width,
 #               launch_beam_curvature,
 #               launch_position,
+#               vacuum_propagation_flag,
+#               Psi_BC_flag,
 #               poloidal_flux_enter,
 #               input_filename_suffix,
 #               output_filename_suffix=str(ii),
