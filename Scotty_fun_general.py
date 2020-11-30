@@ -321,7 +321,7 @@ def find_Booker_gamma(electron_density, B_Total, launch_angular_frequency):
 
 # Functions (beam tracing 2)
 def find_H(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag, 
-           interp_poloidal_flux, interp_density_1D, find_B_R, find_B_T, find_B_Z):
+           interp_poloidal_flux, find_density_1D, find_B_R, find_B_T, find_B_Z):
     
     # For this functions to work,  the interpolation functions for
     # electron density,  B_Total,  and psi  (poloidal flux) must be
@@ -331,7 +331,7 @@ def find_H(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag,
     wavenumber_K0 = launch_angular_frequency / constants.c
 
     poloidal_flux = interp_poloidal_flux(q_R, q_Z)    
-    electron_density = interp_density_1D(poloidal_flux)
+    electron_density = find_density_1D(poloidal_flux)
     B_R = np.squeeze(find_B_R(q_R, q_Z))
     B_T = np.squeeze(find_B_T(q_R, q_Z))
     B_Z = np.squeeze(find_B_Z(q_R, q_Z))
@@ -347,7 +347,8 @@ def find_H(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag,
     
     H = (K_magnitude/wavenumber_K0)**2 + (
             Booker_beta - mode_flag *
-            np.sqrt(max(0, (Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
+            # np.sqrt(max(0, (Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
+            np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
             ) / (2 * Booker_alpha)
     
     return H
@@ -485,26 +486,26 @@ def find_distance_from_waist(width, wavenumber, curvature): #Finds how far you a
     return distance_from_waist
 
 #def find_g_magnitude(q_R,q_Z,K_R,K_zeta,K_Z,launch_angular_frequency,mode_flag,delta_K_R,delta_K_zeta,delta_K_Z,
-#                     interp_poloidal_flux,interp_density_1D,find_B_R,find_B_T,find_B_Z): # Finds the magnitude of the group velocity. This method is slow, do not use in main loop.\
+#                     interp_poloidal_flux,find_density_1D,find_B_R,find_B_T,find_B_Z): # Finds the magnitude of the group velocity. This method is slow, do not use in main loop.\
 #    dH_dKR   = find_dH_dKR(
 #                           q_R,q_Z,
 #                           K_R,K_zeta,K_Z,
 #                           launch_angular_frequency,mode_flag,delta_K_R,
-#                           interp_poloidal_flux,interp_density_1D,
+#                           interp_poloidal_flux,find_density_1D,
 #                           find_B_R,find_B_T,find_B_Z
 #                          )
 #    dH_dKzeta = find_dH_dKzeta(
 #                               q_R,q_Z,
 #                               K_R,K_zeta,K_Z,
 #                               launch_angular_frequency,mode_flag,delta_K_zeta,
-#                               interp_poloidal_flux,interp_density_1D,
+#                               interp_poloidal_flux,find_density_1D,
 #                               find_B_R,find_B_T,find_B_Z
 #                              )
 #    dH_dKZ    = find_dH_dKZ(
 #                            q_R,q_Z,
 #                            K_R,K_zeta,K_Z,
 #                            launch_angular_frequency,mode_flag,delta_K_Z,
-#                            interp_poloidal_flux,interp_density_1D,
+#                            interp_poloidal_flux,find_density_1D,
 #                            find_B_R,find_B_T,find_B_Z
 #                           )    
 #    g_magnitude = (q_R**2 * dH_dKzeta**2 + dH_dKR**2 + dH_dKZ**2)**0.5       
@@ -609,6 +610,74 @@ def find_dB_dZ_CFD(q_R, q_Z, delta_Z, find_B_R, find_B_T, find_B_Z):
     
     dB_dZ = (B_magnitude_plus - B_magnitude_minus) / (2 * delta_Z)    
     return dB_dZ
+
+def find_d2B_dR2_CFD(q_R, q_Z, delta_R, find_B_R, find_B_T, find_B_Z): 
+    """
+    Finds \fract{d^2 B}{d R^2}, where B is the magnitude of the B field
+    """    
+    B_R_0 = np.squeeze(find_B_R(q_R, q_Z))
+    B_T_0 = np.squeeze(find_B_T(q_R, q_Z))
+    B_Z_0 = np.squeeze(find_B_Z(q_R, q_Z))
+    B_magnitude_0 = np.sqrt(B_R_0**2 + B_T_0**2 + B_Z_0**2)
+    
+    B_R_plus = np.squeeze(find_B_R(q_R+delta_R, q_Z))
+    B_T_plus = np.squeeze(find_B_T(q_R+delta_R, q_Z))
+    B_Z_plus = np.squeeze(find_B_Z(q_R+delta_R, q_Z))
+    B_magnitude_plus = np.sqrt(B_R_plus**2 + B_T_plus**2 + B_Z_plus**2)
+    
+    B_R_minus = np.squeeze(find_B_R(q_R-delta_R, q_Z))
+    B_T_minus = np.squeeze(find_B_T(q_R-delta_R, q_Z))
+    B_Z_minus = np.squeeze(find_B_Z(q_R-delta_R, q_Z))
+    B_magnitude_minus = np.sqrt(B_R_minus**2 + B_T_minus**2 + B_Z_minus**2)    
+    
+    d2B_dR2 = ( (1)*B_magnitude_minus + (-2)*B_magnitude_0 + (1)*B_magnitude_plus ) / (delta_R**2)
+    return d2B_dR2
+
+
+def find_d2B_dZ2_CFD(q_R, q_Z, delta_Z, find_B_R, find_B_T, find_B_Z):
+    
+    B_R_0 = np.squeeze(find_B_R(q_R, q_Z))
+    B_T_0 = np.squeeze(find_B_T(q_R, q_Z))
+    B_Z_0 = np.squeeze(find_B_Z(q_R, q_Z))
+    B_magnitude_0 = np.sqrt(B_R_0**2 + B_T_0**2 + B_Z_0**2)
+    
+    B_R_plus = np.squeeze(find_B_R(q_R, q_Z+delta_Z))
+    B_T_plus = np.squeeze(find_B_T(q_R, q_Z+delta_Z))
+    B_Z_plus = np.squeeze(find_B_Z(q_R, q_Z+delta_Z))
+    B_magnitude_plus = np.sqrt(B_R_plus**2 + B_T_plus**2 + B_Z_plus**2)
+    
+    B_R_minus = np.squeeze(find_B_R(q_R, q_Z-delta_Z))
+    B_T_minus = np.squeeze(find_B_T(q_R, q_Z-delta_Z))
+    B_Z_minus = np.squeeze(find_B_Z(q_R, q_Z-delta_Z))
+    B_magnitude_minus = np.sqrt(B_R_minus**2 + B_T_minus**2 + B_Z_minus**2)    
+    
+    d2B_dZ2 = ( (1)*B_magnitude_minus + (-2)*B_magnitude_0 + (1)*B_magnitude_plus ) / (delta_Z**2)    
+    return d2B_dZ2
+
+#def find_d2B_dR_dZ_CFD(q_R, q_Z, delta_R, delta_Z, find_B_R, find_B_T, find_B_Z):
+#    
+#    dB_dZ_0 = find_dB_dZ_FFD(q_R, 
+#                             q_Z, delta_Z, find_B_R, find_B_T, find_B_Z)
+#    dB_dZ_1 = find_dB_dZ_FFD(q_R+delta_R, 
+#                             q_Z, delta_Z, find_B_R, find_B_T, find_B_Z)
+#    dB_dZ_2 = find_dB_dZ_FFD(q_R+2*delta_R, 
+#                             q_Z, delta_Z, find_B_R, find_B_T, find_B_Z)
+#    d2B_dR_dZ = ( (-3/2)*dB_dZ_0 + (2)*dB_dZ_1 + (-1/2)*dB_dZ_2 ) / (delta_R)
+#    
+##    return d2B_dR_dZ
+#    
+#    
+#    
+#    
+#    
+#    
+#    B_plus_R_plus_Z   = find_H(q_R+delta_R, q_Z+delta_Z)
+#    B_plus_R_minus_Z  = find_H(q_R+delta_R, q_Z-delta_Z) 
+#    B_minus_R_plus_Z  = find_H(q_R-delta_R, q_Z+delta_Z)
+#    B_minus_R_minus_Z = find_H(q_R-delta_R, q_Z-delta_Z)
+#    d2B_dR_dZ = (B_plus_R_plus_Z - B_plus_R_minus_Z - B_minus_R_plus_Z + B_minus_R_minus_Z) / (4 * delta_R * delta_Z)    
+    
+    
 
 def find_dB_dR_FFD(q_R, q_Z, delta_R, find_B_R, find_B_T, find_B_Z): 
     """
@@ -718,4 +787,27 @@ def find_d2B_dR_dZ_FFD(q_R, q_Z, delta_R, delta_Z, find_B_R, find_B_T, find_B_Z)
     d2B_dR_dZ = ( (-3/2)*dB_dZ_0 + (2)*dB_dZ_1 + (-1/2)*dB_dZ_2 ) / (delta_R)
     
     return d2B_dR_dZ
+
+
+def find_d2_poloidal_flux_dR2(q_R, q_Z, delta_R, interp_poloidal_flux):
+    
+    poloidal_flux_0 = interp_poloidal_flux(q_R          , q_Z)
+    poloidal_flux_1 = interp_poloidal_flux(q_R+  delta_R, q_Z) 
+    poloidal_flux_2 = interp_poloidal_flux(q_R+2*delta_R, q_Z)
+    poloidal_flux_3 = interp_poloidal_flux(q_R+3*delta_R, q_Z)
+    d2_poloidal_flux_dR2 = ( (2)*poloidal_flux_0 + (-5)*poloidal_flux_1 + (4)*poloidal_flux_2 + (-1)*poloidal_flux_3 ) / (delta_R**2)
+    
+    return d2_poloidal_flux_dR2
+
+
+def find_d2_poloidal_flux_dZ2(q_R, q_Z, delta_Z, interp_poloidal_flux):
+    
+    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z          )
+    poloidal_flux_1 = interp_poloidal_flux(q_R, q_Z+  delta_Z) 
+    poloidal_flux_2 = interp_poloidal_flux(q_R, q_Z+2*delta_Z)
+    poloidal_flux_3 = interp_poloidal_flux(q_R, q_Z+3*delta_Z)
+    d2_poloidal_flux_dZ2 = ( (2)*poloidal_flux_0 + (-5)*poloidal_flux_1 + (4)*poloidal_flux_2 + (-1)*poloidal_flux_3 ) / (delta_Z**2)
+    
+    return d2_poloidal_flux_dZ2
+
 #----------------------------------
