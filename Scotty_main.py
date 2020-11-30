@@ -11,15 +11,15 @@ from Scotty_beam_me_up import beam_me_up
 from Scotty_fun_general import find_q_lab_Cartesian, find_q_lab, find_K_lab_Cartesian, find_K_lab
 import numpy as np
 
-input_filename_suffix = '_29910_190'
+input_filename_suffix = '_29905_190'
 #input_filename_suffix = ''
 
-tau_step = 1.0
-numberOfTauPoints = 1251
+tau_step = 0.5
+numberOfTauPoints = 2001
 saveInterval = 1  # saves every n time steps
 
 poloidal_launch_angle_Torbeam = 4.0 # deg
-toroidal_launch_angle_Torbeam = -5.25 # deg
+toroidal_launch_angle_Torbeam = -2.25 # deg
 #toroidal_launch_angle_Torbeam_scan = np.linspace(2,-6,41)
 
 launch_freq_GHz = 55.0
@@ -30,11 +30,11 @@ vacuumLaunch_flag = True # If true, the launch_position is in vacuum. If false, 
 
 
 vacuum_propagation_flag = True #If true, use analytical propagation until poloidal_flux_enter is reached. If false, start propagating numerically straight away.
-poloidal_flux_enter = 1.2612056746393183
+poloidal_flux_enter = 0.9473479057893939
 
 Psi_BC_flag = True # This solves the boundary conditions for the 3D matrix Psi, which is necessary if there is a discontinuity in the first derivative of density (or B field)
 
-
+find_B_method='efit'
 
 
 
@@ -63,11 +63,12 @@ beam_me_up(tau_step,
            launch_beam_width,
            launch_beam_curvature,
            launch_position,
+           find_B_method,
            vacuum_propagation_flag,
            Psi_BC_flag,
            poloidal_flux_enter,
            input_filename_suffix,
-           output_filename_suffix='1',
+           output_filename_suffix='9',
            figure_flag= True)
 
 #for ii in range(0,41):

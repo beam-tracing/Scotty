@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from Scotty_fun_general import find_waist, find_distance_from_waist,find_q_lab_Cartesian, find_nearest, contract_special
 
-suffix = ''
+suffix = '9'
 
 loadfile = np.load('data_output' + suffix + '.npz')
 tau_array = loadfile['tau_array']
@@ -53,6 +53,7 @@ g_hat_output = loadfile['g_hat_output']
 #K_g_array = loadfile['K_g_array']
 #d_K_g_d_tau_array = loadfile['d_K_g_d_tau_array']
 B_total_output = loadfile['B_total_output']
+b_hat_output = loadfile['b_hat_output']
 gradK_grad_H_output = loadfile['gradK_grad_H_output']
 gradK_gradK_H_output = loadfile['gradK_gradK_H_output']
 grad_grad_H_output = loadfile['grad_grad_H_output']
@@ -82,6 +83,12 @@ electron_density_debugging_3Z = loadfile['electron_density_debugging_3Z']
 electron_density_debugging_2R_2Z = loadfile['electron_density_debugging_2R_2Z']
 electron_density_output=loadfile['electron_density_output']
 poloidal_flux_output = loadfile['poloidal_flux_output']
+dpolflux_dR_FFD_debugging = loadfile['dpolflux_dR_FFD_debugging']
+dpolflux_dZ_FFD_debugging = loadfile['dpolflux_dZ_FFD_debugging']
+d2polflux_dR2_FFD_debugging = loadfile['d2polflux_dR2_FFD_debugging']
+d2polflux_dZ2_FFD_debugging = loadfile['d2polflux_dZ2_FFD_debugging']
+# KZ_debugging = loadfile['KZ_debugging']
+dH_dKZ_debugging = loadfile['dH_dKZ_debugging']
 loadfile.close()
 
 
@@ -372,7 +379,7 @@ plt.plot(distance_along_line,gradK_grad_H_output[:,2,2],'r')
 
 plt.figure()
 plt.subplot(3,3,1)
-plt.plot(distance_along_line,grad_grad_H_output[:,0,0],'r')
+plt.plot(distance_along_line,grad_grad_H_output[:,0,0],'or')
 plt.title('d2H_dR2')
 plt.subplot(3,3,2)
 plt.subplot(3,3,3)
@@ -404,6 +411,7 @@ plt.plot(distance_along_line,gradK_gradK_H_output[:,1,2],'r')
 plt.subplot(3,3,7)
 plt.subplot(3,3,8)
 plt.subplot(3,3,9)
+plt.title('d2H_dZ2')
 plt.plot(distance_along_line,gradK_gradK_H_output[:,2,2],'r')
 
 
@@ -445,17 +453,49 @@ plt.subplot(2,3,6)
 plt.plot(distance_along_line,d2B_dR_dZ_FFD_debugging,'k')
 plt.title('d2B_dR_dZ')
 
+plt.figure()
+plt.subplot(2,2,1)
+plt.plot(distance_along_line,dpolflux_dR_FFD_debugging,'k')
+plt.subplot(2,2,2)
+plt.plot(distance_along_line,dpolflux_dZ_FFD_debugging,'k')
+plt.subplot(2,2,3)
+plt.plot(distance_along_line,d2polflux_dR2_FFD_debugging,'k')
+plt.subplot(2,2,4)
+plt.plot(distance_along_line,d2polflux_dZ2_FFD_debugging,'k')
 
+plt.figure()
+plt.plot(distance_along_line,poloidal_flux_debugging_3R-poloidal_flux_output,'r')
 
+plt.figure()
+plt.plot(distance_along_line,B_total_output,'r')
+
+plt.figure()
+plt.subplot(1,3,1)
+plt.plot(distance_along_line,b_hat_output[:,0])
+plt.subplot(1,3,2)
+plt.plot(distance_along_line,b_hat_output[:,1])
+plt.subplot(1,3,3)
+plt.plot(distance_along_line,b_hat_output[:,2])
+
+plt.figure()
+plt.plot(dH_dKZ_debugging)
+
+# d2H_dKZ2_debugging = np.gradient(dH_dKZ_debugging,KZ_debugging)
+
+# plt.figure()
+# plt.plot(KZ_debugging, d2H_dKZ2_debugging)
+#poloidal_flux_debugging_1R = loadfile['poloidal_flux_debugging_1R']
+#poloidal_flux_debugging_2R = loadfile['poloidal_flux_debugging_2R']
+#poloidal_flux_debugging_3R = loadfile['poloidal_flux_debugging_2R']
 #
 #g_hat_Cartesian = np.zeros_like(g_hat_output)
 #g_hat_Cartesian[:,0] = g_hat_output[:,0]*np.cos(q_zeta_array ) - g_hat_output[:,1]*np.sin(q_zeta_array )
 #g_hat_Cartesian[:,1] = g_hat_output[:,0]*np.sin(q_zeta_array ) + g_hat_output[:,1]*np.cos(q_zeta_array )
 #g_hat_Cartesian[:,2] = g_hat_output[:,2]
 #
-plt.figure()
-plt.plot(distance_along_line,Psi_imag_eigvec[:,0,0],'r')
-plt.plot(distance_along_line,Psi_imag_eigvec[:,0,1],'g')
+#plt.figure()
+#plt.plot(distance_along_line,Psi_imag_eigvec[:,0,0],'r')
+#plt.plot(distance_along_line,Psi_imag_eigvec[:,0,1],'g')
 #
 #plt.figure()
 #plt.plot(distance_along_line,y_hat_output[:,0],'r')

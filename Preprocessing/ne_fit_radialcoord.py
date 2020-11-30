@@ -39,7 +39,7 @@ def linear_times_tanh_constrained(polflux,C_1,C_3,C_4):
 input_files_path ='D:\\Dropbox\\VHChen2020\\Data\\Input_Files_29Apr2019\\'
 torbeam_directory_path = 'D:\\Dropbox\\VHChen2020\\Data\\Input_Files_29Apr2019\\'
 
-suffix = '_29910_190'
+suffix = '_29905_190'
 ne_filename = input_files_path + 'ne' +suffix+ '.dat'
 
 ne_data = np.fromfile(ne_filename,dtype=float, sep='   ') # electron density as a function of poloidal flux label
