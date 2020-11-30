@@ -62,7 +62,7 @@ data_poloidal_flux_grid = np.transpose((np.asarray(data_poloidal_flux_grid)).res
 
 # Interpolation functions declared
 order = 3
-smoothing=1
+smoothing=2
 interp_B_R = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_R_grid, bbox=[None, None, None, None], kx=order, ky=order, s=smoothing)
 interp_B_T = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_T_grid, bbox=[None, None, None, None], kx=order, ky=order, s=smoothing)
 interp_B_Z = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_Z_grid, bbox=[None, None, None, None], kx=order, ky=order, s=smoothing)
@@ -85,10 +85,41 @@ interpolated_poloidal_flux = interp_poloidal_flux(interpolated_R_coord,interpola
 
 interpolated_poloidal_flux2 = np.zeros([numberOfInterpPoints,2*numberOfInterpPoints])
 
+plt.figure()
+plt.title('Rz')
+plt.xlabel('R / m') # x-direction5
+plt.ylabel('z / m')
+    
+contour_levels = np.linspace(0,1.0,11)
+CS = plt.contour(interpolated_R_coord, interpolated_Z_coord, np.transpose(interpolated_poloidal_flux), contour_levels,vmin=0,vmax=1,cmap='plasma_r')
+plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
+plt.xlim(interpolated_R_coord[0],interpolated_R_coord[-1])
+plt.ylim(interpolated_Z_coord[0],interpolated_Z_coord[-1])
 
+plt.figure()
+plt.title('Rz')
+plt.xlabel('R / m') # x-direction5
+plt.ylabel('z / m')
+    
+contour_levels = np.linspace(0,1.0,101)
+CS = plt.contourf(interpolated_R_coord, interpolated_Z_coord, np.transpose(interpolated_poloidal_flux),contour_levels,vmin=0,vmax=1,cmap='inferno_r')
+#plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
+plt.xlim(interpolated_R_coord[0],interpolated_R_coord[-1])
+plt.ylim(interpolated_Z_coord[0],interpolated_Z_coord[-1])
+
+
+
+
+
+
+
+
+
+
+#
 B_magnitude_grid = np.sqrt(data_B_R_grid**2 + data_B_T_grid**2 + data_B_Z_grid**2)
 grad_B_magnitude_grid = np.gradient(B_magnitude_grid,data_R_coord,data_Z_coord)
-grad_grad_B_magnitude_grid = np.gradient(grad_B_magnitude_grid,data_R_coord,data_Z_coord)
+#grad_grad_B_magnitude_grid = np.gradient(grad_B_magnitude_grid,data_R_coord,data_Z_coord)
 
 plt.figure(figsize=(15,5))
 plt.subplot(1,3,1)
@@ -155,27 +186,7 @@ plt.ylim(interpolated_Z_coord[0],interpolated_Z_coord[-1])
 #plt.xlim(data_R_coord[0],data_R_coord[-1])
 #plt.ylim(data_Z_coord[0],data_Z_coord[-1])
 #
-#plt.figure()
-#plt.title('Rz')
-#plt.xlabel('R / m') # x-direction5
-#plt.ylabel('z / m')
-#    
-#contour_levels = np.linspace(0,1.0,11)
-#CS = plt.contour(interpolated_R_coord, interpolated_Z_coord, np.transpose(interpolated_poloidal_flux), contour_levels,vmin=0,vmax=1,cmap='plasma_r')
-#plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
-#plt.xlim(interpolated_R_coord[0],interpolated_R_coord[-1])
-#plt.ylim(interpolated_Z_coord[0],interpolated_Z_coord[-1])
-#
-#plt.figure()
-#plt.title('Rz')
-#plt.xlabel('R / m') # x-direction5
-#plt.ylabel('z / m')
-#    
-#contour_levels = np.linspace(0,1.0,101)
-#CS = plt.contourf(interpolated_R_coord, interpolated_Z_coord, np.transpose(interpolated_poloidal_flux),contour_levels,vmin=0,vmax=1,cmap='inferno_r')
-##plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
-#plt.xlim(interpolated_R_coord[0],interpolated_R_coord[-1])
-#plt.ylim(interpolated_Z_coord[0],interpolated_Z_coord[-1])
+
 #
 #
 #plt.figure()
