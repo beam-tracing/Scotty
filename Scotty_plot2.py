@@ -87,8 +87,9 @@ dpolflux_dR_FFD_debugging = loadfile['dpolflux_dR_FFD_debugging']
 dpolflux_dZ_FFD_debugging = loadfile['dpolflux_dZ_FFD_debugging']
 d2polflux_dR2_FFD_debugging = loadfile['d2polflux_dR2_FFD_debugging']
 d2polflux_dZ2_FFD_debugging = loadfile['d2polflux_dZ2_FFD_debugging']
-# KZ_debugging = loadfile['KZ_debugging']
-dH_dKZ_debugging = loadfile['dH_dKZ_debugging']
+epsilon_para_output = loadfile['epsilon_para_output']
+epsilon_perp_output = loadfile['epsilon_perp_output']
+epsilon_g_output = loadfile['epsilon_g_output']
 loadfile.close()
 
 
@@ -477,8 +478,15 @@ plt.plot(distance_along_line,b_hat_output[:,1])
 plt.subplot(1,3,3)
 plt.plot(distance_along_line,b_hat_output[:,2])
 
+
 plt.figure()
-plt.plot(dH_dKZ_debugging)
+plt.subplot(1,3,1)
+plt.plot(distance_along_line,epsilon_para_output)
+plt.subplot(1,3,2)
+plt.plot(distance_along_line,epsilon_perp_output)
+plt.subplot(1,3,3)
+plt.plot(distance_along_line,epsilon_g_output)
+
 
 # d2H_dKZ2_debugging = np.gradient(dH_dKZ_debugging,KZ_debugging)
 
