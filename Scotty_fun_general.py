@@ -335,7 +335,7 @@ def find_H(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag,
     B_R = np.squeeze(find_B_R(q_R, q_Z))
     B_T = np.squeeze(find_B_T(q_R, q_Z))
     B_Z = np.squeeze(find_B_Z(q_R, q_Z))
-    
+
     B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
     b_hat = np.array([B_R, B_T, B_Z]) / B_Total
     K_hat = np.array([K_R, K_zeta/q_R, K_Z]) / K_magnitude
