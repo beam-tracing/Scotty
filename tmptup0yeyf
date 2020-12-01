@@ -1,0 +1,189 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Dec  1 11:53:31 2020
+
+@author: VH Chen
+"""
+import numpy as np
+from Scotty_fun_general import read_floats_into_list_until
+import math
+from scipy import interpolate as interpolate
+from scipy import constants as constants
+import matplotlib.pyplot as plt
+
+
+
+
+
+
+
+
+
+
+
+
+
+delta_R = -0.0001 #in the same units as data_R_coord
+delta_Z = 0.0001 #in the same units as data_Z_coord
+delta_K_R = 0.1 #in the same units as K_R
+delta_K_zeta = 0.1 #in the same units as K_zeta
+delta_K_Z = 0.1 #in the same units as K_z
+
+
+input_filename_suffix = '_29910_190'
+launch_freq_GHz = 55.0
+
+input_files_path ='D:\\Dropbox\\VHChen2020\\Data\\Input_Files_29Apr2019\\'
+#input_files_path ='D:\\Dropbox\\VHChen2018\\Data\\Input_Files_29Apr2019\\'
+#input_files_path ='D:\\Dropbox\\VHChen2019\\Code - Scotty\\Benchmark_9\\Torbeam\\'
+#input_files_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
+
+
+
+# Importing data from input files
+# ne.dat, topfile
+# Others: inbeam.dat, Te.dat (not currently used in this code)
+# ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_smoothed.dat'
+ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_fitted.dat'
+#ne_filename = input_files_path + 'ne' +input_filename_suffix+ '.dat'
+
+topfile_filename = input_files_path + 'topfile' +input_filename_suffix
+
+
+ne_data = np.fromfile(ne_filename,dtype=float, sep='   ') # electron density as a function of poloidal flux label
+with open(topfile_filename) as f:
+    while not 'X-coordinates' in f.readline(): pass # Start reading only from X-coords onwards
+    data_R_coord = read_floats_into_list_until('Z-coordinates', f)
+    data_Z_coord = read_floats_into_list_until('B_R', f)
+    data_B_R_grid = read_floats_into_list_until('B_t', f)
+    data_B_T_grid = read_floats_into_list_until('B_Z', f)
+    data_B_Z_grid = read_floats_into_list_until('psi', f)
+    data_poloidal_flux_grid = read_floats_into_list_until('you fall asleep', f)
+# ------------------------------
+
+# Tidying up the input data
+launch_angular_frequency = 2*math.pi*10.0**9 * launch_freq_GHz
+wavenumber_K0 = launch_angular_frequency / constants.c
+
+ne_data_length = int(ne_data[0])
+ne_data_density_array = 1.1*ne_data[2::2] # in units of 10.0**19 m-3
+print('Warninig: Scale factor of 1.05 used')
+ne_data_radialcoord_array = ne_data[1::2]
+ne_data_poloidal_flux_array = ne_data_radialcoord_array**2 # Loading radial coord for now, makes it easier to benchmark with Torbeam. Hence, have to convert to poloidal flux
+#ne_data_poloidal_flux_array = ne_data[1::2] # My new IDL file outputs the flux density directly, instead of radialcoord
+
+data_B_R_grid = np.transpose((np.asarray(data_B_R_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
+data_B_T_grid = np.transpose((np.asarray(data_B_T_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
+data_B_Z_grid = np.transpose((np.asarray(data_B_Z_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
+data_poloidal_flux_grid = np.transpose((np.asarray(data_poloidal_flux_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
+# -------------------
+
+for ii in range(0,len(data_R_coord)):
+    for jj in range(0,len(data_Z_coord)):
+        R_val = data_R_coord[ii]
+        Z_val = data_Z_coord[jj]
+
+plt.figure()
+plt.subplot(2,3,1)
+plt.title('B_R Torbeam')
+plt.xlabel('R / m') # x-direction5
+plt.ylabel('z / m')
+    
+contour_levels = np.linspace(0,1.0,11)
+CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels,vmin=0,vmax=1,cmap='plasma_r')
+plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
+plt.xlim(data_R_coord[0],data_R_coord[-1])
+plt.ylim(data_Z_coord[0],data_Z_coord[-1])
+
+contour_scale = 0.2
+contour_extent = min(abs(data_B_R_grid.max()),abs(data_B_R_grid.min()))
+contour_levels = np.linspace(-contour_scale*contour_extent,contour_scale*contour_extent,21)
+CS = plt.contourf(data_R_coord, data_Z_coord, np.transpose(data_B_R_grid),contour_levels,cmap='seismic')
+
+
+plt.subplot(2,3,4)
+plt.title('B_R EFIT')
+# plt.xlabel('R / m') # x-direction5
+# plt.ylabel('z / m')
+    
+# contour_levels = np.linspace(0,1.0,11)
+# CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels,vmin=0,vmax=1,cmap='plasma_r')
+# plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
+# plt.xlim(data_R_coord[0],data_R_coord[-1])
+# plt.ylim(data_Z_coord[0],data_Z_coord[-1])
+
+# contour_scale = 0.2
+# contour_extent = min(abs(data_B_R_grid.max()),abs(data_B_R_grid.min()))
+# contour_levels = np.linspace(-contour_scale*contour_extent,contour_scale*contour_extent,21)
+# CS = plt.contourf(data_R_coord, data_Z_coord, np.transpose(data_B_R_grid),contour_levels,cmap='seismic')
+
+
+plt.subplot(2,3,2)
+plt.title('B_Z Torbeam')
+plt.xlabel('R / m') # x-direction5
+plt.ylabel('z / m')
+    
+contour_levels = np.linspace(0,1.0,11)
+CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels,vmin=0,vmax=1,cmap='plasma_r')
+plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
+plt.xlim(data_R_coord[0],data_R_coord[-1])
+plt.ylim(data_Z_coord[0],data_Z_coord[-1])
+
+contour_scale = 0.5
+contour_extent = min(abs(data_B_Z_grid.max()),abs(data_B_Z_grid.min()))
+contour_levels = np.linspace(-contour_scale*contour_extent,contour_scale*contour_extent,21)
+CS = plt.contourf(data_R_coord, data_Z_coord, np.transpose(data_B_Z_grid),contour_levels,cmap='seismic')
+
+
+plt.subplot(2,3,5)
+plt.title('B_Z EFIT')
+# plt.xlabel('R / m') # x-direction5
+# plt.ylabel('z / m')
+    
+# contour_levels = np.linspace(0,1.0,11)
+# CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels,vmin=0,vmax=1,cmap='plasma_r')
+# plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
+# plt.xlim(data_R_coord[0],data_R_coord[-1])
+# plt.ylim(data_Z_coord[0],data_Z_coord[-1])
+
+# contour_scale = 0.5
+# contour_extent = min(abs(data_B_R_grid.max()),abs(data_B_R_grid.min()))
+# contour_levels = np.linspace(-contour_scale*contour_extent,contour_scale*contour_extent,21)
+# CS = plt.contourf(data_R_coord, data_Z_coord, np.transpose(data_B_R_grid),contour_levels,cmap='seismic')
+
+
+
+plt.subplot(2,3,3)
+plt.title('B_T Torbeam')
+plt.xlabel('R / m') # x-direction5
+plt.ylabel('z / m')
+    
+contour_levels = np.linspace(0,1.0,11)
+CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels,vmin=0,vmax=1,cmap='plasma_r')
+plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
+plt.xlim(data_R_coord[0],data_R_coord[-1])
+plt.ylim(data_Z_coord[0],data_Z_coord[-1])
+
+contour_scale = 0.9
+contour_levels = np.linspace(0.1*contour_scale*data_B_T_grid.min(),contour_scale*data_B_T_grid.max(),21)
+CS = plt.contourf(data_R_coord, data_Z_coord, np.transpose(data_B_Z_grid),contour_levels,cmap='plasma')
+
+
+plt.subplot(2,3,6)
+plt.title('B_T EFIT')
+# plt.xlabel('R / m') # x-direction5
+# plt.ylabel('z / m')
+    
+# contour_levels = np.linspace(0,1.0,11)
+# CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels,vmin=0,vmax=1,cmap='plasma_r')
+# plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
+# plt.xlim(data_R_coord[0],data_R_coord[-1])
+# plt.ylim(data_Z_coord[0],data_Z_coord[-1])
+
+# contour_scale = 0.5
+# contour_extent = min(abs(data_B_R_grid.max()),abs(data_B_R_grid.min()))
+# contour_levels = np.linspace(-contour_scale*contour_extent,contour_scale*contour_extent,21)
+# CS = plt.contourf(data_R_coord, data_Z_coord, np.transpose(data_B_R_grid),contour_levels,cmap='plasma')
+
+
+

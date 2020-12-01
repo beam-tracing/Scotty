@@ -1,0 +1,24 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Dec  1 11:53:31 2020
+
+@author: VH Chen
+"""
+
+
+
+
+
+
+
+
+
+
+
+
+
+delta_R = -0.0001 #in the same units as data_R_coord
+delta_Z = 0.0001 #in the same units as data_Z_coord
+delta_K_R = 0.1 #in the same units as K_R
+delta_K_zeta = 0.1 #in the same units as K_zeta
+delta_K_Z = 0.1 #in the same units as K_z
