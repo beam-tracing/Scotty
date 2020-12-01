@@ -187,11 +187,11 @@ def beam_me_up(tau_step,
                                              kind='cubic', axis=-1, copy=True, bounds_error=False,
                                              fill_value=0, assume_sorted=False) # density is 0 outside the LCFS, hence the fill_value. Use 'linear' instead of 'cubic' if the density data has a discontinuity in the first derivative    
     def find_density_1D(poloidal_flux, interp_density_1D=interp_density_1D):
-        # density = interp_density_1D(poloidal_flux)
-        if poloidal_flux <= 0.9473479057893939:
-            density = 1.1*(-6.78999607*poloidal_flux + 6.43248856)*np.tanh(0.96350798 * poloidal_flux + 0.48792645)
-        else:
-            density = 0.0
+        density = interp_density_1D(poloidal_flux)
+        # if poloidal_flux <= 0.9473479057893939:
+        #     density = 1.1*(-6.78999607*poloidal_flux + 6.43248856)*np.tanh(0.96350798 * poloidal_flux + 0.48792645)
+        # else:
+        #     density = 0.0
         return density
     
     # This part of the code defines find_B_R, find_B_T, find_B_zeta
@@ -267,8 +267,11 @@ def beam_me_up(tau_step,
         Bt_array = radialProfiles.variables['Bt'][time_index][:]
         r_array_B = radialProfiles.variables['r'][time_index][:]
         
-        B_vacuum = Bt_array[-1]
-        R_vacuum = r_array_B[-1]
+        separatrixGeometry = output_group.groups['separatrixGeometry']
+        geometricAxis = separatrixGeometry.variables['geometricAxis'][time_index] # R,Z location of the geometric axis
+        
+        globalParameters = output_group.groups['globalParameters']
+        bvacRgeom = globalParameters.variables['bvacRgeom'][time_index] # Vacuum B field (= B_zeta, in vacuum) at the geometric axis
         
         fluxFunctionProfiles = output_group.groups['fluxFunctionProfiles']
         poloidalFlux = fluxFunctionProfiles.variables['normalizedPoloidalFlux'][:]
@@ -289,25 +292,25 @@ def beam_me_up(tau_step,
         lastPoloidalFluxPoint = poloidalFlux[-1]
         
         def find_B_R(q_R,q_Z,delta_R=delta_R,interp_poloidal_flux=interp_poloidal_flux,polflux_const_m=polflux_const_m):
-            dpolflux_dR = find_dpolflux_dR(q_R,q_Z,delta_R,interp_poloidal_flux)
-            B_R = -  dpolflux_dR / (polflux_const_m * q_R)
+            dpolflux_dZ = find_dpolflux_dZ(q_R,q_Z,delta_R,interp_poloidal_flux)
+            B_R = -  dpolflux_dZ / (polflux_const_m * q_R)
             return B_R
-    
-        def find_B_T(q_R,q_Z, lastPoloidalFluxPoint=lastPoloidalFluxPoint,B_vacuum=B_vacuum,R_vacuum=R_vacuum,interp_poloidal_flux=interp_poloidal_flux,interp_rBphi=interp_rBphi):
+        
+        def find_B_T(q_R,q_Z, lastPoloidalFluxPoint=lastPoloidalFluxPoint,bvacRgeom=bvacRgeom,geometricAxis=geometricAxis,interp_poloidal_flux=interp_poloidal_flux,interp_rBphi=interp_rBphi):
             polflux = interp_poloidal_flux(q_R,q_Z)
-            # There's a negative sign in B_T because of the difference in sign convention between EFIT and Scotty/Torbeam
             if polflux <= lastPoloidalFluxPoint:
                 # B_T from EFIT
                 rBphi = interp_rBphi(polflux)
-                B_T = - rBphi/q_R 
+                B_T = rBphi/q_R
             else:
                 # Extrapolate B_T
-                B_T = - B_vacuum * R_vacuum/q_R
+                # B_T = - B_vacuum * R_vacuum/q_R
+                B_T = bvacRgeom * geometricAxis[0] / q_R
             return B_T
         
         def find_B_Z(q_R,q_Z,delta_Z=delta_Z,interp_poloidal_flux=interp_poloidal_flux,polflux_const_m=polflux_const_m):
-            dpolflux_dZ = find_dpolflux_dZ(q_R,q_Z,delta_Z,interp_poloidal_flux)
-            B_Z = dpolflux_dZ / (polflux_const_m * q_R)
+            dpolflux_dR = find_dpolflux_dR(q_R,q_Z,delta_Z,interp_poloidal_flux)
+            B_Z = dpolflux_dR / (polflux_const_m * q_R)
             return B_Z
         
 
