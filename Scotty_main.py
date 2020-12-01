@@ -14,12 +14,12 @@ import numpy as np
 input_filename_suffix = '_29905_190'
 #input_filename_suffix = ''
 
-tau_step = 0.5
-numberOfTauPoints = 2001
+tau_step = 1.0
+numberOfTauPoints = 1001
 saveInterval = 1  # saves every n time steps
 
 poloidal_launch_angle_Torbeam = 4.0 # deg
-toroidal_launch_angle_Torbeam = -2.25 # deg
+toroidal_launch_angle_Torbeam = -9.25 # deg
 #toroidal_launch_angle_Torbeam_scan = np.linspace(2,-6,41)
 
 launch_freq_GHz = 55.0

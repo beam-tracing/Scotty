@@ -191,7 +191,7 @@ def beam_me_up(tau_step,
         if poloidal_flux <= 0.9473479057893939:
             density = 1.1*(-6.78999607*poloidal_flux + 6.43248856)*np.tanh(0.96350798 * poloidal_flux + 0.48792645)
         else:
-            density = 0
+            density = 0.0
         return density
     
     # This part of the code defines find_B_R, find_B_T, find_B_zeta
@@ -401,6 +401,10 @@ def beam_me_up(tau_step,
             for ii in range(0,numberOfFineSearchPoints):
                 poloidal_fine_search_array[ii] = interp_poloidal_flux(R_fine_search_array[ii],Z_fine_search_array[ii])
             entry_index = find_nearest(poloidal_fine_search_array,poloidal_flux_enter)
+            if poloidal_fine_search_array[entry_index] > poloidal_flux_enter:
+                # The first point needs to be in the plasma
+                # If the first point is outside, then there will be errors when the gradients are calculated
+                entry_index = entry_index + 1
             entry_position = np.zeros(3) # R,Z
             entry_position[0] = R_fine_search_array[entry_index]
             entry_position[1] = K_zeta_launch/K_R_launch * ( 1/launch_position[0] - 1/entry_position[0] )
@@ -412,8 +416,7 @@ def beam_me_up(tau_step,
                                                     + (launch_position[2] - entry_position[2])**2
                                                     )
             # Entry point found
-            plt.figure()
-            plt.plot(R_fine_search_array,poloidal_fine_search_array)
+
             
             # Calculate entry parameters from launch parameters
             # That is, find beam at start of plasma given its parameters at the antenna
@@ -664,11 +667,6 @@ def beam_me_up(tau_step,
 #    eigenvalues_output = np.zeros([numberOfDataPoints,3],dtype='complex128')
 #    eigenvectors_output = np.zeros([numberOfDataPoints,3,3],dtype='complex128')
     # KZ_debugging = np.linspace(-70,-90,1001)   
-    dH_dKZ_debugging = np.zeros(4)
-    for ii in range(0,4):
-        dH_dKZ_debugging[ii] = find_dH_dKZ(initial_position[0], initial_position[2], K_R_initial, K_zeta_initial, K_R_initial + ii*delta_K_Z,
-                                             launch_angular_frequency, mode_flag, delta_K_Z, 
-                                             interp_poloidal_flux, find_density_1D, find_B_R, find_B_T, find_B_Z)
 
     # -------------------
 
@@ -1063,8 +1061,6 @@ def beam_me_up(tau_step,
                  dpolflux_dZ_FFD_debugging=dpolflux_dZ_FFD_debugging,
                  d2polflux_dR2_FFD_debugging=d2polflux_dR2_FFD_debugging,
                  d2polflux_dZ2_FFD_debugging=d2polflux_dZ2_FFD_debugging, 
-                 #KZ_debugging = KZ_debugging, 
-                 dH_dKZ_debugging = dH_dKZ_debugging
                  )
     else:
          np.savez('data_input' + output_filename_suffix, tau_step=tau_step, data_poloidal_flux_grid=data_poloidal_flux_grid,

@@ -347,8 +347,8 @@ def find_H(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag,
     
     H = (K_magnitude/wavenumber_K0)**2 + (
             Booker_beta - mode_flag *
-            # np.sqrt(max(0, (Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
-            np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
+            np.sqrt(max(0, (Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
+            # np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
             ) / (2 * Booker_alpha)
     
     return H
