@@ -19,7 +19,7 @@ numberOfTauPoints = 1001
 saveInterval = 1  # saves every n time steps
 
 poloidal_launch_angle_Torbeam = 4.0 # deg
-toroidal_launch_angle_Torbeam = -9.25 # deg
+toroidal_launch_angle_Torbeam = -2.25 # deg
 #toroidal_launch_angle_Torbeam_scan = np.linspace(2,-6,41)
 
 launch_freq_GHz = 55.0

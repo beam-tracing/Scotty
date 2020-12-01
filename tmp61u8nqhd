@@ -401,10 +401,6 @@ def beam_me_up(tau_step,
             for ii in range(0,numberOfFineSearchPoints):
                 poloidal_fine_search_array[ii] = interp_poloidal_flux(R_fine_search_array[ii],Z_fine_search_array[ii])
             entry_index = find_nearest(poloidal_fine_search_array,poloidal_flux_enter)
-            if poloidal_fine_search_array[entry_index] > poloidal_flux_enter:
-                # The first point needs to be in the plasma
-                # If the first point is outside, then there will be errors when the gradients are calculated
-                entry_index = entry_index + 1
             entry_position = np.zeros(3) # R,Z
             entry_position[0] = R_fine_search_array[entry_index]
             entry_position[1] = K_zeta_launch/K_R_launch * ( 1/launch_position[0] - 1/entry_position[0] )

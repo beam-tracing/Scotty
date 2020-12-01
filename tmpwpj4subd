@@ -478,6 +478,8 @@ plt.plot(distance_along_line,b_hat_output[:,1])
 plt.subplot(1,3,3)
 plt.plot(distance_along_line,b_hat_output[:,2])
 
+plt.figure()
+plt.plot(dH_dKZ_debugging)
 
 plt.figure()
 plt.subplot(1,3,1)
