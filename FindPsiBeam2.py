@@ -73,11 +73,11 @@ width_ellipse_initial = np.zeros([numberOfPlotPoints,2])
 rad_curv_ellipse_entry = np.zeros([numberOfPlotPoints,2])
 rad_curv_ellipse_initial = np.zeros([numberOfPlotPoints,2])
 for ii in range(0,numberOfPlotPoints):
-    width_ellipse_entry[ii,:] = Psi_w_entry_imag_eigval_a*Psi_w_entry_imag_eigvec_a*sin_array[ii] + Psi_w_entry_imag_eigval_b*Psi_w_entry_imag_eigvec_b*cos_array[ii]
-    width_ellipse_initial[ii,:] = Psi_w_initial_imag_eigval_a*Psi_w_initial_imag_eigvec_a*sin_array[ii] + Psi_w_initial_imag_eigval_b*Psi_w_initial_imag_eigvec_b*cos_array[ii]
+    width_ellipse_entry[ii,:] = np.sqrt(2/Psi_w_entry_imag_eigval_a)*Psi_w_entry_imag_eigvec_a*sin_array[ii] + np.sqrt(2/Psi_w_entry_imag_eigval_b)*Psi_w_entry_imag_eigvec_b*cos_array[ii]
+    width_ellipse_initial[ii,:] = np.sqrt(2/Psi_w_initial_imag_eigval_a)*Psi_w_initial_imag_eigvec_a*sin_array[ii] + np.sqrt(2/Psi_w_initial_imag_eigval_b)*Psi_w_initial_imag_eigvec_b*cos_array[ii]
 
-    rad_curv_ellipse_entry[ii,:] = Psi_w_entry_real_eigval_a*Psi_w_entry_real_eigvec_a*sin_array[ii] + Psi_w_entry_real_eigval_b*Psi_w_entry_real_eigvec_b*cos_array[ii]
-    rad_curv_ellipse_initial[ii,:] = Psi_w_initial_real_eigval_a*Psi_w_initial_real_eigvec_a*sin_array[ii] + Psi_w_initial_real_eigval_b*Psi_w_initial_real_eigvec_b*cos_array[ii]
+    rad_curv_ellipse_entry[ii,:] = (K_magnitude_entry/Psi_w_entry_real_eigval_a)*Psi_w_entry_real_eigvec_a*sin_array[ii] + (K_magnitude_entry/Psi_w_entry_real_eigval_b)*Psi_w_entry_real_eigvec_b*cos_array[ii]
+    rad_curv_ellipse_initial[ii,:] = (K_magnitude_array[0]/Psi_w_initial_real_eigval_a)*Psi_w_initial_real_eigvec_a*sin_array[ii] + (K_magnitude_array[0]/Psi_w_initial_real_eigval_b)*Psi_w_initial_real_eigvec_b*cos_array[ii]
 
 plt.figure()
 plt.subplot(1,2,1)

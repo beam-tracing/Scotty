@@ -47,6 +47,8 @@ from scipy import interpolate as interpolate
 from scipy import constants as constants
 import matplotlib.pyplot as plt
 import os
+from netCDF4 import Dataset
+
 
 from Scotty_fun_general import read_floats_into_list_until, find_nearest, contract_special, find_H
 from Scotty_fun_general import find_inverse_2D, find_Psi_3D_lab, find_q_lab_Cartesian, find_K_lab_Cartesian, find_K_lab, find_Psi_3D_lab_Cartesian
@@ -54,12 +56,16 @@ from Scotty_fun_general import find_normalised_plasma_freq, find_normalised_gyro
 from Scotty_fun_general import find_epsilon_para, find_epsilon_perp,find_epsilon_g
 from Scotty_fun_general import find_dbhat_dR, find_dbhat_dZ
 from Scotty_fun_general import find_d_poloidal_flux_dR, find_d_poloidal_flux_dZ,find_Psi_3D_plasma
+from Scotty_fun_general import find_dB_dR_FFD, find_dB_dZ_FFD, find_d2B_dR2_FFD, find_d2B_dZ2_FFD, find_d2B_dR_dZ_FFD          
+from Scotty_fun_general import find_dB_dR_CFD, find_dB_dZ_CFD, find_d2B_dR2_CFD, find_d2B_dZ2_CFD#, find_d2B_dR_dZ_FFD          
+from Scotty_fun_general import find_d2_poloidal_flux_dR2, find_d2_poloidal_flux_dZ2
 
 from Scotty_fun_FFD import find_dH_dR, find_dH_dZ # \nabla H
 from Scotty_fun_FFD import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta # \nabla_K H
 from Scotty_fun_FFD import find_d2H_dR2, find_d2H_dZ2, find_d2H_dR_dZ # \nabla \nabla H
 from Scotty_fun_FFD import find_d2H_dKR2, find_d2H_dKR_dKzeta, find_d2H_dKR_dKZ, find_d2H_dKzeta2, find_d2H_dKzeta_dKZ, find_d2H_dKZ2 # \nabla_K \nabla_K H
 from Scotty_fun_FFD import find_d2H_dKR_dR, find_d2H_dKR_dZ, find_d2H_dKzeta_dR, find_d2H_dKzeta_dZ, find_d2H_dKZ_dR, find_d2H_dKZ_dZ # \nabla_K \nabla H
+from Scotty_fun_FFD import find_dpolflux_dR, find_dpolflux_dZ # For find_B if using efit files directly
 
 def beam_me_up(tau_step,
                numberOfTauPoints,
@@ -72,6 +78,7 @@ def beam_me_up(tau_step,
                launch_beam_width,
                launch_beam_curvature,
                launch_position,
+               find_B_method,
                vacuum_propagation_flag=False,
                Psi_BC_flag = False,
                poloidal_flux_enter=None,
@@ -82,11 +89,13 @@ def beam_me_up(tau_step,
                plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3,3])
                ):
 
-
+    """
+    find_B_method: 1) 'efit' finds B from efit files directly 2) 'torbeam' finds B from topfile
+    """
     numberOfDataPoints = (numberOfTauPoints) // saveInterval
 
-    delta_R = -0.0045 #in the same units as data_R_coord
-    delta_Z = 0.0045 #in the same units as data_Z_coord
+    delta_R = -0.0001 #in the same units as data_R_coord
+    delta_Z = 0.0001 #in the same units as data_Z_coord
     delta_K_R = 0.1 #in the same units as K_R
     delta_K_zeta = 0.1 #in the same units as K_zeta
     delta_K_Z = 0.1 #in the same units as K_z
@@ -146,10 +155,12 @@ def beam_me_up(tau_step,
     #data_poloidal_flux_grid = psi_fun(x_grid,z_grid, major_radius, minor_radius)
     ## ------------------------------
 
+    # Tidying up the input data
+    launch_angular_frequency = 2*math.pi*10.0**9 * launch_freq_GHz
+    wavenumber_K0 = launch_angular_frequency / constants.c
 
 
     # Experimental Profile----------
-
     input_files_path ='D:\\Dropbox\\VHChen2020\\Data\\Input_Files_29Apr2019\\'
 #    input_files_path ='D:\\Dropbox\\VHChen2018\\Data\\Input_Files_29Apr2019\\'
 #    input_files_path ='D:\\Dropbox\\VHChen2019\\Code - Scotty\\Benchmark_9\\Torbeam\\'
@@ -157,56 +168,156 @@ def beam_me_up(tau_step,
 
 
 
-    # Importing data from input files
-    # ne.dat, topfile
-#     Others: inbeam.dat, Te.dat (not currently used in this code)
+    # Importing data from ne.dat
 #    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_smoothed.dat'
     ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_fitted.dat'
 #    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '.dat'
-
-    topfile_filename = input_files_path + 'topfile' +input_filename_suffix
-
-
+    
     ne_data = np.fromfile(ne_filename,dtype=float, sep='   ') # electron density as a function of poloidal flux label
-    with open(topfile_filename) as f:
-        while not 'X-coordinates' in f.readline(): pass # Start reading only from X-coords onwards
-        data_R_coord = read_floats_into_list_until('Z-coordinates', f)
-        data_Z_coord = read_floats_into_list_until('B_R', f)
-        data_B_R_grid = read_floats_into_list_until('B_t', f)
-        data_B_T_grid = read_floats_into_list_until('B_Z', f)
-        data_B_Z_grid = read_floats_into_list_until('psi', f)
-        data_poloidal_flux_grid = read_floats_into_list_until('you fall asleep', f)
-    # ------------------------------
-
-    # Tidying up the input data
-    launch_angular_frequency = 2*math.pi*10.0**9 * launch_freq_GHz
-    wavenumber_K0 = launch_angular_frequency / constants.c
-
-    ne_data_length = int(ne_data[0])
-    ne_data_density_array = 1.05*ne_data[2::2] # in units of 10.0**19 m-3
-    print('Warninig: Scale factor of 1.05 used')
+    
+#    ne_data_length = int(ne_data[0])
+    ne_data_density_array = 1.1*ne_data[2::2] # in units of 10.0**19 m-3
+    print('Warninig: Scale factor of 1.1 used')
     ne_data_radialcoord_array = ne_data[1::2]
     ne_data_poloidal_flux_array = ne_data_radialcoord_array**2 # Loading radial coord for now, makes it easier to benchmark with Torbeam. Hence, have to convert to poloidal flux
-#    ne_data_poloidal_flux_array = ne_data[1::2] # My new IDL file outputs the flux density directly, instead of radialcoord
-
-    data_B_R_grid = np.transpose((np.asarray(data_B_R_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
-    data_B_T_grid = np.transpose((np.asarray(data_B_T_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
-    data_B_Z_grid = np.transpose((np.asarray(data_B_Z_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
-    data_poloidal_flux_grid = np.transpose((np.asarray(data_poloidal_flux_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
-    # -------------------
-
-
-    # Interpolation functions declared
-    interp_B_R = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_R_grid, bbox=[None, None, None, None], kx=3, ky=3, s=0)
-    interp_B_T = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_T_grid, bbox=[None, None, None, None], kx=3, ky=3, s=0)
-    interp_B_Z = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_Z_grid, bbox=[None, None, None, None], kx=3, ky=3, s=0)
-
-    interp_poloidal_flux = interpolate.interp2d(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), kind='cubic',
-                                           copy=True, bounds_error=False, fill_value=None) # Flux extrapolated outside region
-
+#    ne_data_normalised_poloidal_flux_array = ne_data[1::2] # My new IDL file outputs the flux density directly, instead of radialcoord
+    
     interp_density_1D = interpolate.interp1d(ne_data_poloidal_flux_array, ne_data_density_array,
-                                             kind='linear', axis=-1, copy=True, bounds_error=False,
-                                             fill_value=0, assume_sorted=False) # density is 0 outside the LCFS, hence the fill_value
+                                             kind='cubic', axis=-1, copy=True, bounds_error=False,
+                                             fill_value=0, assume_sorted=False) # density is 0 outside the LCFS, hence the fill_value. Use 'linear' instead of 'cubic' if the density data has a discontinuity in the first derivative    
+    def find_density_1D(poloidal_flux, interp_density_1D=interp_density_1D):
+        density = interp_density_1D(poloidal_flux)
+        # if poloidal_flux <= 0.9473479057893939:
+        #     density = 1.1*(-6.78999607*poloidal_flux + 6.43248856)*np.tanh(0.96350798 * poloidal_flux + 0.48792645)
+        # else:
+        #     density = 0.0
+        return density
+    
+    # This part of the code defines find_B_R, find_B_T, find_B_zeta
+    interp_order = 5 # For the 2D interpolation functions
+    interp_smoothing = 2 # For the 2D interpolation functions. For no smoothing, set to 0
+    
+    if find_B_method == 'torbeam':    
+        print('Using Torbeam input files for B and poloidal flux')
+        # topfile
+        #Others: inbeam.dat, Te.dat (not currently used in this code)
+    
+        topfile_filename = input_files_path + 'topfile' +input_filename_suffix
+    
+        with open(topfile_filename) as f:
+            while not 'X-coordinates' in f.readline(): pass # Start reading only from X-coords onwards
+            data_R_coord = read_floats_into_list_until('Z-coordinates', f)
+            data_Z_coord = read_floats_into_list_until('B_R', f)
+            data_B_R_grid = read_floats_into_list_until('B_t', f)
+            data_B_T_grid = read_floats_into_list_until('B_Z', f)
+            data_B_Z_grid = read_floats_into_list_until('psi', f)
+            data_poloidal_flux_grid = read_floats_into_list_until('you fall asleep', f)
+        # ------------------------------
+
+
+        data_B_R_grid = np.transpose((np.asarray(data_B_R_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
+        data_B_T_grid = np.transpose((np.asarray(data_B_T_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
+        data_B_Z_grid = np.transpose((np.asarray(data_B_Z_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
+        data_poloidal_flux_grid = np.transpose((np.asarray(data_poloidal_flux_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
+        # -------------------
+    
+        # Interpolation functions declared
+        interp_B_R = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_R_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        interp_B_T = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_T_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        interp_B_Z = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_Z_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        
+        def find_B_R(q_R,q_Z):
+            B_R = interp_B_R(q_R,q_Z)
+            return B_R
+    
+        def find_B_T(q_R,q_Z):
+            B_T = interp_B_T(q_R,q_Z)
+            return B_T
+        
+        def find_B_Z(q_R,q_Z):
+            B_Z = interp_B_Z(q_R,q_Z)
+            return B_Z
+
+        interp_poloidal_flux = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_poloidal_flux_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        #    interp_poloidal_flux = interpolate.interp2d(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), kind='cubic',
+        #                                           copy=True, bounds_error=False, fill_value=None) # Flux extrapolated outside region
+        
+
+    elif find_B_method == 'efit':
+        print('Using efit output files directly for B and poloidal flux')
+
+        dataset = Dataset('efitOut_29905.nc')
+
+        time_index = 7
+        time_array = dataset.variables['time'][:]
+#        equilibriumStatus_array = dataset.variables['equilibriumStatus'][:]
+        
+        print(time_array[time_index])
+        
+        output_group = dataset.groups['output']
+#        input_group = dataset.groups['input']
+        
+        profiles2D = output_group.groups['profiles2D']
+        data_unnormalised_poloidal_flux_grid = profiles2D.variables['poloidalFlux'][time_index][:][:] #unnormalised, as a function of R and Z
+        data_R_coord = profiles2D.variables['r'][time_index][:]
+        data_Z_coord = profiles2D.variables['z'][time_index][:]
+        
+        radialProfiles = output_group.groups['radialProfiles']
+        Bt_array = radialProfiles.variables['Bt'][time_index][:]
+        r_array_B = radialProfiles.variables['r'][time_index][:]
+        
+        separatrixGeometry = output_group.groups['separatrixGeometry']
+        geometricAxis = separatrixGeometry.variables['geometricAxis'][time_index] # R,Z location of the geometric axis
+        
+        globalParameters = output_group.groups['globalParameters']
+        bvacRgeom = globalParameters.variables['bvacRgeom'][time_index] # Vacuum B field (= B_zeta, in vacuum) at the geometric axis
+        
+        fluxFunctionProfiles = output_group.groups['fluxFunctionProfiles']
+        poloidalFlux = fluxFunctionProfiles.variables['normalizedPoloidalFlux'][:]
+        unnormalizedPoloidalFlux = fluxFunctionProfiles.variables['poloidalFlux'][time_index][:] # poloidalFlux as a function of normalised poloidal flux
+        rBphi = fluxFunctionProfiles.variables['rBphi'][time_index][:] 
+
+        dataset.close()
+
+        interp_rBphi = interpolate.interp1d(poloidalFlux, rBphi, 
+                                                 kind='cubic', axis=-1, copy=True, bounds_error=True, 
+                                                 fill_value=0, assume_sorted=False)
+ 
+        # normalised_polflux = polflux_const_m * poloidalFlux + polflux_const_c (think y = mx + c)        
+        [polflux_const_m, polflux_const_c] = np.polyfit(unnormalizedPoloidalFlux,poloidalFlux,1) #linear fit
+        data_poloidal_flux_grid = data_unnormalised_poloidal_flux_grid*polflux_const_m + polflux_const_c
+        
+        interp_poloidal_flux = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_poloidal_flux_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        
+        # The last value of poloidalFlux for which rBphi (R * B_zeta) is specified. Outside this, we extrapolate B_zeta with 1/R
+        lastPoloidalFluxPoint = poloidalFlux[-1]
+        
+        def find_B_R(q_R,q_Z,delta_R=delta_R,interp_poloidal_flux=interp_poloidal_flux,polflux_const_m=polflux_const_m):
+            dpolflux_dZ = find_dpolflux_dZ(q_R,q_Z,delta_R,interp_poloidal_flux)
+            B_R = -  dpolflux_dZ / (polflux_const_m * q_R)
+            return B_R
+        
+        def find_B_T(q_R,q_Z, lastPoloidalFluxPoint=lastPoloidalFluxPoint,bvacRgeom=bvacRgeom,geometricAxis=geometricAxis,interp_poloidal_flux=interp_poloidal_flux,interp_rBphi=interp_rBphi):
+            polflux = interp_poloidal_flux(q_R,q_Z)
+            if polflux <= lastPoloidalFluxPoint:
+                # B_T from EFIT
+                rBphi = interp_rBphi(polflux)
+                B_T = rBphi/q_R
+            else:
+                # Extrapolate B_T
+                # B_T = - B_vacuum * R_vacuum/q_R
+                B_T = bvacRgeom * geometricAxis[0] / q_R
+            return B_T
+        
+        def find_B_Z(q_R,q_Z,delta_Z=delta_Z,interp_poloidal_flux=interp_poloidal_flux,polflux_const_m=polflux_const_m):
+            dpolflux_dR = find_dpolflux_dR(q_R,q_Z,delta_Z,interp_poloidal_flux)
+            B_Z = dpolflux_dR / (polflux_const_m * q_R)
+            return B_Z
+        
+
+    else:
+        print('Invalid find_B_method')
+        
 
 
 
@@ -287,13 +398,17 @@ def beam_me_up(tau_step,
             dummy_array = np.array(range(numberOfCoarseSearchPoints))
             indices_inside_for_sure_array = dummy_array[meets_flux_condition_array]
             first_inside_index = indices_inside_for_sure_array[0]
-            numberOfFineSearchPoints = 1000
+            numberOfFineSearchPoints = 7500
             R_fine_search_array = np.linspace(launch_position[0],R_coarse_search_array[first_inside_index],numberOfFineSearchPoints)
             Z_fine_search_array = np.linspace(launch_position[2],Z_coarse_search_array[first_inside_index],numberOfFineSearchPoints)
             poloidal_fine_search_array = np.zeros(numberOfFineSearchPoints)
             for ii in range(0,numberOfFineSearchPoints):
                 poloidal_fine_search_array[ii] = interp_poloidal_flux(R_fine_search_array[ii],Z_fine_search_array[ii])
             entry_index = find_nearest(poloidal_fine_search_array,poloidal_flux_enter)
+            if poloidal_fine_search_array[entry_index] > poloidal_flux_enter:
+                # The first point needs to be in the plasma
+                # If the first point is outside, then there will be errors when the gradients are calculated
+                entry_index = entry_index + 1
             entry_position = np.zeros(3) # R,Z
             entry_position[0] = R_fine_search_array[entry_index]
             entry_position[1] = K_zeta_launch/K_R_launch * ( 1/launch_position[0] - 1/entry_position[0] )
@@ -305,7 +420,7 @@ def beam_me_up(tau_step,
                                                     + (launch_position[2] - entry_position[2])**2
                                                     )
             # Entry point found
-            
+
             
             # Calculate entry parameters from launch parameters
             # That is, find beam at start of plasma given its parameters at the antenna
@@ -345,19 +460,19 @@ def beam_me_up(tau_step,
             if Psi_BC_flag: # Use BCs
                 dH_dKR_initial    = find_dH_dKR(initial_position[0], initial_position[2], K_R_initial, K_zeta_initial, K_Z_initial,
                                              launch_angular_frequency, mode_flag, delta_K_R, 
-                                             interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z)
+                                             interp_poloidal_flux, find_density_1D, find_B_R, find_B_T, find_B_Z)
                 dH_dKzeta_initial = find_dH_dKzeta(initial_position[0], initial_position[2], K_R_initial, K_zeta_initial, K_Z_initial,
                                              launch_angular_frequency, mode_flag, delta_K_zeta, 
-                                             interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z) 
+                                             interp_poloidal_flux, find_density_1D, find_B_R, find_B_T, find_B_Z) 
                 dH_dKZ_initial    = find_dH_dKZ(initial_position[0], initial_position[2], K_R_initial, K_zeta_initial, K_Z_initial,
                                              launch_angular_frequency, mode_flag, delta_K_Z, 
-                                             interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z)
+                                             interp_poloidal_flux, find_density_1D, find_B_R, find_B_T, find_B_Z)
                 dH_dR_initial     = find_dH_dR(initial_position[0], initial_position[2], K_R_initial, K_zeta_initial, K_Z_initial, 
                                             launch_angular_frequency, mode_flag, delta_R, 
-                                            interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z)
+                                            interp_poloidal_flux, find_density_1D, find_B_R, find_B_T, find_B_Z)
                 dH_dZ_initial     = find_dH_dZ(initial_position[0], initial_position[2], K_R_initial, K_zeta_initial, K_Z_initial, 
                                             launch_angular_frequency, mode_flag, delta_Z, 
-                                            interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z)
+                                            interp_poloidal_flux, find_density_1D, find_B_R, find_B_T, find_B_Z)
                 d_poloidal_flux_d_R_boundary = find_d_poloidal_flux_dR(initial_position[0], initial_position[2], delta_R, interp_poloidal_flux)
                 d_poloidal_flux_d_Z_boundary = find_d_poloidal_flux_dZ(initial_position[0], initial_position[2], delta_R, interp_poloidal_flux)
                 
@@ -528,8 +643,34 @@ def beam_me_up(tau_step,
 
     electron_density_output = np.zeros(numberOfDataPoints)
 
+    dB_dR_FFD_debugging     = np.zeros(numberOfDataPoints)
+    dB_dZ_FFD_debugging     = np.zeros(numberOfDataPoints)
+    d2B_dR2_FFD_debugging   = np.zeros(numberOfDataPoints)
+    d2B_dZ2_FFD_debugging   = np.zeros(numberOfDataPoints)
+    d2B_dR_dZ_FFD_debugging = np.zeros(numberOfDataPoints)
+
+    dpolflux_dR_FFD_debugging     = np.zeros(numberOfDataPoints)
+    dpolflux_dZ_FFD_debugging     = np.zeros(numberOfDataPoints)
+    d2polflux_dR2_FFD_debugging   = np.zeros(numberOfDataPoints)
+    d2polflux_dZ2_FFD_debugging   = np.zeros(numberOfDataPoints)
+    
+    electron_density_debugging_1R = np.zeros(numberOfDataPoints)
+    electron_density_debugging_2R = np.zeros(numberOfDataPoints)
+    electron_density_debugging_3R = np.zeros(numberOfDataPoints)
+    electron_density_debugging_1Z = np.zeros(numberOfDataPoints)
+    electron_density_debugging_2Z = np.zeros(numberOfDataPoints)
+    electron_density_debugging_3Z = np.zeros(numberOfDataPoints)
+    electron_density_debugging_2R_2Z = np.zeros(numberOfDataPoints)
+    poloidal_flux_debugging_1R = np.zeros(numberOfDataPoints)
+    poloidal_flux_debugging_2R = np.zeros(numberOfDataPoints)
+    poloidal_flux_debugging_3R = np.zeros(numberOfDataPoints)
+    poloidal_flux_debugging_1Z = np.zeros(numberOfDataPoints)
+    poloidal_flux_debugging_2Z = np.zeros(numberOfDataPoints)    
+    poloidal_flux_debugging_3Z = np.zeros(numberOfDataPoints)    
+    poloidal_flux_debugging_2R_2Z = np.zeros(numberOfDataPoints)
 #    eigenvalues_output = np.zeros([numberOfDataPoints,3],dtype='complex128')
 #    eigenvectors_output = np.zeros([numberOfDataPoints,3,3],dtype='complex128')
+    # KZ_debugging = np.linspace(-70,-90,1001)   
 
     # -------------------
 
@@ -538,7 +679,7 @@ def beam_me_up(tau_step,
         # The initial conditions are thus at [0], which makes sense
     for step in range(1,numberOfTauPoints+1):
         poloidal_flux = interp_poloidal_flux(q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1])
-        electron_density = interp_density_1D(poloidal_flux)
+        electron_density = find_density_1D(poloidal_flux)
     #    K_zeta = q_R_buffer[current_marker-1] * K_zeta_initial
         K_zeta = K_zeta_initial
 
@@ -547,15 +688,15 @@ def beam_me_up(tau_step,
                                                 q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                                                 K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                                                 launch_angular_frequency,mode_flag,delta_R,
-                                                interp_poloidal_flux,interp_density_1D,
-                                                interp_B_R,interp_B_T,interp_B_Z
+                                                interp_poloidal_flux,find_density_1D,
+                                                find_B_R,find_B_T,find_B_Z
                                                 )
         dH_dZ_buffer[current_marker-1] = find_dH_dZ(
                                                 q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                                                 K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                                                 launch_angular_frequency,mode_flag,delta_Z,
-                                                interp_poloidal_flux,interp_density_1D,
-                                                interp_B_R,interp_B_T,interp_B_Z
+                                                interp_poloidal_flux,find_density_1D,
+                                                find_B_R,find_B_T,find_B_Z
                                                 )
 
         # \nabla_K H
@@ -563,22 +704,22 @@ def beam_me_up(tau_step,
                                                 q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                                                 K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                                                 launch_angular_frequency,mode_flag,delta_K_R,
-                                                interp_poloidal_flux,interp_density_1D,
-                                                interp_B_R,interp_B_T,interp_B_Z
+                                                interp_poloidal_flux,find_density_1D,
+                                                find_B_R,find_B_T,find_B_Z
                                                 )
         dH_dKzeta_buffer[current_marker-1] = find_dH_dKzeta(
                                                 q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                                                 K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                                                 launch_angular_frequency,mode_flag,delta_K_zeta,
-                                                interp_poloidal_flux,interp_density_1D,
-                                                interp_B_R,interp_B_T,interp_B_Z
+                                                interp_poloidal_flux,find_density_1D,
+                                                find_B_R,find_B_T,find_B_Z
                                                 )
         dH_dKZ_buffer[current_marker-1]    = find_dH_dKZ(
                                                 q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                                                 K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                                                 launch_angular_frequency,mode_flag,delta_K_Z,
-                                                interp_poloidal_flux,interp_density_1D,
-                                                interp_B_R,interp_B_T,interp_B_Z
+                                                interp_poloidal_flux,find_density_1D,
+                                                find_B_R,find_B_T,find_B_Z
                                                 )
 
         # \nabla \nabla H
@@ -586,22 +727,22 @@ def beam_me_up(tau_step,
                             q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                             K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                             launch_angular_frequency,mode_flag,delta_R,
-                            interp_poloidal_flux,interp_density_1D,
-                            interp_B_R,interp_B_T,interp_B_Z
+                            interp_poloidal_flux,find_density_1D,
+                            find_B_R,find_B_T,find_B_Z
                             )
         d2H_dR_dZ = find_d2H_dR_dZ(
                             q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                             K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                             launch_angular_frequency,mode_flag,delta_R,delta_Z,
-                            interp_poloidal_flux,interp_density_1D,
-                            interp_B_R,interp_B_T,interp_B_Z
+                            interp_poloidal_flux,find_density_1D,
+                            find_B_R,find_B_T,find_B_Z
                             )
         d2H_dZ2   = find_d2H_dZ2(
                             q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                             K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                             launch_angular_frequency,mode_flag,delta_Z,
-                            interp_poloidal_flux,interp_density_1D,
-                            interp_B_R,interp_B_T,interp_B_Z
+                            interp_poloidal_flux,find_density_1D,
+                            find_B_R,find_B_T,find_B_Z
                             )
         grad_grad_H_buffer[current_marker-1,:,:] = np.squeeze(np.array([
             [d2H_dR2.item()  , 0.0, d2H_dR_dZ.item()],
@@ -614,43 +755,43 @@ def beam_me_up(tau_step,
                             q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                             K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                             launch_angular_frequency,mode_flag,delta_K_R,delta_R,
-                            interp_poloidal_flux,interp_density_1D,
-                            interp_B_R,interp_B_T,interp_B_Z
+                            interp_poloidal_flux,find_density_1D,
+                            find_B_R,find_B_T,find_B_Z
                             )
         d2H_dKZ_dZ    = find_d2H_dKZ_dZ(
                             q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                             K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                             launch_angular_frequency,mode_flag,delta_K_Z,delta_Z,
-                            interp_poloidal_flux,interp_density_1D,
-                            interp_B_R,interp_B_T,interp_B_Z
+                            interp_poloidal_flux,find_density_1D,
+                            find_B_R,find_B_T,find_B_Z
                             )
         d2H_dKR_dZ    = find_d2H_dKR_dZ(
                             q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                             K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                             launch_angular_frequency,mode_flag,delta_K_R,delta_Z,
-                            interp_poloidal_flux,interp_density_1D,
-                            interp_B_R,interp_B_T,interp_B_Z
+                            interp_poloidal_flux,find_density_1D,
+                            find_B_R,find_B_T,find_B_Z
                             )
         d2H_dKzeta_dZ = find_d2H_dKzeta_dZ(
                              q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                              K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                              launch_angular_frequency,mode_flag,delta_K_zeta,delta_Z,
-                             interp_poloidal_flux,interp_density_1D,
-                             interp_B_R,interp_B_T,interp_B_Z
+                             interp_poloidal_flux,find_density_1D,
+                             find_B_R,find_B_T,find_B_Z
                              )
         d2H_dKzeta_dR = find_d2H_dKzeta_dR(
                              q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                              K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                              launch_angular_frequency,mode_flag,delta_K_zeta,delta_R,
-                             interp_poloidal_flux,interp_density_1D,
-                             interp_B_R,interp_B_T,interp_B_Z
+                             interp_poloidal_flux,find_density_1D,
+                             find_B_R,find_B_T,find_B_Z
                              )
         d2H_dKZ_dR    = find_d2H_dKZ_dR(
                             q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                             K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                             launch_angular_frequency,mode_flag,delta_K_Z,delta_R,
-                            interp_poloidal_flux,interp_density_1D,
-                            interp_B_R,interp_B_T,interp_B_Z
+                            interp_poloidal_flux,find_density_1D,
+                            find_B_R,find_B_T,find_B_Z
                             )
         gradK_grad_H_buffer[current_marker-1,:,:] = np.squeeze(np.array([
             [d2H_dKR_dR.item(),    0.0, d2H_dKR_dZ.item()   ],
@@ -664,43 +805,43 @@ def beam_me_up(tau_step,
                              q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                              K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                              launch_angular_frequency,mode_flag,delta_K_R,
-                             interp_poloidal_flux,interp_density_1D,
-                             interp_B_R,interp_B_T,interp_B_Z
+                             interp_poloidal_flux,find_density_1D,
+                             find_B_R,find_B_T,find_B_Z
                              )
         d2H_dKzeta2    = find_d2H_dKzeta2(
                                 q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                                 K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                                 launch_angular_frequency,mode_flag,delta_K_zeta,
-                             interp_poloidal_flux,interp_density_1D,
-                             interp_B_R,interp_B_T,interp_B_Z
+                             interp_poloidal_flux,find_density_1D,
+                             find_B_R,find_B_T,find_B_Z
                                 )
         d2H_dKZ2       = find_d2H_dKZ2(
                               q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                               K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
-                              launch_angular_frequency,mode_flag,delta_Z,
-                              interp_poloidal_flux,interp_density_1D,
-                              interp_B_R,interp_B_T,interp_B_Z
+                              launch_angular_frequency,mode_flag,delta_K_Z,
+                              interp_poloidal_flux,find_density_1D,
+                              find_B_R,find_B_T,find_B_Z
                               )
         d2H_dKR_dKzeta = find_d2H_dKR_dKzeta(
                                q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                                K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                                launch_angular_frequency,mode_flag,delta_K_R,delta_K_zeta,
-                               interp_poloidal_flux,interp_density_1D,
-                               interp_B_R,interp_B_T,interp_B_Z
+                               interp_poloidal_flux,find_density_1D,
+                               find_B_R,find_B_T,find_B_Z
                                )
         d2H_dKR_dKZ    = find_d2H_dKR_dKZ(
                               q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                               K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                               launch_angular_frequency,mode_flag,delta_K_R,delta_K_Z,
-                              interp_poloidal_flux,interp_density_1D,
-                              interp_B_R,interp_B_T,interp_B_Z
+                              interp_poloidal_flux,find_density_1D,
+                              find_B_R,find_B_T,find_B_Z
                               )
         d2H_dKzeta_dKZ = find_d2H_dKzeta_dKZ(
                                q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                                K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                                launch_angular_frequency,mode_flag,delta_K_zeta,delta_K_Z,
-                               interp_poloidal_flux,interp_density_1D,
-                               interp_B_R,interp_B_T,interp_B_Z
+                               interp_poloidal_flux,find_density_1D,
+                               find_B_R,find_B_T,find_B_Z
                                )
         gradK_gradK_H_buffer[current_marker-1,:,:] = np.squeeze(np.array([
             [d2H_dKR2.item()      , d2H_dKR_dKzeta.item(), d2H_dKR_dKZ.item()   ],
@@ -749,9 +890,9 @@ def beam_me_up(tau_step,
         if step % saveInterval == 0: # Write data to output arrays
             tau_array[output_counter] = tau_current
 
-            q_R_array [output_counter]    = q_R_buffer[current_marker-1]
-            q_zeta_array [output_counter] = q_zeta_buffer[current_marker-1]
-            q_Z_array [output_counter]    = q_Z_buffer[current_marker-1]
+            q_R_array[output_counter]     = q_R_buffer[current_marker-1]
+            q_zeta_array[output_counter]  = q_zeta_buffer[current_marker-1]
+            q_Z_array[output_counter]     = q_Z_buffer[current_marker-1]
             K_R_array[output_counter]     = K_R_buffer[current_marker-1]
             K_Z_array[output_counter]     = K_Z_buffer[current_marker-1]
 
@@ -767,9 +908,9 @@ def beam_me_up(tau_step,
             gradK_gradK_H_output[output_counter,:,:] = gradK_gradK_H_buffer[current_marker-1,:,:]
 
             electron_density_output[output_counter] = electron_density
-            B_R = np.squeeze(interp_B_R(q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1]))
-            B_T = np.squeeze(interp_B_T(q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1]))
-            B_Z = np.squeeze(interp_B_Z(q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1]))
+            B_R = np.squeeze(find_B_R(q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1]))
+            B_T = np.squeeze(find_B_T(q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1]))
+            B_Z = np.squeeze(find_B_Z(q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1]))
 
             B_total     = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
             b_hat       = np.array([B_R,B_T,B_Z]) / B_total
@@ -789,8 +930,8 @@ def beam_me_up(tau_step,
             x_hat_output[output_counter,:] = x_hat
 
             # Calculating the corrections to Psi_w
-            dbhat_dR = find_dbhat_dR(q_R_buffer[current_marker-1], q_Z_buffer[current_marker-1], delta_R, interp_B_R, interp_B_T, interp_B_Z)
-            dbhat_dZ = find_dbhat_dZ(q_R_buffer[current_marker-1], q_Z_buffer[current_marker-1], delta_Z, interp_B_R, interp_B_T, interp_B_Z)
+            dbhat_dR = find_dbhat_dR(q_R_buffer[current_marker-1], q_Z_buffer[current_marker-1], delta_R, find_B_R, find_B_T, find_B_Z)
+            dbhat_dZ = find_dbhat_dZ(q_R_buffer[current_marker-1], q_Z_buffer[current_marker-1], delta_Z, find_B_R, find_B_T, find_B_Z)
 
             grad_bhat_output[output_counter,:,0] = dbhat_dR
             grad_bhat_output[output_counter,:,2] = dbhat_dZ
@@ -805,8 +946,8 @@ def beam_me_up(tau_step,
                     q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                     K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
                     launch_angular_frequency,mode_flag,
-                    interp_poloidal_flux,interp_density_1D,
-                    interp_B_R,interp_B_T,interp_B_Z
+                    interp_poloidal_flux,find_density_1D,
+                    find_B_R,find_B_T,find_B_Z
                     )
 
     #        Booker_alpha_output[output_counter] = find_Booker_alpha(electron_density,B_total,cos_theta_sq,launch_angular_frequency)
@@ -824,6 +965,35 @@ def beam_me_up(tau_step,
             d_poloidal_flux_dR_output[output_counter] = find_d_poloidal_flux_dR(q_R_buffer[current_marker-1], q_Z_buffer[current_marker-1], delta_R, interp_poloidal_flux)
             d_poloidal_flux_dZ_output[output_counter] = find_d_poloidal_flux_dZ(q_R_buffer[current_marker-1], q_Z_buffer[current_marker-1], delta_R, interp_poloidal_flux)
             
+            ## Debugging
+            dB_dR_FFD_debugging[output_counter]     = find_dB_dR_FFD(q_R_array[output_counter]    , q_Z_array[output_counter] , delta_R, find_B_R, find_B_T, find_B_Z)
+            dB_dZ_FFD_debugging[output_counter]     = find_dB_dZ_FFD(q_R_array[output_counter]    , q_Z_array[output_counter] , delta_Z, find_B_R, find_B_T, find_B_Z)
+            d2B_dR2_FFD_debugging[output_counter]   = find_d2B_dR2_FFD(q_R_array[output_counter]  , q_Z_array[output_counter] , delta_R, find_B_R, find_B_T, find_B_Z)
+            d2B_dZ2_FFD_debugging[output_counter]   = find_d2B_dZ2_FFD(q_R_array[output_counter]  , q_Z_array[output_counter] , delta_Z, find_B_R, find_B_T, find_B_Z)
+            d2B_dR_dZ_FFD_debugging[output_counter] = find_d2B_dR_dZ_FFD(q_R_array[output_counter], q_Z_array[output_counter] , delta_R, delta_Z, find_B_R, find_B_T, find_B_Z)      
+            
+            dpolflux_dR_FFD_debugging[output_counter]     = find_d_poloidal_flux_dR(q_R_buffer[current_marker-1], q_Z_buffer[current_marker-1], delta_R, interp_poloidal_flux)
+            dpolflux_dZ_FFD_debugging[output_counter]     = find_d_poloidal_flux_dZ(q_R_buffer[current_marker-1], q_Z_buffer[current_marker-1], delta_Z, interp_poloidal_flux)
+            d2polflux_dR2_FFD_debugging[output_counter]   = find_d2_poloidal_flux_dR2(q_R_buffer[current_marker-1], q_Z_buffer[current_marker-1], delta_R, interp_poloidal_flux)
+            d2polflux_dZ2_FFD_debugging[output_counter]   = find_d2_poloidal_flux_dZ2(q_R_buffer[current_marker-1], q_Z_buffer[current_marker-1], delta_Z, interp_poloidal_flux)
+            
+            poloidal_flux_debugging_1R[output_counter] = interp_poloidal_flux(q_R_buffer[current_marker-1]+delta_R,q_Z_buffer[current_marker-1])
+            poloidal_flux_debugging_2R[output_counter] = interp_poloidal_flux(q_R_buffer[current_marker-1]+2*delta_R,q_Z_buffer[current_marker-1])            
+            poloidal_flux_debugging_3R[output_counter] = interp_poloidal_flux(q_R_buffer[current_marker-1]+3*delta_R,q_Z_buffer[current_marker-1])            
+            poloidal_flux_debugging_1Z[output_counter] = interp_poloidal_flux(q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1]+delta_Z)
+            poloidal_flux_debugging_2Z[output_counter] = interp_poloidal_flux(q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1]+2*delta_Z) 
+            poloidal_flux_debugging_3Z[output_counter] = interp_poloidal_flux(q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1]+3*delta_Z) 
+            poloidal_flux_debugging_2R_2Z[output_counter] = interp_poloidal_flux(q_R_buffer[current_marker-1]+2*delta_R,q_Z_buffer[current_marker-1]+2*delta_Z) 
+
+            electron_density_debugging_1R[output_counter] = find_density_1D(poloidal_flux_debugging_1R[output_counter] )
+            electron_density_debugging_2R[output_counter] = find_density_1D(poloidal_flux_debugging_2R[output_counter] )
+            electron_density_debugging_3R[output_counter] = find_density_1D(poloidal_flux_debugging_3R[output_counter] )
+            electron_density_debugging_1Z[output_counter] = find_density_1D(poloidal_flux_debugging_1Z[output_counter] )
+            electron_density_debugging_2Z[output_counter] = find_density_1D(poloidal_flux_debugging_2Z[output_counter] )
+            electron_density_debugging_3Z[output_counter] = find_density_1D(poloidal_flux_debugging_3Z[output_counter] )
+            electron_density_debugging_2R_2Z[output_counter] = find_density_1D(poloidal_flux_debugging_2R_2Z[output_counter] )
+            # ---------
+            
             output_counter += 1
 
         tau_current += tau_step
@@ -840,7 +1010,7 @@ def beam_me_up(tau_step,
     ## The rest of the data is save further down, after the analysis generates them.
     ## Just in case the analysis fails to run, at least one can get the data from the main loop
     ## -------------------
-    print('Saving data')
+    print('Saving data')    
 
 
     if vacuumLaunch_flag:
@@ -860,7 +1030,7 @@ def beam_me_up(tau_step,
                  tau_array=tau_array, q_R_array=q_R_array, q_zeta_array=q_zeta_array, q_Z_array=q_Z_array,
                  K_R_array=K_R_array, K_zeta_initial=K_zeta_initial, K_Z_array=K_Z_array,
                  Psi_3D_output=Psi_3D_output, Psi_3D_lab_launch=Psi_3D_lab_launch,
-#                 Psi_3D_lab_entry=Psi_3D_lab_entry,
+                 Psi_3D_lab_entry=Psi_3D_lab_entry,
                  distance_from_launch_to_entry=distance_from_launch_to_entry,
                  g_hat_output=g_hat_output,g_magnitude_output=g_magnitude_output,
                  B_total_output=B_total_output,
@@ -873,7 +1043,28 @@ def beam_me_up(tau_step,
                  d_poloidal_flux_dR_output=d_poloidal_flux_dR_output,
                  d_poloidal_flux_dZ_output=d_poloidal_flux_dZ_output,
                  epsilon_para_output=epsilon_para_output,epsilon_perp_output=epsilon_perp_output,epsilon_g_output=epsilon_g_output,
-                 electron_density_output=electron_density_output,H_output=H_output
+                 electron_density_output=electron_density_output,H_output=H_output,
+                 poloidal_flux_output=poloidal_flux_output,
+                 dB_dR_FFD_debugging=dB_dR_FFD_debugging,dB_dZ_FFD_debugging=dB_dZ_FFD_debugging,
+                 d2B_dR2_FFD_debugging=d2B_dR2_FFD_debugging,d2B_dZ2_FFD_debugging=d2B_dZ2_FFD_debugging,d2B_dR_dZ_FFD_debugging=d2B_dR_dZ_FFD_debugging,
+                 poloidal_flux_debugging_1R=poloidal_flux_debugging_1R,
+                 poloidal_flux_debugging_2R=poloidal_flux_debugging_2R,
+                 poloidal_flux_debugging_3R=poloidal_flux_debugging_3R,
+                 poloidal_flux_debugging_1Z=poloidal_flux_debugging_1Z,
+                 poloidal_flux_debugging_2Z=poloidal_flux_debugging_2Z,
+                 poloidal_flux_debugging_3Z=poloidal_flux_debugging_3Z,
+                 poloidal_flux_debugging_2R_2Z=poloidal_flux_debugging_2R_2Z,
+                 electron_density_debugging_1R=electron_density_debugging_1R,
+                 electron_density_debugging_2R=electron_density_debugging_2R,
+                 electron_density_debugging_3R=electron_density_debugging_3R,
+                 electron_density_debugging_1Z=electron_density_debugging_1Z,
+                 electron_density_debugging_2Z=electron_density_debugging_2Z,
+                 electron_density_debugging_3Z=electron_density_debugging_3Z,
+                 electron_density_debugging_2R_2Z=electron_density_debugging_2R_2Z,
+                 dpolflux_dR_FFD_debugging=dpolflux_dR_FFD_debugging,    
+                 dpolflux_dZ_FFD_debugging=dpolflux_dZ_FFD_debugging,
+                 d2polflux_dR2_FFD_debugging=d2polflux_dR2_FFD_debugging,
+                 d2polflux_dZ2_FFD_debugging=d2polflux_dZ2_FFD_debugging, 
                  )
     else:
          np.savez('data_input' + output_filename_suffix, tau_step=tau_step, data_poloidal_flux_grid=data_poloidal_flux_grid,
@@ -998,14 +1189,21 @@ def beam_me_up(tau_step,
     sin_theta_m_analysis = np.zeros(numberOfDataPoints)
     sin_theta_m_analysis[:] = (b_hat_output[:,0]*K_R_array[:] + b_hat_output[:,1]*K_zeta_initial/q_R_array[:] + b_hat_output[:,2]*K_Z_array[:]) / (K_magnitude_array[:]) # B \cdot K / (abs (B) abs(K))
     theta_m_output = np.sign(sin_theta_m_analysis)*np.arcsin(abs(sin_theta_m_analysis)) # Assumes the mismatch angle is never smaller than -90deg or bigger than 90deg
-#    print(theta_m_output[cutoff_index])
+    print(theta_m_output[cutoff_index])
 #    print(cutoff_index)
     
 #    g_magnitude_launch = find_g_magnitude(launch_position[0],launch_position[1],K_R_launch,K_zeta_launch,K_Z_launch,
 #                                          launch_angular_frequency,mode_flag,delta_K_R,delta_K_zeta,delta_K_Z,
-#                                          interp_poloidal_flux,interp_density_1D,interp_B_R,interp_B_T,interp_B_Z)
+#                                          interp_poloidal_flux,find_density_1D,find_B_R,find_B_T,find_B_Z)
 #    d_K_d_tau_analysis = np.gradient(K_magnitude_array,tau_array)
 #    localisation_piece = g_magnitude_launch**2/abs(g_magnitude_output*d_K_d_tau_analysis)
+    
+    # This part is used to make some nice plots when post-processing
+    R_midplane_points = np.linspace(data_R_coord[0],data_R_coord[-1],1000)
+    poloidal_flux_on_midplane = np.zeros_like(R_midplane_points)
+    for ii in range(0,1000):
+        poloidal_flux_on_midplane[ii] = interp_poloidal_flux(R_midplane_points[ii],0) # poloidal flux at R and z=0
+        
     # -------------------
 
 
@@ -1045,6 +1243,7 @@ def beam_me_up(tau_step,
     np.savez('analysis_output' + output_filename_suffix, 
              Psi_xx_output = Psi_xx_output, Psi_xy_output = Psi_xy_output, Psi_yy_output = Psi_yy_output,
              Psi_xx_entry=Psi_xx_entry, Psi_xy_entry=Psi_xy_entry, Psi_yy_entry=Psi_yy_entry,
+             Psi_3D_Cartesian=Psi_3D_Cartesian,x_hat_Cartesian=x_hat_Cartesian,y_hat_Cartesian=y_hat_Cartesian,
              M_xx_output = M_xx_output, M_xy_output = M_xy_output, M_yy_output = M_yy_output,
              xhat_dot_grad_bhat_dot_xhat_output=xhat_dot_grad_bhat_dot_xhat_output,
              xhat_dot_grad_bhat_dot_yhat_output=xhat_dot_grad_bhat_dot_yhat_output,
@@ -1059,7 +1258,8 @@ def beam_me_up(tau_step,
              RZ_distance_along_line=RZ_distance_along_line,
              distance_along_line=distance_along_line,
              k_perp_1_backscattered = k_perp_1_backscattered,K_magnitude_array=K_magnitude_array,
-             cutoff_index=cutoff_index,in_index=in_index,out_index=out_index
+             cutoff_index=cutoff_index,in_index=in_index,out_index=out_index,
+             poloidal_flux_on_midplane=poloidal_flux_on_midplane,R_midplane_points=R_midplane_points
              )
 #    print('Analysis data saved')
     # -------------------
@@ -1071,14 +1271,16 @@ def beam_me_up(tau_step,
     if figure_flag:
         print('Making figures')
         
-        # Plots the beam path on the R Z plane
+        """
+        Plots the beam path on the R Z plane
+        """
         plt.figure()
         plt.title('Rz')
         plt.xlabel('R / m') # x-direction
         plt.ylabel('z / m')
     
-        contour_levels = np.linspace(0,1.3,27)
-        CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels)
+        contour_levels = np.linspace(0,1.0,11)
+        CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels,vmin=0,vmax=1,cmap='plasma_r')
         plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
         plt.plot(
                 np.concatenate([[launch_position[0],initial_position[0]],q_R_array ]),
@@ -1091,7 +1293,76 @@ def beam_me_up(tau_step,
         plt.savefig('Ray1_' + output_filename_suffix)
         plt.close()
         
+        """
+        Plots Psi before and after the BCs are applied 
+        """
+        K_magnitude_entry = np.sqrt(K_R_entry**2 + K_zeta_entry**2 * entry_position[0]**2 + K_Z_entry**2)
+        
+        Psi_w_entry = np.array([
+        [Psi_xx_entry,Psi_xy_entry],
+        [Psi_xy_entry,Psi_yy_entry]
+        ])
+        
+        Psi_w_initial = np.array([
+                [Psi_xx_output[0],Psi_xy_output[0]],
+                [Psi_xy_output[0],Psi_yy_output[0]]
+                ])
+        
+        [Psi_w_entry_real_eigval_a, Psi_w_entry_real_eigval_b], Psi_w_entry_real_eigvec = np.linalg.eig(np.real(Psi_w_entry))
+        [Psi_w_entry_imag_eigval_a, Psi_w_entry_imag_eigval_b], Psi_w_entry_imag_eigvec = np.linalg.eig(np.imag(Psi_w_entry))
+        Psi_w_entry_real_eigvec_a = Psi_w_entry_real_eigvec[:,0]
+        Psi_w_entry_real_eigvec_b = Psi_w_entry_real_eigvec[:,1]
+        Psi_w_entry_imag_eigvec_a = Psi_w_entry_imag_eigvec[:,0]
+        Psi_w_entry_imag_eigvec_b = Psi_w_entry_imag_eigvec[:,1]
+        
+        [Psi_w_initial_real_eigval_a, Psi_w_initial_real_eigval_b], Psi_w_initial_real_eigvec = np.linalg.eig(np.real(Psi_w_initial))
+        [Psi_w_initial_imag_eigval_a, Psi_w_initial_imag_eigval_b], Psi_w_initial_imag_eigvec = np.linalg.eig(np.imag(Psi_w_initial))
+        Psi_w_initial_real_eigvec_a = Psi_w_initial_real_eigvec[:,0]
+        Psi_w_initial_real_eigvec_b = Psi_w_initial_real_eigvec[:,1]
+        Psi_w_initial_imag_eigvec_a = Psi_w_initial_imag_eigvec[:,0]
+        Psi_w_initial_imag_eigvec_b = Psi_w_initial_imag_eigvec[:,1]
+        
+        print(np.imag(Psi_w_entry))
+        print(np.imag(Psi_w_initial))
+        print(np.real(Psi_w_entry))
+        print(np.real(Psi_w_initial))
+        print(Psi_w_entry_real_eigval_a)
+        print(Psi_w_entry_real_eigval_b)
+        print(Psi_w_initial_real_eigval_a)
+        print(Psi_w_initial_real_eigval_b)
+        print(np.linalg.norm(Psi_w_entry_real_eigvec_a))
+        print(np.linalg.norm(Psi_w_entry_real_eigvec_b))
+        print(np.linalg.norm(Psi_w_initial_real_eigvec_a))
+        print(np.linalg.norm(Psi_w_initial_real_eigvec_b))
+        numberOfPlotPoints = 50
+        sin_array = np.sin(np.linspace(0,2*np.pi,numberOfPlotPoints))
+        cos_array = np.cos(np.linspace(0,2*np.pi,numberOfPlotPoints))
+        
+        width_ellipse_entry = np.zeros([numberOfPlotPoints,2])
+        width_ellipse_initial = np.zeros([numberOfPlotPoints,2])
+        rad_curv_ellipse_entry = np.zeros([numberOfPlotPoints,2])
+        rad_curv_ellipse_initial = np.zeros([numberOfPlotPoints,2])
+        for ii in range(0,numberOfPlotPoints):
+            width_ellipse_entry[ii,:] = np.sqrt(2/Psi_w_entry_imag_eigval_a)*Psi_w_entry_imag_eigvec_a*sin_array[ii] + np.sqrt(2/Psi_w_entry_imag_eigval_b)*Psi_w_entry_imag_eigvec_b*cos_array[ii]
+            width_ellipse_initial[ii,:] = np.sqrt(2/Psi_w_initial_imag_eigval_a)*Psi_w_initial_imag_eigvec_a*sin_array[ii] + np.sqrt(2/Psi_w_initial_imag_eigval_b)*Psi_w_initial_imag_eigvec_b*cos_array[ii]
+        
+            rad_curv_ellipse_entry[ii,:] = (K_magnitude_entry/Psi_w_entry_real_eigval_a)*Psi_w_entry_real_eigvec_a*sin_array[ii] + (K_magnitude_entry/Psi_w_entry_real_eigval_b)*Psi_w_entry_real_eigvec_b*cos_array[ii]
+            rad_curv_ellipse_initial[ii,:] = (K_magnitude_array[0]/Psi_w_initial_real_eigval_a)*Psi_w_initial_real_eigvec_a*sin_array[ii] + (K_magnitude_array[0]/Psi_w_initial_real_eigval_b)*Psi_w_initial_real_eigvec_b*cos_array[ii]
 
+        
+        plt.figure()
+        plt.subplot(1,2,1)
+        plt.plot(width_ellipse_entry[:,0],width_ellipse_entry[:,1])
+        plt.plot(width_ellipse_initial[:,0],width_ellipse_initial[:,1])
+        plt.gca().set_aspect('equal', adjustable='box')
+        
+        plt.subplot(1,2,2)
+        plt.plot(rad_curv_ellipse_entry[:,0],rad_curv_ellipse_entry[:,1])
+        plt.plot(rad_curv_ellipse_initial[:,0],rad_curv_ellipse_initial[:,1])
+        plt.gca().set_aspect('equal', adjustable='box')
+        plt.savefig('BC_' + output_filename_suffix)
+        plt.close()
+        
         print('Figures have been saved')
     ## -------------------
 
