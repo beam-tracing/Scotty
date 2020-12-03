@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from Scotty_fun_general import find_waist, find_distance_from_waist,find_q_lab_Cartesian, find_nearest, contract_special
 
-suffix = '2'
+suffix = '33'
 
 loadfile = np.load('data_output' + suffix + '.npz')
 tau_array = loadfile['tau_array']
