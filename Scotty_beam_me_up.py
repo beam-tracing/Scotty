@@ -278,6 +278,8 @@ def beam_me_up(tau_step,
         unnormalizedPoloidalFlux = fluxFunctionProfiles.variables['poloidalFlux'][time_index][:] # poloidalFlux as a function of normalised poloidal flux
         rBphi = fluxFunctionProfiles.variables['rBphi'][time_index][:] 
 
+        dataset.close()
+
         interp_rBphi = interpolate.interp1d(poloidalFlux, rBphi, 
                                                  kind='cubic', axis=-1, copy=True, bounds_error=True, 
                                                  fill_value=0, assume_sorted=False)
@@ -1188,7 +1190,7 @@ def beam_me_up(tau_step,
     sin_theta_m_analysis = np.zeros(numberOfDataPoints)
     sin_theta_m_analysis[:] = (b_hat_output[:,0]*K_R_array[:] + b_hat_output[:,1]*K_zeta_initial/q_R_array[:] + b_hat_output[:,2]*K_Z_array[:]) / (K_magnitude_array[:]) # B \cdot K / (abs (B) abs(K))
     theta_m_output = np.sign(sin_theta_m_analysis)*np.arcsin(abs(sin_theta_m_analysis)) # Assumes the mismatch angle is never smaller than -90deg or bigger than 90deg
-#    print(theta_m_output[cutoff_index])
+    print(theta_m_output[cutoff_index])
 #    print(cutoff_index)
     
 #    g_magnitude_launch = find_g_magnitude(launch_position[0],launch_position[1],K_R_launch,K_zeta_launch,K_Z_launch,
@@ -1197,6 +1199,7 @@ def beam_me_up(tau_step,
 #    d_K_d_tau_analysis = np.gradient(K_magnitude_array,tau_array)
 #    localisation_piece = g_magnitude_launch**2/abs(g_magnitude_output*d_K_d_tau_analysis)
     
+    # This part is used to make some nice plots when post-processing
     R_midplane_points = np.linspace(data_R_coord[0],data_R_coord[-1],1000)
     poloidal_flux_on_midplane = np.zeros_like(R_midplane_points)
     for ii in range(0,1000):
