@@ -27,6 +27,10 @@ from scipy.optimize import fsolve
 def linear_times_tanh(polflux,C_1,C_2,C_3,C_4):
     return (C_1*polflux + C_2)*np.tanh(C_3 * polflux + C_4)
 
+def linear_times_tanh_constrained(polflux,C_1,C_3,C_4):
+    C_2 = -C_1
+    return (C_1*polflux + C_2)*np.tanh(C_3 * polflux + C_4)
+
 #input_files_path ='D:\\Dropbox\\VHChen2018\\Data\\Input_Files_08Apr2019\\'
 #torbeam_directory_path = 'D:\\Dropbox\\VHChen2018\\Code - Torbeam\\torbeam_ccfe_val_test\\'
 #torbeam_directory_path = 'C:\\Users\\chenv\\Dropbox\\VHChen2018\\Code - Torbeam\\torbeam_ccfe_val_test\\'
@@ -35,7 +39,7 @@ def linear_times_tanh(polflux,C_1,C_2,C_3,C_4):
 input_files_path ='D:\\Dropbox\\VHChen2020\\Data\\Input_Files_29Apr2019\\'
 torbeam_directory_path = 'D:\\Dropbox\\VHChen2020\\Data\\Input_Files_29Apr2019\\'
 
-suffix = '_29908_200'
+suffix = '_29905_190'
 ne_filename = input_files_path + 'ne' +suffix+ '.dat'
 
 ne_data = np.fromfile(ne_filename,dtype=float, sep='   ') # electron density as a function of poloidal flux label
@@ -51,18 +55,21 @@ popt, pcov = curve_fit(linear_times_tanh, ne_data_flux_array, ne_data_density_ar
 print(-popt[1]/popt[0])
 
 output_length = 2001
-ne_flux_output = np.linspace(0,2,output_length)
+ne_flux_output = np.linspace(0,-popt[1]/popt[0],output_length)
 
 plt.figure()
 plt.scatter(ne_data_flux_array,ne_data_density_array,color='black')
 plt.plot(ne_flux_output,linear_times_tanh(ne_flux_output,*popt))
 plt.plot(ne_flux_output,np.tanh(popt[2]*ne_flux_output)+popt[3])
 plt.plot(ne_flux_output,(popt[0]*ne_flux_output + popt[1]))
+plt.ylim([0, 4])
+plt.xlim([0, 1.5])
+
 
 radialcoord_interp_array = np.sqrt(ne_flux_output)
 density_fit_array = linear_times_tanh(ne_flux_output,*popt)
 
-density_fit_array[density_fit_array<0] = 0
+#density_fit_array[density_fit_array<0] = 0
 
 
 ne_data_file = open(torbeam_directory_path + 'ne' +suffix+ '_fitted.dat','w')  

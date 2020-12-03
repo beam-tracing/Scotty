@@ -101,56 +101,20 @@ def find_D_matrix(K_magnitude,launch_angular_frequency,epsilon_para,epsilon_perp
 
     return D_matrix
 
-def find_dH_dKR_Cardano(K_magnitude, launch_angular_frequency, epsilon_para,epsilon_perp, epsilon_g, theta_m, delta_K_R):
-    
-    H_plus  = find_H_Cardano(K_magnitude,launch_angular_frequency,epsilon_para,epsilon_perp,epsilon_g,theta_m)
-    H_minus = find_H(q_R, q_Z, K_R-delta_K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag, 
-                     interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z)
-    dH_dKR = (H_plus - H_minus) / (2 * delta_K_R)
-    
-    return dH_dKR
-
-
-def find_dH_dKZ_Cardano(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag, delta_K_Z, 
-                interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z):
-    
-    H_plus  = find_H(q_R, q_Z, K_R, K_zeta, K_Z+delta_K_Z, launch_angular_frequency, mode_flag, 
-                     interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z)
-    H_minus = find_H(q_R, q_Z, K_R, K_zeta, K_Z-delta_K_Z, launch_angular_frequency, mode_flag, 
-                     interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z)
-    dH_dKZ = (H_plus - H_minus) / (2 * delta_K_Z)
-    
-    return dH_dKZ
-
-
-def find_dH_dKzeta_Cardano(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag, delta_K_zeta, 
-                   interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z):
-    
-    H_plus  = find_H(q_R, q_Z, K_R, K_zeta+delta_K_zeta, K_Z, launch_angular_frequency, mode_flag, 
-                     interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z)
-    H_minus = find_H(q_R, q_Z, K_R, K_zeta-delta_K_zeta, K_Z, launch_angular_frequency, mode_flag, 
-                     interp_poloidal_flux, interp_density_1D, interp_B_R, interp_B_T, interp_B_Z)
-    dH_dKzeta = (H_plus - H_minus) / (2 * delta_K_zeta)
-    
-    return dH_dKzeta
+def find_nearest(array,  value): #returns the index
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return int(idx)
 
 
 
+suffix = '33'
 
-
-
-
-
-
-
-
-
-
-loadfile = np.load('data_input.npz')
+loadfile = np.load('data_input' + suffix + '.npz')
 launch_freq_GHz =loadfile['launch_freq_GHz']
 loadfile.close()
 
-loadfile = np.load('analysis_output.npz')
+loadfile = np.load('analysis_output' + suffix + '.npz')
 #localisation_piece = loadfile['localisation_piece']
 cutoff_index = loadfile['cutoff_index']
 RZ_distance_along_line = loadfile['RZ_distance_along_line']
@@ -165,9 +129,10 @@ M_yy_output = loadfile['M_yy_output']
 in_index = loadfile['in_index']
 out_index = loadfile['out_index']
 theta_m_output = loadfile['theta_m_output']
+K_magnitude_array = loadfile['K_magnitude_array']
 loadfile.close()
 
-loadfile = np.load('data_output.npz')
+loadfile = np.load('data_output' + suffix + '.npz')
 g_magnitude_output = loadfile['g_magnitude_output']
 q_R_array = loadfile['q_R_array']
 K_R_array = loadfile['K_R_array']
@@ -239,5 +204,79 @@ plt.plot(distance_along_line,abs(H_2_Cardano_array),'g')
 plt.plot(distance_along_line,abs(H_3_Cardano_array),'b')    
 plt.ylim(0,1)
 
+
+
+#d_K_magnitude_array_d_tau = np.gradient(K_magnitude_array,distance_along_line)
+#d2_K_magnitude_array_d_tau2 = np.gradient(d_K_magnitude_array_d_tau,distance_along_line)
+#
+#kperp1_minus_ks1 = - d2_K_magnitude_array_d_tau2[cutoff_index] * (distance_along_line-distance_along_line[cutoff_index])**2
+
+
+
+
+out_index_new=out_index-20
+
+ray_localisation_piece = g_magnitude[0]**2/g_magnitude**2
+
+spectrum = ( k_perp_1_backscattered / k_perp_1_backscattered[0] )**(-2*10/3)
+
+# Beam: Localisation vs distance
+numberOfDataPoints = len(M_xx_output)             
+M_w = np.zeros([numberOfDataPoints,2,2],dtype='complex128')
+M_w[:,0,0] = M_xx_output
+M_w[:,1,1] = M_yy_output
+M_w[:,1,0] = M_xy_output
+M_w[:,0,1] = M_w[:,1,0]
+
+Psi_w = np.zeros([numberOfDataPoints,2,2],dtype='complex128')
+Psi_w[:,0,0] = Psi_xx_output
+Psi_w[:,1,1] = Psi_yy_output
+Psi_w[:,1,0] = Psi_xy_output
+Psi_w[:,0,1] = Psi_w[:,1,0]
+         
+beam_localisation_piece = np.linalg.det(np.imag(Psi_w)) / abs(np.linalg.det(M_w))
+# --
+
+ray_and_spectrum_piece = ray_localisation_piece * spectrum
+overall_localisation_piece = beam_localisation_piece * ray_localisation_piece * spectrum
+localisation_no_spectrum = beam_localisation_piece * ray_localisation_piece
+
+localisation_1_over_e = overall_localisation_piece.max() / (np.e)
+localisation_index = find_nearest(overall_localisation_piece,overall_localisation_piece.max())
+localised_distance_from_cutoff = distance_along_line[localisation_index]-distance_along_line[cutoff_index]
+
+w_1_over_e_index_1 = find_nearest(overall_localisation_piece[0:localisation_index],localisation_1_over_e)
+w_1_over_e_index_2 = localisation_index + find_nearest(overall_localisation_piece[localisation_index:],localisation_1_over_e)
+half_width = 0.5*(distance_along_line[w_1_over_e_index_2] - distance_along_line[w_1_over_e_index_1])
+
 plt.figure()
-plt.plot(distance_along_line,g_magnitude[0]**2/g_magnitude**2)
+plt.subplot(2,2,1)
+plt.plot(distance_along_line[:out_index_new]-distance_along_line[cutoff_index],ray_localisation_piece[:out_index_new])
+plt.plot(distance_along_line[:out_index_new]-distance_along_line[cutoff_index],beam_localisation_piece[:out_index_new])
+plt.xlabel(r'$(l - l_c) / m$')
+plt.ylabel(r'$g_{ant}^2 / g^2$')
+plt.subplot(2,2,2)
+plt.plot(distance_along_line[:out_index_new]-distance_along_line[cutoff_index],k_perp_1_backscattered[:out_index_new])
+plt.xlabel(r'$(l - l_c) / m$')
+plt.ylabel(r'$- 2 K$')
+plt.subplot(2,2,3)
+plt.plot(k_perp_1_backscattered[:out_index_new],spectrum[:out_index_new])
+plt.ylabel('spectrum')
+plt.xlabel(r'$- 2 K$')
+plt.subplot(2,2,4)
+plt.plot(distance_along_line[:out_index_new]-distance_along_line[cutoff_index],overall_localisation_piece[:out_index_new])
+plt.plot(distance_along_line[:out_index_new]-distance_along_line[cutoff_index],ray_and_spectrum_piece[:out_index_new])
+plt.xlabel(r'$(l - l_c) / m$')
+plt.ylabel('localisation')
+plt.tight_layout(pad=1.08, h_pad=None, w_pad=None, rect=None)
+plt.savefig('localisation.jpg',dpi=150)
+
+plt.figure()
+plt.plot(distance_along_line[:out_index_new]-distance_along_line[cutoff_index],localisation_no_spectrum[:out_index_new])
+
+plt.figure()
+plt.plot(distance_along_line[:out_index_new]-distance_along_line[cutoff_index],beam_localisation_piece[:out_index_new])
+
+
+
+

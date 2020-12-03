@@ -11,30 +11,30 @@ from Scotty_beam_me_up import beam_me_up
 from Scotty_fun_general import find_q_lab_Cartesian, find_q_lab, find_K_lab_Cartesian, find_K_lab
 import numpy as np
 
-input_filename_suffix = '_29908_200'
+input_filename_suffix = '_29905_190'
 #input_filename_suffix = ''
 
 tau_step = 1.0
-numberOfTauPoints = 751
+numberOfTauPoints = 1001
 saveInterval = 1  # saves every n time steps
 
-poloidal_launch_angle_Torbeam = 10.0 # deg
-toroidal_launch_angle_Torbeam = 0.0 # deg
-#toroidal_launch_angle_Torbeam_scan = np.linspace(-3,-8,51)
+poloidal_launch_angle_Torbeam = 4.0 # deg
+toroidal_launch_angle_Torbeam = -5.25 # deg
+# toroidal_launch_angle_Torbeam_scan = np.linspace(-0.5,-7.5,71)
 
 launch_freq_GHz = 55.0
 mode_flag = 1 # O-mode (1) or X-mode (-1)
-launch_beam_width = 0.06 # in m
-launch_beam_curvature = -192 # in m. negative because launched BEFORE the beam waist
+launch_beam_width = 0.0554 # in m
+launch_beam_curvature = -1.77 # in m. negative because launched BEFORE the beam waist
 vacuumLaunch_flag = True # If true, the launch_position is in vacuum. If false, the launch_position is in plasma.
 
 
 vacuum_propagation_flag = True #If true, use analytical propagation until poloidal_flux_enter is reached. If false, start propagating numerically straight away.
-poloidal_flux_enter = 1.23
+poloidal_flux_enter = 0.9473479057893939
 
 Psi_BC_flag = True # This solves the boundary conditions for the 3D matrix Psi, which is necessary if there is a discontinuity in the first derivative of density (or B field)
 
-
+find_B_method='efit'
 
 
 
@@ -53,39 +53,44 @@ Psi_BC_flag = True # This solves the boundary conditions for the 3D matrix Psi, 
 launch_position = np.asarray([2.43521,0,0]) # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
 
 beam_me_up(tau_step,
-           numberOfTauPoints,
-           saveInterval,
-           poloidal_launch_angle_Torbeam,
-           toroidal_launch_angle_Torbeam,
-           launch_freq_GHz,
-           mode_flag,
-           vacuumLaunch_flag,
-           launch_beam_width,
-           launch_beam_curvature,
-           launch_position,
-           vacuum_propagation_flag,
-           Psi_BC_flag,
-           poloidal_flux_enter,
-           input_filename_suffix,
-           output_filename_suffix='0',
-           figure_flag= True)
+            numberOfTauPoints,
+            saveInterval,
+            poloidal_launch_angle_Torbeam,
+            toroidal_launch_angle_Torbeam,
+            launch_freq_GHz,
+            mode_flag,
+            vacuumLaunch_flag,
+            launch_beam_width,
+            launch_beam_curvature,
+            launch_position,
+            find_B_method,
+            vacuum_propagation_flag,
+            Psi_BC_flag,
+            poloidal_flux_enter,
+            input_filename_suffix,
+            output_filename_suffix='',
+            figure_flag= True)
 
-#for ii in range(0,51):
-#    print('Iteration number: ' + str(ii))
-#    
-#    toroidal_launch_angle_Torbeam = toroidal_launch_angle_Torbeam_scan[ii]
-#
-#    beam_me_up(tau_step,
+# for ii in range(0,71):
+#     print('Iteration number: ' + str(ii))
+    
+#     toroidal_launch_angle_Torbeam = toroidal_launch_angle_Torbeam_scan[ii]
+
+#     beam_me_up(tau_step,
 #               numberOfTauPoints,
 #               saveInterval,
 #               poloidal_launch_angle_Torbeam,
 #               toroidal_launch_angle_Torbeam,
 #               launch_freq_GHz,
 #               mode_flag,
+#               vacuumLaunch_flag,
 #               launch_beam_width,
 #               launch_beam_curvature,
 #               launch_position,
+#               find_B_method,
+#               vacuum_propagation_flag,
+#               Psi_BC_flag,
 #               poloidal_flux_enter,
 #               input_filename_suffix,
 #               output_filename_suffix=str(ii),
-#               figure_flag= True)
+#               figure_flag= False)
