@@ -101,17 +101,20 @@ def find_D_matrix(K_magnitude,launch_angular_frequency,epsilon_para,epsilon_perp
 
     return D_matrix
 
+def find_nearest(array,  value): #returns the index
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return int(idx)
 
 
 
+suffix = '33'
 
-
-
-loadfile = np.load('data_input.npz')
+loadfile = np.load('data_input' + suffix + '.npz')
 launch_freq_GHz =loadfile['launch_freq_GHz']
 loadfile.close()
 
-loadfile = np.load('analysis_output.npz')
+loadfile = np.load('analysis_output' + suffix + '.npz')
 #localisation_piece = loadfile['localisation_piece']
 cutoff_index = loadfile['cutoff_index']
 RZ_distance_along_line = loadfile['RZ_distance_along_line']
@@ -129,7 +132,7 @@ theta_m_output = loadfile['theta_m_output']
 K_magnitude_array = loadfile['K_magnitude_array']
 loadfile.close()
 
-loadfile = np.load('data_output.npz')
+loadfile = np.load('data_output' + suffix + '.npz')
 g_magnitude_output = loadfile['g_magnitude_output']
 q_R_array = loadfile['q_R_array']
 K_R_array = loadfile['K_R_array']
@@ -211,7 +214,7 @@ plt.ylim(0,1)
 
 
 
-out_index_new=out_index+50
+out_index_new=out_index-20
 
 ray_localisation_piece = g_magnitude[0]**2/g_magnitude**2
 
@@ -234,8 +237,17 @@ Psi_w[:,0,1] = Psi_w[:,1,0]
 beam_localisation_piece = np.linalg.det(np.imag(Psi_w)) / abs(np.linalg.det(M_w))
 # --
 
+ray_and_spectrum_piece = ray_localisation_piece * spectrum
 overall_localisation_piece = beam_localisation_piece * ray_localisation_piece * spectrum
+localisation_no_spectrum = beam_localisation_piece * ray_localisation_piece
 
+localisation_1_over_e = overall_localisation_piece.max() / (np.e)
+localisation_index = find_nearest(overall_localisation_piece,overall_localisation_piece.max())
+localised_distance_from_cutoff = distance_along_line[localisation_index]-distance_along_line[cutoff_index]
+
+w_1_over_e_index_1 = find_nearest(overall_localisation_piece[0:localisation_index],localisation_1_over_e)
+w_1_over_e_index_2 = localisation_index + find_nearest(overall_localisation_piece[localisation_index:],localisation_1_over_e)
+half_width = 0.5*(distance_along_line[w_1_over_e_index_2] - distance_along_line[w_1_over_e_index_1])
 
 plt.figure()
 plt.subplot(2,2,1)
@@ -253,11 +265,14 @@ plt.ylabel('spectrum')
 plt.xlabel(r'$- 2 K$')
 plt.subplot(2,2,4)
 plt.plot(distance_along_line[:out_index_new]-distance_along_line[cutoff_index],overall_localisation_piece[:out_index_new])
+plt.plot(distance_along_line[:out_index_new]-distance_along_line[cutoff_index],ray_and_spectrum_piece[:out_index_new])
 plt.xlabel(r'$(l - l_c) / m$')
 plt.ylabel('localisation')
 plt.tight_layout(pad=1.08, h_pad=None, w_pad=None, rect=None)
 plt.savefig('localisation.jpg',dpi=150)
 
+plt.figure()
+plt.plot(distance_along_line[:out_index_new]-distance_along_line[cutoff_index],localisation_no_spectrum[:out_index_new])
 
 plt.figure()
 plt.plot(distance_along_line[:out_index_new]-distance_along_line[cutoff_index],beam_localisation_piece[:out_index_new])
