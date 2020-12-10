@@ -9,22 +9,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import simps
 
-
-loadfile = np.load('analysis_output.npz')
+suffix = '80'
+loadfile = np.load('analysis_output' + suffix + '.npz')
 cutoff_index = loadfile['cutoff_index']
 RZ_distance_along_line = loadfile['RZ_distance_along_line']
 k_perp_1_backscattered = loadfile['k_perp_1_backscattered']
 K_magnitude_array = loadfile['K_magnitude_array']
 loadfile.close()
 
-loadfile = np.load('data_output.npz')
+loadfile = np.load('data_output' + suffix + '.npz')
 tau_array = loadfile['tau_array']
 g_magnitude_output = loadfile['g_magnitude_output']
 q_R_array = loadfile['q_R_array']
 q_Z_array = loadfile['q_Z_array']
 loadfile.close()
 
-loadfile = np.load('data_input.npz')
+loadfile = np.load('data_input' + suffix + '.npz')
 data_R_coord = loadfile['data_R_coord']
 data_Z_coord = loadfile['data_Z_coord']
 data_poloidal_flux_grid = loadfile['data_poloidal_flux_grid']

@@ -60,12 +60,13 @@ from Scotty_fun_general import find_d_poloidal_flux_dR, find_d_poloidal_flux_dZ,
 from Scotty_fun_general import find_dB_dR_FFD, find_dB_dZ_FFD, find_d2B_dR2_FFD, find_d2B_dZ2_FFD, find_d2B_dR_dZ_FFD          
 from Scotty_fun_general import find_dB_dR_CFD, find_dB_dZ_CFD, find_d2B_dR2_CFD, find_d2B_dZ2_CFD#, find_d2B_dR_dZ_FFD          
 from Scotty_fun_general import find_d2_poloidal_flux_dR2, find_d2_poloidal_flux_dZ2
+from Scotty_fun_general import find_H_Cardano
 
 from Scotty_fun_FFD import find_dH_dR, find_dH_dZ # \nabla H
-from Scotty_fun_FFD import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta # \nabla_K H
+from Scotty_fun_CFD import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta # \nabla_K H
 from Scotty_fun_FFD import find_d2H_dR2, find_d2H_dZ2, find_d2H_dR_dZ # \nabla \nabla H
-from Scotty_fun_FFD import find_d2H_dKR2, find_d2H_dKR_dKzeta, find_d2H_dKR_dKZ, find_d2H_dKzeta2, find_d2H_dKzeta_dKZ, find_d2H_dKZ2 # \nabla_K \nabla_K H
-from Scotty_fun_FFD import find_d2H_dKR_dR, find_d2H_dKR_dZ, find_d2H_dKzeta_dR, find_d2H_dKzeta_dZ, find_d2H_dKZ_dR, find_d2H_dKZ_dZ # \nabla_K \nabla H
+from Scotty_fun_CFD import find_d2H_dKR2, find_d2H_dKR_dKzeta, find_d2H_dKR_dKZ, find_d2H_dKzeta2, find_d2H_dKzeta_dKZ, find_d2H_dKZ2 # \nabla_K \nabla_K H
+from Scotty_fun_mix import find_d2H_dKR_dR, find_d2H_dKR_dZ, find_d2H_dKzeta_dR, find_d2H_dKzeta_dZ, find_d2H_dKZ_dR, find_d2H_dKZ_dZ # \nabla_K \nabla H
 from Scotty_fun_FFD import find_dpolflux_dR, find_dpolflux_dZ # For find_B if using efit files directly
 
 def beam_me_up(tau_step,
@@ -80,6 +81,7 @@ def beam_me_up(tau_step,
                launch_beam_curvature,
                launch_position,
                find_B_method,
+               stop_flag=False,
                vacuum_propagation_flag=False,
                Psi_BC_flag = False,
                poloidal_flux_enter=None,
@@ -87,7 +89,8 @@ def beam_me_up(tau_step,
                output_filename_suffix='',
                figure_flag=True,
                plasmaLaunch_K=np.zeros(3),
-               plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3,3])
+               plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3,3]),
+               density_fit_parameters=None
                ):
 
     """
@@ -166,33 +169,39 @@ def beam_me_up(tau_step,
 #    input_files_path ='D:\\Dropbox\\VHChen2018\\Data\\Input_Files_29Apr2019\\'
 #    input_files_path ='D:\\Dropbox\\VHChen2019\\Code - Scotty\\Benchmark_9\\Torbeam\\'
 #    input_files_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
-
-
-
-    # Importing data from ne.dat
-#    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_smoothed.dat'
-    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_fitted.dat'
-#    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '.dat'
     
-    ne_data = np.fromfile(ne_filename,dtype=float, sep='   ') # electron density as a function of poloidal flux label
-    
-#    ne_data_length = int(ne_data[0])
-    ne_data_density_array = 1.1*ne_data[2::2] # in units of 10.0**19 m-3
-    print('Warninig: Scale factor of 1.1 used')
-    ne_data_radialcoord_array = ne_data[1::2]
-    ne_data_poloidal_flux_array = ne_data_radialcoord_array**2 # Loading radial coord for now, makes it easier to benchmark with Torbeam. Hence, have to convert to poloidal flux
-#    ne_data_normalised_poloidal_flux_array = ne_data[1::2] # My new IDL file outputs the flux density directly, instead of radialcoord
-    
-    interp_density_1D = interpolate.interp1d(ne_data_poloidal_flux_array, ne_data_density_array,
-                                             kind='cubic', axis=-1, copy=True, bounds_error=False,
-                                             fill_value=0, assume_sorted=False) # density is 0 outside the LCFS, hence the fill_value. Use 'linear' instead of 'cubic' if the density data has a discontinuity in the first derivative    
-    def find_density_1D(poloidal_flux, interp_density_1D=interp_density_1D):
-        density = interp_density_1D(poloidal_flux)
-        # if poloidal_flux <= 0.9473479057893939:
-        #     density = 1.1*(-6.78999607*poloidal_flux + 6.43248856)*np.tanh(0.96350798 * poloidal_flux + 0.48792645)
-        # else:
-        #     density = 0.0
-        return density
+    if density_fit_parameters is None:
+        print('Warning: Scale factor of 1.1 used')
+        # Importing data from ne.dat
+    #    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_smoothed.dat'
+        ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_fitted.dat'
+    #    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '.dat'
+        
+        ne_data = np.fromfile(ne_filename,dtype=float, sep='   ') # electron density as a function of poloidal flux label
+        
+    #    ne_data_length = int(ne_data[0])
+        ne_data_density_array = 1.1*ne_data[2::2] # in units of 10.0**19 m-3
+        ne_data_radialcoord_array = ne_data[1::2]
+        ne_data_poloidal_flux_array = ne_data_radialcoord_array**2 # Loading radial coord for now, makes it easier to benchmark with Torbeam. Hence, have to convert to poloidal flux
+    #    ne_data_normalised_poloidal_flux_array = ne_data[1::2] # My new IDL file outputs the flux density directly, instead of radialcoord        
+        
+        interp_density_1D = interpolate.interp1d(ne_data_poloidal_flux_array, ne_data_density_array,
+                                                 kind='cubic', axis=-1, copy=True, bounds_error=False,
+                                                 fill_value=0, assume_sorted=False) # density is 0 outside the LCFS, hence the fill_value. Use 'linear' instead of 'cubic' if the density data has a discontinuity in the first derivative    
+        def find_density_1D(poloidal_flux, interp_density_1D=interp_density_1D):
+            density = interp_density_1D(poloidal_flux)
+            return density
+    else:
+        print('Warning: Scale factor of 1.1 used')
+        ne_data_density_array=None # So that saving the input data later does not complain
+        ne_data_radialcoord_array=None # So that saving the input data later does not complain
+        
+        def find_density_1D(poloidal_flux, poloidal_flux_enter=poloidal_flux_enter,density_fit_parameters=density_fit_parameters):
+            if poloidal_flux <= poloidal_flux_enter:
+                density = 1.1*(density_fit_parameters[0]*poloidal_flux + density_fit_parameters[1])*np.tanh(density_fit_parameters[2] * poloidal_flux + density_fit_parameters[3])
+            else:
+                density = 0.0
+            return density            
     
     # This part of the code defines find_B_R, find_B_T, find_B_zeta
     interp_order = 5 # For the 2D interpolation functions
@@ -263,15 +272,15 @@ def beam_me_up(tau_step,
         data_R_coord = profiles2D.variables['r'][time_index][:]
         data_Z_coord = profiles2D.variables['z'][time_index][:]
         
-        radialProfiles = output_group.groups['radialProfiles']
-        Bt_array = radialProfiles.variables['Bt'][time_index][:]
-        r_array_B = radialProfiles.variables['r'][time_index][:]
+        # radialProfiles = output_group.groups['radialProfiles']
+        # Bt_array = radialProfiles.variables['Bt'][time_index][:]
+        # r_array_B = radialProfiles.variables['r'][time_index][:]
         
-        separatrixGeometry = output_group.groups['separatrixGeometry']
-        geometricAxis = separatrixGeometry.variables['geometricAxis'][time_index] # R,Z location of the geometric axis
+        # separatrixGeometry = output_group.groups['separatrixGeometry']
+        # geometricAxis = separatrixGeometry.variables['geometricAxis'][time_index] # R,Z location of the geometric axis
         
-        globalParameters = output_group.groups['globalParameters']
-        bvacRgeom = globalParameters.variables['bvacRgeom'][time_index] # Vacuum B field (= B_zeta, in vacuum) at the geometric axis
+        # globalParameters = output_group.groups['globalParameters']
+        # bvacRgeom = globalParameters.variables['bvacRgeom'][time_index] # Vacuum B field (= B_zeta, in vacuum) at the geometric axis
         
         fluxFunctionProfiles = output_group.groups['fluxFunctionProfiles']
         poloidalFlux = fluxFunctionProfiles.variables['normalizedPoloidalFlux'][:]
@@ -281,33 +290,26 @@ def beam_me_up(tau_step,
         dataset.close()
 
         interp_rBphi = interpolate.interp1d(poloidalFlux, rBphi, 
-                                                 kind='cubic', axis=-1, copy=True, bounds_error=True, 
-                                                 fill_value=0, assume_sorted=False)
+                                                 kind='cubic', axis=-1, copy=True, bounds_error=False, 
+                                                 fill_value=rBphi[-1], assume_sorted=False)
  
         # normalised_polflux = polflux_const_m * poloidalFlux + polflux_const_c (think y = mx + c)        
         [polflux_const_m, polflux_const_c] = np.polyfit(unnormalizedPoloidalFlux,poloidalFlux,1) #linear fit
         data_poloidal_flux_grid = data_unnormalised_poloidal_flux_grid*polflux_const_m + polflux_const_c
         
         interp_poloidal_flux = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_poloidal_flux_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
-        
-        # The last value of poloidalFlux for which rBphi (R * B_zeta) is specified. Outside this, we extrapolate B_zeta with 1/R
-        lastPoloidalFluxPoint = poloidalFlux[-1]
-        
+
         def find_B_R(q_R,q_Z,delta_R=delta_R,interp_poloidal_flux=interp_poloidal_flux,polflux_const_m=polflux_const_m):
             dpolflux_dZ = find_dpolflux_dZ(q_R,q_Z,delta_R,interp_poloidal_flux)
             B_R = -  dpolflux_dZ / (polflux_const_m * q_R)
             return B_R
         
-        def find_B_T(q_R,q_Z, lastPoloidalFluxPoint=lastPoloidalFluxPoint,bvacRgeom=bvacRgeom,geometricAxis=geometricAxis,interp_poloidal_flux=interp_poloidal_flux,interp_rBphi=interp_rBphi):
+        def find_B_T(q_R,q_Z,interp_poloidal_flux=interp_poloidal_flux,interp_rBphi=interp_rBphi):
             polflux = interp_poloidal_flux(q_R,q_Z)
-            if polflux <= lastPoloidalFluxPoint:
-                # B_T from EFIT
-                rBphi = interp_rBphi(polflux)
-                B_T = rBphi/q_R
-            else:
-                # Extrapolate B_T
-                # B_T = - B_vacuum * R_vacuum/q_R
-                B_T = bvacRgeom * geometricAxis[0] / q_R
+            # B_T from EFIT
+            rBphi = interp_rBphi(polflux)
+            B_T = rBphi/q_R
+
             return B_T
         
         def find_B_Z(q_R,q_Z,delta_Z=delta_Z,interp_poloidal_flux=interp_poloidal_flux,polflux_const_m=polflux_const_m):
@@ -491,6 +493,7 @@ def beam_me_up(tau_step,
             K_Z_initial        = K_Z_launch
             initial_position   = launch_position            
             
+            Psi_3D_lab_entry = None
             distance_from_launch_to_entry=None
             Psi_3D_lab_entry_cartersian = np.full_like(Psi_3D_lab_launch,fill_value=np.nan)
             
@@ -810,12 +813,12 @@ def beam_me_up(tau_step,
                              find_B_R,find_B_T,find_B_Z
                              )
         d2H_dKzeta2    = find_d2H_dKzeta2(
-                                q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
-                                K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
-                                launch_angular_frequency,mode_flag,delta_K_zeta,
+                             q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
+                             K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
+                             launch_angular_frequency,mode_flag,delta_K_zeta,
                              interp_poloidal_flux,find_density_1D,
                              find_B_R,find_B_T,find_B_Z
-                                )
+                             )
         d2H_dKZ2       = find_d2H_dKZ2(
                               q_R_buffer[current_marker-1],q_Z_buffer[current_marker-1],
                               K_R_buffer[current_marker-1],K_zeta,K_Z_buffer[current_marker-1],
@@ -1121,8 +1124,12 @@ def beam_me_up(tau_step,
     cutoff_index = find_nearest(abs(K_magnitude_array),  0) # Index of the cutoff, at the minimum value of K, use this with other arrays
 
         # Calculates when the beam 'enters' and 'leaves' the plasma
-        # Here entry and exit refer to cross the LCFS, poloidal_flux = 1.0
-    in_out_poloidal_flux = 1.0
+        # Here, entry and exit refer to crossing poloidal_flux_enter, if specified
+        # Otherwise, entry and exit refer to crossing the LCFS, poloidal_flux = 1.0
+    if poloidal_flux_enter is None:
+        in_out_poloidal_flux = 1.0
+    else:
+        in_out_poloidal_flux = poloidal_flux_enter
     poloidal_flux_a = poloidal_flux_output[0:cutoff_index]
     poloidal_flux_b = poloidal_flux_output[cutoff_index::]
     in_index = find_nearest(poloidal_flux_a,in_out_poloidal_flux)
@@ -1133,7 +1140,7 @@ def beam_me_up(tau_step,
         # Calcuating the corrections to make M from Psi
         # Corrections that are small in mismatch are ignored in the calculation of M
         # However, these small terms are still calculated in this section, so that their actual size can be checked, if need be
-    ray_curvature_kappa_output         = np.zeros([numberOfDataPoints,3])
+    ray_curvature_kappa_output = np.zeros([numberOfDataPoints,3])
 
     k_perp_1_backscattered = -2*K_magnitude_array
 
@@ -1176,10 +1183,10 @@ def beam_me_up(tau_step,
     M_yy_output = Psi_yy_output
     
         # Calculates the localisation, wavenumber resolution, and mismatch attenuation pieces
-    det_M_w = M_xx_output*M_yy_output - M_xy_output**2
-    M_w_inv_xx_output =   M_yy_output / det_M_w
-    M_w_inv_xy_output = - M_xy_output / det_M_w
-    M_w_inv_yy_output =   M_xx_output / det_M_w
+    det_M_w_analysis = M_xx_output*M_yy_output - M_xy_output**2
+    M_w_inv_xx_output =   M_yy_output / det_M_w_analysis
+    M_w_inv_xy_output = - M_xy_output / det_M_w_analysis
+    M_w_inv_yy_output =   M_xx_output / det_M_w_analysis
     
     delta_k_perp_2 = np.sqrt( - 2 / np.imag(M_w_inv_yy_output) )
     delta_theta_m  = np.sqrt( 
@@ -1190,46 +1197,81 @@ def beam_me_up(tau_step,
     sin_theta_m_analysis = np.zeros(numberOfDataPoints)
     sin_theta_m_analysis[:] = (b_hat_output[:,0]*K_R_array[:] + b_hat_output[:,1]*K_zeta_initial/q_R_array[:] + b_hat_output[:,2]*K_Z_array[:]) / (K_magnitude_array[:]) # B \cdot K / (abs (B) abs(K))
     theta_m_output = np.sign(sin_theta_m_analysis)*np.arcsin(abs(sin_theta_m_analysis)) # Assumes the mismatch angle is never smaller than -90deg or bigger than 90deg
-    print(theta_m_output[cutoff_index])
+    # print(theta_m_output[cutoff_index])
 #    print(cutoff_index)
-    
-#    g_magnitude_launch = find_g_magnitude(launch_position[0],launch_position[1],K_R_launch,K_zeta_launch,K_Z_launch,
-#                                          launch_angular_frequency,mode_flag,delta_K_R,delta_K_zeta,delta_K_Z,
-#                                          interp_poloidal_flux,find_density_1D,find_B_R,find_B_T,find_B_Z)
-#    d_K_d_tau_analysis = np.gradient(K_magnitude_array,tau_array)
-#    localisation_piece = g_magnitude_launch**2/abs(g_magnitude_output*d_K_d_tau_analysis)
-    
-    # This part is used to make some nice plots when post-processing
+
+
+        # This part is used to make some nice plots when post-processing
     R_midplane_points = np.linspace(data_R_coord[0],data_R_coord[-1],1000)
     poloidal_flux_on_midplane = np.zeros_like(R_midplane_points)
     for ii in range(0,1000):
         poloidal_flux_on_midplane[ii] = interp_poloidal_flux(R_midplane_points[ii],0) # poloidal flux at R and z=0
         
+    
+        # Calculates localisation (start)
+    # Ray piece of localisation as a function of distance along ray
+    K_magnitude_array_plus_KR     = np.sqrt((K_R_array+delta_K_R)**2 + K_Z_array**2 + K_zeta_initial**2/q_R_array**2)
+    K_magnitude_array_minus_KR    = np.sqrt((K_R_array-delta_K_R)**2 + K_Z_array**2 + K_zeta_initial**2/q_R_array**2)
+    K_magnitude_array_plus_Kzeta  = np.sqrt(K_R_array**2 + K_Z_array**2 + (K_zeta_initial+delta_K_zeta)**2/q_R_array**2)
+    K_magnitude_array_minus_Kzeta = np.sqrt(K_R_array**2 + K_Z_array**2 + (K_zeta_initial-delta_K_zeta)**2/q_R_array**2)
+    K_magnitude_array_plus_KZ     = np.sqrt(K_R_array**2 + (K_Z_array+delta_K_Z)**2 + K_zeta_initial**2/q_R_array**2)
+    K_magnitude_array_minus_KZ    = np.sqrt(K_R_array**2 + (K_Z_array-delta_K_Z)**2 + K_zeta_initial**2/q_R_array**2)
+        
+    H_1_Cardano_array,H_2_Cardano_array,H_3_Cardano_array = find_H_Cardano(K_magnitude_array,launch_angular_frequency,epsilon_para_output,epsilon_perp_output,epsilon_g_output,theta_m_output)
+    
+    # In my experience, the H_3_Cardano expression corresponds to the O mode, and the H_2_Cardano expression corresponds to the X-mode
+    # ALERT: This may not always be the case! Check the output figure to make sure that the appropriate solution is indeed 0 along the ray
+    if mode_flag == 1:
+        _,_,H_Cardano_plus_KR_array     = find_H_Cardano(K_magnitude_array_plus_KR    ,launch_angular_frequency,epsilon_para_output,epsilon_perp_output,epsilon_g_output,theta_m_output)
+        _,_,H_Cardano_minus_KR_array    = find_H_Cardano(K_magnitude_array_minus_KR   ,launch_angular_frequency,epsilon_para_output,epsilon_perp_output,epsilon_g_output,theta_m_output)
+        _,_,H_Cardano_plus_Kzeta_array  = find_H_Cardano(K_magnitude_array_plus_Kzeta ,launch_angular_frequency,epsilon_para_output,epsilon_perp_output,epsilon_g_output,theta_m_output)
+        _,_,H_Cardano_minus_Kzeta_array = find_H_Cardano(K_magnitude_array_minus_Kzeta,launch_angular_frequency,epsilon_para_output,epsilon_perp_output,epsilon_g_output,theta_m_output)
+        _,_,H_Cardano_plus_KZ_array     = find_H_Cardano(K_magnitude_array_plus_KZ    ,launch_angular_frequency,epsilon_para_output,epsilon_perp_output,epsilon_g_output,theta_m_output)
+        _,_,H_Cardano_minus_KZ_array    = find_H_Cardano(K_magnitude_array_minus_KZ   ,launch_angular_frequency,epsilon_para_output,epsilon_perp_output,epsilon_g_output,theta_m_output)
+    elif mode_flag == -1:
+        _,H_Cardano_plus_KR_array,_     = find_H_Cardano(K_magnitude_array_plus_KR    ,launch_angular_frequency,epsilon_para_output,epsilon_perp_output,epsilon_g_output,theta_m_output)
+        _,H_Cardano_minus_KR_array,_    = find_H_Cardano(K_magnitude_array_minus_KR   ,launch_angular_frequency,epsilon_para_output,epsilon_perp_output,epsilon_g_output,theta_m_output)
+        _,H_Cardano_plus_Kzeta_array,_  = find_H_Cardano(K_magnitude_array_plus_Kzeta ,launch_angular_frequency,epsilon_para_output,epsilon_perp_output,epsilon_g_output,theta_m_output)
+        _,H_Cardano_minus_Kzeta_array,_ = find_H_Cardano(K_magnitude_array_minus_Kzeta,launch_angular_frequency,epsilon_para_output,epsilon_perp_output,epsilon_g_output,theta_m_output)
+        _,H_Cardano_plus_KZ_array,_     = find_H_Cardano(K_magnitude_array_plus_KZ    ,launch_angular_frequency,epsilon_para_output,epsilon_perp_output,epsilon_g_output,theta_m_output)
+        _,H_Cardano_minus_KZ_array,_    = find_H_Cardano(K_magnitude_array_minus_KZ   ,launch_angular_frequency,epsilon_para_output,epsilon_perp_output,epsilon_g_output,theta_m_output)
+            
+    g_R_Cardano    = np.real(H_Cardano_plus_KR_array - H_Cardano_minus_KR_array) / (2 * delta_K_R)
+    g_zeta_Cardano = np.real(H_Cardano_plus_Kzeta_array - H_Cardano_minus_Kzeta_array) / (2 * delta_K_zeta)
+    g_Z_Cardano    = np.real(H_Cardano_plus_KZ_array - H_Cardano_minus_KZ_array) / (2 * delta_K_Z)
+    
+    g_magnitude_Cardano = np.sqrt(g_R_Cardano**2 + g_zeta_Cardano**2 + g_Z_Cardano**2)
+        
+    localisation_ray = g_magnitude_Cardano[0]**2/g_magnitude_Cardano**2
+
+    # Spectrum piece of localisation as a function of distance along ray      
+    spectrum_power_law_coefficient = 10/3 # Turbulence cascade
+    localisation_spectrum = ( k_perp_1_backscattered / (-2*wavenumber_K0) )**(-2*spectrum_power_law_coefficient)
+    
+    # I have temporarily removed the beam part of localisation because it is fiddly, and I want to do a parameter sweep
+    # # Beam piece of localisation as a function of distance along ray   
+    # det_imag_Psi_w_analysis = np.imag(Psi_xx_output)*np.imag(Psi_yy_output) - np.imag(Psi_xy_output)**2 # Determinant of the imaginary part of Psi_w
+    # det_real_Psi_w_analysis = np.real(Psi_xx_output)*np.real(Psi_yy_output) - np.real(Psi_xy_output)**2 # Determinant of the real part of Psi_w. Not needed for the calculation, but gives useful insight
+             
+    # localisation_beam = det_imag_Psi_w_analysis / abs(det_M_w_analysis)
+    # # --
+    
+    localisation_ray_spectrum = localisation_ray * localisation_spectrum
+    # localisation_beam_ray_spectrum = localisation_beam * localisation_ray * localisation_spectrum
+    # localisation_beam_ray = localisation_beam * localisation_ray
+    
+    # # Finds the half-width (1/e)**2 and the distance the peak is from the cutoff location
+    # localisation_beam_ray_spectrum_max_over_e = localisation_beam_ray_spectrum.max() / (np.e)**2 # localisation_beam_ray_spectrum.max() / 2.71**2
+    # localisation_beam_ray_spectrum_max_index = find_nearest(localisation_beam_ray_spectrum,localisation_beam_ray_spectrum.max())
+    # localisation_beam_ray_spectrum_max_distance_from_cutoff = distance_along_line[localisation_beam_ray_spectrum_max_index]-distance_along_line[cutoff_index]
+    # localisation_beam_ray_spectrum_index_1 = find_nearest(localisation_beam_ray_spectrum[0:localisation_beam_ray_spectrum_max_index],localisation_beam_ray_spectrum_max_over_e)
+    # localisation_beam_ray_spectrum_index_2 = localisation_beam_ray_spectrum_max_index + find_nearest(localisation_beam_ray_spectrum[localisation_beam_ray_spectrum_max_index:],localisation_beam_ray_spectrum_max_over_e)
+    # localisation_beam_ray_spectrum_half_width = 0.5*(distance_along_line[localisation_beam_ray_spectrum_index_2] - distance_along_line[localisation_beam_ray_spectrum_index_1])
+        # Calculates localisation (end)
+    
+
+    
     # -------------------
-
-
-
-    ## -------------------
-    ## Cartesian check
-    ## -------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1260,9 +1302,18 @@ def beam_me_up(tau_step,
              distance_along_line=distance_along_line,
              k_perp_1_backscattered = k_perp_1_backscattered,K_magnitude_array=K_magnitude_array,
              cutoff_index=cutoff_index,in_index=in_index,out_index=out_index,
-             poloidal_flux_on_midplane=poloidal_flux_on_midplane,R_midplane_points=R_midplane_points
+             poloidal_flux_on_midplane=poloidal_flux_on_midplane,R_midplane_points=R_midplane_points,
+             localisation_ray=localisation_ray,localisation_spectrum=localisation_spectrum,
+             # localisation_beam=localisation_beam,
+             localisation_ray_spectrum=localisation_ray_spectrum
+             # localisation_beam_ray=localisation_beam_ray,
+             # localisation_beam_ray_spectrum=localisation_beam_ray_spectrum,
+             # localisation_beam_ray_spectrum_max_distance_from_cutoff=localisation_beam_ray_spectrum_max_distance_from_cutoff,
+             # localisation_beam_ray_spectrum_half_width=localisation_beam_ray_spectrum_half_width,
+             # localisation_beam_ray_spectrum_max_index=localisation_beam_ray_spectrum_max_index,
+             # det_imag_Psi_w_analysis=det_imag_Psi_w_analysis,det_real_Psi_w_analysis=det_real_Psi_w_analysis,det_M_w_analysis=det_M_w_analysis
              )
-#    print('Analysis data saved')
+    print('Analysis data saved')
     # -------------------
 
     ## -------------------
@@ -1295,74 +1346,76 @@ def beam_me_up(tau_step,
         plt.close()
         
         """
-        Plots Psi before and after the BCs are applied 
+        Plots Cardano's solutions to the actual dispersion relation
+        Useful to check whether the solution which = 0 along the path changes
         """
-        K_magnitude_entry = np.sqrt(K_R_entry**2 + K_zeta_entry**2 * entry_position[0]**2 + K_Z_entry**2)
+        plt.figure()
+        plt.title('Cardano')
+        plt.plot(distance_along_line,abs(H_1_Cardano_array),'r')    
+        plt.plot(distance_along_line,abs(H_2_Cardano_array),'g')    
+        plt.plot(distance_along_line,abs(H_3_Cardano_array),'b')    
+        plt.ylim(0,1)
+        plt.savefig('Cardano_' + output_filename_suffix)
+        plt.close()
         
-        Psi_w_entry = np.array([
-        [Psi_xx_entry,Psi_xy_entry],
-        [Psi_xy_entry,Psi_yy_entry]
-        ])
+        # Commented out because this does not work properly
+        # """
+        # Plots Psi before and after the BCs are applied 
+        # """
+        # K_magnitude_entry = np.sqrt(K_R_entry**2 + K_zeta_entry**2 * entry_position[0]**2 + K_Z_entry**2)
         
-        Psi_w_initial = np.array([
-                [Psi_xx_output[0],Psi_xy_output[0]],
-                [Psi_xy_output[0],Psi_yy_output[0]]
-                ])
+        # Psi_w_entry = np.array([
+        # [Psi_xx_entry,Psi_xy_entry],
+        # [Psi_xy_entry,Psi_yy_entry]
+        # ])
         
-        [Psi_w_entry_real_eigval_a, Psi_w_entry_real_eigval_b], Psi_w_entry_real_eigvec = np.linalg.eig(np.real(Psi_w_entry))
-        [Psi_w_entry_imag_eigval_a, Psi_w_entry_imag_eigval_b], Psi_w_entry_imag_eigvec = np.linalg.eig(np.imag(Psi_w_entry))
-        Psi_w_entry_real_eigvec_a = Psi_w_entry_real_eigvec[:,0]
-        Psi_w_entry_real_eigvec_b = Psi_w_entry_real_eigvec[:,1]
-        Psi_w_entry_imag_eigvec_a = Psi_w_entry_imag_eigvec[:,0]
-        Psi_w_entry_imag_eigvec_b = Psi_w_entry_imag_eigvec[:,1]
+        # Psi_w_initial = np.array([
+        #         [Psi_xx_output[0],Psi_xy_output[0]],
+        #         [Psi_xy_output[0],Psi_yy_output[0]]
+        #         ])
         
-        [Psi_w_initial_real_eigval_a, Psi_w_initial_real_eigval_b], Psi_w_initial_real_eigvec = np.linalg.eig(np.real(Psi_w_initial))
-        [Psi_w_initial_imag_eigval_a, Psi_w_initial_imag_eigval_b], Psi_w_initial_imag_eigvec = np.linalg.eig(np.imag(Psi_w_initial))
-        Psi_w_initial_real_eigvec_a = Psi_w_initial_real_eigvec[:,0]
-        Psi_w_initial_real_eigvec_b = Psi_w_initial_real_eigvec[:,1]
-        Psi_w_initial_imag_eigvec_a = Psi_w_initial_imag_eigvec[:,0]
-        Psi_w_initial_imag_eigvec_b = Psi_w_initial_imag_eigvec[:,1]
+        # [Psi_w_entry_real_eigval_a, Psi_w_entry_real_eigval_b], Psi_w_entry_real_eigvec = np.linalg.eig(np.real(Psi_w_entry))
+        # [Psi_w_entry_imag_eigval_a, Psi_w_entry_imag_eigval_b], Psi_w_entry_imag_eigvec = np.linalg.eig(np.imag(Psi_w_entry))
+        # Psi_w_entry_real_eigvec_a = Psi_w_entry_real_eigvec[:,0]
+        # Psi_w_entry_real_eigvec_b = Psi_w_entry_real_eigvec[:,1]
+        # Psi_w_entry_imag_eigvec_a = Psi_w_entry_imag_eigvec[:,0]
+        # Psi_w_entry_imag_eigvec_b = Psi_w_entry_imag_eigvec[:,1]
         
-        print(np.imag(Psi_w_entry))
-        print(np.imag(Psi_w_initial))
-        print(np.real(Psi_w_entry))
-        print(np.real(Psi_w_initial))
-        print(Psi_w_entry_real_eigval_a)
-        print(Psi_w_entry_real_eigval_b)
-        print(Psi_w_initial_real_eigval_a)
-        print(Psi_w_initial_real_eigval_b)
-        print(np.linalg.norm(Psi_w_entry_real_eigvec_a))
-        print(np.linalg.norm(Psi_w_entry_real_eigvec_b))
-        print(np.linalg.norm(Psi_w_initial_real_eigvec_a))
-        print(np.linalg.norm(Psi_w_initial_real_eigvec_b))
-        numberOfPlotPoints = 50
-        sin_array = np.sin(np.linspace(0,2*np.pi,numberOfPlotPoints))
-        cos_array = np.cos(np.linspace(0,2*np.pi,numberOfPlotPoints))
+        # [Psi_w_initial_real_eigval_a, Psi_w_initial_real_eigval_b], Psi_w_initial_real_eigvec = np.linalg.eig(np.real(Psi_w_initial))
+        # [Psi_w_initial_imag_eigval_a, Psi_w_initial_imag_eigval_b], Psi_w_initial_imag_eigvec = np.linalg.eig(np.imag(Psi_w_initial))
+        # Psi_w_initial_real_eigvec_a = Psi_w_initial_real_eigvec[:,0]
+        # Psi_w_initial_real_eigvec_b = Psi_w_initial_real_eigvec[:,1]
+        # Psi_w_initial_imag_eigvec_a = Psi_w_initial_imag_eigvec[:,0]
+        # Psi_w_initial_imag_eigvec_b = Psi_w_initial_imag_eigvec[:,1]
         
-        width_ellipse_entry = np.zeros([numberOfPlotPoints,2])
-        width_ellipse_initial = np.zeros([numberOfPlotPoints,2])
-        rad_curv_ellipse_entry = np.zeros([numberOfPlotPoints,2])
-        rad_curv_ellipse_initial = np.zeros([numberOfPlotPoints,2])
-        for ii in range(0,numberOfPlotPoints):
-            width_ellipse_entry[ii,:] = np.sqrt(2/Psi_w_entry_imag_eigval_a)*Psi_w_entry_imag_eigvec_a*sin_array[ii] + np.sqrt(2/Psi_w_entry_imag_eigval_b)*Psi_w_entry_imag_eigvec_b*cos_array[ii]
-            width_ellipse_initial[ii,:] = np.sqrt(2/Psi_w_initial_imag_eigval_a)*Psi_w_initial_imag_eigvec_a*sin_array[ii] + np.sqrt(2/Psi_w_initial_imag_eigval_b)*Psi_w_initial_imag_eigvec_b*cos_array[ii]
+        # numberOfPlotPoints = 50
+        # sin_array = np.sin(np.linspace(0,2*np.pi,numberOfPlotPoints))
+        # cos_array = np.cos(np.linspace(0,2*np.pi,numberOfPlotPoints))
         
-            rad_curv_ellipse_entry[ii,:] = (K_magnitude_entry/Psi_w_entry_real_eigval_a)*Psi_w_entry_real_eigvec_a*sin_array[ii] + (K_magnitude_entry/Psi_w_entry_real_eigval_b)*Psi_w_entry_real_eigvec_b*cos_array[ii]
-            rad_curv_ellipse_initial[ii,:] = (K_magnitude_array[0]/Psi_w_initial_real_eigval_a)*Psi_w_initial_real_eigvec_a*sin_array[ii] + (K_magnitude_array[0]/Psi_w_initial_real_eigval_b)*Psi_w_initial_real_eigvec_b*cos_array[ii]
+        # width_ellipse_entry = np.zeros([numberOfPlotPoints,2])
+        # width_ellipse_initial = np.zeros([numberOfPlotPoints,2])
+        # rad_curv_ellipse_entry = np.zeros([numberOfPlotPoints,2])
+        # rad_curv_ellipse_initial = np.zeros([numberOfPlotPoints,2])
+        # for ii in range(0,numberOfPlotPoints):
+        #     width_ellipse_entry[ii,:] = np.sqrt(2/Psi_w_entry_imag_eigval_a)*Psi_w_entry_imag_eigvec_a*sin_array[ii] + np.sqrt(2/Psi_w_entry_imag_eigval_b)*Psi_w_entry_imag_eigvec_b*cos_array[ii]
+        #     width_ellipse_initial[ii,:] = np.sqrt(2/Psi_w_initial_imag_eigval_a)*Psi_w_initial_imag_eigvec_a*sin_array[ii] + np.sqrt(2/Psi_w_initial_imag_eigval_b)*Psi_w_initial_imag_eigvec_b*cos_array[ii]
+        
+        #     rad_curv_ellipse_entry[ii,:] = (K_magnitude_entry/Psi_w_entry_real_eigval_a)*Psi_w_entry_real_eigvec_a*sin_array[ii] + (K_magnitude_entry/Psi_w_entry_real_eigval_b)*Psi_w_entry_real_eigvec_b*cos_array[ii]
+        #     rad_curv_ellipse_initial[ii,:] = (K_magnitude_array[0]/Psi_w_initial_real_eigval_a)*Psi_w_initial_real_eigvec_a*sin_array[ii] + (K_magnitude_array[0]/Psi_w_initial_real_eigval_b)*Psi_w_initial_real_eigvec_b*cos_array[ii]
 
         
-        plt.figure()
-        plt.subplot(1,2,1)
-        plt.plot(width_ellipse_entry[:,0],width_ellipse_entry[:,1])
-        plt.plot(width_ellipse_initial[:,0],width_ellipse_initial[:,1])
-        plt.gca().set_aspect('equal', adjustable='box')
+        # plt.figure()
+        # plt.subplot(1,2,1)
+        # plt.plot(width_ellipse_entry[:,0],width_ellipse_entry[:,1])
+        # plt.plot(width_ellipse_initial[:,0],width_ellipse_initial[:,1])
+        # plt.gca().set_aspect('equal', adjustable='box')
         
-        plt.subplot(1,2,2)
-        plt.plot(rad_curv_ellipse_entry[:,0],rad_curv_ellipse_entry[:,1])
-        plt.plot(rad_curv_ellipse_initial[:,0],rad_curv_ellipse_initial[:,1])
-        plt.gca().set_aspect('equal', adjustable='box')
-        plt.savefig('BC_' + output_filename_suffix)
-        plt.close()
+        # plt.subplot(1,2,2)
+        # plt.plot(rad_curv_ellipse_entry[:,0],rad_curv_ellipse_entry[:,1])
+        # plt.plot(rad_curv_ellipse_initial[:,0],rad_curv_ellipse_initial[:,1])
+        # plt.gca().set_aspect('equal', adjustable='box')
+        # plt.savefig('BC_' + output_filename_suffix)
+        # plt.close()
         
         print('Figures have been saved')
     ## -------------------
