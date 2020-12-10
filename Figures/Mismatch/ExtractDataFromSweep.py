@@ -57,6 +57,8 @@ scattered_power_stdev = np.asarray([8.73E-05,1.14E-06,2.05E-06,0.000189811,7.52E
 theta_m_sweep                = np.zeros(numberOfRuns)
 delta_theta_m_sweep          = np.zeros(numberOfRuns) 
 k_perp_1_backscattered_sweep = np.zeros(numberOfRuns)
+theta_m_sweep2               = np.zeros(numberOfRuns)
+delta_theta_m_sweep2         = np.zeros(numberOfRuns) 
 
 for ii in range(0,numberOfRuns):
     loadfile = np.load('analysis_output' + str(ii) +  '.npz')
@@ -64,11 +66,14 @@ for ii in range(0,numberOfRuns):
     k_perp_1_backscattered = loadfile['k_perp_1_backscattered']
     delta_theta_m = loadfile['delta_theta_m']
     theta_m_output = loadfile['theta_m_output']
+    # localisation_beam_ray_spectrum_max_index = loadfile['localisation_beam_ray_spectrum_max_index']
     loadfile.close()
     
     theta_m_sweep[ii]                = theta_m_output[cutoff_index]
     delta_theta_m_sweep[ii]          = delta_theta_m[cutoff_index] 
     k_perp_1_backscattered_sweep[ii] = k_perp_1_backscattered[cutoff_index]
+    # theta_m_sweep2[ii]               = theta_m_output[localisation_beam_ray_spectrum_max_index]
+    # delta_theta_m_sweep2[ii]         = delta_theta_m[localisation_beam_ray_spectrum_max_index] 
     
 mismatch_angle_offset = np.rad2deg(np.asarray([theta_m_sweep[43],theta_m_sweep[53],theta_m_sweep[63],theta_m_sweep[23],theta_m_sweep[13],theta_m_sweep[33]]))
 # mismatch_angle_offset = np.asarray([6.17073,10.24059,13.86935,-3.20812,-8.38919,1.668527])
@@ -76,9 +81,11 @@ mismatch_angle_offset = np.rad2deg(np.asarray([theta_m_sweep[43],theta_m_sweep[5
 k_to_choose = k_perp_1_backscattered_sweep[0]
 turbulence_piece = (k_perp_1_backscattered_sweep/k_to_choose)**(-2*10/3)
 plt.figure()
-plt.plot(np.rad2deg(theta_m_sweep),np.exp(-(theta_m_sweep/delta_theta_m_sweep)**2))
+plt.plot(np.rad2deg(theta_m_sweep),np.exp(-(theta_m_sweep/delta_theta_m_sweep)**2),label='Model')
+# plt.plot(np.rad2deg(theta_m_sweep),np.exp(-(theta_m_sweep2/delta_theta_m_sweep2)**2))
 #plt.plot(np.rad2deg(theta_m_sweep),np.exp(-(theta_m_sweep/delta_theta_m_sweep)**2)*turbulence_piece)
 plt.errorbar(mismatch_angle_offset, scattered_power/max(scattered_power), yerr=(scattered_power_stdev/max(scattered_power)), fmt='o',label='Data')
+plt.legend()
 
 # plt.figure()
 # plt.plot(theta_m_sweep)
