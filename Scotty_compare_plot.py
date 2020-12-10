@@ -9,8 +9,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from Scotty_fun_general import find_waist, find_distance_from_waist,find_q_lab_Cartesian, find_nearest, contract_special
 
-suffix1 = '9'
-suffix2 = '10'
+suffix1 = '01'
+suffix2 = '02'
 
 loadfile = np.load('data_output' + suffix1 + '.npz')
 q_R_array1 = loadfile['q_R_array']
@@ -62,3 +62,44 @@ loadfile.close()
 plt.figure()
 plt.plot(q_R_array1,q_Z_array1,'r')
 plt.plot(q_R_array2,q_Z_array2,'b')
+
+
+plt.figure()
+plt.subplot(2,3,1)
+plt.plot(distance_along_line1,np.real(Psi_xx_output1),'r')
+plt.plot(distance_along_line2,np.real(Psi_xx_output2),'g')
+plt.subplot(2,3,2)
+plt.plot(distance_along_line1,np.real(Psi_xy_output1),'r')
+plt.plot(distance_along_line2,np.real(Psi_xy_output2),'g')
+plt.subplot(2,3,3)
+plt.plot(distance_along_line1,np.real(Psi_yy_output1),'r')
+plt.plot(distance_along_line2,np.real(Psi_yy_output2),'g')
+plt.subplot(2,3,4)
+plt.plot(distance_along_line1,np.imag(Psi_xx_output1),'r')
+plt.plot(distance_along_line2,np.imag(Psi_xx_output2),'g')
+plt.subplot(2,3,5)
+plt.plot(distance_along_line1,np.imag(Psi_xy_output1),'r')
+plt.plot(distance_along_line2,np.imag(Psi_xy_output2),'g')
+plt.subplot(2,3,6)
+plt.plot(distance_along_line1,np.imag(Psi_yy_output1),'r')
+plt.plot(distance_along_line2,np.imag(Psi_yy_output2),'g')
+
+plt.figure()
+plt.subplot(2,3,1)
+plt.plot(distance_along_line1,np.real(M_xx_output1),'r')
+plt.plot(distance_along_line2,np.real(M_xx_output2),'g')
+plt.subplot(2,3,2)
+plt.plot(distance_along_line1,np.real(M_xy_output1),'r')
+plt.plot(distance_along_line2,np.real(M_xy_output2),'g')
+plt.subplot(2,3,3)
+plt.plot(distance_along_line1,np.real(M_yy_output1),'r')
+plt.plot(distance_along_line2,np.real(M_yy_output2),'g')
+plt.subplot(2,3,4)
+plt.plot(distance_along_line1,np.imag(M_xx_output1),'r')
+plt.plot(distance_along_line2,np.imag(M_xx_output2),'g')
+plt.subplot(2,3,5)
+plt.plot(distance_along_line1,np.imag(M_xy_output1),'r')
+plt.plot(distance_along_line2,np.imag(M_xy_output2),'g')
+plt.subplot(2,3,6)
+plt.plot(distance_along_line1,np.imag(M_yy_output1),'r')
+plt.plot(distance_along_line2,np.imag(M_yy_output2),'g')

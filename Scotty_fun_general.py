@@ -246,14 +246,14 @@ def find_normalised_plasma_freq(electron_density, launch_angular_frequency):
     # Electron density in units of 10^19 m-3
     normalised_plasma_freq = (constants.e*np.sqrt(electron_density*10**19 / (constants.epsilon_0*constants.m_e) )) / launch_angular_frequency
     #normalised_plasma_freq = np.sqrt(electron_density*10**19 * 3187.042702) / launch_angular_frequency # Torbeam's implementation
-    
+
     return normalised_plasma_freq
 
 
 def find_normalised_gyro_freq(B_Total, launch_angular_frequency):
     
     normalised_gyro_freq = constants.e * B_Total / (constants.m_e * launch_angular_frequency)   
-    
+
     return normalised_gyro_freq
 
 
@@ -322,7 +322,6 @@ def find_Booker_gamma(electron_density, B_Total, launch_angular_frequency):
 # Functions (beam tracing 2)
 def find_H(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag, 
            interp_poloidal_flux, find_density_1D, find_B_R, find_B_T, find_B_Z):
-    
     # For this functions to work,  the interpolation functions for
     # electron density,  B_Total,  and psi  (poloidal flux) must be
     # declared at some point before they are called
@@ -475,6 +474,10 @@ def find_dbhat_dZ(q_R, q_Z, delta_Z, find_B_R, find_B_T, find_B_Z):
     dbhat_dZ = (b_hat_plus - b_hat_minus) / (2 * delta_Z)
         
     return dbhat_dZ
+
+def find_Rayleigh_length(waist, wavenumber): #Finds the size of the waist (assumes vacuum propagation and circular beam)
+    Rayleigh_length = 0.5 * wavenumber * waist**2
+    return Rayleigh_length
 
 def find_waist(width, wavenumber, curvature): #Finds the size of the waist (assumes vacuum propagation and circular beam)
     waist = width / np.sqrt(1+curvature**2 * width**4 * wavenumber**2 / 4)

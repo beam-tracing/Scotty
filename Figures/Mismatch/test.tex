@@ -1,3 +1,13 @@
+\usepackage[utf8]{inputenc}
+\usepackage{pgfplots}
+\DeclareUnicodeCharacter{2212}{−}
+\usepgfplotslibrary{groupplots,dateplot}
+\usetikzlibrary{patterns,shapes.arrows}
+\pgfplotsset{compat=newest}
+\usepackage{tikz}
+\usepackage{tkz-euclide}
+\usepackage{tikz-3dplot}
+
 % This file was created by tikzplotlib v0.9.6.
 \begin{tikzpicture}
 
@@ -5,6 +15,8 @@
 \definecolor{color1}{rgb}{0.12156862745098,0.466666666666667,0.705882352941177}
 
 \begin{axis}[
+legend cell align={left},
+legend style={fill opacity=0.8, draw opacity=1, text opacity=1, draw=white!80!black},
 tick align=outside,
 tick pos=left,
 x grid style={white!69.0196078431373!black},
@@ -112,6 +124,7 @@ table {%
 -14.834642744605 6.5888373852192e-05
 -15.1903612277262 3.89053007589173e-05
 };
+\addlegendentry{Model}
 \addplot [semithick, color0, mark=*, mark size=3, mark options={solid}, only marks]
 table {%
 -4.52524479559365 0.390600855989362
@@ -121,6 +134,8 @@ table {%
 9.53786463242363 0.0201913892617379
 -0.0303111881273633 1
 };
+\addlegendentry{Data}
 \end{axis}
 
 \end{tikzpicture}
+
