@@ -17,22 +17,23 @@ import numpy as np
 input_filename_suffix = '_29905_190'
 #input_filename_suffix = ''
 
-tau_step = 1.0
-numberOfTauPoints = 1001
+tau_max = 5001
 saveInterval = 1  # saves every n time steps
 
 poloidal_launch_angle_Torbeam = 4.0 # deg
 toroidal_launch_angle_Torbeam = -3.8 # deg
 # toroidal_launch_angle_Torbeam = 1.0 # deg
-# toroidal_launch_angle_Torbeam_scan = np.linspace(0.0,-10.0,11)
+# toroidal_launch_angle_Torbeam_scan = np.linspace(0.0,-10.0,51)
+# poloidal_launch_angle_Torbeam_scan = np.linspace(2.0,10.0,5)
 
 # launch_freq_GHz_sweep = np.array([30.0,32.5,35.0,37.5,42.5,45.0,47.5,50.0,55.0,57.5,60.0,62.5,67.5,70.0,72.5,75.0])
+# launch_freq_GHz_sweep = np.array([30.0,32.5,35.0,37.5,40.0,42.5,45.0,47.5,50.0,52.5,55.0])
 launch_freq_GHz = 55.0
 mode_flag = 1 # O-mode (1) or X-mode (-1)
 
 beam_rayleigh_distance = 0.885
 beam_waist = np.sqrt(beam_rayleigh_distance * constants.c / (np.pi * launch_freq_GHz*10**9) )
-# beam_waist = 0.0392
+# beam_waist = 0.0392 * np.sqrt(2)
 # launch_distance_from_waist = np.linspace(-beam_rayleigh_distance*10,-beam_rayleigh_distance,81)
 # launch_beam_width_sweep = beam_waist * np.sqrt( 1 + (launch_distance_from_waist/beam_rayleigh_distance)**2 )
 # launch_beam_curvature_sweep = launch_distance_from_waist*( 1 + (beam_rayleigh_distance/launch_distance_from_waist)**2 )
@@ -75,38 +76,56 @@ find_B_method='efit'
 
 launch_position = np.asarray([2.43521,0,0]) # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
 
-
-# for ii in range(0,16):
-#     for jj in range(0,11):
-
-#         print('Iteration number: ' + str(ii) + ' ' + str(jj))
+# for ii in range(0,len(launch_freq_GHz_sweep)):
+#     for jj in range(0,len(toroidal_launch_angle_Torbeam_scan)):
+#         for kk in range(0,len(poloidal_launch_angle_Torbeam_scan)):
     
-#         launch_freq_GHz = launch_freq_GHz_sweep[ii]    
-#         toroidal_launch_angle_Torbeam = toroidal_launch_angle_Torbeam_scan[jj]
+#             print('Iteration number: ' + str(ii) + ' ' + str(jj) +  ' ' + str(kk))
     
-#         beam_me_up(tau_step,
-#                   numberOfTauPoints,
-#                   saveInterval,
-#                   poloidal_launch_angle_Torbeam,
-#                   toroidal_launch_angle_Torbeam,
-#                   launch_freq_GHz,
-#                   mode_flag,
-#                   vacuumLaunch_flag,
-#                   launch_beam_width,
-#                   launch_beam_curvature,
-#                   launch_position,
-#                   find_B_method,
-#                   vacuum_propagation_flag,
-#                   Psi_BC_flag,
-#                   poloidal_flux_enter,
-#                   input_filename_suffix,
-#                   output_filename_suffix= str(ii) + '_' + str(jj),
-#                   figure_flag=True,
-#                   density_fit_parameters=np.array([-6.78999607,6.43248856,0.96350798,0.48792645])
-#                   )
+#             launch_freq_GHz = launch_freq_GHz_sweep[ii]    
+#             toroidal_launch_angle_Torbeam = toroidal_launch_angle_Torbeam_scan[jj]
+#             poloidal_launch_angle_Torbeam = poloidal_launch_angle_Torbeam_scan[kk]
+    
+#             beam_waist = np.sqrt(beam_rayleigh_distance * constants.c / (np.pi * launch_freq_GHz*10**9) )
+#             launch_beam_width = beam_waist * np.sqrt(2) # in m
+#             launch_beam_curvature = -2*beam_rayleigh_distance # in m. negative because launched BEFORE the beam waist
+            
+#             if mode_flag == 1:
+#                 mode_string = 'O'
+#             elif mode_flag == -1:
+#                 mode_string = 'X'
+            
+#             output_filename_string = (
+#                                         '_p' + f'{poloidal_launch_angle_Torbeam:.1f}'
+#                                       + '_t' + f'{toroidal_launch_angle_Torbeam:.1f}' 
+#                                       + '_f' + f'{launch_freq_GHz:.1f}'
+#                                       + '_'  + mode_string
+#                                       + '_z-1.0' 
+#                                       + '_r0.885'
+#                                       )
+            
+#             beam_me_up(tau_max,
+#                       saveInterval,
+#                       poloidal_launch_angle_Torbeam,
+#                       toroidal_launch_angle_Torbeam,
+#                       launch_freq_GHz,
+#                       mode_flag,
+#                       vacuumLaunch_flag,
+#                       launch_beam_width,
+#                       launch_beam_curvature,
+#                       launch_position,
+#                       find_B_method,
+#                       stop_flag,
+#                       vacuum_propagation_flag,
+#                       Psi_BC_flag,
+#                       poloidal_flux_enter,
+#                       input_filename_suffix,
+#                       output_filename_suffix= output_filename_string,
+#                       figure_flag=True,
+#                       density_fit_parameters=np.array([-6.78999607,6.43248856,0.96350798,0.48792645])
+#                       )
 
-beam_me_up(tau_step,
-            numberOfTauPoints,
+beam_me_up(tau_max,
             saveInterval,
             poloidal_launch_angle_Torbeam,
             toroidal_launch_angle_Torbeam,
@@ -122,19 +141,18 @@ beam_me_up(tau_step,
             Psi_BC_flag,
             poloidal_flux_enter,
             input_filename_suffix,
-            output_filename_suffix='benchmark',
+            output_filename_suffix='',
             figure_flag= True,
             density_fit_parameters=np.array([-6.78999607,6.43248856,0.96350798,0.48792645])
             )# from ne_fit_radialcoord.py
 
-# for ii in range(0,71):
+# for ii in range(0,51):
 #     print('Iteration number: ' + str(ii))
     
 #     toroidal_launch_angle_Torbeam = toroidal_launch_angle_Torbeam_scan[ii]
 
-#     beam_me_up(tau_step,
-#               numberOfTauPoints,
-#               saveInterval,
+#     beam_me_up(tau_max,
+#             saveInterval,
 #               poloidal_launch_angle_Torbeam,
 #               toroidal_launch_angle_Torbeam,
 #               launch_freq_GHz,
@@ -144,6 +162,7 @@ beam_me_up(tau_step,
 #               launch_beam_curvature,
 #               launch_position,
 #               find_B_method,
+#               stop_flag,
 #               vacuum_propagation_flag,
 #               Psi_BC_flag,
 #               poloidal_flux_enter,
