@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from Scotty_fun_general import find_waist, find_distance_from_waist,find_q_lab_Cartesian, find_nearest, contract_special
 import tikzplotlib
 
-suffix = '53'
+suffix = ''
 
 loadfile = np.load('data_output' + suffix + '.npz')
 tau_array = loadfile['tau_array']
@@ -53,44 +53,7 @@ g_hat_output = loadfile['g_hat_output']
 #tau_0_index=loadfile['tau_0_index']
 #K_g_array = loadfile['K_g_array']
 #d_K_g_d_tau_array = loadfile['d_K_g_d_tau_array']
-B_total_output = loadfile['B_total_output']
-b_hat_output = loadfile['b_hat_output']
-gradK_grad_H_output = loadfile['gradK_grad_H_output']
-gradK_gradK_H_output = loadfile['gradK_gradK_H_output']
-grad_grad_H_output = loadfile['grad_grad_H_output']
-dH_dR_output = loadfile['dH_dR_output']
-dH_dZ_output = loadfile['dH_dZ_output']
-dH_dKR_output = loadfile['dH_dKR_output']
-dH_dKzeta_output = loadfile['dH_dKzeta_output']
-dH_dKZ_output = loadfile['dH_dKZ_output']
-dB_dR_FFD_debugging = loadfile['dB_dR_FFD_debugging']
-dB_dZ_FFD_debugging = loadfile['dB_dZ_FFD_debugging']
-d2B_dR2_FFD_debugging = loadfile['d2B_dR2_FFD_debugging']
-d2B_dZ2_FFD_debugging = loadfile['d2B_dZ2_FFD_debugging']
-d2B_dR_dZ_FFD_debugging = loadfile['d2B_dR_dZ_FFD_debugging']
-poloidal_flux_debugging_1R = loadfile['poloidal_flux_debugging_1R']
-poloidal_flux_debugging_2R = loadfile['poloidal_flux_debugging_2R']
-poloidal_flux_debugging_3R = loadfile['poloidal_flux_debugging_2R']
-poloidal_flux_debugging_1Z = loadfile['poloidal_flux_debugging_1Z']
-poloidal_flux_debugging_2Z = loadfile['poloidal_flux_debugging_2Z']
-poloidal_flux_debugging_3Z = loadfile['poloidal_flux_debugging_2Z']
-poloidal_flux_debugging_2R_2Z = loadfile['poloidal_flux_debugging_2R_2Z']
-electron_density_debugging_1R = loadfile['electron_density_debugging_1R']
-electron_density_debugging_2R = loadfile['electron_density_debugging_2R']
-electron_density_debugging_3R = loadfile['electron_density_debugging_3R']
-electron_density_debugging_1Z = loadfile['electron_density_debugging_1Z']
-electron_density_debugging_2Z = loadfile['electron_density_debugging_2Z']
-electron_density_debugging_3Z = loadfile['electron_density_debugging_3Z']
-electron_density_debugging_2R_2Z = loadfile['electron_density_debugging_2R_2Z']
-electron_density_output=loadfile['electron_density_output']
-poloidal_flux_output = loadfile['poloidal_flux_output']
-dpolflux_dR_FFD_debugging = loadfile['dpolflux_dR_FFD_debugging']
-dpolflux_dZ_FFD_debugging = loadfile['dpolflux_dZ_FFD_debugging']
-d2polflux_dR2_FFD_debugging = loadfile['d2polflux_dR2_FFD_debugging']
-d2polflux_dZ2_FFD_debugging = loadfile['d2polflux_dZ2_FFD_debugging']
-epsilon_para_output = loadfile['epsilon_para_output']
-epsilon_perp_output = loadfile['epsilon_perp_output']
-epsilon_g_output = loadfile['epsilon_g_output']
+
 loadfile.close()
 
 
@@ -117,7 +80,6 @@ delta_theta_m = loadfile['delta_theta_m']
 theta_m_output = loadfile['theta_m_output']
 k_perp_1_backscattered = loadfile['k_perp_1_backscattered']
 cutoff_index = loadfile['cutoff_index']
-out_index = loadfile['out_index']
 K_magnitude_array = loadfile['K_magnitude_array']
 poloidal_flux_on_midplane = loadfile['poloidal_flux_on_midplane']
 R_midplane_points = loadfile['R_midplane_points']
@@ -125,9 +87,6 @@ Psi_3D_Cartesian = loadfile['Psi_3D_Cartesian']
 distance_along_line = loadfile['distance_along_line']
 x_hat_Cartesian = loadfile['x_hat_Cartesian']
 y_hat_Cartesian = loadfile['y_hat_Cartesian']
-det_imag_Psi_w_analysis = loadfile['det_imag_Psi_w_analysis']
-det_real_Psi_w_analysis = loadfile['det_real_Psi_w_analysis']
-det_M_w_analysis = loadfile['det_M_w_analysis']
 loadfile.close()
 
 loadfile = np.load('data_input' + suffix + '.npz')
@@ -198,12 +157,14 @@ W_line_XY_2_Xpoints = q_X_array - W_vec_XY[:,0] * width_XY
 W_line_XY_2_Ypoints = q_Y_array - W_vec_XY[:,1] * width_XY
 ##
 
-plot_every_n_points = 10
+plot_every_n_points = 1
 
 R_start_index = 60
 R_end_index = 100
-Z_start_index = 40
-Z_end_index = 70
+Z_start_index = 7
+Z_end_index = 40
+
+out_index = numberOfDataPoints
 
 plt.figure(figsize=(5,5))
 plt.title('Poloidal Plane')
@@ -284,3 +245,9 @@ plt.ylabel('(1 / R_b) / m')
 tikzplotlib.save("curvatures.tex")
 
 
+plt.figure()
+plt.plot(distance_along_line[:out_index:plot_every_n_points]-distance_along_line[cutoff_index],delta_k_perp_2)
+plt.xlabel('l - l_c / m')
+plt.ylabel('delta kperp2 / m')
+plt.axvline(0,c='k', linestyle='dashed')
+tikzplotlib.save("kperp2_res.tex")
