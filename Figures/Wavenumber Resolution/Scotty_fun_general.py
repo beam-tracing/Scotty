@@ -13,9 +13,6 @@ Run in Python 3,  does not work in Python 2
 
 import numpy as np
 from scipy import constants as constants
-from scipy import interpolate as interpolate
-from scipy import optimize as optimize
-
 
 def read_floats_into_list_until(terminator, lines):
     # Reads the lines of a file until the string (terminator) is read
@@ -30,12 +27,10 @@ def read_floats_into_list_until(terminator, lines):
         lst.extend(map(float,  line.split()))
     return lst
 
-
 def find_nearest(array,  value): #returns the index
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return int(idx)
-
 
 def contract_special(arg_a,arg_b):
     """
@@ -68,7 +63,6 @@ def contract_special(arg_a,arg_b):
         print('Error: Invalid dimensions')
     return result
 
-
 def find_inverse_2D(matrix_2D):
     # Finds the inverse of a 2x2 matrix
     matrix_2D_inverse = np.zeros([2,2],dtype='complex128')
@@ -78,28 +72,6 @@ def find_inverse_2D(matrix_2D):
     matrix_2D_inverse[0,1] = - matrix_2D[0,1] / determinant
     matrix_2D_inverse[1,0] = - matrix_2D[1,0] / determinant
     return matrix_2D_inverse
-
-
-def find_x0(xs,ys,y0):
-    """
-    xs,ys are the x and y coordinates of a line on a plane
-    Finds the value of x corresponding to a certain y0
-    This implementation is silly but I am impatient and want to move on to other things quickly
-    """
-
-    index_guess = find_nearest(ys,y0)
-
-    interp_y = interpolate.interp1d(xs, ys,
-                                    kind='linear', axis=-1, copy=True, bounds_error=False,
-                                    fill_value='extrapolate', assume_sorted=False) 
-
-    xs_fine = np.linspace(xs[index_guess-1],xs[index_guess+1],101)
-    ys_fine = interp_y(xs_fine)
-
-    index = find_nearest(ys_fine,y0)
-    x0 = xs_fine[index]
-    
-    return x0
 
 #----------------------------------
     
@@ -547,9 +519,9 @@ def find_distance_from_waist(width, wavenumber, curvature): #Finds how far you a
 #    g_magnitude = (q_R**2 * dH_dKzeta**2 + dH_dKR**2 + dH_dKZ**2)**0.5       
 #    return g_magnitude
 
-def find_D(K_magnitude,launch_angular_frequency,epsilon_para,epsilon_perp,epsilon_g,theta_m): 
-    # Finds the dispersion
-    
+def find_H_Cardano(K_magnitude,launch_angular_frequency,epsilon_para,epsilon_perp,epsilon_g,theta_m):  
+    # This function is designed to be evaluated in post-procesing, hence it uses different inputs from the usual H
+
     wavenumber_K0 = launch_angular_frequency / constants.c
     n_ref_index = K_magnitude/wavenumber_K0
     sin_theta_m = np.sin(theta_m)
@@ -561,14 +533,6 @@ def find_D(K_magnitude,launch_angular_frequency,epsilon_para,epsilon_perp,epsilo
     D_bb_component = epsilon_para - n_ref_index**2*cos_theta_m**2
     D_12_component = epsilon_g
     D_1b_component = n_ref_index**2*sin_theta_m*cos_theta_m
-    
-    return D_11_component, D_22_component, D_bb_component, D_12_component, D_1b_component
-    
-
-def find_H_Cardano(K_magnitude,launch_angular_frequency,epsilon_para,epsilon_perp,epsilon_g,theta_m):  
-    # This function is designed to be evaluated in post-procesing, hence it uses different inputs from the usual H
-    
-    D_11_component, D_22_component, D_bb_component, D_12_component, D_1b_component = find_D(K_magnitude,launch_angular_frequency,epsilon_para,epsilon_perp,epsilon_g,theta_m)
     
     h_2_coefficient = - D_11_component - D_22_component - D_bb_component
     h_1_coefficient = D_11_component*D_bb_component + D_11_component*D_22_component + D_22_component*D_bb_component - D_12_component**2 - D_1b_component**2

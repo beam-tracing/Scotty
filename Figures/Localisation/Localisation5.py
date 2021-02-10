@@ -110,7 +110,7 @@ def find_nearest(array,  value): #returns the index
 
 
 
-suffix = '30GHz'
+suffix = '33'
 
 loadfile = np.load('data_input' + suffix + '.npz')
 launch_freq_GHz =loadfile['launch_freq_GHz']
@@ -221,7 +221,7 @@ out_index_new=out_index-15
 localisation_ray = (2*constants.c/launch_angular_frequency)**2/g_magnitude_Cardano**2
 # localisation_ray2 = g_magnitude_output[-1]**2/g_magnitude_output**2
 
-localisation_spectrum = ( k_perp_1_backscattered / k_perp_1_backscattered[0] )**(-2*10/3)
+localisation_spectrum = ( k_perp_1_backscattered / k_perp_1_backscattered[0] )**(-13/3)
 
 # Beam: Localisation vs distance
 M_w = np.zeros([numberOfDataPoints,2,2],dtype='complex128')
@@ -235,18 +235,20 @@ Psi_w[:,0,0] = Psi_xx_output
 Psi_w[:,1,1] = Psi_yy_output
 Psi_w[:,1,0] = Psi_xy_output
 Psi_w[:,0,1] = Psi_w[:,1,0]
+
+M_yy_inv = M_xx_output / np.linalg.det(M_w)
          
 localisation_beam = np.linalg.det(np.imag(Psi_w)) / abs(np.linalg.det(M_w))
 
-# localisation_beam2 = localisation_beam * ()**()
+localisation_beam2 = localisation_beam * np.sqrt(-np.imag(M_yy_inv))
 # --
 
 localisation_ray_spectrum = localisation_ray * localisation_spectrum
-localisation_beam_ray_spectrum = localisation_beam * localisation_ray * localisation_spectrum
-localisation_beam_ray = localisation_beam * localisation_ray
+localisation_beam_ray_spectrum = localisation_beam2 * localisation_ray * localisation_spectrum
+localisation_beam_ray = localisation_beam2 * localisation_ray
 
 # Finds the half-width (1/e)**2 and the distance the peak is from the cutoff location
-localisation_beam_ray_spectrum_max_over_e = localisation_beam_ray_spectrum.max() / (np.e)**2 # localisation_beam_ray_spectrum.max() / 2.71**2
+localisation_beam_ray_spectrum_max_over_e = localisation_beam_ray_spectrum.max() / (np.e) # localisation_beam_ray_spectrum.max() / 2.71
 localisation_beam_ray_spectrum_max_index = find_nearest(localisation_beam_ray_spectrum,localisation_beam_ray_spectrum.max())
 localised_beam_ray_spectrum_distance_from_cutoff = distance_along_line[localisation_beam_ray_spectrum_max_index]-distance_along_line[cutoff_index]
 localisation_beam_ray_spectrum_index_1 = find_nearest(localisation_beam_ray_spectrum[0:localisation_beam_ray_spectrum_max_index],localisation_beam_ray_spectrum_max_over_e)
@@ -277,13 +279,13 @@ plt.ylabel('localisation')
 plt.tight_layout(pad=1.08, h_pad=None, w_pad=None, rect=None)
 plt.savefig('localisation.jpg',dpi=150)
 
-
 plt.figure()
 plt.title('Beam')
-plt.plot(distance_along_line[:out_index_new:plot_every_n_points]-distance_along_line[cutoff_index],localisation_beam[:out_index_new:plot_every_n_points])
-# plt.plot(distance_along_line[:out_index_new:plot_every_n_points]-distance_along_line[cutoff_index],localisation_beam2[:out_index_new:plot_every_n_points])
+# plt.plot(distance_along_line[:out_index_new:plot_every_n_points]-distance_along_line[cutoff_index],localisation_beam[:out_index_new:plot_every_n_points])
+plt.plot(distance_along_line[:out_index_new:plot_every_n_points]-distance_along_line[cutoff_index],localisation_beam2[:out_index_new:plot_every_n_points])
 plt.xlabel(r'$(l - l_c) / m$')
 plt.ylabel('localisation')
+plt.axvline(0,color='k', linestyle='dashed')
 tikzplotlib.save("localisation_beam.tex")
 
 plt.figure()
@@ -292,6 +294,7 @@ plt.plot(distance_along_line[:out_index_new:plot_every_n_points]-distance_along_
 # plt.plot(distance_along_line[:out_index_new]-distance_along_line[cutoff_index],localisation_ray2[:out_index_new])
 plt.xlabel(r'$(l - l_c) / m$')
 plt.ylabel('localisation')
+plt.axvline(0,color='k', linestyle='dashed')
 tikzplotlib.save("localisation_ray.tex")
 
 plt.figure()
@@ -299,6 +302,7 @@ plt.title('Spectrum')
 plt.plot(distance_along_line[:out_index_new:plot_every_n_points]-distance_along_line[cutoff_index],localisation_ray_spectrum[:out_index_new:plot_every_n_points])
 plt.xlabel(r'$(l - l_c) / m$')
 plt.ylabel('localisation')
+plt.axvline(0,color='k', linestyle='dashed')
 tikzplotlib.save("localisation_spectrum.tex")
 
 plt.figure()
@@ -306,6 +310,7 @@ plt.title('Beam and ray')
 plt.plot(distance_along_line[:out_index_new:plot_every_n_points]-distance_along_line[cutoff_index],localisation_beam_ray[:out_index_new:plot_every_n_points])
 plt.xlabel(r'$(l - l_c) / m$')
 plt.ylabel('localisation')
+plt.axvline(0,color='k', linestyle='dashed')
 tikzplotlib.save("localisation_beam_ray.tex")
 
 
@@ -325,3 +330,5 @@ plt.ylabel('localisation')
 plt.axvline(0,color='k', linestyle='dashed')
 tikzplotlib.save("localisation_beam_ray_spectrum.tex")
 
+# plt.figure()
+# plt.plot(distance_along_line[:out_index_new]-distance_along_line[cutoff_index],np.sqrt(-np.imag(M_yy_inv[:out_index_new])))

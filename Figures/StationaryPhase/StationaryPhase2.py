@@ -41,7 +41,7 @@ loadfile.close()
 k_perp_1_s = -2*K_magnitude_array[cutoff_index]
 k_perp_mu_s = -1320
 k_perp_low_s = -500
-k_perp_high_s = -1750
+k_perp_high_s = -2350
 # tau_step = 1.0
 # start_index = 50
 # end_index = 600

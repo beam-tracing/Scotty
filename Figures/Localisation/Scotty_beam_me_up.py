@@ -53,7 +53,7 @@ import os
 from netCDF4 import Dataset
 
 
-from Scotty_fun_general import read_floats_into_list_until, find_nearest, contract_special, find_x0, find_H
+from Scotty_fun_general import read_floats_into_list_until, find_nearest, contract_special, find_H
 from Scotty_fun_general import find_inverse_2D, find_Psi_3D_lab, find_q_lab_Cartesian, find_K_lab_Cartesian, find_K_lab, find_Psi_3D_lab_Cartesian
 from Scotty_fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq
 from Scotty_fun_general import find_epsilon_para, find_epsilon_perp,find_epsilon_g
@@ -1366,25 +1366,19 @@ def beam_me_up(tau_max,
     
     g_magnitude_Cardano = np.sqrt(g_R_Cardano**2 + g_zeta_Cardano**2 + g_Z_Cardano**2)  
     
-    ##
     # From here on, we use the shorthand
-        # loc: localisation
-        # l_lc: distance from cutoff (l - l_c). Distance along the ray
-        # cum: cumulative. As such, cum_loc is the cumulative integral of the localisation
         # p: polarisation    
         # r: ray
         # b: beam
         # s: spectrum
-    # Otherwise, variable names get really unwieldly
-    ##
     
     # localisation_ray = g_magnitude_Cardano[0]**2/g_magnitude_Cardano**2
         # The first point of the beam may be very slightly in the plasma, so I have used the vacuum expression for the group velocity instead
-    loc_r = (2*constants.c / launch_angular_frequency)**2/g_magnitude_Cardano**2
+    localisation_r = (2*constants.c / launch_angular_frequency)**2/g_magnitude_Cardano**2
     
     # Spectrum piece of localisation as a function of distance along ray      
     spectrum_power_law_coefficient = 13/3 # Turbulence cascade
-    loc_s = ( k_perp_1_backscattered / (-2*wavenumber_K0) )**(-spectrum_power_law_coefficient)
+    localisation_s = ( k_perp_1_backscattered / (-2*wavenumber_K0) )**(-2*spectrum_power_law_coefficient)
     
     # plt.figure()
     # plt.plot(distance_along_line, np.sqrt(-np.imag(M_w_inv_yy_output)))
@@ -1393,7 +1387,7 @@ def beam_me_up(tau_max,
     det_imag_Psi_w_analysis = np.imag(Psi_xx_output)*np.imag(Psi_yy_output) - np.imag(Psi_xy_output)**2 # Determinant of the imaginary part of Psi_w
     det_real_Psi_w_analysis = np.real(Psi_xx_output)*np.real(Psi_yy_output) - np.real(Psi_xy_output)**2 # Determinant of the real part of Psi_w. Not needed for the calculation, but gives useful insight
              
-    loc_b = det_imag_Psi_w_analysis / abs(det_M_w_analysis)
+    localisation_b = det_imag_Psi_w_analysis / abs(det_M_w_analysis)
     # --
     
     # Polarisation piece of localisation as a function of distance along ray   
@@ -1438,7 +1432,7 @@ def beam_me_up(tau_max,
     epsilon_minus_identity[:,0,1] = -1j * epsilon_g_output
     epsilon_minus_identity[:,1,0] =  1j * epsilon_g_output
 
-    loc_p = abs(contract_special(np.conjugate(e_hat_output), contract_special(epsilon_minus_identity,e_hat_output)))**2
+    localisation_p = abs(contract_special(np.conjugate(e_hat_output), contract_special(epsilon_minus_identity,e_hat_output)))**2
     
     # Note that K_1 = K cos theta_m, K_2 = 0, K_b = K sin theta_m, as a result of cold plasma dispersion
     K_hat_dot_e_hat = (
@@ -1449,119 +1443,65 @@ def beam_me_up(tau_max,
     K_hat_dot_e_hat_sq = np.conjugate(K_hat_dot_e_hat) * K_hat_dot_e_hat    
     # --
     
-    ## TODO: Come back and see if the naming of variables makes sense and is consistent
     
-    l_lc = distance_along_line-distance_along_line[cutoff_index] # Distance from cutoff
+    # localisation_p_r_s   =                  localisation_p * localisation_r * localisation_s
+    localisation_b_p_r_s = localisation_b * localisation_p * localisation_r * localisation_s
+    # localisation_b_p_r   = localisation_b * localisation_p * localisation_r
     
-        # Combining the various localisation pieces to get some overall localisation
-    # loc_p_r_s   =                  loc_p * loc_r * loc_s
-    loc_b_p_r_s = loc_b * loc_p * loc_r * loc_s
-    loc_b_p_r   = loc_b * loc_p * loc_r
+    # Finds the half-width (1/e)**2 and the distance the peak is from the cutoff location
+    interp_localisation_b_p_r_s = interpolate.interp1d(tau_array, localisation_b_p_r_s,
+                                                       kind='cubic', axis=-1, copy=True, bounds_error=True,
+                                                       fill_value=0, assume_sorted=False) 
+    interp_distance_from_cutoff = interpolate.interp1d(tau_array, distance_along_line-distance_along_line[cutoff_index],
+                                                      kind='cubic', axis=-1, copy=True, bounds_error=True,
+                                                      fill_value=0, assume_sorted=False) 
     
-        # Finds the 1/e values (localisation)
-    loc_b_p_r_s_max_over_e = loc_b_p_r_s.max() / (np.e) # loc_b_p_r_s.max() / 2.71
-    loc_b_p_r_max_over_e = loc_b_p_r.max() / (np.e) # loc_b_p_r.max() / 2.71
+    localisation_fine_tau = np.linspace(tau_array[0],tau_array[-1],10001)
     
-        # Gives the inter-e range (analogous to interquartile range) in l-lc
-    loc_b_p_r_s_delta_l_1 = find_x0(l_lc[0:cutoff_index], loc_b_p_r_s[0:cutoff_index], loc_b_p_r_s_max_over_e)
-    loc_b_p_r_s_delta_l_2 = find_x0(l_lc[cutoff_index::], loc_b_p_r_s[cutoff_index::], loc_b_p_r_s_max_over_e)
-    loc_b_p_r_s_delta_l = np.array([loc_b_p_r_s_delta_l_1, loc_b_p_r_s_delta_l_2])# The 1/e distances,  (l - l_c)
-    loc_b_p_r_s_half_width_l = (loc_b_p_r_s_delta_l_2 - loc_b_p_r_s_delta_l_1)/2
-    loc_b_p_r_delta_l_1 = find_x0(l_lc[0:cutoff_index], loc_b_p_r[0:cutoff_index], loc_b_p_r_max_over_e)
-    loc_b_p_r_delta_l_2 = find_x0(l_lc[cutoff_index::], loc_b_p_r[cutoff_index::], loc_b_p_r_max_over_e)
-    loc_b_p_r_delta_l = np.array([loc_b_p_r_delta_l_1, loc_b_p_r_delta_l_2])# The 1/e distances,  (l - l_c)   
-    loc_b_p_r_half_width_l = (loc_b_p_r_delta_l_1 - loc_b_p_r_delta_l_2)/2
-
-        # Estimates the inter-e range (analogous to interquartile range) in kperp1, from l-lc
-        # Bear in mind that since abs(kperp1) is minimised at cutoff, one really has to use that in addition to these.
-    loc_b_p_r_s_delta_kperp1_1 = find_x0(k_perp_1_backscattered[0:cutoff_index],l_lc[0:cutoff_index],loc_b_p_r_s_delta_l_1)
-    loc_b_p_r_s_delta_kperp1_2 = find_x0(k_perp_1_backscattered[cutoff_index::], l_lc[cutoff_index::], loc_b_p_r_s_delta_l_2)
-    loc_b_p_r_delta_kperp1_1 = find_x0(k_perp_1_backscattered[0:cutoff_index], l_lc[0:cutoff_index], loc_b_p_r_delta_l_1)
-    loc_b_p_r_delta_kperp1_2 = find_x0(k_perp_1_backscattered[cutoff_index::], l_lc[cutoff_index::], loc_b_p_r_delta_l_2)
-
-
-        # Calculate the cumulative integral of the localisation pieces
-    cum_loc_b_p_r_s = integrate.cumtrapz(loc_b_p_r_s, distance_along_line, initial=0)
-    cum_loc_b_p_r_s = (cum_loc_b_p_r_s - max(cum_loc_b_p_r_s)/2)
-    cum_loc_b_p_r = integrate.cumtrapz(loc_b_p_r, distance_along_line, initial=0)
-    cum_loc_b_p_r = (cum_loc_b_p_r - max(cum_loc_b_p_r)/2)
-    
-        # Finds the 1/e values (cumulative integral of localisation)
-    cum_loc_b_p_r_s_max_over_e_1 = cum_loc_b_p_r_s.min() * (1 - 1 / (np.e))
-    cum_loc_b_p_r_s_max_over_e_2 = cum_loc_b_p_r_s.max() * (1 - 1 / (np.e))
-    cum_loc_b_p_r_max_over_e_1 = cum_loc_b_p_r.min() * (1 - 1 / (np.e))
-    cum_loc_b_p_r_max_over_e_2 = cum_loc_b_p_r.max() * (1 - 1 / (np.e))
-    
-        # Gives the inter-e range (analogous to interquartile range) in l-lc
-    cum_loc_b_p_r_s_delta_l_1 = find_x0(l_lc, cum_loc_b_p_r_s, cum_loc_b_p_r_s_max_over_e_1)
-    cum_loc_b_p_r_s_delta_l_2 = find_x0(l_lc, cum_loc_b_p_r_s, cum_loc_b_p_r_s_max_over_e_2)
-    cum_loc_b_p_r_s_half_width = (cum_loc_b_p_r_s_delta_l_2 - cum_loc_b_p_r_s_delta_l_1)/2
-    cum_loc_b_p_r_delta_l_1 = find_x0(l_lc, cum_loc_b_p_r, cum_loc_b_p_r_max_over_e_1)
-    cum_loc_b_p_r_delta_l_2 = find_x0(l_lc, cum_loc_b_p_r, cum_loc_b_p_r_max_over_e_2)
-    cum_loc_b_p_r_half_width = (cum_loc_b_p_r_delta_l_2 - cum_loc_b_p_r_delta_l_1)/2
-
-        # Gives the inter-e range (analogous to interquartile range) in kperp1. 
-        # Bear in mind that since abs(kperp1) is minimised at cutoff, one really has to use that in addition to these.
-    cum_loc_b_p_r_s_delta_kperp1_1 = find_x0(k_perp_1_backscattered[0:cutoff_index], cum_loc_b_p_r_s[0:cutoff_index], cum_loc_b_p_r_s_max_over_e_1)
-    cum_loc_b_p_r_s_delta_kperp1_2 = find_x0(k_perp_1_backscattered[cutoff_index::], cum_loc_b_p_r_s[cutoff_index::], cum_loc_b_p_r_s_max_over_e_2)
-    cum_loc_b_p_r_delta_kperp1_1 = find_x0(k_perp_1_backscattered[0:cutoff_index], cum_loc_b_p_r[0:cutoff_index], cum_loc_b_p_r_max_over_e_1)
-    cum_loc_b_p_r_delta_kperp1_2 = find_x0(k_perp_1_backscattered[cutoff_index::], cum_loc_b_p_r[cutoff_index::], cum_loc_b_p_r_max_over_e_2)
-    
-        # Gives the mode l-lc for backscattering        
-    loc_b_p_r_s_max_index = find_nearest(loc_b_p_r_s, loc_b_p_r_s.max())    
-    loc_b_p_r_s_max_l_lc = distance_along_line[loc_b_p_r_s_max_index] - distance_along_line[cutoff_index]
-    loc_b_p_r_max_index = find_nearest(loc_b_p_r, loc_b_p_r.max())    
-    loc_b_p_r_max_l_lc = distance_along_line[loc_b_p_r_max_index] - distance_along_line[cutoff_index]
-    
-        # Gives the mean l-lc for backscattering    
-    cum_loc_b_p_r_s_mean_l = np.trapz(loc_b_p_r_s*distance_along_line, distance_along_line) / np.trapz(loc_b_p_r_s, distance_along_line)
-    cum_loc_b_p_r_mean_l = np.trapz(loc_b_p_r*distance_along_line, distance_along_line) / np.trapz(loc_b_p_r, distance_along_line)
-
-        # Gives the median l-lc for backscattering
-    cum_loc_b_p_r_s_delta_l_0 = find_x0(l_lc, cum_loc_b_p_r_s, 0) 
-    cum_loc_b_p_r_delta_l_0 = find_x0(l_lc, cum_loc_b_p_r, 0)
-    
-        # Due to the divergency of the ray piece, the mode kperp1 for backscattering is exactly that at the cut-off
-
-        # Gives the mean kperp1 for backscattering    
-    cum_loc_b_p_r_s_mean_kperp1 = np.trapz(loc_b_p_r_s*k_perp_1_backscattered, k_perp_1_backscattered) / np.trapz(loc_b_p_r_s, k_perp_1_backscattered)
-    cum_loc_b_p_r_mean_kperp1 = np.trapz(loc_b_p_r*k_perp_1_backscattered, k_perp_1_backscattered) / np.trapz(loc_b_p_r, k_perp_1_backscattered)
-
-        # Gives the median kperp1 for backscattering
-    cum_loc_b_p_r_s_delta_kperp1_0 = find_x0(k_perp_1_backscattered, cum_loc_b_p_r_s, 0)    
-    cum_loc_b_p_r_delta_kperp1_0 = find_x0(k_perp_1_backscattered[0:cutoff_index], cum_loc_b_p_r[0:cutoff_index], 0) # Only works if point is before cutoff. To fix.
-
-        # To make the plots look nice
-    k_perp_1_backscattered_plot = np.append(-2*wavenumber_K0, k_perp_1_backscattered)    
-    k_perp_1_backscattered_plot = np.append(k_perp_1_backscattered_plot, -2*wavenumber_K0)
-    cum_loc_b_p_r_s_plot = np.append(cum_loc_b_p_r_s[0], cum_loc_b_p_r_s)
-    cum_loc_b_p_r_s_plot = np.append(cum_loc_b_p_r_s_plot, cum_loc_b_p_r_s[-1])
-    cum_loc_b_p_r_plot = np.append(cum_loc_b_p_r[0], cum_loc_b_p_r)
-    cum_loc_b_p_r_plot = np.append(cum_loc_b_p_r_plot, cum_loc_b_p_r[-1])
-    
-    
-
+    localisation_b_p_r_s_fine = interp_localisation_b_p_r_s(localisation_fine_tau)
+    distance_from_cutoff_fine = interp_distance_from_cutoff(localisation_fine_tau)
 
     
+    localisation_b_p_r_s_fine_max_over_e = localisation_b_p_r_s_fine.max() / (np.e) # localisation_beam_ray_spectrum.max() / 2.71
+    localisation_b_p_r_s_fine_max_index = find_nearest(localisation_b_p_r_s_fine,localisation_b_p_r_s_fine.max())
+    localisation_b_p_r_s_fine_max_distance_from_cutoff = distance_from_cutoff_fine[localisation_b_p_r_s_fine_max_index]
+    localisation_b_p_r_s_fine_index_1 = find_nearest(localisation_b_p_r_s_fine[0:localisation_b_p_r_s_fine_max_index],localisation_b_p_r_s_fine_max_over_e)
+    localisation_b_p_r_s_fine_index_2 = localisation_b_p_r_s_fine_max_index + find_nearest(localisation_b_p_r_s_fine[localisation_b_p_r_s_fine_max_index:],localisation_b_p_r_s_fine_max_over_e)
+    localisation_b_p_r_s_fine_half_width = 0.5*(distance_from_cutoff_fine[localisation_b_p_r_s_fine_index_2] - distance_from_cutoff_fine[localisation_b_p_r_s_fine_index_1])
+        # Calculates localisation (end)
+    
+    plt.figure()
+    plt.title('Beam, ray, and spectrum')
+    plt.plot(distance_along_line-distance_along_line[cutoff_index],localisation_b_p_r_s)
+    plt.plot(distance_from_cutoff_fine[localisation_b_p_r_s_fine_index_1],localisation_b_p_r_s_fine[localisation_b_p_r_s_fine_index_1],'ko', markersize=10)
+    plt.plot(distance_from_cutoff_fine[localisation_b_p_r_s_fine_index_2],localisation_b_p_r_s_fine[localisation_b_p_r_s_fine_index_2],'ko', markersize=10)
+    plt.xlabel(r'$(l - l_c) / m$')
+    plt.ylabel('localisation')
+    plt.axvline(0,color='k', linestyle='dashed')
 
 
-
-
-
-
-    # integrated_localisation_b_p_r_delta_kperp1_0 = find_x0(k_perp_1_backscattered[0:cutoff_index],integrated_localisation_b_p_r[0:cutoff_index],0)
-
-
-
+  
+    
+    
 #     # -------------------
 
 
 
 
-    ## -------------------
-    ## This saves the data generated by the analysis after the main loop
-    ## -------------------
-    print('Saving analysis data')
+#     ## -------------------
+#     ## This saves the data generated by the analysis after the main loop
+#     ## -------------------
+    # print('Saving analysis data')
+    # np.savez('analysis_output' + output_filename_suffix, 
+    #           distance_along_line=distance_along_line,
+    #           K_magnitude_array=K_magnitude_array,
+    #           cutoff_index=cutoff_index,
+    #           g_hat_output=g_hat_output,
+    #           dH_dKR_output=dH_dKR_output,
+    #           dH_dKzeta_output=dH_dKzeta_output,
+    #           dH_dKZ_output=dH_dKZ_output
+    #           )
+    # print('Analysis data saved')
     np.savez('analysis_output' + output_filename_suffix, 
               Psi_xx_output = Psi_xx_output, Psi_xy_output = Psi_xy_output, Psi_yy_output = Psi_yy_output,
               Psi_xx_entry=Psi_xx_entry, Psi_xy_entry=Psi_xy_entry, Psi_yy_entry=Psi_yy_entry,
@@ -1588,22 +1528,16 @@ def beam_me_up(tau_max,
               g_hat_output=g_hat_output,
               # in_index=in_index,out_index=out_index,
               poloidal_flux_on_midplane=poloidal_flux_on_midplane,R_midplane_points=R_midplane_points,
-              loc_b=loc_b,loc_p=loc_p,
-              loc_r=loc_r,loc_s=loc_s,
-              loc_b_p_r_s=loc_b_p_r_s, loc_b_p_r=loc_b_p_r,
-              k_perp_1_backscattered_plot=k_perp_1_backscattered_plot,
-              cum_loc_b_p_r_s_plot=cum_loc_b_p_r_s_plot, cum_loc_b_p_r_plot=cum_loc_b_p_r_plot,
-              loc_b_p_r_s_max_l_lc=loc_b_p_r_s_max_l_lc, loc_b_p_r_max_l_lc=loc_b_p_r_max_l_lc, # mode l-lc
-              cum_loc_b_p_r_s_mean_l=cum_loc_b_p_r_s_mean_l, cum_loc_b_p_r_mean_l=cum_loc_b_p_r_mean_l, # mean l-lc
-              cum_loc_b_p_r_s_delta_l_0=cum_loc_b_p_r_s_delta_l_0, cum_loc_b_p_r_delta_l_0=cum_loc_b_p_r_delta_l_0, # median l-lc
-              cum_loc_b_p_r_s_mean_kperp1=cum_loc_b_p_r_s_mean_kperp1, cum_loc_b_p_r_mean_kperp1=cum_loc_b_p_r_mean_kperp1, # mean kperp1
-              cum_loc_b_p_r_s_delta_kperp1_0=cum_loc_b_p_r_s_delta_kperp1_0, cum_loc_b_p_r_delta_kperp1_0=cum_loc_b_p_r_delta_kperp1_0, # median kperp1
+              localisation_b=localisation_b,localisation_p=localisation_p,
+              localisation_r=localisation_r,localisation_s=localisation_s,
+              localisation_b_p_r_s=localisation_b_p_r_s,
+              localisation_b_p_r_s_fine_max_distance_from_cutoff=localisation_b_p_r_s_fine_max_distance_from_cutoff,
+              localisation_b_p_r_s_fine_half_width=localisation_b_p_r_s_fine_half_width
               # det_imag_Psi_w_analysis=det_imag_Psi_w_analysis,det_real_Psi_w_analysis=det_real_Psi_w_analysis,det_M_w_analysis=det_M_w_analysis
               )
     print('Analysis data saved')
     # -------------------
 
-    
     ## -------------------
     ## This saves some simple figures
     ## Allows one to quickly gain an insight into what transpired in the simulation
@@ -1638,12 +1572,12 @@ def beam_me_up(tau_max,
         Useful to check whether the solution which = 0 along the path changes
         """
         plt.figure()
-        plt.plot(l_lc,abs(H_eigvals[:,0]),'ro')
-        plt.plot(l_lc,abs(H_eigvals[:,1]),'go')
-        plt.plot(l_lc,abs(H_eigvals[:,2]),'bo')
-        plt.plot(l_lc,abs(H_1_Cardano_array),'r')    
-        plt.plot(l_lc,abs(H_2_Cardano_array),'g')    
-        plt.plot(l_lc,abs(H_3_Cardano_array),'b')    
+        plt.plot(distance_along_line-distance_along_line[cutoff_index],abs(H_eigvals[:,0]),'ro')
+        plt.plot(distance_along_line-distance_along_line[cutoff_index],abs(H_eigvals[:,1]),'go')
+        plt.plot(distance_along_line-distance_along_line[cutoff_index],abs(H_eigvals[:,2]),'bo')
+        plt.plot(distance_along_line-distance_along_line[cutoff_index],abs(H_1_Cardano_array),'r')    
+        plt.plot(distance_along_line-distance_along_line[cutoff_index],abs(H_2_Cardano_array),'g')    
+        plt.plot(distance_along_line-distance_along_line[cutoff_index],abs(H_3_Cardano_array),'b')    
         plt.savefig('H_' + output_filename_suffix)
         plt.close()        
 
