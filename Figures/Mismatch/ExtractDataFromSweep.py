@@ -40,7 +40,7 @@ import tikzplotlib
 #theta_m_output = loadfile['theta_m_output']
 #loadfile.close()
 
-numberOfRuns = 71
+numberOfRuns = 51
 # toroidal_launch_angle_Torbeam_scan = np.linspace(-0.5,-7.5,71)
 
 
@@ -75,8 +75,8 @@ for ii in range(0,numberOfRuns):
     # theta_m_sweep2[ii]               = theta_m_output[localisation_beam_ray_spectrum_max_index]
     # delta_theta_m_sweep2[ii]         = delta_theta_m[localisation_beam_ray_spectrum_max_index] 
     
-mismatch_angle_offset = np.rad2deg(np.asarray([theta_m_sweep[43],theta_m_sweep[53],theta_m_sweep[63],theta_m_sweep[23],theta_m_sweep[13],theta_m_sweep[33]]))
-# mismatch_angle_offset = np.asarray([6.17073,10.24059,13.86935,-3.20812,-8.38919,1.668527])
+# mismatch_angle_offset = np.rad2deg(np.asarray([theta_m_sweep[43],theta_m_sweep[53],theta_m_sweep[63],theta_m_sweep[23],theta_m_sweep[13],theta_m_sweep[33]]))
+mismatch_angle_offset = np.asarray([6.17073,10.24059,13.86935,-3.20812,-8.38919,1.668527])
     
 k_to_choose = k_perp_1_backscattered_sweep[0]
 turbulence_piece = (k_perp_1_backscattered_sweep/k_to_choose)**(-2*10/3)
