@@ -72,8 +72,7 @@ from Scotty_fun_CFD import find_d2H_dKR2, find_d2H_dKR_dKzeta, find_d2H_dKR_dKZ,
 from Scotty_fun_mix import find_d2H_dKR_dR, find_d2H_dKR_dZ, find_d2H_dKzeta_dR, find_d2H_dKzeta_dZ, find_d2H_dKZ_dR, find_d2H_dKZ_dZ # \nabla_K \nabla H
 from Scotty_fun_FFD import find_dpolflux_dR, find_dpolflux_dZ # For find_B if using efit files directly
 
-def beam_me_up(saveInterval,
-               poloidal_launch_angle_Torbeam,
+def beam_me_up(poloidal_launch_angle_Torbeam,
                toroidal_launch_angle_Torbeam,
                launch_freq_GHz,
                mode_flag,
@@ -82,7 +81,6 @@ def beam_me_up(saveInterval,
                launch_beam_radius_of_curvature,
                launch_position,
                find_B_method,
-               stop_flag=False,
                vacuum_propagation_flag=False,
                Psi_BC_flag = False,
                poloidal_flux_enter=None,
@@ -171,6 +169,7 @@ def beam_me_up(saveInterval,
 #    input_files_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
     
     if density_fit_parameters is None:
+        print('ne(psi): loading from input file')
         print('Warning: Scale factor of 1.1 used')
         # Importing data from ne.dat
     #    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_smoothed.dat'
@@ -191,7 +190,8 @@ def beam_me_up(saveInterval,
         def find_density_1D(poloidal_flux, interp_density_1D=interp_density_1D):
             density = interp_density_1D(poloidal_flux)
             return density
-    else:
+    elif len(density_fit_parameters) == 4:
+        print('ne(psi): Using order_1_polynomial*tanh')
         print('Warning: Scale factor of 1.1 used')
         ne_data_density_array=None # So that saving the input data later does not complain
         ne_data_radialcoord_array=None # So that saving the input data later does not complain
@@ -200,7 +200,19 @@ def beam_me_up(saveInterval,
             density_fit = 1.1*(density_fit_parameters[0]*poloidal_flux + density_fit_parameters[1])*np.tanh(density_fit_parameters[2] * poloidal_flux + density_fit_parameters[3])
             is_inside = poloidal_flux <= poloidal_flux_enter # Boolean array
             density = is_inside * density_fit # The Boolean array sets stuff outside poloidal_flux_enter to zero
-            return density            
+            return density     
+    elif len(density_fit_parameters) == 3:
+        print('ne(psi): using constant*tanh')
+        ne_data_density_array=None # So that saving the input data later does not complain
+        ne_data_radialcoord_array=None # So that saving the input data later does not complain
+        
+        def find_density_1D(poloidal_flux, poloidal_flux_enter=poloidal_flux_enter,density_fit_parameters=density_fit_parameters):
+            density_fit = density_fit_parameters[0]*np.tanh( density_fit_parameters[1] * (poloidal_flux - density_fit_parameters[2]) )
+            is_inside = poloidal_flux <= poloidal_flux_enter # Boolean array
+            density = is_inside * density_fit # The Boolean array sets stuff outside poloidal_flux_enter to zero
+            return density         
+    else:
+        print('density_fit_parameters has an invalid length')
     
     # This part of the code defines find_B_R, find_B_T, find_B_zeta
     interp_order = 5 # For the 2D interpolation functions
@@ -255,7 +267,7 @@ def beam_me_up(saveInterval,
     elif find_B_method == 'efit':
         print('Using efit output files directly for B and poloidal flux')
 
-        dataset = Dataset('efitOut_29905.nc')
+        dataset = Dataset('efitOut_29908.nc')
 
         time_index = 7
         time_array = dataset.variables['time'][:]
@@ -1049,11 +1061,12 @@ def beam_me_up(saveInterval,
     grad_bhat_output = np.zeros([numberOfDataPoints,3,3])
     dbhat_dR = find_dbhat_dR(q_R_array, q_Z_array, delta_R, find_B_R, find_B_T, find_B_Z)
     dbhat_dZ = find_dbhat_dZ(q_R_array, q_Z_array, delta_Z, find_B_R, find_B_T, find_B_Z)
-    grad_bhat_output[:,:,0] = dbhat_dR.T # Transpose dbhat_dR so that it has the right shape
-    grad_bhat_output[:,:,2] = dbhat_dZ.T
+    grad_bhat_output[:,0,:] = dbhat_dR.T # Transpose dbhat_dR so that it has the right shape
+    grad_bhat_output[:,2,:] = dbhat_dZ.T
+    grad_bhat_output[:,1,0] = - B_T_output / (B_magnitude * q_R_array)
     grad_bhat_output[:,1,1] = B_R_output / (B_magnitude * q_R_array)
-    grad_bhat_output[:,0,1] = - B_T_output / (B_magnitude * q_R_array)
-            
+
+
     # x_hat and y_hat
     y_hat_output = np.zeros([numberOfDataPoints,3])
     x_hat_output = np.zeros([numberOfDataPoints,3])
@@ -1068,6 +1081,24 @@ def beam_me_up(saveInterval,
     x_hat_output[:,1] = x_output[:,1] / x_output_magnitude
     x_hat_output[:,2] = x_output[:,2] / x_output_magnitude
 
+    print(B_T_output)
+    ## -------------------
+    ## Not useful for physics or data analysis
+    ## But good for checking whether things are working properly
+    ## -------------------
+        
+        # Gradients of poloidal flux along the ray
+    # dpolflux_dR_FFD_debugging   =
+    # dpolflux_dZ_FFD_debugging   =
+    # d2polflux_dR2_FFD_debugging =
+    # d2polflux_dZ2_FFD_debugging = 
+
+        # Gradients of the total magnetic field along the ray
+    # dB_dR_FFD_debugging     =
+    # dB_dZ_FFD_debugging     =
+    # d2B_dR2_FFD_debugging   =
+    # d2B_dZ2_FFD_debugging   =
+    # d2B_dR_dZ_FFD_debugging =
 
 
     ## -------------------
@@ -1264,13 +1295,14 @@ def beam_me_up(saveInterval,
     delta_theta_m  = np.sqrt( 
                               np.imag(M_w_inv_yy_output) / ( (np.imag(M_w_inv_xy_output))**2 - np.imag(M_w_inv_xx_output)*np.imag(M_w_inv_yy_output) ) 
                             ) / (2 * K_magnitude_array)
-    # print(delta_theta_m[cutoff_index])
     
     sin_theta_m_analysis = np.zeros(numberOfDataPoints)
     sin_theta_m_analysis[:] = (b_hat_output[:,0]*K_R_array[:] + b_hat_output[:,1]*K_zeta_initial/q_R_array[:] + b_hat_output[:,2]*K_Z_array[:]) / (K_magnitude_array[:]) # B \cdot K / (abs (B) abs(K))
 
     theta_m_output = np.sign(sin_theta_m_analysis)*np.arcsin(abs(sin_theta_m_analysis)) # Assumes the mismatch angle is never smaller than -90deg or bigger than 90deg
-    # print(theta_m_output[cutoff_index])
+    
+    print('theta_m', theta_m_output[cutoff_index])
+    print('mismatch attenuation', np.exp(-theta_m_output[cutoff_index]**2/ (2*delta_theta_m[cutoff_index]**2)))
 #    print(cutoff_index)
 
 
@@ -1576,6 +1608,7 @@ def beam_me_up(saveInterval,
     ## -------------------
     if figure_flag:
         print('Making figures')
+        output_figurename_suffix = output_filename_suffix + '.png'
         
         """
         Plots the beam path on the R Z plane
@@ -1597,7 +1630,7 @@ def beam_me_up(saveInterval,
         plt.xlim(data_R_coord[0],data_R_coord[-1])
         plt.ylim(data_Z_coord[0],data_Z_coord[-1])
 
-        plt.savefig('Ray1_' + output_filename_suffix)
+        plt.savefig('Ray1_' + output_figurename_suffix)
         plt.close()
         
         """
@@ -1611,7 +1644,7 @@ def beam_me_up(saveInterval,
         plt.plot(l_lc,abs(H_1_Cardano_array),'r')    
         plt.plot(l_lc,abs(H_2_Cardano_array),'g')    
         plt.plot(l_lc,abs(H_3_Cardano_array),'b')    
-        plt.savefig('H_' + output_filename_suffix)
+        plt.savefig('H_' + output_figurename_suffix)
         plt.close()        
 
         # Commented out because this does not work properly
