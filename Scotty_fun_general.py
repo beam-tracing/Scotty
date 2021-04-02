@@ -861,3 +861,86 @@ def find_d2_poloidal_flux_dZ2(q_R, q_Z, delta_Z, interp_poloidal_flux):
     return d2_poloidal_flux_dZ2
 
 #----------------------------------
+
+
+
+# Functions (Launch angle)
+"""
+Written by Neal Crocker, added to Scotty by Valerian.
+Converts mirror angles of the MAST DBS to launch angles (genray)
+Genray -> Scotty/Torbeam: poloidal launch angle has opposite sign
+"""
+def use_deg_args(func,*args,**kwargs):
+    'transform args from degrees to radians before calling' #doc string
+    return func(*[a*np.pi/180 for a in args],**kwargs)
+
+def tilt_trns_RZ_make(t):
+    'tilts R ([1,0,0]) in to Z ([0,0,1]) using angle in radians' #doc string
+    ctilt=np.cos(t)
+    stilt=np.sin(t)
+    return np.array([[ctilt,0,stilt],[0,1,0],[-stilt,0,ctilt]])
+
+def tilt_trns_TZ_make(t):
+    'tilts T ([1,0,0]) in to Z ([0,0,1]) using angle in radians' #doc string
+    ctilt=np.cos(t)
+    stilt=np.sin(t)
+    return np.array([[1,0,0],[0,ctilt,-stilt],[0,stilt,ctilt]])
+
+def rot_trns_make(r): 
+    'rotates R ([1,0,0]) into T ([0,1,0]) using angle in radians' #doc string
+    crot=np.cos(r)
+    srot=np.sin(r)
+    return np.array([[crot,-srot,0],[srot,crot,0],[0,0,1]])
+
+def mirrornorm_make_with_rot_tilt_operators(r,t):
+    'makes norm vector for mirror using rot and tilt operators given angles in radians' #doc string
+    mirrornorm0=np.array([0,1,0])
+    tilt_trns=tilt_trns_TZ_make(t)
+    rot_trns=rot_trns_make(np.pi/4+r)
+    mirrornorm = rot_trns @ (tilt_trns @ mirrornorm0)
+    return mirrornorm
+
+def mirrornorm_make(r,t):
+    'makes norm vector for mirror directly using angles in radians' #doc string
+    mirrornorm=np.array([*(np.cos(t)*np.array([-np.sin(r+np.pi/4),np.cos(r+np.pi/4)])),np.sin(t)])
+    return mirrornorm
+
+def reflector_make_from_mirrornorm(mirrornorm):
+    'makes relector matrix for mirror using norm vector for mirror' #doc string
+    reflector=np.eye(3)-2*mirrornorm[:,np.newaxis]@mirrornorm[np.newaxis,:]
+    return reflector
+    
+def reflector_make(r,t):
+    'makes relector matrix for mirror using angles in radians' #doc string
+    mirrornorm = mirrornorm_make(r,t)
+    reflector=reflector_make_from_mirrornorm(mirrornorm)
+    return reflector
+
+def genray_angles_from_mirror_angles(rot_ang_deg,tilt_ang_deg,offset_for_window_norm_to_R = 3.0):
+    '''
+      Input args are steering mirror rotation and tilt angles in degrees (rot_ang_deg,tilt_ang_deg).
+      rot_ang_deg,tilt_ang_deg = 0,0 imply beam propagates in negative window normal direction.
+      optional keyword offset_for_window_norm_to_R gives toroial angle (in degrees) of 
+      window normal to major radial direction, so for rot_ang_deg,tilt_ang_deg = 0,0, beam would have
+      toroidal angle given by offset_for_window_norm_to_R.
+    
+      can get from rot_ang_deg,tilt_ang_deg buy using toroidal and poloidal "genray angles" (tor_ang, pol_ang)
+      in IDL savefile log (/u/jhilles/DBS/dbs_logbook_2013.idl).  The angles were calculated according to the logic: 
+          tor_ang = 3.0 - rot_ang_deg
+          pol_ang = tilt_ang_deg
+    '''
+    
+    
+    beam0=np.array([0,-1,0])
+    rdeg=rot_ang_deg if np.isscalar(rot_ang_deg) else  rot_ang_deg.flat[0]
+    tdeg=tilt_ang_deg if np.isscalar(tilt_ang_deg) else  tilt_ang_deg.flat[0]
+    reflector=use_deg_args(reflector_make,rdeg,tdeg)
+    beam_windowframe = reflector @ beam0
+    #rotate from window frame to port frame:
+    beam = use_deg_args(rot_trns_make,-offset_for_window_norm_to_R) @ beam_windowframe
+
+    tor_ang_genray=np.arctan2(beam[1],-beam[0])#+offset_for_window_norm_to_R*np.pi/180
+    pol_ang_genray=np.arctan2(beam[2],np.sqrt(beam[0]**2+beam[1]**2))
+    tor_ang_genray_deg,pol_ang_genray_deg = tor_ang_genray*180/np.pi,pol_ang_genray*180/np.pi
+
+    return tor_ang_genray_deg,pol_ang_genray_deg

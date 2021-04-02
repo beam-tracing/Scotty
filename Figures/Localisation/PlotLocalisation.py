@@ -18,7 +18,7 @@ import tikzplotlib
 
 
 
-suffix = 'many_points'
+suffix = ''
 
 loadfile = np.load('data_input' + suffix + '.npz')
 launch_freq_GHz =loadfile['launch_freq_GHz']
