@@ -419,7 +419,7 @@ plt.subplot(3,3,7)
 plt.plot(distance_along_line,gradK_grad_H_output[:,2,0],'r')
 plt.subplot(3,3,8)
 plt.subplot(3,3,9)
-plt.title('d2H_dKZ2')
+plt.title('d2H_dKZ_dZ')
 plt.plot(distance_along_line,gradK_grad_H_output[:,2,2],'r')
 
 plt.figure()
@@ -456,7 +456,7 @@ plt.plot(distance_along_line,gradK_gradK_H_output[:,1,2],'r')
 plt.subplot(3,3,7)
 plt.subplot(3,3,8)
 plt.subplot(3,3,9)
-plt.title('d2H_dZ2')
+plt.title('d2H_dKZ2')
 plt.plot(distance_along_line,gradK_gradK_H_output[:,2,2],'r')
 
 
