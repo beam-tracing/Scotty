@@ -123,7 +123,7 @@ CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_gri
 plt.clabel(CS, inline=True, fontsize=10,inline_spacing=-5,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
 # plt.xlim(1.0,1.8)
 # plt.ylim(-0.7,0.1)
-tikzplotlib.clean_figure() # Removes points that are outside the plot area
+# tikzplotlib.clean_figure() # Removes points that are outside the plot area
 plt.plot(q_R_array[:out_index],q_Z_array[:out_index],'k')
 plt.plot( [launch_position[0], q_R_array[0]], [launch_position[2], q_Z_array[0]],':k')
 plt.plot(W_line_RZ_1_Rpoints[:out_index],W_line_RZ_1_Zpoints[:out_index],'k--')
