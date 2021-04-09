@@ -50,7 +50,6 @@ from scipy import constants as constants
 from scipy import linalg as linalg
 import matplotlib.pyplot as plt
 import os
-import sys
 from netCDF4 import Dataset
 import bisect
 import time
@@ -95,6 +94,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                plasmaLaunch_K=np.zeros(3),
                plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3,3]),
                density_fit_parameters=None,
+               acceleration_flag=False
                ):
 
     """
@@ -586,67 +586,26 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     # -------------------
 
     # Define events for the solver
-	# Notice how the beam parameters are allocated: this function only works correctly for the 2D case
-    def event_leave_plasma(tau, ray_parameters_2D, K_zeta, 
+    def event_leave_plasma(tau, beam_parameters, K_zeta, 
                            launch_angular_frequency, mode_flag,
                            delta_R, delta_Z, delta_K_R, delta_K_zeta, delta_K_Z,
                            interp_poloidal_flux, find_density_1D, 
                            find_B_R, find_B_T, find_B_Z,
-                           poloidal_flux_leave=poloidal_flux_enter): # Leave at the same poloidal flux of entry
+                           poloidal_flux_enter=poloidal_flux_enter):
         
-        q_R          = ray_parameters_2D[0]
-        q_Z          = ray_parameters_2D[1]
+        q_R          = beam_parameters[0]
+        q_Z          = beam_parameters[1]
         
         poloidal_flux = interp_poloidal_flux(q_R,q_Z)
         
-        poloidal_flux_difference = poloidal_flux - poloidal_flux_leave
-
+        poloidal_flux_difference = poloidal_flux - poloidal_flux_enter
         # goes from negative to positive when leaving the plasma
         return poloidal_flux_difference
     event_leave_plasma.terminal = True # Stop the solver when the beam leaves the plasma
     event_leave_plasma.direction = 1.0 # positive value, when function result goes from negative to positive
     
-
-    def event_leave_LCFS(tau, ray_parameters_2D, K_zeta, 
-                         launch_angular_frequency, mode_flag,
-                         delta_R, delta_Z, delta_K_R, delta_K_zeta, delta_K_Z,
-                         interp_poloidal_flux, find_density_1D, 
-                         find_B_R, find_B_T, find_B_Z,
-                         poloidal_flux_LCFS=1.0):
-        
-        q_R          = ray_parameters_2D[0]
-        q_Z          = ray_parameters_2D[1]
-        
-        poloidal_flux = interp_poloidal_flux(q_R,q_Z)
-        
-        poloidal_flux_difference = poloidal_flux - poloidal_flux_LCFS
-
-        # goes from negative to positive when leaving the LCFS
-        return poloidal_flux_difference
-    event_leave_LCFS.terminal = False # Do not stop the solver when the beam leaves the plasma
-    event_leave_LCFS.direction = 1.0 # positive value, when function result goes from negative to positive
-
-
-    def event_leave_simulation(tau, ray_parameters_2D, K_zeta, 
-                               launch_angular_frequency, mode_flag,
-                               delta_R, delta_Z, delta_K_R, delta_K_zeta, delta_K_Z,
-                               interp_poloidal_flux, find_density_1D, 
-                               find_B_R, find_B_T, find_B_Z,
-                               data_R_coord_min = data_R_coord.min(),
-                               data_R_coord_max = data_R_coord.max(),
-                               data_Z_coord_min = data_Z_coord.min(),
-                               data_Z_coord_max = data_Z_coord.max()
-                               ): 
-        
-        q_R          = ray_parameters_2D[0]
-        q_Z          = ray_parameters_2D[1]
-        
-        is_inside = (q_R > data_R_coord_min) and (q_R < data_R_coord_max) and (q_Z > data_Z_coord_min) and (q_R < data_Z_coord_max)
-        
-        # goes from positive (True) to negative(False) when leaving the simulation region
-        return is_inside
-    event_leave_simulation.terminal = True # Stop the solver when the beam leaves the simulation region. Entering the simulation region is fine
-    event_leave_simulation.direction = -1.0 # negative value, when function result goes from positive to negative
+    event_leave_plasma.terminal = True # Stop the solver when the beam leaves the plasma
+    event_leave_plasma.direction = 1.0 # positive value, when function result goes from negative to positive
     # -------------------
 
 
@@ -665,148 +624,394 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     """
     solver_start_time = time.time()
     
-    solver_ray_events = (event_leave_plasma, event_leave_LCFS, event_leave_simulation) 
     solver_ray_output = integrate.solve_ivp(
                         ray_evolution_2D_fun, [0,tau_max], ray_parameters_2D_initial, 
-                        method='RK45', t_eval=None, dense_output=False, 
-                        events=solver_ray_events, vectorized=False, args=solver_arguments,
-                        max_step = 100
-                    ) # This seems to be throwing a warning about ragged arrays, see if new scipy update fixes this
+                        method='RK45', t_eval=None, dense_output=(acceleration_flag), 
+                        events=event_leave_plasma, vectorized=False, args=solver_arguments
+                    ) # Compute dense output if acceleration_flag, do not compute if not
+
+
     solver_end_time = time.time()
     print('Time taken (ray solver)', solver_end_time-solver_start_time,'s')
 
-    ray_parameters_2D = solver_ray_output.y
-    tau_ray = solver_ray_output.t
-    
+
     solver_ray_status = solver_ray_output.status
     if solver_ray_status != 1:
-        print('Warning: Ray has not left plasma/simulation region. Increase tau_max or choose different initial conditions.')
-        print('We should not be here. I am prematurely terminating this simulation.')
-        sys.exit()
-
-        
+        print('Warning: Ray has not left plasma. Increase tau_max')
+    
+    ray_parameters_2D = solver_ray_output.y    
     K_magnitude_ray = (  (np.real(ray_parameters_2D[2,:]))**2 
                         + K_zeta_initial**2/(np.real(ray_parameters_2D[0,:]))**2 
                         + (np.real(ray_parameters_2D[3,:]))**2)**(0.5)
     
+    tau_ray = solver_ray_output.t
     index_cutoff_estimate = K_magnitude_ray.argmin()
 
-    tau_events = solver_ray_output.t_events
+    tau_leave = np.squeeze(solver_ray_output.t_events)
 
-    if len(tau_events[0]) != 0: 
+        ##
+    
+    
+
+
+
+        ##    
+    
+    if acceleration_flag:
         """
-        If event_leave_plasma occurs, everything is great, and life is easy
-        """
-        tau_leave = np.squeeze(tau_events[0]) 
-    elif len(tau_events[1]) != 0: 
-        """
-        - If event_leave_plasma doesn't occur, but event_leave_LCFS does.
-        - Since the LCFS is defined by poloidal_flux = constant (usually 1.0), 
-          there might be multiple events. But the real crossing of the LCFS 
-          should be the first crossing
-        -
-        """
-        tau_leave_LCFS = tau_events[1] 
-        tau_leave = tau_leave_LCFS[0] 
+        - Propagates a ray with the appropriate points
+        - Calculate second derivatives along the ray
+        - Get beam properties from those derivatives
+        """   
+        numberOfTauPointsFine = 1000 + 1
+        tau_points_fine = np.linspace(0,0.995*tau_leave,numberOfTauPointsFine)
+        # # factor of 0.995 so that the last point would definitely still be in the plasma
+        
+        ray_parameters_2D_fine = solver_ray_output.sol(tau_points_fine)
+        
+        [q_R_fine, q_Z_fine, K_R_fine, K_Z_fine] = ray_parameters_2D_fine
+        
+   
+        # \nabla \nabla H
+        d2H_dR2_fine   = find_d2H_dR2(q_R_fine, q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine,
+                                 launch_angular_frequency, mode_flag,
+                                 delta_R,
+                                 interp_poloidal_flux, find_density_1D,
+                                 find_B_R, find_B_T, find_B_Z
+                                 )
+        d2H_dR_dZ_fine = find_d2H_dR_dZ(q_R_fine ,q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine,
+                                   launch_angular_frequency, mode_flag,
+                                   delta_R, delta_Z,
+                                   interp_poloidal_flux, find_density_1D,
+                                   find_B_R, find_B_T, find_B_Z
+                                   )
+        d2H_dZ2_fine   = find_d2H_dZ2(q_R_fine, q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine,
+                                 launch_angular_frequency, mode_flag,
+                                 delta_Z,
+                                 interp_poloidal_flux, find_density_1D,
+                                 find_B_R, find_B_T, find_B_Z
+                                 )
+        # grad_grad_H = np.squeeze(np.array([
+        #     [d2H_dR2.item()  , 0.0, d2H_dR_dZ.item()],
+        #     [0.0             , 0.0, 0.0             ],
+        #     [d2H_dR_dZ.item(), 0.0, d2H_dZ2.item()  ] 
+        #     ]))
+        grad_grad_H_fine        = np.zeros([numberOfTauPointsFine,3,3])
+        grad_grad_H_fine[:,0,0] = d2H_dR2_fine
+        grad_grad_H_fine[:,2,2] = d2H_dZ2_fine
+        grad_grad_H_fine[:,2,0] = d2H_dR_dZ_fine
+        grad_grad_H_fine[:,0,2] = grad_grad_H_fine[:,2,0]
+    
+        # \nabla_K \nabla H
+        d2H_dKR_dR_fine    = find_d2H_dKR_dR(q_R_fine, q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine,
+                                        launch_angular_frequency, mode_flag,
+                                        delta_K_R, delta_R,
+                                        interp_poloidal_flux, find_density_1D,
+                                        find_B_R, find_B_T, find_B_Z
+                                        )
+        d2H_dKZ_dZ_fine    = find_d2H_dKZ_dZ(q_R_fine, q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine,
+                                        launch_angular_frequency, mode_flag,
+                                        delta_K_Z, delta_Z,
+                                        interp_poloidal_flux, find_density_1D,
+                                        find_B_R, find_B_T, find_B_Z
+                                        )
+        d2H_dKR_dZ_fine    = find_d2H_dKR_dZ(q_R_fine, q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine,
+                                        launch_angular_frequency, mode_flag,
+                                        delta_K_R, delta_Z,
+                                        interp_poloidal_flux, find_density_1D,
+                                        find_B_R, find_B_T, find_B_Z
+                                        )
+        d2H_dKzeta_dZ_fine = find_d2H_dKzeta_dZ(q_R_fine, q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine, 
+                                           launch_angular_frequency, mode_flag,
+                                           delta_K_zeta, delta_Z,
+                                           interp_poloidal_flux, find_density_1D,
+                                           find_B_R, find_B_T, find_B_Z
+                                           )
+        d2H_dKzeta_dR_fine = find_d2H_dKzeta_dR(q_R_fine, q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine,
+                                           launch_angular_frequency, mode_flag,
+                                           delta_K_zeta, delta_R,
+                                           interp_poloidal_flux, find_density_1D,
+                                           find_B_R, find_B_T, find_B_Z
+                                           )
+        d2H_dKZ_dR_fine    = find_d2H_dKZ_dR(q_R_fine, q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine,
+                                        launch_angular_frequency, mode_flag,
+                                        delta_K_Z, delta_R,
+                                        interp_poloidal_flux, find_density_1D,
+                                        find_B_R, find_B_T, find_B_Z
+                                        )
+        # gradK_grad_H = np.squeeze(np.array([
+        #     [d2H_dKR_dR.item(),    0.0, d2H_dKR_dZ.item()   ],
+        #     [d2H_dKzeta_dR.item(), 0.0, d2H_dKzeta_dZ.item()],
+        #     [d2H_dKZ_dR.item(),    0.0, d2H_dKZ_dZ.item()   ]
+        #     ]))
+        gradK_grad_H_fine        = np.zeros([numberOfTauPointsFine,3,3])
+        gradK_grad_H_fine[:,0,0] = d2H_dKR_dR_fine
+        gradK_grad_H_fine[:,2,2] = d2H_dKZ_dZ_fine
+        gradK_grad_H_fine[:,0,2] = d2H_dKR_dZ_fine
+        gradK_grad_H_fine[:,1,0] = d2H_dKzeta_dR_fine
+        gradK_grad_H_fine[:,1,2] = d2H_dKzeta_dZ_fine
+        gradK_grad_H_fine[:,2,0] = d2H_dKZ_dR_fine
+        grad_gradK_H_fine        = np.transpose(gradK_grad_H_fine,axes=[0,2,1])
+
+        # \nabla_K \nabla_K H
+        d2H_dKR2_fine       = find_d2H_dKR2(q_R_fine, q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine,
+                                       launch_angular_frequency, mode_flag,
+                                       delta_K_R,
+                                       interp_poloidal_flux, find_density_1D,
+                                       find_B_R, find_B_T, find_B_Z
+                                       )
+        d2H_dKzeta2_fine    = find_d2H_dKzeta2(q_R_fine, q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine,
+                                          launch_angular_frequency, mode_flag,
+                                          delta_K_zeta,
+                                          interp_poloidal_flux, find_density_1D,
+                                          find_B_R, find_B_T, find_B_Z
+                                          )
+        d2H_dKZ2_fine       = find_d2H_dKZ2(q_R_fine, q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine,
+                                       launch_angular_frequency, mode_flag,
+                                       delta_K_Z,
+                                       interp_poloidal_flux, find_density_1D,
+                                       find_B_R, find_B_T, find_B_Z
+                                       )
+        d2H_dKR_dKzeta_fine = find_d2H_dKR_dKzeta(q_R_fine, q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine,
+                                             launch_angular_frequency, mode_flag,
+                                             delta_K_R, delta_K_zeta,
+                                             interp_poloidal_flux, find_density_1D,
+                                             find_B_R, find_B_T, find_B_Z
+                                             )
+        d2H_dKR_dKZ_fine    = find_d2H_dKR_dKZ(q_R_fine, q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine,
+                                          launch_angular_frequency, mode_flag,
+                                          delta_K_R, delta_K_Z,
+                                          interp_poloidal_flux, find_density_1D,
+                                          find_B_R, find_B_T, find_B_Z
+                                          )
+        d2H_dKzeta_dKZ_fine = find_d2H_dKzeta_dKZ(q_R_fine, q_Z_fine, K_R_fine, K_zeta_initial, K_Z_fine,
+                                             launch_angular_frequency, mode_flag,
+                                             delta_K_zeta, delta_K_Z,
+                                             interp_poloidal_flux, find_density_1D,
+                                             find_B_R, find_B_T, find_B_Z
+                                             )
+        # gradK_gradK_H = np.squeeze(np.array([
+        #     [d2H_dKR2.item()      , d2H_dKR_dKzeta.item(), d2H_dKR_dKZ.item()   ],
+        #     [d2H_dKR_dKzeta.item(), d2H_dKzeta2.item()   , d2H_dKzeta_dKZ.item()],
+        #     [d2H_dKR_dKZ.item()   , d2H_dKzeta_dKZ.item(), d2H_dKZ2.item()      ]
+        #     ]))
+        gradK_gradK_H_fine        = np.zeros([numberOfTauPointsFine,3,3])
+        gradK_gradK_H_fine[:,0,0] = d2H_dKR2_fine
+        gradK_gradK_H_fine[:,1,1] = d2H_dKzeta2_fine
+        gradK_gradK_H_fine[:,2,2] = d2H_dKZ2_fine
+        gradK_gradK_H_fine[:,0,1] = d2H_dKR_dKzeta_fine
+        gradK_gradK_H_fine[:,0,2] = d2H_dKR_dKZ_fine
+        gradK_gradK_H_fine[:,1,2] = d2H_dKzeta_dKZ_fine
+        gradK_gradK_H_fine[:,1,0] = gradK_grad_H_fine[:,0,1]
+        gradK_gradK_H_fine[:,2,0] = gradK_grad_H_fine[:,0,2]
+        gradK_gradK_H_fine[:,2,1] = gradK_grad_H_fine[:,1,2]
+
+        Psi_3D_fine        = np.zeros([numberOfTauPointsFine,3,3], dtype='complex128')
+
+        Psi_3D_fine[0,0,0] = beam_parameters_initial[5]  + 1j*beam_parameters_initial[11] # d (Psi_RR) / d tau
+        Psi_3D_fine[0,1,1] = beam_parameters_initial[6]  + 1j*beam_parameters_initial[12] # d (Psi_zetazeta) / d tau
+        Psi_3D_fine[0,2,2] = beam_parameters_initial[7]  + 1j*beam_parameters_initial[13] # d (Psi_ZZ) / d tau
+        Psi_3D_fine[0,0,1] = beam_parameters_initial[8]  + 1j*beam_parameters_initial[14] # d (Psi_Rzeta) / d tau
+        Psi_3D_fine[0,0,2] = beam_parameters_initial[9]  + 1j*beam_parameters_initial[15] # d (Psi_RZ) / d tau
+        Psi_3D_fine[0,1,2] = beam_parameters_initial[10] + 1j*beam_parameters_initial[16] # d (Psi_zetaZ) / d tau
+        Psi_3D_fine[0,1,0] = Psi_3D_fine[0,0,1]
+        Psi_3D_fine[0,2,0] = Psi_3D_fine[0,0,2]
+        Psi_3D_fine[0,2,1] = Psi_3D_fine[0,1,2]
+
+        for ii in range(0,numberOfTauPointsFine-1):
+            print(ii)
+            Psi_3D_fine[ii+1,:,:]= (( - grad_grad_H_fine[ii,:,:].squeeze()
+                    - np.matmul(
+                                Psi_3D_fine[ii,:,:].squeeze(), gradK_grad_H_fine[ii,:,:].squeeze()
+                                )
+                    - np.matmul(
+                                grad_gradK_H_fine[ii,:,:].squeeze(), Psi_3D_fine[ii,:,:].squeeze()
+                                )
+                    - np.matmul(np.matmul(
+                                Psi_3D_fine[ii,:,:].squeeze(), gradK_gradK_H_fine[ii,:,:].squeeze()
+                                ),
+                                Psi_3D_fine[ii,:,:].squeeze()
+                                )
+                    ) * (tau_points_fine[ii+1] - tau_points_fine[ii])
+                    +
+                    Psi_3D_fine[ii,:,:])
+            
+        print(Psi_3D_fine[0,:,:])
+        print(Psi_3D_fine[1,:,:])
+        print(Psi_3D_fine[2,:,:])
+            
+        plt.figure()
+        plt.subplot(3,3,1)
+        plt.plot(tau_points_fine,np.real(Psi_3D_fine[:,0,0]))
+        plt.subplot(3,3,2)
+        plt.plot(tau_points_fine,np.real(Psi_3D_fine[:,0,1]))        
+        plt.subplot(3,3,3)
+        plt.plot(tau_points_fine,np.real(Psi_3D_fine[:,0,2]))        
+        plt.subplot(3,3,5)
+        plt.plot(tau_points_fine,np.real(Psi_3D_fine[:,1,1]))        
+        plt.subplot(3,3,6)
+        plt.plot(tau_points_fine,np.real(Psi_3D_fine[:,1,2]))        
+        plt.subplot(3,3,9)
+        plt.plot(tau_points_fine,np.real(Psi_3D_fine[:,2,2]))
+
+        plt.figure()
+        plt.subplot(3,3,1)
+        plt.plot(tau_points_fine,np.imag(Psi_3D_fine[:,0,0]))
+        plt.subplot(3,3,2)
+        plt.plot(tau_points_fine,np.imag(Psi_3D_fine[:,0,1]))        
+        plt.subplot(3,3,3)
+        plt.plot(tau_points_fine,np.imag(Psi_3D_fine[:,0,2]))        
+        plt.subplot(3,3,5)
+        plt.plot(tau_points_fine,np.imag(Psi_3D_fine[:,1,1]))        
+        plt.subplot(3,3,6)
+        plt.plot(tau_points_fine,np.imag(Psi_3D_fine[:,1,2]))        
+        plt.subplot(3,3,9)
+        plt.plot(tau_points_fine,np.imag(Psi_3D_fine[:,2,2]))
+                
+        plt.figure()
+        plt.subplot(3,3,1)
+        plt.plot(tau_points_fine,gradK_grad_H_fine[:,0,0],'r')
+        plt.subplot(3,3,2)
+        plt.subplot(3,3,3)
+        plt.plot(tau_points_fine,gradK_grad_H_fine[:,0,2],'r')
+        plt.subplot(3,3,4)
+        plt.plot(tau_points_fine,gradK_grad_H_fine[:,1,0],'r')
+        plt.subplot(3,3,5)
+        plt.subplot(3,3,6)
+        plt.plot(tau_points_fine,gradK_grad_H_fine[:,1,2],'r')
+        plt.subplot(3,3,7)
+        plt.plot(tau_points_fine,gradK_grad_H_fine[:,2,0],'r')
+        plt.subplot(3,3,8)
+        plt.subplot(3,3,9)
+        plt.title('d2H_dKZ_dZ')
+        plt.plot(tau_points_fine,gradK_grad_H_fine[:,2,2],'r')
+        
+        plt.figure()
+        plt.subplot(3,3,1)
+        plt.plot(tau_points_fine,grad_grad_H_fine[:,0,0],'or')
+        plt.title('d2H_dR2')
+        plt.subplot(3,3,2)
+        plt.subplot(3,3,3)
+        plt.plot(tau_points_fine,grad_grad_H_fine[:,0,2],'r')
+        plt.title('d2H_dR_dZ')
+        plt.subplot(3,3,4)
+        plt.subplot(3,3,5)
+        plt.subplot(3,3,6)
+        plt.subplot(3,3,7)
+        #plt.plot(tau_points_fine,grad_grad_H_fine[:,2,0],'r')
+        plt.subplot(3,3,8)
+        plt.subplot(3,3,9)
+        plt.plot(tau_points_fine,grad_grad_H_fine[:,2,2],'r')
+        plt.title('d2H_dZ2')
+        
+        
+        plt.figure()
+        plt.subplot(3,3,1)
+        plt.plot(tau_points_fine,gradK_gradK_H_fine[:,0,0],'r')
+        plt.subplot(3,3,2)
+        plt.plot(tau_points_fine,gradK_gradK_H_fine[:,0,1],'r')
+        plt.subplot(3,3,3)
+        plt.plot(tau_points_fine,gradK_gradK_H_fine[:,0,2],'r')
+        plt.subplot(3,3,4)
+        plt.subplot(3,3,5)
+        plt.plot(tau_points_fine,gradK_gradK_H_fine[:,1,1],'r')
+        plt.subplot(3,3,6)
+        plt.plot(tau_points_fine,gradK_gradK_H_fine[:,1,2],'r')
+        plt.subplot(3,3,7)
+        plt.subplot(3,3,8)
+        plt.subplot(3,3,9)
+        plt.title('d2H_dKZ2')
+        plt.plot(tau_points_fine,gradK_gradK_H_fine[:,2,2],'r')  
+        
+        # numberOfDataPoints = len(tau_array)
+        
+        # q_R_array = np.real(beam_parameters[0,:])
+        # q_zeta_array = np.real(beam_parameters[1,:])
+        # q_Z_array = np.real(beam_parameters[2,:])
+        
+        # K_R_array = np.real(beam_parameters[3,:])
+        # K_Z_array = np.real(beam_parameters[4,:])
+        
+        # Psi_3D_output = np.zeros([numberOfDataPoints,3,3],dtype='complex128')
+        # Psi_3D_output[:,0,0] = beam_parameters[5,:]  + 1j*beam_parameters[11,:] # d (Psi_RR) / d tau
+        # Psi_3D_output[:,1,1] = beam_parameters[6,:]  + 1j*beam_parameters[12,:] # d (Psi_zetazeta) / d tau
+        # Psi_3D_output[:,2,2] = beam_parameters[7,:]  + 1j*beam_parameters[13,:] # d (Psi_ZZ) / d tau
+        # Psi_3D_output[:,0,1] = beam_parameters[8,:]  + 1j*beam_parameters[14,:] # d (Psi_Rzeta) / d tau
+        # Psi_3D_output[:,0,2] = beam_parameters[9,:]  + 1j*beam_parameters[15,:] # d (Psi_RZ) / d tau
+        # Psi_3D_output[:,1,2] = beam_parameters[10,:] + 1j*beam_parameters[16,:] # d (Psi_zetaZ) / d tau
+        # Psi_3D_output[:,1,0] = Psi_3D_output[:,0,1]
+        # Psi_3D_output[:,2,0] = Psi_3D_output[:,0,2]
+        # Psi_3D_output[:,2,1] = Psi_3D_output[:,1,2]
+        
     else:
         """
-        If one ends up here, things aren't going well. I can think of two possible reasons
-        - The launch conditions are really weird (hasn't happened yet, in my experience)
-        - The max_step setting of the solver is too large, such that the ray 
-          leaves the LCFS and enters a region where poloidal_flux < 1 in a 
-          single step. The solver thus doesn't log the event when it really should
+        - Propagates another ray to find the cut-off location
+        - suffix _fine for variables in this section
+        - I guess I could've used 'dense_output' for the section above and got the information from there, and one day I'll go and see which method works better/faster
         """
+        ray_parameters_2D_initial_fine = ray_parameters_2D[:,index_cutoff_estimate-1]
+        tau_start_fine                 = tau_ray[index_cutoff_estimate-1]
+        tau_end_fine                   = tau_ray[index_cutoff_estimate+1]
+        tau_points_fine                = np.linspace(tau_start_fine,tau_end_fine,1001)
         
-        # plt.figure()
-        # plt.plot(ray_parameters_2D[0,:],ray_parameters_2D[1,:],'o')
-        # contour_levels = np.linspace(0,1,11)
-        # CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
-        # plt.clabel(CS, inline=True, fontsize=10,inline_spacing=-5,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
+        solver_ray_output_fine = integrate.solve_ivp(
+                            ray_evolution_2D_fun, [tau_start_fine,tau_end_fine], ray_parameters_2D_initial_fine, 
+                            method='RK45', t_eval=tau_points_fine, dense_output=False, 
+                            events=event_leave_plasma, vectorized=False, args=solver_arguments
+                        )
+        ray_parameters_2D_fine = solver_ray_output_fine.y  
+        K_magnitude_ray_fine = (  (np.real(ray_parameters_2D_fine[2,:]))**2 
+                                + K_zeta_initial**2/(np.real(ray_parameters_2D_fine[0,:]))**2 
+                                + (np.real(ray_parameters_2D_fine[3,:]))**2)**(0.5)
+        index_cutoff_fine = K_magnitude_ray_fine.argmin()
+        tau_ray_fine    = solver_ray_output_fine.t
+        tau_cutoff_fine = tau_ray_fine[index_cutoff_fine]        
         
-        print('Warning: Ray has left the simulation region without leaving the LCFS.')
-        print('We should not be here. I am prematurely terminating this simulation.')
-        sys.exit()
-  
-        ##
+        
+        """
+        - Propagates the beam
+        - But first, tell the solver which values of tau we want for the output
+        """        
+        tau_points = np.linspace(0,0.995*tau_leave,101).tolist() 
+        # I'm using a list because it makes the insertion of tau_cutoff_fine easier
+        # factor of 0.995 so that the last point would definitely still be in the plasma
+        bisect.insort(tau_points,tau_cutoff_fine) # This function modifies tau_points via a side-effect
+        tau_points = np.array(tau_points)
 
-
-    """
-    - Propagates another ray to find the cut-off location
-    - suffix _fine for variables in this section
-    - I guess I could've used 'dense_output' for the section above and got the information from there, and one day I'll go and see which method works better/faster
-    """
-    ray_parameters_2D_initial_fine = ray_parameters_2D[:,max(0,index_cutoff_estimate-1)]
-    tau_start_fine                 = tau_ray[max(0,index_cutoff_estimate-1)]
-    tau_end_fine                   = tau_ray[min(len(tau_ray)-1,index_cutoff_estimate+1)]
-    tau_points_fine                = np.linspace(tau_start_fine,tau_end_fine,1001)
-    # The max and min in the indices are to ensure that the index is not out of bounds
+        solver_start_time = time.time()
     
-    solver_start_time = time.time()
-    
-    solver_ray_output_fine = integrate.solve_ivp(
-                        ray_evolution_2D_fun, [tau_start_fine,tau_end_fine], ray_parameters_2D_initial_fine, 
-                        method='RK45', t_eval=tau_points_fine, dense_output=False, 
-                        events=event_leave_plasma, vectorized=False, args=solver_arguments
-                    )
-    
-    solver_end_time = time.time()
-    print('Time taken (cut-off finder)', solver_end_time-solver_start_time,'s')
-    
-    ray_parameters_2D_fine = solver_ray_output_fine.y  
-    K_magnitude_ray_fine = (  (np.real(ray_parameters_2D_fine[2,:]))**2 
-                            + K_zeta_initial**2/(np.real(ray_parameters_2D_fine[0,:]))**2 
-                            + (np.real(ray_parameters_2D_fine[3,:]))**2)**(0.5)
-    index_cutoff_fine = K_magnitude_ray_fine.argmin()
-    tau_ray_fine    = solver_ray_output_fine.t
-    tau_cutoff_fine = tau_ray_fine[index_cutoff_fine]        
-    
-    """
-    - Propagates the beam
-    - But first, tell the solver which values of tau we want for the output
-    """        
-    tau_points = np.linspace(0,tau_leave,102).tolist() 
-
-
-    # I'm using a list because it makes the insertion of tau_cutoff_fine easier
-    bisect.insort(tau_points,tau_cutoff_fine) # This function modifies tau_points via a side-effect
-    tau_points = np.array(tau_points)
-
-    tau_points = np.delete(tau_points,-1) # Remove the last point, probably does a good job of making sure that the new last point is inside the plasma
-    
-    solver_start_time = time.time()
-
-    solver_beam_output = integrate.solve_ivp(
-                        beam_evolution_fun, [0,tau_leave], beam_parameters_initial, 
-                        method='RK45', t_eval=tau_points, dense_output=False, 
-                        events=None, vectorized=False, args=solver_arguments
-                    )
-    
-    solver_end_time = time.time()
-    print('Time taken (beam solver)', solver_end_time-solver_start_time,'s')    
-    
-    beam_parameters = solver_beam_output.y
-    tau_array = solver_beam_output.t
-    solver_status = solver_beam_output.status
-    
-    numberOfDataPoints = len(tau_array)
-    
-    q_R_array = np.real(beam_parameters[0,:])
-    q_zeta_array = np.real(beam_parameters[1,:])
-    q_Z_array = np.real(beam_parameters[2,:])
-    
-    K_R_array = np.real(beam_parameters[3,:])
-    K_Z_array = np.real(beam_parameters[4,:])
-    
-    Psi_3D_output = np.zeros([numberOfDataPoints,3,3],dtype='complex128')
-    Psi_3D_output[:,0,0] = beam_parameters[5,:]  + 1j*beam_parameters[11,:] # d (Psi_RR) / d tau
-    Psi_3D_output[:,1,1] = beam_parameters[6,:]  + 1j*beam_parameters[12,:] # d (Psi_zetazeta) / d tau
-    Psi_3D_output[:,2,2] = beam_parameters[7,:]  + 1j*beam_parameters[13,:] # d (Psi_ZZ) / d tau
-    Psi_3D_output[:,0,1] = beam_parameters[8,:]  + 1j*beam_parameters[14,:] # d (Psi_Rzeta) / d tau
-    Psi_3D_output[:,0,2] = beam_parameters[9,:]  + 1j*beam_parameters[15,:] # d (Psi_RZ) / d tau
-    Psi_3D_output[:,1,2] = beam_parameters[10,:] + 1j*beam_parameters[16,:] # d (Psi_zetaZ) / d tau
-    Psi_3D_output[:,1,0] = Psi_3D_output[:,0,1]
-    Psi_3D_output[:,2,0] = Psi_3D_output[:,0,2]
-    Psi_3D_output[:,2,1] = Psi_3D_output[:,1,2]
+        solver_beam_output = integrate.solve_ivp(
+                            beam_evolution_fun, [0,tau_leave], beam_parameters_initial, 
+                            method='RK45', t_eval=tau_points, dense_output=False, 
+                            events=None, vectorized=False, args=solver_arguments
+                        )
+        
+        solver_end_time = time.time()
+        print('Time taken (ray solver)', solver_end_time-solver_start_time,'s')    
+        
+        beam_parameters = solver_beam_output.y
+        tau_array = solver_beam_output.t
+        solver_status = solver_beam_output.status
+        
+        numberOfDataPoints = len(tau_array)
+        
+        q_R_array = np.real(beam_parameters[0,:])
+        q_zeta_array = np.real(beam_parameters[1,:])
+        q_Z_array = np.real(beam_parameters[2,:])
+        
+        K_R_array = np.real(beam_parameters[3,:])
+        K_Z_array = np.real(beam_parameters[4,:])
+        
+        Psi_3D_output = np.zeros([numberOfDataPoints,3,3],dtype='complex128')
+        Psi_3D_output[:,0,0] = beam_parameters[5,:]  + 1j*beam_parameters[11,:] # d (Psi_RR) / d tau
+        Psi_3D_output[:,1,1] = beam_parameters[6,:]  + 1j*beam_parameters[12,:] # d (Psi_zetazeta) / d tau
+        Psi_3D_output[:,2,2] = beam_parameters[7,:]  + 1j*beam_parameters[13,:] # d (Psi_ZZ) / d tau
+        Psi_3D_output[:,0,1] = beam_parameters[8,:]  + 1j*beam_parameters[14,:] # d (Psi_Rzeta) / d tau
+        Psi_3D_output[:,0,2] = beam_parameters[9,:]  + 1j*beam_parameters[15,:] # d (Psi_RZ) / d tau
+        Psi_3D_output[:,1,2] = beam_parameters[10,:] + 1j*beam_parameters[16,:] # d (Psi_zetaZ) / d tau
+        Psi_3D_output[:,1,0] = Psi_3D_output[:,0,1]
+        Psi_3D_output[:,2,0] = Psi_3D_output[:,0,2]
+        Psi_3D_output[:,2,1] = Psi_3D_output[:,1,2]
 
     print('Main loop complete')
     # -------------------

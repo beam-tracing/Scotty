@@ -17,6 +17,7 @@ from scipy import interpolate as interpolate
 from scipy import optimize as optimize
 
 
+
 def read_floats_into_list_until(terminator, lines):
     # Reads the lines of a file until the string (terminator) is read
     # Currently used to read topfile
@@ -383,14 +384,42 @@ def find_H(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag,
     Booker_beta = find_Booker_beta(electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency)
     Booker_gamma = find_Booker_gamma(electron_density, B_Total, launch_angular_frequency)
     
+    # Due to numerical errors, sometimes H_discriminant ends up being a very small negative number
+    # That's why we take max(0, H_discriminant) in the sqrt
+
     H = (K_magnitude/wavenumber_K0)**2 + (
             Booker_beta - mode_flag *
-            # np.sqrt(max(0, (Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
-            np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
+            np.sqrt(np.maximum(np.zeros_like(Booker_beta), (Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
+            # np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
             ) / (2 * Booker_alpha)
     
     return H
+
+def find_H_numba(K_magnitude, electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency, mode_flag):
+    # For use with the numba package (parallelisation)
+    # As such, doesn't take any functions as arguments
     
+    wavenumber_K0 = launch_angular_frequency / constants.c
+        
+    Booker_alpha = find_Booker_alpha(electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency)
+    Booker_beta = find_Booker_beta(electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency)
+    Booker_gamma = find_Booker_gamma(electron_density, B_Total, launch_angular_frequency)
+    
+    # Due to numerical errors, sometimes H_discriminant ends up being a very small negative number
+    # That's why we take max(0, H_discriminant) in the sqrt
+
+    H = (K_magnitude/wavenumber_K0)**2 + (
+            Booker_beta - mode_flag *
+            np.sqrt(np.maximum(np.zeros_like(Booker_beta), (Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
+            # np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
+            ) / (2 * Booker_alpha)
+    
+    return H
+
+
+#----------------------------------
+
+
 
 # Functions (interface)
     # For going from vacuum to plasma (Will one day implement going from plasma to vacuum)
@@ -440,7 +469,10 @@ def find_Psi_3D_plasma(Psi_vacuum_3D,
     interface_matrix[5][2] = dH_dKR
     interface_matrix[5][4] = dH_dKZ
     interface_matrix[5][5] = dH_dKzeta
-    
+
+
+    # interface_matrix will be singular if one tries to transition while still in vacuum (and there's no plasma at all)
+    # at least that's what happens, in my experience
     interface_matrix_inverse = np.linalg.inv(interface_matrix)
     
     [
@@ -465,7 +497,7 @@ def find_Psi_3D_plasma(Psi_vacuum_3D,
     Psi_3D_plasma[2,0] = Psi_3D_plasma[0,2]
     Psi_3D_plasma[1,2] = Psi_p_Z_zeta
     Psi_3D_plasma[2,1] = Psi_3D_plasma[1,2]
-    
+
     return Psi_3D_plasma
 # -----------------
 
