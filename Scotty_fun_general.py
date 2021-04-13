@@ -17,6 +17,7 @@ from scipy import interpolate as interpolate
 from scipy import optimize as optimize
 
 
+
 def read_floats_into_list_until(terminator, lines):
     # Reads the lines of a file until the string (terminator) is read
     # Currently used to read topfile
@@ -93,7 +94,13 @@ def find_x0(xs,ys,y0):
                                     kind='linear', axis=-1, copy=True, bounds_error=False,
                                     fill_value='extrapolate', assume_sorted=False) 
 
-    xs_fine = np.linspace(xs[index_guess-1],xs[index_guess+1],101)
+    if index_guess == 0:
+        xs_fine = np.linspace(xs[0],xs[index_guess+1],101)
+    elif index_guess == len(xs)-1:
+        xs_fine = np.linspace(xs[index_guess-1],xs[-1],101)
+    else:
+        xs_fine = np.linspace(xs[index_guess-1],xs[index_guess+1],101)
+    
     ys_fine = interp_y(xs_fine)
 
     index = find_nearest(ys_fine,y0)
@@ -377,14 +384,42 @@ def find_H(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag,
     Booker_beta = find_Booker_beta(electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency)
     Booker_gamma = find_Booker_gamma(electron_density, B_Total, launch_angular_frequency)
     
+    # Due to numerical errors, sometimes H_discriminant ends up being a very small negative number
+    # That's why we take max(0, H_discriminant) in the sqrt
+
     H = (K_magnitude/wavenumber_K0)**2 + (
             Booker_beta - mode_flag *
-            # np.sqrt(max(0, (Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
-            np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
+            np.sqrt(np.maximum(np.zeros_like(Booker_beta), (Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
+            # np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
             ) / (2 * Booker_alpha)
     
     return H
+
+def find_H_numba(K_magnitude, electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency, mode_flag):
+    # For use with the numba package (parallelisation)
+    # As such, doesn't take any functions as arguments
     
+    wavenumber_K0 = launch_angular_frequency / constants.c
+        
+    Booker_alpha = find_Booker_alpha(electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency)
+    Booker_beta = find_Booker_beta(electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency)
+    Booker_gamma = find_Booker_gamma(electron_density, B_Total, launch_angular_frequency)
+    
+    # Due to numerical errors, sometimes H_discriminant ends up being a very small negative number
+    # That's why we take max(0, H_discriminant) in the sqrt
+
+    H = (K_magnitude/wavenumber_K0)**2 + (
+            Booker_beta - mode_flag *
+            np.sqrt(np.maximum(np.zeros_like(Booker_beta), (Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
+            # np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
+            ) / (2 * Booker_alpha)
+    
+    return H
+
+
+#----------------------------------
+
+
 
 # Functions (interface)
     # For going from vacuum to plasma (Will one day implement going from plasma to vacuum)
@@ -434,7 +469,10 @@ def find_Psi_3D_plasma(Psi_vacuum_3D,
     interface_matrix[5][2] = dH_dKR
     interface_matrix[5][4] = dH_dKZ
     interface_matrix[5][5] = dH_dKzeta
-    
+
+
+    # interface_matrix will be singular if one tries to transition while still in vacuum (and there's no plasma at all)
+    # at least that's what happens, in my experience
     interface_matrix_inverse = np.linalg.inv(interface_matrix)
     
     [
@@ -459,7 +497,7 @@ def find_Psi_3D_plasma(Psi_vacuum_3D,
     Psi_3D_plasma[2,0] = Psi_3D_plasma[0,2]
     Psi_3D_plasma[1,2] = Psi_p_Z_zeta
     Psi_3D_plasma[2,1] = Psi_3D_plasma[1,2]
-    
+
     return Psi_3D_plasma
 # -----------------
 
@@ -855,3 +893,86 @@ def find_d2_poloidal_flux_dZ2(q_R, q_Z, delta_Z, interp_poloidal_flux):
     return d2_poloidal_flux_dZ2
 
 #----------------------------------
+
+
+
+# Functions (Launch angle)
+"""
+Written by Neal Crocker, added to Scotty by Valerian.
+Converts mirror angles of the MAST DBS to launch angles (genray)
+Genray -> Scotty/Torbeam: poloidal launch angle has opposite sign
+"""
+def use_deg_args(func,*args,**kwargs):
+    'transform args from degrees to radians before calling' #doc string
+    return func(*[a*np.pi/180 for a in args],**kwargs)
+
+def tilt_trns_RZ_make(t):
+    'tilts R ([1,0,0]) in to Z ([0,0,1]) using angle in radians' #doc string
+    ctilt=np.cos(t)
+    stilt=np.sin(t)
+    return np.array([[ctilt,0,stilt],[0,1,0],[-stilt,0,ctilt]])
+
+def tilt_trns_TZ_make(t):
+    'tilts T ([1,0,0]) in to Z ([0,0,1]) using angle in radians' #doc string
+    ctilt=np.cos(t)
+    stilt=np.sin(t)
+    return np.array([[1,0,0],[0,ctilt,-stilt],[0,stilt,ctilt]])
+
+def rot_trns_make(r): 
+    'rotates R ([1,0,0]) into T ([0,1,0]) using angle in radians' #doc string
+    crot=np.cos(r)
+    srot=np.sin(r)
+    return np.array([[crot,-srot,0],[srot,crot,0],[0,0,1]])
+
+def mirrornorm_make_with_rot_tilt_operators(r,t):
+    'makes norm vector for mirror using rot and tilt operators given angles in radians' #doc string
+    mirrornorm0=np.array([0,1,0])
+    tilt_trns=tilt_trns_TZ_make(t)
+    rot_trns=rot_trns_make(np.pi/4+r)
+    mirrornorm = rot_trns @ (tilt_trns @ mirrornorm0)
+    return mirrornorm
+
+def mirrornorm_make(r,t):
+    'makes norm vector for mirror directly using angles in radians' #doc string
+    mirrornorm=np.array([*(np.cos(t)*np.array([-np.sin(r+np.pi/4),np.cos(r+np.pi/4)])),np.sin(t)])
+    return mirrornorm
+
+def reflector_make_from_mirrornorm(mirrornorm):
+    'makes relector matrix for mirror using norm vector for mirror' #doc string
+    reflector=np.eye(3)-2*mirrornorm[:,np.newaxis]@mirrornorm[np.newaxis,:]
+    return reflector
+    
+def reflector_make(r,t):
+    'makes relector matrix for mirror using angles in radians' #doc string
+    mirrornorm = mirrornorm_make(r,t)
+    reflector=reflector_make_from_mirrornorm(mirrornorm)
+    return reflector
+
+def genray_angles_from_mirror_angles(rot_ang_deg,tilt_ang_deg,offset_for_window_norm_to_R = 3.0):
+    '''
+      Input args are steering mirror rotation and tilt angles in degrees (rot_ang_deg,tilt_ang_deg).
+      rot_ang_deg,tilt_ang_deg = 0,0 imply beam propagates in negative window normal direction.
+      optional keyword offset_for_window_norm_to_R gives toroial angle (in degrees) of 
+      window normal to major radial direction, so for rot_ang_deg,tilt_ang_deg = 0,0, beam would have
+      toroidal angle given by offset_for_window_norm_to_R.
+    
+      can get from rot_ang_deg,tilt_ang_deg buy using toroidal and poloidal "genray angles" (tor_ang, pol_ang)
+      in IDL savefile log (/u/jhilles/DBS/dbs_logbook_2013.idl).  The angles were calculated according to the logic: 
+          tor_ang = 3.0 - rot_ang_deg
+          pol_ang = tilt_ang_deg
+    '''
+    
+    
+    beam0=np.array([0,-1,0])
+    rdeg=rot_ang_deg if np.isscalar(rot_ang_deg) else  rot_ang_deg.flat[0]
+    tdeg=tilt_ang_deg if np.isscalar(tilt_ang_deg) else  tilt_ang_deg.flat[0]
+    reflector=use_deg_args(reflector_make,rdeg,tdeg)
+    beam_windowframe = reflector @ beam0
+    #rotate from window frame to port frame:
+    beam = use_deg_args(rot_trns_make,-offset_for_window_norm_to_R) @ beam_windowframe
+
+    tor_ang_genray=np.arctan2(beam[1],-beam[0])#+offset_for_window_norm_to_R*np.pi/180
+    pol_ang_genray=np.arctan2(beam[2],np.sqrt(beam[0]**2+beam[1]**2))
+    tor_ang_genray_deg,pol_ang_genray_deg = tor_ang_genray*180/np.pi,pol_ang_genray*180/np.pi
+
+    return tor_ang_genray_deg,pol_ang_genray_deg
