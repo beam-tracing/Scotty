@@ -23,6 +23,7 @@ Psi_3D_output = loadfile['Psi_3D_output']
 x_hat_output = loadfile['x_hat_output']
 y_hat_output = loadfile['y_hat_output']
 g_hat_output = loadfile['g_hat_output']
+b_hat_output = loadfile['b_hat_output']
 loadfile.close()
 
 loadfile = np.load('analysis_output' + suffix + '.npz')
@@ -44,6 +45,11 @@ distance_along_line = loadfile['distance_along_line']
 cutoff_index = loadfile['cutoff_index']
 R_midplane_points = loadfile['R_midplane_points']
 poloidal_flux_on_midplane = loadfile['poloidal_flux_on_midplane']
+e_hat_output = loadfile['e_hat_output']
+theta_output = loadfile['theta_output']
+theta_m_output = loadfile['theta_m_output']
+y_hat_Cartesian = loadfile['y_hat_Cartesian']
+x_hat_Cartesian = loadfile['x_hat_Cartesian']
 loadfile.close()
 
 loadfile = np.load('data_input' + suffix + '.npz')
@@ -198,3 +204,31 @@ plt.plot(l_lc,np.imag(Psi_yy_output),'k')
 plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
 plt.title(r'Im$(\Psi_{yy})$')
 plt.xlabel(r'$l-l_c$')
+
+
+# ------------------
+plt.figure()
+plt.plot(l_lc,np.rad2deg(theta_output),label='theta')
+plt.plot(l_lc,np.rad2deg(theta_m_output),label='theta_m')
+plt.legend()
+plt.xlabel('l - l_c')
+plt.ylabel('deg')
+
+plot_index = 0
+
+x_hat_plot = x_hat_output[plot_index,:]
+y_hat_plot = y_hat_output[plot_index,:]
+g_hat_plot = g_hat_output[plot_index,:]
+
+e_hat_plot = e_hat_output[plot_index,:]
+# e_hat has components e_1,e_2,e_b
+
+theta_plot = theta_output[plot_index]
+
+
+plt.figure()
+plt.arrow(0, 0, -abs(e_hat_plot[2])*np.cos(theta_plot), abs(e_hat_plot[1]), length_includes_head=True, head_width=0.1 )
+plt.xlim(-1,1)
+plt.ylim(-1,1)
+plt.xlabel('x')
+plt.ylabel('y') #these are the beam coordinates x,y,
