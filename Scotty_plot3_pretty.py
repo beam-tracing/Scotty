@@ -87,6 +87,8 @@ Psi_3D_Cartesian = loadfile['Psi_3D_Cartesian']
 distance_along_line = loadfile['distance_along_line']
 x_hat_Cartesian = loadfile['x_hat_Cartesian']
 y_hat_Cartesian = loadfile['y_hat_Cartesian']
+e_hat_output = loadfile['e_hat_output']
+
 loadfile.close()
 
 loadfile = np.load('data_input' + suffix + '.npz')
@@ -173,10 +175,10 @@ CS = plt.contour(data_R_coord[R_start_index:R_end_index], data_Z_coord[Z_start_i
 plt.clabel(CS, inline=True, fontsize=10,inline_spacing=1,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
 plt.xlim(1.0,1.8)
 plt.ylim(-0.7,0.1)
-plt.plot(q_R_array[:out_index:plot_every_n_points],q_Z_array[:out_index:plot_every_n_points],'k')
+plt.plot(q_R_array[:out_index:plot_every_n_points],q_Z_array[:out_index:plot_every_n_points],'k',linewidth=3)
 plt.plot( [launch_position[0], q_R_array[0]], [launch_position[2], q_Z_array[0]],':k')
-plt.plot(W_line_RZ_1_Rpoints[:out_index:plot_every_n_points],W_line_RZ_1_Zpoints[:out_index:plot_every_n_points],'k--')
-plt.plot(W_line_RZ_2_Rpoints[:out_index:plot_every_n_points],W_line_RZ_2_Zpoints[:out_index:plot_every_n_points],'k--')
+plt.plot(W_line_RZ_1_Rpoints[:out_index:plot_every_n_points],W_line_RZ_1_Zpoints[:out_index:plot_every_n_points],'k',linewidth=1)
+plt.plot(W_line_RZ_2_Rpoints[:out_index:plot_every_n_points],W_line_RZ_2_Zpoints[:out_index:plot_every_n_points],'k',linewidth=1)
 # plt.xlim(data_R_coord[0],data_R_coord[-1])
 # plt.ylim(data_Z_coord[0],data_Z_coord[-1])
 
@@ -196,10 +198,10 @@ plt.plot(circle_outboard[circle_start_index:circle_end_index,0],circle_outboard[
 # plt.plot(circle_inboard[:,0],circle_inboard[:,1],'orange')
 plt.xlim(1.0,1.8)
 plt.ylim(-0.2,0.6)
-plt.plot(q_X_array[:out_index:plot_every_n_points],q_Y_array[:out_index:plot_every_n_points],'k')
+plt.plot(q_X_array[:out_index:plot_every_n_points],q_Y_array[:out_index:plot_every_n_points],'k',linewidth=3)
 plt.plot( [launch_position_X, entry_position_X], [launch_position_Y, entry_position_Y],':k')
-plt.plot(W_line_XY_1_Xpoints[:out_index:plot_every_n_points],W_line_XY_1_Ypoints[:out_index:plot_every_n_points],'k--')
-plt.plot(W_line_XY_2_Xpoints[:out_index:plot_every_n_points],W_line_XY_2_Ypoints[:out_index:plot_every_n_points],'k--')
+plt.plot(W_line_XY_1_Xpoints[:out_index:plot_every_n_points],W_line_XY_1_Ypoints[:out_index:plot_every_n_points],'k',linewidth=1)
+plt.plot(W_line_XY_2_Xpoints[:out_index:plot_every_n_points],W_line_XY_2_Ypoints[:out_index:plot_every_n_points],'k',linewidth=1)
 # plt.xlim(-data_R_coord[-1],data_R_coord[-1])
 # plt.ylim(-data_R_coord[-1],data_R_coord[-1])
 plt.xlabel('X / m')

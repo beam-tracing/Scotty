@@ -70,6 +70,16 @@ def contract_special(arg_a,arg_b):
     return result
 
 
+def make_unit_vector_from_cross_product(vector_a, vector_b):
+    """
+    Assume np.shape(vector_a) = np.shape(vector_b) = (n,3) 
+    """
+    output_vector = np.cross(vector_a, vector_b)
+    output_vector_magnitude = np.linalg.norm(output_vector,axis=-1)
+    output_unit_vector = output_vector / np.tile( output_vector_magnitude, (3,1) ).T
+    
+    return output_unit_vector
+
 def find_inverse_2D(matrix_2D):
     # Finds the inverse of a 2x2 matrix
     matrix_2D_inverse = np.zeros([2,2],dtype='complex128')
