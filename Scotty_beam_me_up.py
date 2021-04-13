@@ -49,10 +49,12 @@ from scipy import constants as constants
 from scipy import linalg as linalg
 import matplotlib.pyplot as plt
 import os
+import sys
 from netCDF4 import Dataset
+import bisect
+import time
 
-
-from Scotty_fun_general import read_floats_into_list_until, find_nearest, contract_special, find_x0, find_H
+from Scotty_fun_general import read_floats_into_list_until, find_nearest, contract_special, find_x0, find_H, find_waist
 from Scotty_fun_general import find_inverse_2D, find_Psi_3D_lab, find_q_lab_Cartesian, find_K_lab_Cartesian, find_K_lab, find_Psi_3D_lab_Cartesian
 from Scotty_fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq
 from Scotty_fun_general import find_epsilon_para, find_epsilon_perp,find_epsilon_g
@@ -63,6 +65,9 @@ from Scotty_fun_general import find_dB_dR_CFD, find_dB_dZ_CFD, find_d2B_dR2_CFD,
 from Scotty_fun_general import find_d2_poloidal_flux_dR2, find_d2_poloidal_flux_dZ2
 from Scotty_fun_general import find_H_Cardano, find_D
 
+from Scotty_fun_evolution import ray_evolution_2D_fun, beam_evolution_fun
+
+
 from Scotty_fun_FFD import find_dH_dR, find_dH_dZ # \nabla H
 from Scotty_fun_CFD import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta # \nabla_K H
 from Scotty_fun_FFD import find_d2H_dR2, find_d2H_dZ2, find_d2H_dR_dZ # \nabla \nabla H
@@ -70,18 +75,16 @@ from Scotty_fun_CFD import find_d2H_dKR2, find_d2H_dKR_dKzeta, find_d2H_dKR_dKZ,
 from Scotty_fun_mix import find_d2H_dKR_dR, find_d2H_dKR_dZ, find_d2H_dKzeta_dR, find_d2H_dKzeta_dZ, find_d2H_dKZ_dR, find_d2H_dKZ_dZ # \nabla_K \nabla H
 from Scotty_fun_FFD import find_dpolflux_dR, find_dpolflux_dZ # For find_B if using efit files directly
 
-def beam_me_up(tau_max,
-               saveInterval,
-               poloidal_launch_angle_Torbeam,
+def beam_me_up(poloidal_launch_angle_Torbeam,
                toroidal_launch_angle_Torbeam,
                launch_freq_GHz,
                mode_flag,
                vacuumLaunch_flag,
                launch_beam_width,
-               launch_beam_curvature,
+               launch_beam_radius_of_curvature,
                launch_position,
                find_B_method,
-               stop_flag=False,
+               efit_time_index=None,
                vacuum_propagation_flag=False,
                Psi_BC_flag = False,
                poloidal_flux_enter=None,
@@ -90,7 +93,7 @@ def beam_me_up(tau_max,
                figure_flag=True,
                plasmaLaunch_K=np.zeros(3),
                plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3,3]),
-               density_fit_parameters=None
+               density_fit_parameters=None,
                ):
 
     """
@@ -104,6 +107,7 @@ def beam_me_up(tau_max,
     delta_K_Z = 0.1 #in the same units as K_z
 
     #major_radius = 0.9
+
 
     print('Beam trace me up, Scotty!')
     # ------------------------------
@@ -170,6 +174,7 @@ def beam_me_up(tau_max,
 #    input_files_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
     
     if density_fit_parameters is None:
+        print('ne(psi): loading from input file')
         print('Warning: Scale factor of 1.1 used')
         # Importing data from ne.dat
     #    ne_filename = input_files_path + 'ne' +input_filename_suffix+ '_smoothed.dat'
@@ -190,7 +195,8 @@ def beam_me_up(tau_max,
         def find_density_1D(poloidal_flux, interp_density_1D=interp_density_1D):
             density = interp_density_1D(poloidal_flux)
             return density
-    else:
+    elif len(density_fit_parameters) == 4:
+        print('ne(psi): Using order_1_polynomial*tanh')
         print('Warning: Scale factor of 1.1 used')
         ne_data_density_array=None # So that saving the input data later does not complain
         ne_data_radialcoord_array=None # So that saving the input data later does not complain
@@ -199,7 +205,19 @@ def beam_me_up(tau_max,
             density_fit = 1.1*(density_fit_parameters[0]*poloidal_flux + density_fit_parameters[1])*np.tanh(density_fit_parameters[2] * poloidal_flux + density_fit_parameters[3])
             is_inside = poloidal_flux <= poloidal_flux_enter # Boolean array
             density = is_inside * density_fit # The Boolean array sets stuff outside poloidal_flux_enter to zero
-            return density            
+            return density     
+    elif len(density_fit_parameters) == 3:
+        print('ne(psi): using constant*tanh')
+        ne_data_density_array=None # So that saving the input data later does not complain
+        ne_data_radialcoord_array=None # So that saving the input data later does not complain
+        
+        def find_density_1D(poloidal_flux, poloidal_flux_enter=poloidal_flux_enter,density_fit_parameters=density_fit_parameters):
+            density_fit = density_fit_parameters[0]*np.tanh( density_fit_parameters[1] * (poloidal_flux - density_fit_parameters[2]) )
+            is_inside = poloidal_flux <= poloidal_flux_enter # Boolean array
+            density = is_inside * density_fit # The Boolean array sets stuff outside poloidal_flux_enter to zero
+            return density         
+    else:
+        print('density_fit_parameters has an invalid length')
     
     # This part of the code defines find_B_R, find_B_T, find_B_zeta
     interp_order = 5 # For the 2D interpolation functions
@@ -250,17 +268,19 @@ def beam_me_up(tau_max,
         #    interp_poloidal_flux = interpolate.interp2d(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), kind='cubic',
         #                                           copy=True, bounds_error=False, fill_value=None) # Flux extrapolated outside region
         
-
+        efit_time = None # To prevent the data-saving routines from complaining later on
+        
     elif find_B_method == 'efit':
         print('Using efit output files directly for B and poloidal flux')
 
-        dataset = Dataset('efitOut_29905.nc')
-
-        time_index = 7
+        dataset = Dataset('efitOut_29908.nc')
+        
+        time_index = efit_time_index
         time_array = dataset.variables['time'][:]
 #        equilibriumStatus_array = dataset.variables['equilibriumStatus'][:]
         
-        print(time_array[time_index])
+        efit_time = time_array[time_index]
+        print(efit_time)
         
         output_group = dataset.groups['output']
 #        input_group = dataset.groups['input']
@@ -368,8 +388,8 @@ def beam_me_up(tau_max,
     
         Psi_w_beam_launch_cartersian = np.array(
                 [
-                [ wavenumber_K0/launch_beam_curvature+2j*launch_beam_width**(-2), 0],
-                [ 0, wavenumber_K0/launch_beam_curvature+2j*launch_beam_width**(-2)]
+                [ wavenumber_K0/launch_beam_radius_of_curvature+2j*launch_beam_width**(-2), 0],
+                [ 0, wavenumber_K0/launch_beam_radius_of_curvature+2j*launch_beam_width**(-2)]
                 ]
                 )    
         identity_matrix_2D = np.array(
@@ -430,6 +450,7 @@ def beam_me_up(tau_max,
             entry_position[0] = R_fine_search_array[entry_index]
             entry_position[1] = K_zeta_launch/K_R_launch * ( 1/launch_position[0] - 1/entry_position[0] )
             entry_position[2] = Z_fine_search_array[entry_index]
+
             distance_from_launch_to_entry = np.sqrt(
                                                     launch_position[0]**2 
                                                     + entry_position[0]**2 
@@ -492,11 +513,11 @@ def beam_me_up(tau_max,
                                             interp_poloidal_flux, find_density_1D, find_B_R, find_B_T, find_B_Z)
                 d_poloidal_flux_d_R_boundary = find_d_poloidal_flux_dR(initial_position[0], initial_position[2], delta_R, interp_poloidal_flux)
                 d_poloidal_flux_d_Z_boundary = find_d_poloidal_flux_dZ(initial_position[0], initial_position[2], delta_R, interp_poloidal_flux)
-                
+
                 Psi_3D_lab_initial = find_Psi_3D_plasma(Psi_3D_lab_entry,
                                                         dH_dKR_initial, dH_dKzeta_initial, dH_dKZ_initial,
                                                         dH_dR_initial, dH_dZ_initial,
-                                                        d_poloidal_flux_d_R_boundary, d_poloidal_flux_d_Z_boundary)
+                                                        d_poloidal_flux_d_R_boundary.item(), d_poloidal_flux_d_Z_boundary.item()) #. item() to convert variable from type ndarray to float, such that the array elements all have the same type
             else: # Do not use BCs
                 Psi_3D_lab_initial = Psi_3D_lab_entry
             
@@ -530,463 +551,238 @@ def beam_me_up(tau_max,
     # -------------------
 
 
-    # Defines the ray evolution function
-    # I should consider moving this to Scotty_fun_general
-    # Not necessary for what I want to do, but it does make life easier
-    def ray_evolution_2D_fun(tau, ray_parameters_2D, K_zeta, 
-                             launch_angular_frequency, mode_flag,
-                             delta_R, delta_Z, delta_K_R, delta_K_zeta, delta_K_Z,
-                             interp_poloidal_flux, find_density_1D, 
-                             find_B_R, find_B_T, find_B_Z):
-        """
-        Parameters
-        ----------
-        tau : float
-            Parameter along the ray.
-        ray_parameters_2D : complex128
-            q_R, q_zeta, q_Z, K_R, K_Z
-
-        Returns
-        -------
-        d_beam_parameters_d_tau
-            d (beam_parameters) / d tau
-            
-        Notes
-        -------
-        This function takes q_zeta but not does evolve it. This is to make
-        other functions, written for beam evolution, to be compatible with itself.   
-        """
-
-        ## Clean input up. Not necessary, but aids readability        
-        q_R = ray_parameters_2D[0]
-        q_Z = ray_parameters_2D[2]
-        K_R = ray_parameters_2D[3]
-        K_Z = ray_parameters_2D[4]
-        
-        ## Find derivatives of H
-        # \nabla H
-        dH_dR = find_dH_dR(q_R, q_Z, K_R, K_zeta, K_Z,
-                           launch_angular_frequency, mode_flag,
-                           delta_R,
-                           interp_poloidal_flux, find_density_1D, 
-                           find_B_R, find_B_T, find_B_Z
-                           )
-        dH_dZ = find_dH_dZ(q_R, q_Z, K_R, K_zeta, K_Z,
-                           launch_angular_frequency, mode_flag,
-                           delta_Z,
-                           interp_poloidal_flux, find_density_1D,
-                           find_B_R, find_B_T, find_B_Z
-                           )
-
-        # \nabla_K H
-        dH_dKR    = find_dH_dKR(q_R, q_Z, K_R, K_zeta, K_Z,
-                                launch_angular_frequency, mode_flag,
-                                delta_K_R,
-                                interp_poloidal_flux, find_density_1D,
-                                find_B_R, find_B_T, find_B_Z
-                                )
-        dH_dKZ    = find_dH_dKZ(q_R, q_Z, K_R, K_zeta, K_Z,
-                                launch_angular_frequency, mode_flag,
-                                delta_K_Z,
-                                interp_poloidal_flux, find_density_1D,
-                                find_B_R, find_B_T, find_B_Z
-                                )
-
-        d_ray_parameters_2D_d_tau = np.zeros_like(ray_parameters_2D)
-        
-        d_ray_parameters_2D_d_tau[0]  = dH_dKR # d (q_R) / d tau
-        d_ray_parameters_2D_d_tau[2]  = dH_dKZ # d (q_Z) / d tau
-        d_ray_parameters_2D_d_tau[3]  = -dH_dR # d (K_R) / d tau
-        d_ray_parameters_2D_d_tau[4]  = -dH_dZ # d (K_Z) / d tau
-
-        return d_ray_parameters_2D_d_tau    
-    # -------------------
-
-
-    # Defines the beam evolution function
-    # I should consider moving this to Scotty_fun_general
-    def beam_evolution_fun(tau, beam_parameters, K_zeta, 
-                           launch_angular_frequency, mode_flag,
-                           delta_R, delta_Z, delta_K_R, delta_K_zeta, delta_K_Z,
-                           interp_poloidal_flux, find_density_1D, 
-                           find_B_R, find_B_T, find_B_Z):
-        """
-        Parameters
-        ----------
-        tau : float
-            Parameter along the ray.
-        beam_parameters : complex128
-            q_R, q_zeta, q_Z, K_R, K_Z, Psi_RR, Psi_zetazeta, Psi_ZZ, Psi_Rzeta, Psi_RZ, Psi_zetaZ.
-
-        Returns
-        -------
-        d_beam_parameters_d_tau
-            d (beam_parameters) / d tau
-        """
-
-        ## Clean input up. Not necessary, but aids readability        
-        q_R          = beam_parameters[0]
-        q_zeta       = beam_parameters[1]
-        q_Z          = beam_parameters[2]
-        K_R          = beam_parameters[3]
-        K_Z          = beam_parameters[4]
-        
-        Psi_3D = np.zeros([3,3],dtype='complex128')     
-        Psi_3D[0,0] = beam_parameters[5] # Psi_RR
-        Psi_3D[1,1] = beam_parameters[6] # Psi_zetazeta
-        Psi_3D[2,2] = beam_parameters[7] # Psi_ZZ
-        Psi_3D[0,1] = beam_parameters[8] # Psi_Rzeta
-        Psi_3D[0,2] = beam_parameters[9] # Psi_RZ
-        Psi_3D[1,2] = beam_parameters[10] # Psi_zetaZ
-        Psi_3D[1,0] = Psi_3D[0,1] # Psi_3D is symmetric
-        Psi_3D[2,0] = Psi_3D[0,2]
-        Psi_3D[2,1] = Psi_3D[1,2]
-        
-        ## Find derivatives of H
-        # \nabla H
-        dH_dR = find_dH_dR(q_R, q_Z, K_R, K_zeta, K_Z,
-                           launch_angular_frequency, mode_flag,
-                           delta_R,
-                           interp_poloidal_flux, find_density_1D, 
-                           find_B_R, find_B_T, find_B_Z
-                           )
-        dH_dZ = find_dH_dZ(q_R, q_Z, K_R, K_zeta, K_Z,
-                           launch_angular_frequency, mode_flag,
-                           delta_Z,
-                           interp_poloidal_flux, find_density_1D,
-                           find_B_R, find_B_T, find_B_Z
-                           )
-
-        # \nabla_K H
-        dH_dKR    = find_dH_dKR(q_R, q_Z, K_R, K_zeta, K_Z,
-                                launch_angular_frequency, mode_flag,
-                                delta_K_R,
-                                interp_poloidal_flux, find_density_1D,
-                                find_B_R, find_B_T, find_B_Z
-                                )
-        dH_dKzeta = find_dH_dKzeta(q_R, q_Z, K_R, K_zeta, K_Z,
-                                   launch_angular_frequency, mode_flag, 
-                                   delta_K_zeta,
-                                   interp_poloidal_flux, find_density_1D,
-                                   find_B_R, find_B_T, find_B_Z
-                                   )
-        dH_dKZ    = find_dH_dKZ(q_R, q_Z, K_R, K_zeta, K_Z,
-                                launch_angular_frequency, mode_flag,
-                                delta_K_Z,
-                                interp_poloidal_flux, find_density_1D,
-                                find_B_R, find_B_T, find_B_Z
-                                )
-
-        # \nabla \nabla H
-        d2H_dR2   = find_d2H_dR2(q_R, q_Z, K_R, K_zeta, K_Z,
-                                 launch_angular_frequency, mode_flag,
-                                 delta_R,
-                                 interp_poloidal_flux, find_density_1D,
-                                 find_B_R, find_B_T, find_B_Z
-                                 )
-        d2H_dR_dZ = find_d2H_dR_dZ(q_R ,q_Z, K_R, K_zeta, K_Z,
-                                   launch_angular_frequency, mode_flag,
-                                   delta_R, delta_Z,
-                                   interp_poloidal_flux, find_density_1D,
-                                   find_B_R, find_B_T, find_B_Z
-                                   )
-        d2H_dZ2   = find_d2H_dZ2(q_R, q_Z, K_R, K_zeta, K_Z,
-                                 launch_angular_frequency, mode_flag,
-                                 delta_Z,
-                                 interp_poloidal_flux, find_density_1D,
-                                 find_B_R, find_B_T, find_B_Z
-                                 )
-        grad_grad_H = np.squeeze(np.array([
-            [d2H_dR2.item()  , 0.0, d2H_dR_dZ.item()],
-            [0.0             , 0.0, 0.0             ],
-            [d2H_dR_dZ.item(), 0.0, d2H_dZ2.item()  ] #. item() to convert variable from type ndarray to float, such that the array elements all have the same type
-            ]))
-
-        # \nabla_K \nabla H
-        d2H_dKR_dR    = find_d2H_dKR_dR(q_R, q_Z, K_R, K_zeta, K_Z,
-                                        launch_angular_frequency, mode_flag,
-                                        delta_K_R, delta_R,
-                                        interp_poloidal_flux, find_density_1D,
-                                        find_B_R, find_B_T, find_B_Z
-                                        )
-        d2H_dKZ_dZ    = find_d2H_dKZ_dZ(q_R, q_Z, K_R, K_zeta, K_Z,
-                                        launch_angular_frequency, mode_flag,
-                                        delta_K_Z, delta_Z,
-                                        interp_poloidal_flux, find_density_1D,
-                                        find_B_R, find_B_T, find_B_Z
-                                        )
-        d2H_dKR_dZ    = find_d2H_dKR_dZ(q_R, q_Z, K_R, K_zeta, K_Z,
-                                        launch_angular_frequency, mode_flag,
-                                        delta_K_R, delta_Z,
-                                        interp_poloidal_flux, find_density_1D,
-                                        find_B_R, find_B_T, find_B_Z
-                                        )
-        d2H_dKzeta_dZ = find_d2H_dKzeta_dZ(q_R, q_Z, K_R, K_zeta, K_Z, 
-                                           launch_angular_frequency, mode_flag,
-                                           delta_K_zeta, delta_Z,
-                                           interp_poloidal_flux, find_density_1D,
-                                           find_B_R, find_B_T, find_B_Z
-                                           )
-        d2H_dKzeta_dR = find_d2H_dKzeta_dR(q_R, q_Z, K_R, K_zeta, K_Z,
-                                           launch_angular_frequency, mode_flag,
-                                           delta_K_zeta, delta_R,
-                                           interp_poloidal_flux, find_density_1D,
-                                           find_B_R, find_B_T, find_B_Z
-                                           )
-        d2H_dKZ_dR    = find_d2H_dKZ_dR(q_R, q_Z, K_R, K_zeta, K_Z,
-                                        launch_angular_frequency, mode_flag,
-                                        delta_K_Z, delta_R,
-                                        interp_poloidal_flux, find_density_1D,
-                                        find_B_R, find_B_T, find_B_Z
-                                        )
-        gradK_grad_H = np.squeeze(np.array([
-            [d2H_dKR_dR.item(),    0.0, d2H_dKR_dZ.item()   ],
-            [d2H_dKzeta_dR.item(), 0.0, d2H_dKzeta_dZ.item()],
-            [d2H_dKZ_dR.item(),    0.0, d2H_dKZ_dZ.item()   ]
-            ]))
-        grad_gradK_H = np.transpose(gradK_grad_H)
-
-        # \nabla_K \nabla_K H
-        d2H_dKR2       = find_d2H_dKR2(q_R, q_Z, K_R, K_zeta, K_Z,
-                                       launch_angular_frequency, mode_flag,
-                                       delta_K_R,
-                                       interp_poloidal_flux, find_density_1D,
-                                       find_B_R, find_B_T, find_B_Z
-                                       )
-        d2H_dKzeta2    = find_d2H_dKzeta2(q_R, q_Z, K_R, K_zeta, K_Z,
-                                          launch_angular_frequency, mode_flag,
-                                          delta_K_zeta,
-                                          interp_poloidal_flux, find_density_1D,
-                                          find_B_R, find_B_T, find_B_Z
-                                          )
-        d2H_dKZ2       = find_d2H_dKZ2(q_R, q_Z, K_R, K_zeta, K_Z,
-                                       launch_angular_frequency, mode_flag,
-                                       delta_K_Z,
-                                       interp_poloidal_flux, find_density_1D,
-                                       find_B_R, find_B_T, find_B_Z
-                                       )
-        d2H_dKR_dKzeta = find_d2H_dKR_dKzeta(q_R, q_Z, K_R, K_zeta, K_Z,
-                                             launch_angular_frequency, mode_flag,
-                                             delta_K_R, delta_K_zeta,
-                                             interp_poloidal_flux, find_density_1D,
-                                             find_B_R, find_B_T, find_B_Z
-                                             )
-        d2H_dKR_dKZ    = find_d2H_dKR_dKZ(q_R, q_Z, K_R, K_zeta, K_Z,
-                                          launch_angular_frequency, mode_flag,
-                                          delta_K_R, delta_K_Z,
-                                          interp_poloidal_flux, find_density_1D,
-                                          find_B_R, find_B_T, find_B_Z
-                                          )
-        d2H_dKzeta_dKZ = find_d2H_dKzeta_dKZ(q_R, q_Z, K_R, K_zeta, K_Z,
-                                             launch_angular_frequency, mode_flag,
-                                             delta_K_zeta, delta_K_Z,
-                                             interp_poloidal_flux, find_density_1D,
-                                             find_B_R, find_B_T, find_B_Z
-                                             )
-        gradK_gradK_H = np.squeeze(np.array([
-            [d2H_dKR2.item()      , d2H_dKR_dKzeta.item(), d2H_dKR_dKZ.item()   ],
-            [d2H_dKR_dKzeta.item(), d2H_dKzeta2.item()   , d2H_dKzeta_dKZ.item()],
-            [d2H_dKR_dKZ.item()   , d2H_dKzeta_dKZ.item(), d2H_dKZ2.item()      ]
-            ]))
-
-        d_Psi_d_tau = ( - grad_grad_H
-                        - np.matmul(
-                                    Psi_3D, gradK_grad_H
-                                    )
-                        - np.matmul(
-                                    grad_gradK_H, Psi_3D
-                                    )
-                        - np.matmul(np.matmul(
-                                    Psi_3D, gradK_gradK_H
-                                    ),
-                                    Psi_3D
-                                    )
-                        )
-
-        d_beam_parameters_d_tau = np.zeros_like(beam_parameters)
-        
-        d_beam_parameters_d_tau[0]  = dH_dKR # d (q_R) / d tau
-        d_beam_parameters_d_tau[1]  = dH_dKzeta # d (q_zeta) / d tau
-        d_beam_parameters_d_tau[2]  = dH_dKZ # d (q_Z) / d tau
-        d_beam_parameters_d_tau[3]  = -dH_dR # d (K_R) / d tau
-        d_beam_parameters_d_tau[4]  = -dH_dZ # d (K_Z) / d tau
-        d_beam_parameters_d_tau[5]  = d_Psi_d_tau[0,0] # d (Psi_RR) / d tau
-        d_beam_parameters_d_tau[6]  = d_Psi_d_tau[1,1] # d (Psi_zetazeta) / d tau
-        d_beam_parameters_d_tau[7]  = d_Psi_d_tau[2,2] # d (Psi_ZZ) / d tau
-        d_beam_parameters_d_tau[8]  = d_Psi_d_tau[0,1] # d (Psi_Rzeta) / d tau
-        d_beam_parameters_d_tau[9]  = d_Psi_d_tau[0,2] # d (Psi_RZ) / d tau
-        d_beam_parameters_d_tau[10] = d_Psi_d_tau[1,2] # d (Psi_zetaZ) / d tau
- 
-        return d_beam_parameters_d_tau
 
     # -------------------
 
     # Initial conditions for the solver
-    beam_parameters_initial = np.zeros(11,dtype='complex128')
+    beam_parameters_initial = np.zeros(17)
+    # This used to be complex, with a length of 11, but the solver throws a warning saying that something is casted to real
+    # It seems to be fine, bu
     
     beam_parameters_initial[0]  = initial_position[0] # q_R
     beam_parameters_initial[1]  = initial_position[1] # q_zeta (This should be = 0)
     beam_parameters_initial[2]  = initial_position[2] # q_Z
+    
     beam_parameters_initial[3]  = K_R_initial
     beam_parameters_initial[4]  = K_Z_initial
-    beam_parameters_initial[5]  = Psi_3D_lab_initial[0,0] # Psi_RR
-    beam_parameters_initial[6]  = Psi_3D_lab_initial[1,1] # Psi_zetazeta 
-    beam_parameters_initial[7]  = Psi_3D_lab_initial[2,2] # Psi_ZZ
-    beam_parameters_initial[8]  = Psi_3D_lab_initial[0,1] # Psi_Rzeta 
-    beam_parameters_initial[9]  = Psi_3D_lab_initial[0,2] # Psi_RZ 
-    beam_parameters_initial[10] = Psi_3D_lab_initial[1,2] # Psi_zetaZ 
     
-    ray_parameters_2D_initial = np.real(beam_parameters_initial[0:5])
+    beam_parameters_initial[5]  = np.real(Psi_3D_lab_initial[0,0]) # Psi_RR
+    beam_parameters_initial[6]  = np.real(Psi_3D_lab_initial[1,1]) # Psi_zetazeta 
+    beam_parameters_initial[7]  = np.real(Psi_3D_lab_initial[2,2]) # Psi_ZZ
+    beam_parameters_initial[8]  = np.real(Psi_3D_lab_initial[0,1]) # Psi_Rzeta 
+    beam_parameters_initial[9]  = np.real(Psi_3D_lab_initial[0,2]) # Psi_RZ 
+    beam_parameters_initial[10] = np.real(Psi_3D_lab_initial[1,2]) # Psi_zetaZ 
+    
+    beam_parameters_initial[11] = np.imag(Psi_3D_lab_initial[0,0]) # Psi_RR
+    beam_parameters_initial[12] = np.imag(Psi_3D_lab_initial[1,1]) # Psi_zetazeta 
+    beam_parameters_initial[13] = np.imag(Psi_3D_lab_initial[2,2]) # Psi_ZZ
+    beam_parameters_initial[14] = np.imag(Psi_3D_lab_initial[0,1]) # Psi_Rzeta 
+    beam_parameters_initial[15] = np.imag(Psi_3D_lab_initial[0,2]) # Psi_RZ 
+    beam_parameters_initial[16] = np.imag(Psi_3D_lab_initial[1,2]) # Psi_zetaZ  
+    
+    ray_parameters_initial    = np.real(beam_parameters_initial[0:5])
+    ray_parameters_2D_initial = np.delete(ray_parameters_initial,1) # Remove q_zeta
     # -------------------
 
     # Define events for the solver
-    def event_leave_plasma(tau, beam_parameters, K_zeta, 
+	# Notice how the beam parameters are allocated: this function only works correctly for the 2D case
+    def event_leave_plasma(tau, ray_parameters_2D, K_zeta, 
                            launch_angular_frequency, mode_flag,
                            delta_R, delta_Z, delta_K_R, delta_K_zeta, delta_K_Z,
                            interp_poloidal_flux, find_density_1D, 
                            find_B_R, find_B_T, find_B_Z,
-                           poloidal_flux_enter=poloidal_flux_enter):
+                           poloidal_flux_leave=poloidal_flux_enter): # Leave at the same poloidal flux of entry
         
-        q_R          = beam_parameters[0]
-        q_Z          = beam_parameters[2]
+        q_R          = ray_parameters_2D[0]
+        q_Z          = ray_parameters_2D[1]
         
         poloidal_flux = interp_poloidal_flux(q_R,q_Z)
         
-        poloidal_flux_difference = poloidal_flux - poloidal_flux_enter
+        poloidal_flux_difference = poloidal_flux - poloidal_flux_leave
+
         # goes from negative to positive when leaving the plasma
         return poloidal_flux_difference
     event_leave_plasma.terminal = True # Stop the solver when the beam leaves the plasma
     event_leave_plasma.direction = 1.0 # positive value, when function result goes from negative to positive
     
-    event_leave_plasma.terminal = True # Stop the solver when the beam leaves the plasma
-    event_leave_plasma.direction = 1.0 # positive value, when function result goes from negative to positive
-    
-    #TODO: Write event for cut-off
-    
-    # solver_events = (event_leave_plasma)
+
+    def event_leave_LCFS(tau, ray_parameters_2D, K_zeta, 
+                         launch_angular_frequency, mode_flag,
+                         delta_R, delta_Z, delta_K_R, delta_K_zeta, delta_K_Z,
+                         interp_poloidal_flux, find_density_1D, 
+                         find_B_R, find_B_T, find_B_Z,
+                         poloidal_flux_LCFS=1.0):
+        
+        q_R          = ray_parameters_2D[0]
+        q_Z          = ray_parameters_2D[1]
+        
+        poloidal_flux = interp_poloidal_flux(q_R,q_Z)
+        
+        poloidal_flux_difference = poloidal_flux - poloidal_flux_LCFS
+
+        # goes from negative to positive when leaving the LCFS
+        return poloidal_flux_difference
+    event_leave_LCFS.terminal = False # Do not stop the solver when the beam leaves the plasma
+    event_leave_LCFS.direction = 1.0 # positive value, when function result goes from negative to positive
+
+
+    def event_leave_simulation(tau, ray_parameters_2D, K_zeta, 
+                               launch_angular_frequency, mode_flag,
+                               delta_R, delta_Z, delta_K_R, delta_K_zeta, delta_K_Z,
+                               interp_poloidal_flux, find_density_1D, 
+                               find_B_R, find_B_T, find_B_Z,
+                               data_R_coord_min = data_R_coord.min(),
+                               data_R_coord_max = data_R_coord.max(),
+                               data_Z_coord_min = data_Z_coord.min(),
+                               data_Z_coord_max = data_Z_coord.max()
+                               ): 
+        
+        q_R          = ray_parameters_2D[0]
+        q_Z          = ray_parameters_2D[1]
+        
+        is_inside = (q_R > data_R_coord_min) and (q_R < data_R_coord_max) and (q_Z > data_Z_coord_min) and (q_R < data_Z_coord_max)
+        
+        # goes from positive (True) to negative(False) when leaving the simulation region
+        return is_inside
+    event_leave_simulation.terminal = True # Stop the solver when the beam leaves the simulation region. Entering the simulation region is fine
+    event_leave_simulation.direction = -1.0 # negative value, when function result goes from positive to negative
     # -------------------
 
-    # Initialise the results arrays
-    # dH_dKR_output    = np.zeros(numberOfDataPoints)
-    # dH_dKzeta_output = np.zeros(numberOfDataPoints)
-    # dH_dKZ_output    = np.zeros(numberOfDataPoints)
-    # dH_dR_output     = np.zeros(numberOfDataPoints)
-    # dH_dZ_output     = np.zeros(numberOfDataPoints)
-
-    # grad_grad_H_output   = np.zeros([numberOfDataPoints,3,3])
-    # gradK_grad_H_output  = np.zeros([numberOfDataPoints,3,3])
-    # gradK_gradK_H_output = np.zeros([numberOfDataPoints,3,3])
-    # Psi_3D_output        = np.zeros([numberOfDataPoints,3,3],dtype='complex128')
-
-    # g_hat_output = np.zeros([numberOfDataPoints,3])
-    # b_hat_output = np.zeros([numberOfDataPoints,3])
-    # y_hat_output = np.zeros([numberOfDataPoints,3])
-    # x_hat_output = np.zeros([numberOfDataPoints,3])
-
-    # g_magnitude_output = np.zeros(numberOfDataPoints)
-    # grad_bhat_output   = np.zeros([numberOfDataPoints,3,3])
-
-#    x_hat_Cartesian_output             = np.zeros([numberOfDataPoints,3])
-#    y_hat_Cartesian_output             = np.zeros([numberOfDataPoints,3])
-#    b_hat_Cartesian_output             = np.zeros([numberOfDataPoints,3])
-#    xhat_dot_grad_bhat_dot_xhat_output = np.zeros(numberOfDataPoints)
-#    xhat_dot_grad_bhat_dot_yhat_output = np.zeros(numberOfDataPoints)
-#    xhat_dot_grad_bhat_dot_ghat_output = np.zeros(numberOfDataPoints)
-#    yhat_dot_grad_bhat_dot_xhat_output = np.zeros(numberOfDataPoints)
-#    yhat_dot_grad_bhat_dot_yhat_output = np.zeros(numberOfDataPoints)
-#    yhat_dot_grad_bhat_dot_ghat_output = np.zeros(numberOfDataPoints)
-#    d_theta_d_tau_output               = np.zeros(numberOfDataPoints)
-#    d_xhat_d_tau_output                = np.zeros([numberOfDataPoints,3])
-#    d_xhat_d_tau_dot_yhat_output       = np.zeros(numberOfDataPoints)
-#    ray_curvature_kappa_output         = np.zeros([numberOfDataPoints,3])
-#    kappa_dot_xhat_output              = np.zeros(numberOfDataPoints)
-#    kappa_dot_yhat_output              = np.zeros(numberOfDataPoints)
-
-
-    # B_total_output = np.zeros(numberOfDataPoints)
-
-    # H_output                      = np.zeros(numberOfDataPoints)
-    # Booker_alpha_output           = np.zeros(numberOfDataPoints)
-    # Booker_beta_output            = np.zeros(numberOfDataPoints)
-    # Booker_gamma_output           = np.zeros(numberOfDataPoints)
-    # epsilon_para_output           = np.zeros(numberOfDataPoints)
-    # epsilon_perp_output           = np.zeros(numberOfDataPoints)
-    # epsilon_g_output              = np.zeros(numberOfDataPoints)
-    # poloidal_flux_output          = np.zeros(numberOfDataPoints)
-    # d_poloidal_flux_dR_output     = np.zeros(numberOfDataPoints)
-    # d_poloidal_flux_dZ_output     = np.zeros(numberOfDataPoints)
-    # normalised_gyro_freq_output   = np.zeros(numberOfDataPoints)
-    # normalised_plasma_freq_output = np.zeros(numberOfDataPoints)
-
-    # electron_density_output = np.zeros(numberOfDataPoints)
-
-    # dB_dR_FFD_debugging     = np.zeros(numberOfDataPoints)
-    # dB_dZ_FFD_debugging     = np.zeros(numberOfDataPoints)
-    # d2B_dR2_FFD_debugging   = np.zeros(numberOfDataPoints)
-    # d2B_dZ2_FFD_debugging   = np.zeros(numberOfDataPoints)
-    # d2B_dR_dZ_FFD_debugging = np.zeros(numberOfDataPoints)
-
-    # dpolflux_dR_FFD_debugging     = np.zeros(numberOfDataPoints)
-    # dpolflux_dZ_FFD_debugging     = np.zeros(numberOfDataPoints)
-    # d2polflux_dR2_FFD_debugging   = np.zeros(numberOfDataPoints)
-    # d2polflux_dZ2_FFD_debugging   = np.zeros(numberOfDataPoints)
-    
-    # electron_density_debugging_1R = np.zeros(numberOfDataPoints)
-    # electron_density_debugging_2R = np.zeros(numberOfDataPoints)
-    # electron_density_debugging_3R = np.zeros(numberOfDataPoints)
-    # electron_density_debugging_1Z = np.zeros(numberOfDataPoints)
-    # electron_density_debugging_2Z = np.zeros(numberOfDataPoints)
-    # electron_density_debugging_3Z = np.zeros(numberOfDataPoints)
-    # electron_density_debugging_2R_2Z = np.zeros(numberOfDataPoints)
-    # poloidal_flux_debugging_1R = np.zeros(numberOfDataPoints)
-    # poloidal_flux_debugging_2R = np.zeros(numberOfDataPoints)
-    # poloidal_flux_debugging_3R = np.zeros(numberOfDataPoints)
-    # poloidal_flux_debugging_1Z = np.zeros(numberOfDataPoints)
-    # poloidal_flux_debugging_2Z = np.zeros(numberOfDataPoints)    
-    # poloidal_flux_debugging_3Z = np.zeros(numberOfDataPoints)    
-    # poloidal_flux_debugging_2R_2Z = np.zeros(numberOfDataPoints)
-#    eigenvalues_output = np.zeros([numberOfDataPoints,3],dtype='complex128')
-#    eigenvectors_output = np.zeros([numberOfDataPoints,3,3],dtype='complex128')
-    # KZ_debugging = np.linspace(-70,-90,1001)   
-
-    # -------------------
 
     # Propagate the beam
-        # Calls scipy's initial value problem solver        
+        # Calls scipy's initial value problem solver   
+        
+    tau_max = 10**5 # If the ray hasn't left the plasma by the time this tau is reached, the solver gives up
     solver_arguments = (K_zeta_initial, 
                         launch_angular_frequency, mode_flag,
                         delta_R, delta_Z, delta_K_R, delta_K_zeta, delta_K_Z,
                         interp_poloidal_flux, find_density_1D, 
-                        find_B_R, find_B_T, find_B_Z)    
+                        find_B_R, find_B_T, find_B_Z) # Stuff the solver needs to evolve beam_parameters
 
+    """
+    Propagate a ray. Quickly finds tau at which the ray leaves the plasma, as well as estimates location of cut-off
+    """
+    solver_start_time = time.time()
+    
+    solver_ray_events = (event_leave_plasma, event_leave_LCFS, event_leave_simulation) 
     solver_ray_output = integrate.solve_ivp(
                         ray_evolution_2D_fun, [0,tau_max], ray_parameters_2D_initial, 
                         method='RK45', t_eval=None, dense_output=False, 
-                        events=event_leave_plasma, vectorized=False, args=solver_arguments
-                    )
+                        events=solver_ray_events, vectorized=False, args=solver_arguments,
+                        max_step = 100
+                    ) # This seems to be throwing a warning about ragged arrays, see if new scipy update fixes this
+    solver_end_time = time.time()
+    print('Time taken (ray solver)', solver_end_time-solver_start_time,'s')
 
+    ray_parameters_2D = solver_ray_output.y
+    tau_ray = solver_ray_output.t
+    
     solver_ray_status = solver_ray_output.status
     if solver_ray_status != 1:
-        print('Warning: Ray has not left plasma')
+        print('Warning: Ray has not left plasma/simulation region. Increase tau_max or choose different initial conditions.')
+        print('We should not be here. I am prematurely terminating this simulation.')
+        sys.exit()
 
-    tau_leave = np.squeeze(solver_ray_output.t_events)
-    tau_points_coarse = np.linspace(0,tau_leave,101)
         
-        # Puts more points near the middle of the ray, which is hopefully where the cut-off is near
-    fine_start_index = 40
-    find_end_index = 60
-    tau_points_near_middle = np.linspace(tau_points_coarse[fine_start_index],tau_points_coarse[find_end_index],201)
-    tau_points_fine = np.append(np.append(tau_points_coarse[:fine_start_index],tau_points_near_middle), tau_points_coarse[find_end_index+1:-1])
+    K_magnitude_ray = (  (np.real(ray_parameters_2D[2,:]))**2 
+                        + K_zeta_initial**2/(np.real(ray_parameters_2D[0,:]))**2 
+                        + (np.real(ray_parameters_2D[3,:]))**2)**(0.5)
+    
+    index_cutoff_estimate = K_magnitude_ray.argmin()
 
-    # I have deliberately missed the last point of tau_points_coarse.
-    # This is to ensure that the last point is still in the plasma
+    tau_events = solver_ray_output.t_events
+
+    if len(tau_events[0]) != 0: 
+        """
+        If event_leave_plasma occurs, everything is great, and life is easy
+        """
+        tau_leave = np.squeeze(tau_events[0]) 
+    elif len(tau_events[1]) != 0: 
+        """
+        - If event_leave_plasma doesn't occur, but event_leave_LCFS does.
+        - Since the LCFS is defined by poloidal_flux = constant (usually 1.0), 
+          there might be multiple events. But the real crossing of the LCFS 
+          should be the first crossing
+        -
+        """
+        tau_leave_LCFS = tau_events[1] 
+        tau_leave = tau_leave_LCFS[0] 
+    else:
+        """
+        If one ends up here, things aren't going well. I can think of two possible reasons
+        - The launch conditions are really weird (hasn't happened yet, in my experience)
+        - The max_step setting of the solver is too large, such that the ray 
+          leaves the LCFS and enters a region where poloidal_flux < 1 in a 
+          single step. The solver thus doesn't log the event when it really should
+        """
+        
+        # plt.figure()
+        # plt.plot(ray_parameters_2D[0,:],ray_parameters_2D[1,:],'o')
+        # contour_levels = np.linspace(0,1,11)
+        # CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
+        # plt.clabel(CS, inline=True, fontsize=10,inline_spacing=-5,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
+        
+        print('Warning: Ray has left the simulation region without leaving the LCFS.')
+        print('We should not be here. I am prematurely terminating this simulation.')
+        sys.exit()
+  
+        ##
+
+
+    """
+    - Propagates another ray to find the cut-off location
+    - suffix _fine for variables in this section
+    - I guess I could've used 'dense_output' for the section above and got the information from there, and one day I'll go and see which method works better/faster
+    """
+    ray_parameters_2D_initial_fine = ray_parameters_2D[:,max(0,index_cutoff_estimate-1)]
+    tau_start_fine                 = tau_ray[max(0,index_cutoff_estimate-1)]
+    tau_end_fine                   = tau_ray[min(len(tau_ray)-1,index_cutoff_estimate+1)]
+    tau_points_fine                = np.linspace(tau_start_fine,tau_end_fine,1001)
+    # The max and min in the indices are to ensure that the index is not out of bounds
+    
+    solver_start_time = time.time()
+    
+    solver_ray_output_fine = integrate.solve_ivp(
+                        ray_evolution_2D_fun, [tau_start_fine,tau_end_fine], ray_parameters_2D_initial_fine, 
+                        method='RK45', t_eval=tau_points_fine, dense_output=False, 
+                        events=event_leave_plasma, vectorized=False, args=solver_arguments
+                    )
+    
+    solver_end_time = time.time()
+    print('Time taken (cut-off finder)', solver_end_time-solver_start_time,'s')
+    
+    ray_parameters_2D_fine = solver_ray_output_fine.y  
+    K_magnitude_ray_fine = (  (np.real(ray_parameters_2D_fine[2,:]))**2 
+                            + K_zeta_initial**2/(np.real(ray_parameters_2D_fine[0,:]))**2 
+                            + (np.real(ray_parameters_2D_fine[3,:]))**2)**(0.5)
+    index_cutoff_fine = K_magnitude_ray_fine.argmin()
+    tau_ray_fine    = solver_ray_output_fine.t
+    tau_cutoff_fine = tau_ray_fine[index_cutoff_fine]        
+    
+    """
+    - Propagates the beam
+    - But first, tell the solver which values of tau we want for the output
+    """        
+    tau_points = np.linspace(0,tau_leave,102).tolist() 
+
+
+    # I'm using a list because it makes the insertion of tau_cutoff_fine easier
+    bisect.insort(tau_points,tau_cutoff_fine) # This function modifies tau_points via a side-effect
+    tau_points = np.array(tau_points)
+
+    tau_points = np.delete(tau_points,-1) # Remove the last point, probably does a good job of making sure that the new last point is inside the plasma
+    
+    solver_start_time = time.time()
 
     solver_beam_output = integrate.solve_ivp(
                         beam_evolution_fun, [0,tau_leave], beam_parameters_initial, 
-                        method='RK45', t_eval=tau_points_fine, dense_output=False, 
+                        method='RK45', t_eval=tau_points, dense_output=False, 
                         events=None, vectorized=False, args=solver_arguments
                     )
-
+    
+    solver_end_time = time.time()
+    print('Time taken (beam solver)', solver_end_time-solver_start_time,'s')    
+    
     beam_parameters = solver_beam_output.y
     tau_array = solver_beam_output.t
     solver_status = solver_beam_output.status
@@ -1001,12 +797,12 @@ def beam_me_up(tau_max,
     K_Z_array = np.real(beam_parameters[4,:])
     
     Psi_3D_output = np.zeros([numberOfDataPoints,3,3],dtype='complex128')
-    Psi_3D_output[:,0,0] = beam_parameters[5,:] # d (Psi_RR) / d tau
-    Psi_3D_output[:,1,1] = beam_parameters[6,:] # d (Psi_zetazeta) / d tau
-    Psi_3D_output[:,2,2] = beam_parameters[7,:] # d (Psi_ZZ) / d tau
-    Psi_3D_output[:,0,1] = beam_parameters[8,:] # d (Psi_Rzeta) / d tau
-    Psi_3D_output[:,0,2] = beam_parameters[9,:] # d (Psi_RZ) / d tau
-    Psi_3D_output[:,1,2] = beam_parameters[10,:] # d (Psi_zetaZ) / d tau
+    Psi_3D_output[:,0,0] = beam_parameters[5,:]  + 1j*beam_parameters[11,:] # d (Psi_RR) / d tau
+    Psi_3D_output[:,1,1] = beam_parameters[6,:]  + 1j*beam_parameters[12,:] # d (Psi_zetazeta) / d tau
+    Psi_3D_output[:,2,2] = beam_parameters[7,:]  + 1j*beam_parameters[13,:] # d (Psi_ZZ) / d tau
+    Psi_3D_output[:,0,1] = beam_parameters[8,:]  + 1j*beam_parameters[14,:] # d (Psi_Rzeta) / d tau
+    Psi_3D_output[:,0,2] = beam_parameters[9,:]  + 1j*beam_parameters[15,:] # d (Psi_RZ) / d tau
+    Psi_3D_output[:,1,2] = beam_parameters[10,:] + 1j*beam_parameters[16,:] # d (Psi_zetaZ) / d tau
     Psi_3D_output[:,1,0] = Psi_3D_output[:,0,1]
     Psi_3D_output[:,2,0] = Psi_3D_output[:,0,2]
     Psi_3D_output[:,2,1] = Psi_3D_output[:,1,2]
@@ -1027,10 +823,11 @@ def beam_me_up(tau_max,
               launch_freq_GHz=launch_freq_GHz,
               mode_flag=mode_flag,
               launch_beam_width=launch_beam_width,
-              launch_beam_curvature=launch_beam_curvature,
+              launch_beam_radius_of_curvature=launch_beam_radius_of_curvature,
               launch_position=launch_position,
               launch_K=launch_K,
-              ne_data_density_array=ne_data_density_array,ne_data_radialcoord_array=ne_data_radialcoord_array
+              ne_data_density_array=ne_data_density_array,ne_data_radialcoord_array=ne_data_radialcoord_array,
+              efit_time=efit_time
              )    
     np.savez('solver_output' + output_filename_suffix, 
              solver_status=solver_status,
@@ -1097,11 +894,12 @@ def beam_me_up(tau_max,
     grad_bhat_output = np.zeros([numberOfDataPoints,3,3])
     dbhat_dR = find_dbhat_dR(q_R_array, q_Z_array, delta_R, find_B_R, find_B_T, find_B_Z)
     dbhat_dZ = find_dbhat_dZ(q_R_array, q_Z_array, delta_Z, find_B_R, find_B_T, find_B_Z)
-    grad_bhat_output[:,:,0] = dbhat_dR.T # Transpose dbhat_dR so that it has the right shape
-    grad_bhat_output[:,:,2] = dbhat_dZ.T
+    grad_bhat_output[:,0,:] = dbhat_dR.T # Transpose dbhat_dR so that it has the right shape
+    grad_bhat_output[:,2,:] = dbhat_dZ.T
+    grad_bhat_output[:,1,0] = - B_T_output / (B_magnitude * q_R_array)
     grad_bhat_output[:,1,1] = B_R_output / (B_magnitude * q_R_array)
-    grad_bhat_output[:,0,1] = - B_T_output / (B_magnitude * q_R_array)
-            
+
+
     # x_hat and y_hat
     y_hat_output = np.zeros([numberOfDataPoints,3])
     x_hat_output = np.zeros([numberOfDataPoints,3])
@@ -1116,6 +914,23 @@ def beam_me_up(tau_max,
     x_hat_output[:,1] = x_output[:,1] / x_output_magnitude
     x_hat_output[:,2] = x_output[:,2] / x_output_magnitude
 
+    ## -------------------
+    ## Not useful for physics or data analysis
+    ## But good for checking whether things are working properly
+    ## -------------------
+        
+        # Gradients of poloidal flux along the ray
+    # dpolflux_dR_FFD_debugging   =
+    # dpolflux_dZ_FFD_debugging   =
+    # d2polflux_dR2_FFD_debugging =
+    # d2polflux_dZ2_FFD_debugging = 
+
+        # Gradients of the total magnetic field along the ray
+    # dB_dR_FFD_debugging     =
+    # dB_dZ_FFD_debugging     =
+    # d2B_dR2_FFD_debugging   =
+    # d2B_dZ2_FFD_debugging   =
+    # d2B_dR_dZ_FFD_debugging =
 
 
     ## -------------------
@@ -1308,17 +1123,18 @@ def beam_me_up(tau_max,
     M_w_inv_xy_output = - M_xy_output / det_M_w_analysis
     M_w_inv_yy_output =   M_xx_output / det_M_w_analysis
     
-    delta_k_perp_2 = np.sqrt( - 2 / np.imag(M_w_inv_yy_output) )
+    delta_k_perp_2 = np.sqrt( - 1 / np.imag(M_w_inv_yy_output) )
     delta_theta_m  = np.sqrt( 
                               np.imag(M_w_inv_yy_output) / ( (np.imag(M_w_inv_xy_output))**2 - np.imag(M_w_inv_xx_output)*np.imag(M_w_inv_yy_output) ) 
-                            ) / (np.sqrt(2) * K_magnitude_array)
-    # print(delta_theta_m[cutoff_index])
+                            ) / (2 * K_magnitude_array)
     
     sin_theta_m_analysis = np.zeros(numberOfDataPoints)
     sin_theta_m_analysis[:] = (b_hat_output[:,0]*K_R_array[:] + b_hat_output[:,1]*K_zeta_initial/q_R_array[:] + b_hat_output[:,2]*K_Z_array[:]) / (K_magnitude_array[:]) # B \cdot K / (abs (B) abs(K))
 
     theta_m_output = np.sign(sin_theta_m_analysis)*np.arcsin(abs(sin_theta_m_analysis)) # Assumes the mismatch angle is never smaller than -90deg or bigger than 90deg
-    # print(theta_m_output[cutoff_index])
+    
+    print('theta_m', theta_m_output[cutoff_index])
+    print('mismatch attenuation', np.exp(-theta_m_output[cutoff_index]**2/ (2*delta_theta_m[cutoff_index]**2)))
 #    print(cutoff_index)
 
 
@@ -1379,20 +1195,19 @@ def beam_me_up(tau_max,
     
     # localisation_ray = g_magnitude_Cardano[0]**2/g_magnitude_Cardano**2
         # The first point of the beam may be very slightly in the plasma, so I have used the vacuum expression for the group velocity instead
-    loc_r = (2*constants.c / launch_angular_frequency)**2/g_magnitude_Cardano**2
+    loc_r = (2 * constants.c / launch_angular_frequency)**2 / g_magnitude_Cardano**2
     
     # Spectrum piece of localisation as a function of distance along ray      
     spectrum_power_law_coefficient = 13/3 # Turbulence cascade
     loc_s = ( k_perp_1_backscattered / (-2*wavenumber_K0) )**(-spectrum_power_law_coefficient)
     
-    # plt.figure()
-    # plt.plot(distance_along_line, np.sqrt(-np.imag(M_w_inv_yy_output)))
-    
     # Beam piece of localisation as a function of distance along ray   
     det_imag_Psi_w_analysis = np.imag(Psi_xx_output)*np.imag(Psi_yy_output) - np.imag(Psi_xy_output)**2 # Determinant of the imaginary part of Psi_w
     det_real_Psi_w_analysis = np.real(Psi_xx_output)*np.real(Psi_yy_output) - np.real(Psi_xy_output)**2 # Determinant of the real part of Psi_w. Not needed for the calculation, but gives useful insight
-             
-    loc_b = det_imag_Psi_w_analysis / abs(det_M_w_analysis)
+
+    beam_waist_y = find_waist(launch_beam_width, wavenumber_K0, 1/launch_beam_radius_of_curvature) # Assumes circular beam at launch
+    
+    loc_b = (beam_waist_y/np.sqrt(2))* det_imag_Psi_w_analysis / ( abs(det_M_w_analysis) * np.sqrt(-np.imag(M_w_inv_yy_output)) )
     # --
     
     # Polarisation piece of localisation as a function of distance along ray   
@@ -1437,7 +1252,7 @@ def beam_me_up(tau_max,
     epsilon_minus_identity[:,0,1] = -1j * epsilon_g_output
     epsilon_minus_identity[:,1,0] =  1j * epsilon_g_output
 
-    loc_p = abs(contract_special(np.conjugate(e_hat_output), contract_special(epsilon_minus_identity,e_hat_output)))**2
+    loc_p = abs(contract_special(np.conjugate(e_hat_output), contract_special(epsilon_minus_identity,e_hat_output)))**2 / (electron_density_output*10**19)**2
     
     # Note that K_1 = K cos theta_m, K_2 = 0, K_b = K sin theta_m, as a result of cold plasma dispersion
     K_hat_dot_e_hat = (
@@ -1452,100 +1267,109 @@ def beam_me_up(tau_max,
     
     l_lc = distance_along_line-distance_along_line[cutoff_index] # Distance from cutoff
     
+    
+    # plt.figure()
+    # plt.plot(l_lc,theta_m_output)
+    # plt.axhline(constants.e**4 / (launch_angular_frequency**2 *constants.epsilon_0*constants.m_e)**2,c='k')
+    
         # Combining the various localisation pieces to get some overall localisation
     # loc_p_r_s   =                  loc_p * loc_r * loc_s
-    loc_b_p_r_s = loc_b * loc_p * loc_r * loc_s
-    loc_b_p_r   = loc_b * loc_p * loc_r
+    loc_b_r_s = loc_b * loc_r * loc_s
+    loc_b_r   = loc_b * loc_r
     
-        # Finds the 1/e values (localisation)
-    loc_b_p_r_s_max_over_e = loc_b_p_r_s.max() / (np.e) # loc_b_p_r_s.max() / 2.71
-    loc_b_p_r_max_over_e = loc_b_p_r.max() / (np.e) # loc_b_p_r.max() / 2.71
+        # Finds the 1/e2 values (localisation)
+    loc_b_r_s_max_over_e2 = loc_b_r_s.max() / (np.e)**2 # loc_b_r_s.max() / 2.71**2
+    loc_b_r_max_over_e2   = loc_b_r.max() / (np.e)**2 # loc_b_r.max() / 2.71**2
     
-        # Gives the inter-e range (analogous to interquartile range) in l-lc
-    loc_b_p_r_s_delta_l_1 = find_x0(l_lc[0:cutoff_index], loc_b_p_r_s[0:cutoff_index], loc_b_p_r_s_max_over_e)
-    loc_b_p_r_s_delta_l_2 = find_x0(l_lc[cutoff_index::], loc_b_p_r_s[cutoff_index::], loc_b_p_r_s_max_over_e)
-    loc_b_p_r_s_delta_l = np.array([loc_b_p_r_s_delta_l_1, loc_b_p_r_s_delta_l_2])# The 1/e distances,  (l - l_c)
-    loc_b_p_r_s_half_width_l = (loc_b_p_r_s_delta_l_2 - loc_b_p_r_s_delta_l_1)/2
-    loc_b_p_r_delta_l_1 = find_x0(l_lc[0:cutoff_index], loc_b_p_r[0:cutoff_index], loc_b_p_r_max_over_e)
-    loc_b_p_r_delta_l_2 = find_x0(l_lc[cutoff_index::], loc_b_p_r[cutoff_index::], loc_b_p_r_max_over_e)
-    loc_b_p_r_delta_l = np.array([loc_b_p_r_delta_l_1, loc_b_p_r_delta_l_2])# The 1/e distances,  (l - l_c)   
-    loc_b_p_r_half_width_l = (loc_b_p_r_delta_l_1 - loc_b_p_r_delta_l_2)/2
+        # Gives the inter-e2 range (analogous to interquartile range) in l-lc
+    loc_b_r_s_delta_l_1 = find_x0(l_lc[0:cutoff_index], loc_b_r_s[0:cutoff_index], loc_b_r_s_max_over_e2)
+    loc_b_r_s_delta_l_2 = find_x0(l_lc[cutoff_index::], loc_b_r_s[cutoff_index::], loc_b_r_s_max_over_e2)
+    loc_b_r_s_delta_l = np.array([loc_b_r_s_delta_l_1, loc_b_r_s_delta_l_2])# The 1/e2 distances,  (l - l_c)
+    loc_b_r_s_half_width_l = (loc_b_r_s_delta_l_2 - loc_b_r_s_delta_l_1)/2
+    loc_b_r_delta_l_1 = find_x0(l_lc[0:cutoff_index], loc_b_r[0:cutoff_index], loc_b_r_max_over_e2)
+    loc_b_r_delta_l_2 = find_x0(l_lc[cutoff_index::], loc_b_r[cutoff_index::], loc_b_r_max_over_e2)
+    loc_b_r_delta_l = np.array([loc_b_r_delta_l_1, loc_b_r_delta_l_2])# The 1/e2 distances,  (l - l_c)   
+    loc_b_r_half_width_l = (loc_b_r_delta_l_1 - loc_b_r_delta_l_2)/2
 
-        # Estimates the inter-e range (analogous to interquartile range) in kperp1, from l-lc
+        # Estimates the inter-e2 range (analogous to interquartile range) in kperp1, from l-lc
         # Bear in mind that since abs(kperp1) is minimised at cutoff, one really has to use that in addition to these.
-    loc_b_p_r_s_delta_kperp1_1 = find_x0(k_perp_1_backscattered[0:cutoff_index],l_lc[0:cutoff_index],loc_b_p_r_s_delta_l_1)
-    loc_b_p_r_s_delta_kperp1_2 = find_x0(k_perp_1_backscattered[cutoff_index::], l_lc[cutoff_index::], loc_b_p_r_s_delta_l_2)
-    loc_b_p_r_delta_kperp1_1 = find_x0(k_perp_1_backscattered[0:cutoff_index], l_lc[0:cutoff_index], loc_b_p_r_delta_l_1)
-    loc_b_p_r_delta_kperp1_2 = find_x0(k_perp_1_backscattered[cutoff_index::], l_lc[cutoff_index::], loc_b_p_r_delta_l_2)
+    loc_b_r_s_delta_kperp1_1 = find_x0(k_perp_1_backscattered[0:cutoff_index],l_lc[0:cutoff_index],loc_b_r_s_delta_l_1)
+    loc_b_r_s_delta_kperp1_2 = find_x0(k_perp_1_backscattered[cutoff_index::], l_lc[cutoff_index::], loc_b_r_s_delta_l_2)
+    loc_b_r_s_delta_kperp1 = np.array([loc_b_r_s_delta_kperp1_1,loc_b_r_s_delta_kperp1_2])
+    loc_b_r_delta_kperp1_1 = find_x0(k_perp_1_backscattered[0:cutoff_index], l_lc[0:cutoff_index], loc_b_r_delta_l_1)
+    loc_b_r_delta_kperp1_2 = find_x0(k_perp_1_backscattered[cutoff_index::], l_lc[cutoff_index::], loc_b_r_delta_l_2)
+    loc_b_r_delta_kperp1 = np.array([loc_b_r_delta_kperp1_1,loc_b_r_delta_kperp1_2])
 
 
         # Calculate the cumulative integral of the localisation pieces
-    cum_loc_b_p_r_s = integrate.cumtrapz(loc_b_p_r_s, distance_along_line, initial=0)
-    cum_loc_b_p_r_s = (cum_loc_b_p_r_s - max(cum_loc_b_p_r_s)/2)
-    cum_loc_b_p_r = integrate.cumtrapz(loc_b_p_r, distance_along_line, initial=0)
-    cum_loc_b_p_r = (cum_loc_b_p_r - max(cum_loc_b_p_r)/2)
+    cum_loc_b_r_s = integrate.cumtrapz(loc_b_r_s, distance_along_line, initial=0)    
+    cum_loc_b_r_s = (cum_loc_b_r_s - max(cum_loc_b_r_s)/2)
+    cum_loc_b_r = integrate.cumtrapz(loc_b_r, distance_along_line, initial=0)
+    cum_loc_b_r = (cum_loc_b_r - max(cum_loc_b_r)/2)
     
-        # Finds the 1/e values (cumulative integral of localisation)
-    cum_loc_b_p_r_s_max_over_e_1 = cum_loc_b_p_r_s.min() * (1 - 1 / (np.e))
-    cum_loc_b_p_r_s_max_over_e_2 = cum_loc_b_p_r_s.max() * (1 - 1 / (np.e))
-    cum_loc_b_p_r_max_over_e_1 = cum_loc_b_p_r.min() * (1 - 1 / (np.e))
-    cum_loc_b_p_r_max_over_e_2 = cum_loc_b_p_r.max() * (1 - 1 / (np.e))
+        # Finds the 1/e2 values (cumulative integral of localisation)
+    # cum_loc_b_r_s_max_over_e2_1 = cum_loc_b_r_s.min() * (1 - 1 / (np.e)**2)
+    # cum_loc_b_r_s_max_over_e2_2 = cum_loc_b_r_s.max() * (1 - 1 / (np.e)**2)
+    # cum_loc_b_r_max_over_e2_1 = cum_loc_b_r.min() * (1 - 1 / (np.e)**2)
+    # cum_loc_b_r_max_over_e2_2 = cum_loc_b_r.max() * (1 - 1 / (np.e)**2)
+    cum_loc_b_r_s_max_over_e2 = cum_loc_b_r_s.max() * (1 - 1 / (np.e)**2)
+    cum_loc_b_r_max_over_e2 = cum_loc_b_r.max() * (1 - 1 / (np.e)**2)
     
         # Gives the inter-e range (analogous to interquartile range) in l-lc
-    cum_loc_b_p_r_s_delta_l_1 = find_x0(l_lc, cum_loc_b_p_r_s, cum_loc_b_p_r_s_max_over_e_1)
-    cum_loc_b_p_r_s_delta_l_2 = find_x0(l_lc, cum_loc_b_p_r_s, cum_loc_b_p_r_s_max_over_e_2)
-    cum_loc_b_p_r_s_half_width = (cum_loc_b_p_r_s_delta_l_2 - cum_loc_b_p_r_s_delta_l_1)/2
-    cum_loc_b_p_r_delta_l_1 = find_x0(l_lc, cum_loc_b_p_r, cum_loc_b_p_r_max_over_e_1)
-    cum_loc_b_p_r_delta_l_2 = find_x0(l_lc, cum_loc_b_p_r, cum_loc_b_p_r_max_over_e_2)
-    cum_loc_b_p_r_half_width = (cum_loc_b_p_r_delta_l_2 - cum_loc_b_p_r_delta_l_1)/2
+    cum_loc_b_r_s_delta_l_1 = find_x0(l_lc, cum_loc_b_r_s, -cum_loc_b_r_s_max_over_e2)
+    cum_loc_b_r_s_delta_l_2 = find_x0(l_lc, cum_loc_b_r_s,  cum_loc_b_r_s_max_over_e2)
+    cum_loc_b_r_s_delta_l = np.array([cum_loc_b_r_s_delta_l_1,cum_loc_b_r_s_delta_l_2])
+    cum_loc_b_r_s_half_width = (cum_loc_b_r_s_delta_l_2 - cum_loc_b_r_s_delta_l_1)/2
+    cum_loc_b_r_delta_l_1 = find_x0(l_lc, cum_loc_b_r, -cum_loc_b_r_max_over_e2)
+    cum_loc_b_r_delta_l_2 = find_x0(l_lc, cum_loc_b_r,  cum_loc_b_r_max_over_e2)
+    cum_loc_b_r_delta_l = np.array([cum_loc_b_r_delta_l_1,cum_loc_b_r_delta_l_2])
+    cum_loc_b_r_half_width = (cum_loc_b_r_delta_l_2 - cum_loc_b_r_delta_l_1)/2
 
-        # Gives the inter-e range (analogous to interquartile range) in kperp1. 
+        # Gives the inter-e2 range (analogous to interquartile range) in kperp1. 
         # Bear in mind that since abs(kperp1) is minimised at cutoff, one really has to use that in addition to these.
-    cum_loc_b_p_r_s_delta_kperp1_1 = find_x0(k_perp_1_backscattered[0:cutoff_index], cum_loc_b_p_r_s[0:cutoff_index], cum_loc_b_p_r_s_max_over_e_1)
-    cum_loc_b_p_r_s_delta_kperp1_2 = find_x0(k_perp_1_backscattered[cutoff_index::], cum_loc_b_p_r_s[cutoff_index::], cum_loc_b_p_r_s_max_over_e_2)
-    cum_loc_b_p_r_delta_kperp1_1 = find_x0(k_perp_1_backscattered[0:cutoff_index], cum_loc_b_p_r[0:cutoff_index], cum_loc_b_p_r_max_over_e_1)
-    cum_loc_b_p_r_delta_kperp1_2 = find_x0(k_perp_1_backscattered[cutoff_index::], cum_loc_b_p_r[cutoff_index::], cum_loc_b_p_r_max_over_e_2)
+    cum_loc_b_r_s_delta_kperp1_1 = find_x0(k_perp_1_backscattered[0:cutoff_index], cum_loc_b_r_s[0:cutoff_index], -cum_loc_b_r_s_max_over_e2)
+    cum_loc_b_r_s_delta_kperp1_2 = find_x0(k_perp_1_backscattered[cutoff_index::], cum_loc_b_r_s[cutoff_index::],  cum_loc_b_r_s_max_over_e2)
+    cum_loc_b_r_s_delta_kperp1   = np.array([cum_loc_b_r_s_delta_kperp1_1,cum_loc_b_r_s_delta_kperp1_2])
+    cum_loc_b_r_delta_kperp1_1 = find_x0(k_perp_1_backscattered[0:cutoff_index], cum_loc_b_r[0:cutoff_index], -cum_loc_b_r_max_over_e2)
+    cum_loc_b_r_delta_kperp1_2 = find_x0(k_perp_1_backscattered[cutoff_index::], cum_loc_b_r[cutoff_index::],  cum_loc_b_r_max_over_e2)
+    cum_loc_b_r_delta_kperp1   = np.array([cum_loc_b_r_delta_kperp1_1,cum_loc_b_r_delta_kperp1_2])
     
         # Gives the mode l-lc for backscattering        
-    loc_b_p_r_s_max_index = find_nearest(loc_b_p_r_s, loc_b_p_r_s.max())    
-    loc_b_p_r_s_max_l_lc = distance_along_line[loc_b_p_r_s_max_index] - distance_along_line[cutoff_index]
-    loc_b_p_r_max_index = find_nearest(loc_b_p_r, loc_b_p_r.max())    
-    loc_b_p_r_max_l_lc = distance_along_line[loc_b_p_r_max_index] - distance_along_line[cutoff_index]
+    loc_b_r_s_max_index = find_nearest(loc_b_r_s, loc_b_r_s.max())    
+    loc_b_r_s_max_l_lc = distance_along_line[loc_b_r_s_max_index] - distance_along_line[cutoff_index]
+    loc_b_r_max_index = find_nearest(loc_b_r, loc_b_r.max())    
+    loc_b_r_max_l_lc = distance_along_line[loc_b_r_max_index] - distance_along_line[cutoff_index]
     
         # Gives the mean l-lc for backscattering    
-    cum_loc_b_p_r_s_mean_l = np.trapz(loc_b_p_r_s*distance_along_line, distance_along_line) / np.trapz(loc_b_p_r_s, distance_along_line)
-    cum_loc_b_p_r_mean_l = np.trapz(loc_b_p_r*distance_along_line, distance_along_line) / np.trapz(loc_b_p_r, distance_along_line)
+    cum_loc_b_r_s_mean_l_lc = np.trapz(loc_b_r_s*distance_along_line, distance_along_line) / np.trapz(loc_b_r_s, distance_along_line) - distance_along_line[cutoff_index]
+    cum_loc_b_r_mean_l_lc = np.trapz(loc_b_r*distance_along_line, distance_along_line) / np.trapz(loc_b_r, distance_along_line) - distance_along_line[cutoff_index]
 
         # Gives the median l-lc for backscattering
-    cum_loc_b_p_r_s_delta_l_0 = find_x0(l_lc, cum_loc_b_p_r_s, 0) 
-    cum_loc_b_p_r_delta_l_0 = find_x0(l_lc, cum_loc_b_p_r, 0)
-    
+    cum_loc_b_r_s_delta_l_0 = find_x0(l_lc, cum_loc_b_r_s, 0) 
+    cum_loc_b_r_delta_l_0 = find_x0(l_lc, cum_loc_b_r, 0)
+
         # Due to the divergency of the ray piece, the mode kperp1 for backscattering is exactly that at the cut-off
 
         # Gives the mean kperp1 for backscattering    
-    cum_loc_b_p_r_s_mean_kperp1 = np.trapz(loc_b_p_r_s*k_perp_1_backscattered, k_perp_1_backscattered) / np.trapz(loc_b_p_r_s, k_perp_1_backscattered)
-    cum_loc_b_p_r_mean_kperp1 = np.trapz(loc_b_p_r*k_perp_1_backscattered, k_perp_1_backscattered) / np.trapz(loc_b_p_r, k_perp_1_backscattered)
+    cum_loc_b_r_s_mean_kperp1 = np.trapz(loc_b_r_s*k_perp_1_backscattered, k_perp_1_backscattered) / np.trapz(loc_b_r_s, k_perp_1_backscattered)
+    cum_loc_b_r_mean_kperp1   = np.trapz(loc_b_r  *k_perp_1_backscattered, k_perp_1_backscattered) / np.trapz(loc_b_r  , k_perp_1_backscattered)
 
         # Gives the median kperp1 for backscattering
-    cum_loc_b_p_r_s_delta_kperp1_0 = find_x0(k_perp_1_backscattered, cum_loc_b_p_r_s, 0)    
-    cum_loc_b_p_r_delta_kperp1_0 = find_x0(k_perp_1_backscattered[0:cutoff_index], cum_loc_b_p_r[0:cutoff_index], 0) # Only works if point is before cutoff. To fix.
+    cum_loc_b_r_s_delta_kperp1_0 = find_x0(k_perp_1_backscattered, cum_loc_b_r_s, 0)    
+    cum_loc_b_r_delta_kperp1_0 = find_x0(k_perp_1_backscattered[0:cutoff_index], cum_loc_b_r[0:cutoff_index], 0) # Only works if point is before cutoff. To fix.
 
         # To make the plots look nice
     k_perp_1_backscattered_plot = np.append(-2*wavenumber_K0, k_perp_1_backscattered)    
     k_perp_1_backscattered_plot = np.append(k_perp_1_backscattered_plot, -2*wavenumber_K0)
-    cum_loc_b_p_r_s_plot = np.append(cum_loc_b_p_r_s[0], cum_loc_b_p_r_s)
-    cum_loc_b_p_r_s_plot = np.append(cum_loc_b_p_r_s_plot, cum_loc_b_p_r_s[-1])
-    cum_loc_b_p_r_plot = np.append(cum_loc_b_p_r[0], cum_loc_b_p_r)
-    cum_loc_b_p_r_plot = np.append(cum_loc_b_p_r_plot, cum_loc_b_p_r[-1])
+    cum_loc_b_r_s_plot = np.append(cum_loc_b_r_s[0], cum_loc_b_r_s)
+    cum_loc_b_r_s_plot = np.append(cum_loc_b_r_s_plot, cum_loc_b_r_s[-1])
+    cum_loc_b_r_plot = np.append(cum_loc_b_r[0], cum_loc_b_r)
+    cum_loc_b_r_plot = np.append(cum_loc_b_r_plot, cum_loc_b_r[-1])
     
     
 
 
     
-
-
-
-
 
 
     # integrated_localisation_b_p_r_delta_kperp1_0 = find_x0(k_perp_1_backscattered[0:cutoff_index],integrated_localisation_b_p_r[0:cutoff_index],0)
@@ -1589,14 +1413,21 @@ def beam_me_up(tau_max,
               poloidal_flux_on_midplane=poloidal_flux_on_midplane,R_midplane_points=R_midplane_points,
               loc_b=loc_b,loc_p=loc_p,
               loc_r=loc_r,loc_s=loc_s,
-              loc_b_p_r_s=loc_b_p_r_s, loc_b_p_r=loc_b_p_r,
+              loc_b_r_s=loc_b_r_s, loc_b_r=loc_b_r,
+              loc_b_r_s_max_over_e2=loc_b_r_s_max_over_e2,loc_b_r_max_over_e2=loc_b_r_max_over_e2,
+              loc_b_r_s_delta_l=loc_b_r_s_delta_l,loc_b_r_delta_l=loc_b_r_delta_l, # The 1/e2 distances,  (l - l_c)
+              loc_b_r_s_delta_kperp1=loc_b_r_s_delta_kperp1,loc_b_r_delta_kperp1=loc_b_r_delta_kperp1,  # The 1/e2 distances, kperp1, estimated from (l - l_c)
+              cum_loc_b_r_s=cum_loc_b_r_s, cum_loc_b_r=cum_loc_b_r,
               k_perp_1_backscattered_plot=k_perp_1_backscattered_plot,
-              cum_loc_b_p_r_s_plot=cum_loc_b_p_r_s_plot, cum_loc_b_p_r_plot=cum_loc_b_p_r_plot,
-              loc_b_p_r_s_max_l_lc=loc_b_p_r_s_max_l_lc, loc_b_p_r_max_l_lc=loc_b_p_r_max_l_lc, # mode l-lc
-              cum_loc_b_p_r_s_mean_l=cum_loc_b_p_r_s_mean_l, cum_loc_b_p_r_mean_l=cum_loc_b_p_r_mean_l, # mean l-lc
-              cum_loc_b_p_r_s_delta_l_0=cum_loc_b_p_r_s_delta_l_0, cum_loc_b_p_r_delta_l_0=cum_loc_b_p_r_delta_l_0, # median l-lc
-              cum_loc_b_p_r_s_mean_kperp1=cum_loc_b_p_r_s_mean_kperp1, cum_loc_b_p_r_mean_kperp1=cum_loc_b_p_r_mean_kperp1, # mean kperp1
-              cum_loc_b_p_r_s_delta_kperp1_0=cum_loc_b_p_r_s_delta_kperp1_0, cum_loc_b_p_r_delta_kperp1_0=cum_loc_b_p_r_delta_kperp1_0, # median kperp1
+              cum_loc_b_r_s_plot=cum_loc_b_r_s_plot, cum_loc_b_r_plot=cum_loc_b_r_plot,
+              cum_loc_b_r_s_max_over_e2=cum_loc_b_r_s_max_over_e2,cum_loc_b_r_max_over_e2=cum_loc_b_r_max_over_e2,
+              cum_loc_b_r_s_delta_l=cum_loc_b_r_s_delta_l,cum_loc_b_r_delta_l=cum_loc_b_r_delta_l, # The cumloc 1/e2 distances, (l - l_c)
+              cum_loc_b_r_s_delta_kperp1=cum_loc_b_r_s_delta_kperp1,cum_loc_b_r_delta_kperp1=cum_loc_b_r_delta_kperp1, # The cumloc 1/e2 distances, kperp1
+              loc_b_r_s_max_l_lc=loc_b_r_s_max_l_lc, loc_b_r_max_l_lc=loc_b_r_max_l_lc, # mode l-lc
+              cum_loc_b_r_s_mean_l_lc=cum_loc_b_r_s_mean_l_lc, cum_loc_b_r_mean_l_lc=cum_loc_b_r_mean_l_lc, # mean l-lc
+              cum_loc_b_r_s_delta_l_0=cum_loc_b_r_s_delta_l_0, cum_loc_b_r_delta_l_0=cum_loc_b_r_delta_l_0, # median l-lc
+              cum_loc_b_r_s_mean_kperp1=cum_loc_b_r_s_mean_kperp1, cum_loc_b_r_mean_kperp1=cum_loc_b_r_mean_kperp1, # mean kperp1
+              cum_loc_b_r_s_delta_kperp1_0=cum_loc_b_r_s_delta_kperp1_0, cum_loc_b_r_delta_kperp1_0=cum_loc_b_r_delta_kperp1_0, # median kperp1
               # det_imag_Psi_w_analysis=det_imag_Psi_w_analysis,det_real_Psi_w_analysis=det_real_Psi_w_analysis,det_M_w_analysis=det_M_w_analysis
               )
     print('Analysis data saved')
@@ -1609,6 +1440,7 @@ def beam_me_up(tau_max,
     ## -------------------
     if figure_flag:
         print('Making figures')
+        output_figurename_suffix = output_filename_suffix + '.png'
         
         """
         Plots the beam path on the R Z plane
@@ -1629,7 +1461,8 @@ def beam_me_up(tau_max,
         #                             levels=1,vmin=1,vmax=1,linewidths=5,colors='grey')
         plt.xlim(data_R_coord[0],data_R_coord[-1])
         plt.ylim(data_Z_coord[0],data_Z_coord[-1])
-        plt.savefig('Ray1_' + output_filename_suffix)
+
+        plt.savefig('Ray1_' + output_figurename_suffix)
         plt.close()
         
         """
@@ -1643,7 +1476,7 @@ def beam_me_up(tau_max,
         plt.plot(l_lc,abs(H_1_Cardano_array),'r')    
         plt.plot(l_lc,abs(H_2_Cardano_array),'g')    
         plt.plot(l_lc,abs(H_3_Cardano_array),'b')    
-        plt.savefig('H_' + output_filename_suffix)
+        plt.savefig('H_' + output_figurename_suffix)
         plt.close()        
 
         # Commented out because this does not work properly
