@@ -95,7 +95,7 @@ data_R_coord = loadfile['data_R_coord']
 data_Z_coord = loadfile['data_Z_coord']
 launch_position = loadfile['launch_position']
 launch_beam_width = loadfile['launch_beam_width']
-launch_beam_curvature = loadfile['launch_beam_curvature']
+launch_beam_radius_of_curvature = loadfile['launch_beam_radius_of_curvature']
 loadfile.close()
 
 
