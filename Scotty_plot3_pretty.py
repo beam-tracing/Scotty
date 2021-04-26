@@ -88,7 +88,9 @@ distance_along_line = loadfile['distance_along_line']
 x_hat_Cartesian = loadfile['x_hat_Cartesian']
 y_hat_Cartesian = loadfile['y_hat_Cartesian']
 e_hat_output = loadfile['e_hat_output']
-
+M_w_inv_xx_output = loadfile['M_w_inv_xx_output']
+M_w_inv_xy_output = loadfile['M_w_inv_xy_output']
+M_w_inv_yy_output = loadfile['M_w_inv_yy_output']
 loadfile.close()
 
 loadfile = np.load('data_input' + suffix + '.npz')
@@ -167,6 +169,7 @@ Z_start_index = 40
 Z_end_index = 80
 
 out_index = numberOfDataPoints
+l_lc = distance_along_line[:out_index:plot_every_n_points]-distance_along_line[cutoff_index]
 
 plt.figure(figsize=(5,5))
 plt.title('Poloidal Plane')
@@ -245,51 +248,50 @@ eff_curv_eigval[:,1] = M_real_eigval[:,1] / K_magnitude_array
 
 
 plt.figure()
-plt.plot(distance_along_line[:out_index:plot_every_n_points],np.maximum(W_eigval[:out_index:plot_every_n_points,0],W_eigval[:out_index:plot_every_n_points,1]))
-plt.plot(distance_along_line[:out_index:plot_every_n_points],np.minimum(W_eigval[:out_index:plot_every_n_points,0],W_eigval[:out_index:plot_every_n_points,1]))
+plt.plot(l_lc,np.maximum(W_eigval[:out_index:plot_every_n_points,0],W_eigval[:out_index:plot_every_n_points,1]))
+plt.plot(l_lc,np.minimum(W_eigval[:out_index:plot_every_n_points,0],W_eigval[:out_index:plot_every_n_points,1]))
 plt.xlabel('l / m')
 plt.ylabel('W / m')
-plt.axvline(distance_along_line[cutoff_index],c='k', linestyle='dashed')
+plt.axvline(0,c='k', linestyle='dashed')
 tikzplotlib.save("widths.tex")
 
 plt.figure()
-plt.plot(distance_along_line[:out_index:plot_every_n_points],np.maximum(curv_eigval[:out_index:plot_every_n_points,0],curv_eigval[:out_index:plot_every_n_points,1]))
-plt.plot(distance_along_line[:out_index:plot_every_n_points],np.minimum(curv_eigval[:out_index:plot_every_n_points,0],curv_eigval[:out_index:plot_every_n_points,1]))
-# plt.plot(distance_along_line[:out_index:plot_every_n_points],np.maximum(eff_curv_eigval[:out_index:plot_every_n_points,0],eff_curv_eigval[:out_index:plot_every_n_points,1]))
-# plt.plot(distance_along_line[:out_index:plot_every_n_points],np.minimum(eff_curv_eigval[:out_index:plot_every_n_points,0],eff_curv_eigval[:out_index:plot_every_n_points,1]))
-plt.plot(distance_along_line[:out_index:plot_every_n_points],eff_curv_eigval[:out_index:plot_every_n_points,0],'ko',markersize=1)
-plt.plot(distance_along_line[:out_index:plot_every_n_points],eff_curv_eigval[:out_index:plot_every_n_points,1],'ko',markersize=1)
-plt.axvline(distance_along_line[cutoff_index],c='k', linestyle='dashed')
+plt.plot(l_lc,np.maximum(curv_eigval[:out_index:plot_every_n_points,0],curv_eigval[:out_index:plot_every_n_points,1]))
+plt.plot(l_lc,np.minimum(curv_eigval[:out_index:plot_every_n_points,0],curv_eigval[:out_index:plot_every_n_points,1]))
+plt.plot(l_lc,np.maximum(eff_curv_eigval[:out_index:plot_every_n_points,0],eff_curv_eigval[:out_index:plot_every_n_points,1]))
+plt.plot(l_lc,np.minimum(eff_curv_eigval[:out_index:plot_every_n_points,0],eff_curv_eigval[:out_index:plot_every_n_points,1]))
+# plt.plot(l_lc,eff_curv_eigval[:out_index:plot_every_n_points,0],'ko',markersize=1)
+# plt.plot(l_lc,eff_curv_eigval[:out_index:plot_every_n_points,1],'ko',markersize=1)
+plt.axvline(0,c='k', linestyle='dashed')
 plt.xlabel('l / m')
 plt.ylabel('(1 / R_b) / m')
 tikzplotlib.save("curvatures.tex")
 
+# plt.figure()
+# plt.subplot(2,2,1)
+# plt.plot(distance_along_line[:out_index:plot_every_n_points],M_real_eigvec[:out_index:plot_every_n_points,0,0],'ro',markersize=1)
+# plt.plot(distance_along_line[:out_index:plot_every_n_points],M_real_eigvec[:out_index:plot_every_n_points,0,1],'go',markersize=1)
+# plt.subplot(2,2,2)
+# plt.plot(distance_along_line[:out_index:plot_every_n_points],M_real_eigvec[:out_index:plot_every_n_points,1,0],'ro',markersize=1)
+# plt.plot(distance_along_line[:out_index:plot_every_n_points],M_real_eigvec[:out_index:plot_every_n_points,1,1],'go',markersize=1)
+# plt.subplot(2,2,3)
+# plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_real_eigvec[:out_index:plot_every_n_points,0,0],'ro',markersize=1)
+# plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_real_eigvec[:out_index:plot_every_n_points,0,1],'go',markersize=1)
+# plt.subplot(2,2,4)
+# plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_real_eigvec[:out_index:plot_every_n_points,1,0],'ro',markersize=1)
+# plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_real_eigvec[:out_index:plot_every_n_points,1,1],'go',markersize=1)
 
-plt.figure()
-plt.subplot(2,2,1)
-plt.plot(distance_along_line[:out_index:plot_every_n_points],M_real_eigvec[:out_index:plot_every_n_points,0,0],'ro',markersize=1)
-plt.plot(distance_along_line[:out_index:plot_every_n_points],M_real_eigvec[:out_index:plot_every_n_points,0,1],'go',markersize=1)
-plt.subplot(2,2,2)
-plt.plot(distance_along_line[:out_index:plot_every_n_points],M_real_eigvec[:out_index:plot_every_n_points,1,0],'ro',markersize=1)
-plt.plot(distance_along_line[:out_index:plot_every_n_points],M_real_eigvec[:out_index:plot_every_n_points,1,1],'go',markersize=1)
-plt.subplot(2,2,3)
-plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_real_eigvec[:out_index:plot_every_n_points,0,0],'ro',markersize=1)
-plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_real_eigvec[:out_index:plot_every_n_points,0,1],'go',markersize=1)
-plt.subplot(2,2,4)
-plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_real_eigvec[:out_index:plot_every_n_points,1,0],'ro',markersize=1)
-plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_real_eigvec[:out_index:plot_every_n_points,1,1],'go',markersize=1)
+# plt.figure()
+# plt.subplot(1,2,1)
+# plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_imag_eigvec[:out_index:plot_every_n_points,0,0],'ro',markersize=1)
+# plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_imag_eigvec[:out_index:plot_every_n_points,0,1],'go',markersize=1)
+# plt.subplot(1,2,2)
+# plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_imag_eigvec[:out_index:plot_every_n_points,1,0],'ro',markersize=1)
+# plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_imag_eigvec[:out_index:plot_every_n_points,1,1],'go',markersize=1)
 
-plt.figure()
-plt.subplot(1,2,1)
-plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_imag_eigvec[:out_index:plot_every_n_points,0,0],'ro',markersize=1)
-plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_imag_eigvec[:out_index:plot_every_n_points,0,1],'go',markersize=1)
-plt.subplot(1,2,2)
-plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_imag_eigvec[:out_index:plot_every_n_points,1,0],'ro',markersize=1)
-plt.plot(distance_along_line[:out_index:plot_every_n_points],Psi_imag_eigvec[:out_index:plot_every_n_points,1,1],'go',markersize=1)
-
-plt.figure()
-plt.plot(distance_along_line[:out_index:plot_every_n_points]-distance_along_line[cutoff_index],delta_k_perp_2)
-plt.xlabel('l - l_c / m')
-plt.ylabel('delta kperp2 / m')
-plt.axvline(0,c='k', linestyle='dashed')
-tikzplotlib.save("kperp2_res.tex")
+# plt.figure()
+# plt.plot(distance_along_line[:out_index:plot_every_n_points]-distance_along_line[cutoff_index],delta_k_perp_2)
+# plt.xlabel('l - l_c / m')
+# plt.ylabel('delta kperp2 / m')
+# plt.axvline(0,c='k', linestyle='dashed')
+# tikzplotlib.save("kperp2_res.tex")

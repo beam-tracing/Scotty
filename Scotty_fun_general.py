@@ -15,7 +15,7 @@ import numpy as np
 from scipy import constants as constants
 from scipy import interpolate as interpolate
 from scipy import optimize as optimize
-
+import sys
 
 
 def read_floats_into_list_until(terminator, lines):
@@ -370,7 +370,7 @@ def find_H(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag,
     # For this functions to work,  the interpolation functions for
     # electron density,  B_Total,  and psi  (poloidal flux) must be
     # declared at some point before they are called
-    
+
     K_magnitude = np.sqrt(K_R**2 + (K_zeta/q_R)**2 + K_Z**2)
     wavenumber_K0 = launch_angular_frequency / constants.c
 
@@ -399,7 +399,11 @@ def find_H(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag,
 
     H = (K_magnitude/wavenumber_K0)**2 + (
             Booker_beta - mode_flag *
-            np.sqrt(np.maximum(np.zeros_like(Booker_beta), (Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
+            np.sqrt(np.maximum(
+                    np.zeros_like(Booker_beta), 
+                    (Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
+                )
+            )
             # np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
             ) / (2 * Booker_alpha)
     
@@ -408,6 +412,7 @@ def find_H(q_R, q_Z, K_R, K_zeta, K_Z, launch_angular_frequency, mode_flag,
 def find_H_numba(K_magnitude, electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency, mode_flag):
     # For use with the numba package (parallelisation)
     # As such, doesn't take any functions as arguments
+    # Still in development
     
     wavenumber_K0 = launch_angular_frequency / constants.c
         
@@ -556,19 +561,6 @@ def find_dbhat_dZ(q_R, q_Z, delta_Z, find_B_R, find_B_T, find_B_Z):
         
     return dbhat_dZ
 
-def find_Rayleigh_length(waist, wavenumber): #Finds the size of the waist (assumes vacuum propagation and circular beam)
-    Rayleigh_length = 0.5 * wavenumber * waist**2
-    return Rayleigh_length
-
-def find_waist(width, wavenumber, curvature): #Finds the size of the waist (assumes vacuum propagation and circular beam)
-    waist = width / np.sqrt(1+curvature**2 * width**4 * wavenumber**2 / 4)
-    return waist
-
-def find_distance_from_waist(width, wavenumber, curvature): #Finds how far you are from the waist (assumes vacuum propagation and circular beam)
-    waist = width / np.sqrt(1+curvature**2 * width**4 * wavenumber**2 / 4)
-    distance_from_waist = np.sign(curvature)*np.sqrt((width**2 - waist**2)*waist**2*wavenumber**2/4)
-    return distance_from_waist
-
 #def find_g_magnitude(q_R,q_Z,K_R,K_zeta,K_Z,launch_angular_frequency,mode_flag,delta_K_R,delta_K_zeta,delta_K_Z,
 #                     interp_poloidal_flux,find_density_1D,find_B_R,find_B_T,find_B_Z): # Finds the magnitude of the group velocity. This method is slow, do not use in main loop.\
 #    dH_dKR   = find_dH_dKR(
@@ -640,6 +632,41 @@ def find_H_Cardano(K_magnitude,launch_angular_frequency,epsilon_para,epsilon_per
     H_2_Cardano = - (1 - 1j*np.sqrt(3))/(6*2**(1/3))*h_t_coefficient + (1 + 1j*np.sqrt(3))*(3*h_1_coefficient - h_2_coefficient**2)/(3*2**(2/3)*h_t_coefficient) - h_2_coefficient/3
     H_3_Cardano = - (1 + 1j*np.sqrt(3))/(6*2**(1/3))*h_t_coefficient + (1 - 1j*np.sqrt(3))*(3*h_1_coefficient - h_2_coefficient**2)/(3*2**(2/3)*h_t_coefficient) - h_2_coefficient/3
     return H_1_Cardano, H_2_Cardano, H_3_Cardano
+#----------------------------------
+    
+
+# Functions (circular Gaussian beam in vacuum)
+def find_Rayleigh_length(waist, wavenumber): #Finds the size of the waist (assumes vacuum propagation and circular beam)
+    Rayleigh_length = 0.5 * wavenumber * waist**2
+    return Rayleigh_length
+
+def find_waist(width, wavenumber, curvature): #Finds the size of the waist (assumes vacuum propagation and circular beam)
+    waist = width / np.sqrt(1+curvature**2 * width**4 * wavenumber**2 / 4)
+    return waist
+
+def find_distance_from_waist(width, wavenumber, curvature): #Finds how far you are from the waist (assumes vacuum propagation and circular beam)
+    waist = width / np.sqrt(1+curvature**2 * width**4 * wavenumber**2 / 4)
+    distance_from_waist = np.sign(curvature)*np.sqrt((width**2 - waist**2)*waist**2*wavenumber**2/4)
+    return distance_from_waist
+#----------------------------------
+
+
+# Functions (general Gaussian beam in vacuum)
+def propagate_beam(Psi_w_initial_cartesian,propagation_distance,freq_GHz):
+    """
+    Uses the vacuum solution of the beam tracing equations to propagate the beam
+    Works for arbitrary Gaussian beam in vacuum
+    """
+    angular_frequency = 2*np.pi*10.0**9 * freq_GHz
+    wavenumber_K0 = angular_frequency / constants.c
+    
+    Psi_w_inv_initial_cartersian = find_inverse_2D(Psi_w_initial_cartesian)
+    
+    Psi_w_inv_final_cartersian = propagation_distance/(wavenumber_K0)*np.eye(2) + Psi_w_inv_initial_cartersian
+    
+    Psi_w_final_cartesian = find_inverse_2D(Psi_w_inv_final_cartersian)
+    
+    return Psi_w_final_cartesian
 
 def find_widths_and_curvatures(Psi_xx, Psi_xy, Psi_yy, K_magnitude):
     Psi_w_real = np.array(np.real([
@@ -660,7 +687,7 @@ def find_widths_and_curvatures(Psi_xx, Psi_xy, Psi_yy, K_magnitude):
     
     return widths, Psi_w_imag_eigvecs, curvatures, Psi_w_real_eigvecs
 #----------------------------------
-    
+
 
 
 # Functions (Debugging)
