@@ -12,10 +12,16 @@ I want efit_times[np.arange(0,10)*2 + 1]. 160ms, 170ms, ..., 250ms
 """
 from Scotty_beam_me_up import beam_me_up
 from Scotty_fun_general import find_q_lab_Cartesian, find_q_lab, find_K_lab_Cartesian, find_K_lab, find_waist, find_Rayleigh_length, genray_angles_from_mirror_angles
+from Scotty_fun_general import propagate_beam
 
 from scipy import constants
 import math
 import numpy as np
+import sys
+
+from hornpy import make_my_horn
+from lensalot import make_my_lens
+
 
 # from joblib import Parallel, delayed
 # from numba import njit, prange
@@ -24,22 +30,26 @@ import numpy as np
 # input_filename_suffix = '_29905_190'
 #input_filename_suffix = ''
 
-poloidal_launch_angle_Torbeam = 6.0 # deg
-toroidal_launch_angle_Torbeam = -4.4 # deg
+# poloidal_launch_angle_Torbeam = 6.0 # deg
+# toroidal_launch_angle_Torbeam = -6.4 # deg
+# pol 6deg, tor -6.4  (O mode) tor -7.0 (X mode)
 
+# poloidal_launch_angle_Torbeam = 6.0 # deg
+# toroidal_launch_angle_Torbeam = 0.0 # deg
 
-# rotation_angles_array = np.array([7.0,8,9,5,4,6]) 
-# mirror_rotation_angle_scan = np.linspace(-1,-7,31)
+rotation_angles_array = np.array([7.0,8,9,5,4,6]) 
+mirror_rotation_angle_scan = np.linspace(0,-7,36)
 # mirror_rotation_angle_scan = np.linspace(2,-6,81)
 # mirror_rotation_angle = -1.3
-# mirror_tilt_angle = -4.0
+mirror_tilt_angle = -4.0
 # mirror_tilt_angle = 0
 
 
 
 # launch_freq_GHz_sweep = np.array([30.0,32.5,35.0,37.5,42.5,45.0,47.5,50.0,55.0,57.5,60.0,62.5,67.5,70.0,72.5,75.0])
-# launch_freq_GHz_sweep = np.array([30.0,32.5,35.0,37.5,42.5,45.0,47.5,50.0])
-launch_freq_GHz = 55.0
+launch_freq_GHz_sweep = np.array([30.0,32.5,35.0,37.5,42.5,45.0,47.5,50.0])
+# launch_freq_GHz_sweep = np.array([55.0,57.5,60.0,62.5,67.5,70.0,72.5,75.0])
+# launch_freq_GHz = 55.0
 mode_flag = -1 # O-mode (1) or X-mode (-1)
 
 # beam_rayleigh_distance = 0.885
@@ -61,8 +71,10 @@ mode_flag = -1 # O-mode (1) or X-mode (-1)
 # launch_beam_radius_of_curvature = 1 / (-0.85)
 # launch_beam_width = 0.0554
 # launch_beam_radius_of_curvature = -1.77
-launch_beam_width = 0.0397
-launch_beam_radius_of_curvature = -0.7286
+# launch_beam_width = 0.0397 # 50GHz E plane, Jon's measurements
+# launch_beam_radius_of_curvature = -0.7286
+# launch_beam_width = 0.0947 # To get waist to the cut-off for the O mode test case
+# launch_beam_radius_of_curvature = -1.79
 
 vacuumLaunch_flag = True # If true, the launch_position is in vacuum. If false, the launch_position is in plasma.
 
@@ -119,29 +131,29 @@ params_record = np.array([
 
 #plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3,3])
 
-launch_position = np.asarray([2.43521,0,0]) # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
+# launch_position = np.asarray([2.43521,0,0]) # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
 
-efit_time_index = 7
-density_fit_parameters = params_record[3,:]
-poloidal_flux_enter = density_fit_parameters[2]
+# efit_time_index = 7
+# density_fit_parameters = params_record[3,:]
+# poloidal_flux_enter = density_fit_parameters[2]
 
-beam_me_up( poloidal_launch_angle_Torbeam,
-            toroidal_launch_angle_Torbeam,
-            launch_freq_GHz,
-            mode_flag,
-            vacuumLaunch_flag,
-            launch_beam_width,
-            launch_beam_radius_of_curvature,
-            launch_position,
-            find_B_method,
-            efit_time_index,
-            vacuum_propagation_flag,
-            Psi_BC_flag,
-            poloidal_flux_enter,
-            output_filename_suffix='',
-            figure_flag= True,
-            density_fit_parameters=density_fit_parameters
-            )# from ne_fit_radialcoord.py
+# beam_me_up( poloidal_launch_angle_Torbeam,
+#             toroidal_launch_angle_Torbeam,
+#             launch_freq_GHz,
+#             mode_flag,
+#             vacuumLaunch_flag,
+#             launch_beam_width,
+#             launch_beam_radius_of_curvature,
+#             launch_position,
+#             find_B_method,
+#             efit_time_index,
+#             vacuum_propagation_flag,
+#             Psi_BC_flag,
+#             poloidal_flux_enter,
+#             output_filename_suffix='_O',
+#             figure_flag= True,
+#             density_fit_parameters=density_fit_parameters
+#             )# from ne_fit_radialcoord.py
 
 # for ii, mirror_rotation_angle in enumerate(mirror_rotation_angle_scan):
 #     print('Iteration number: ' + str(ii))
@@ -174,24 +186,7 @@ beam_me_up( poloidal_launch_angle_Torbeam,
 #                                   )
         
 
-    
-#     beam_me_up( poloidal_launch_angle_Torbeam,
-#                 toroidal_launch_angle_Torbeam,
-#                 launch_freq_GHz,
-#                 mode_flag,
-#                 vacuumLaunch_flag,
-#                 launch_beam_width,
-#                 launch_beam_radius_of_curvature,
-#                 launch_position,
-#                 find_B_method,
-#                 efit_time_index,
-#                 vacuum_propagation_flag,
-#                 Psi_BC_flag,
-#                 poloidal_flux_enter=density_fit_parameters[2],
-#                 output_filename_suffix= output_filename_string,
-#                 figure_flag=True,
-#                 density_fit_parameters=density_fit_parameters
-#                 )
+
 
 # for ii, efit_time_index in enumerate(efit_time_index_scan):
 #     for jj, mirror_rotation_angle in enumerate(mirror_rotation_angle_scan):
@@ -204,25 +199,58 @@ beam_me_up( poloidal_launch_angle_Torbeam,
 #             # efit_time_index=3
 #             print('Iteration number: ' + str(ii) + ' ' + str(jj) + ' ' + str(kk))
     
-#             print(mirror_rotation_angle)
-    
+#             #####
 #             toroidal_launch_angle_genray, poloidal_launch_angle_genray = genray_angles_from_mirror_angles(mirror_rotation_angle,mirror_tilt_angle,offset_for_window_norm_to_R = np.rad2deg(math.atan2(125,2432)))
     
 #             poloidal_launch_angle_Torbeam = - poloidal_launch_angle_genray
 #             toroidal_launch_angle_Torbeam = - toroidal_launch_angle_genray
-                
-#             density_fit_parameters = params_record[ii,:]
-            
+                            
 #             print('poloidal_launch_angle_Torbeam: ' + str(poloidal_launch_angle_Torbeam))
 #             print('toroidal_launch_angle_Torbeam: ' + str(toroidal_launch_angle_Torbeam))
-    
-    
+#             #####
+            
+#             #####
+#             density_fit_parameters = params_record[ii,:]
+#             #####
+            
+#             #####
+#             name = 'MAST_Q_band'
+#             # horn_to_lens = 0.139 # Q Band
+#             horn_to_lens = 0.270 # V Band
+#             myLens = make_my_lens(name)
+#             myHorn = make_my_horn(name)    
+#             angular_frequency = 2*np.pi*10.0**9 * launch_freq_GHz
+#             wavenumber_K0 = angular_frequency / constants.c    
+            
+#             horn_width, horn_curvature = myHorn.output_beam()
+            
+#             Psi_w_horn_cartersian = np.array(
+#                     [
+#                     [ wavenumber_K0*horn_curvature+2j*horn_width**(-2), 0],
+#                     [ 0, wavenumber_K0*horn_curvature+2j*horn_width**(-2)]
+#                     ]
+#                     )      
+            
+#             Psi_w_lens_cartesian_input = propagate_beam(Psi_w_horn_cartersian,horn_to_lens,launch_freq_GHz)
+            
+#             Psi_w_lens_cartesian_output = myLens.output_beam(Psi_w_lens_cartesian_input,launch_freq_GHz)
+            
+#             Psi_w_cartesian_launch = propagate_beam(Psi_w_lens_cartesian_output,0.644,launch_freq_GHz)
+#             launch_beam_width = np.sqrt(2 / np.imag(Psi_w_cartesian_launch[0,0]))
+#             launch_beam_radius_of_curvature = np.sign(np.real(Psi_w_cartesian_launch[0,0])) * np.sqrt(wavenumber_K0 / abs(np.real(Psi_w_cartesian_launch[0,0])))
+#             #####
+            
+            
+#             #####
 #             if mode_flag == 1:
 #                 mode_string = 'O'
 #             elif mode_flag == -1:
 #                 mode_string = 'X'
-#             efit_time = efit_times[efit_time_index]    
+#             #####
             
+#             #####
+#             efit_time = efit_times[efit_time_index]    
+
 #             output_filename_string = (
 #                                         '_r' + f'{mirror_rotation_angle:.1f}'
 #                                         '_t' + f'{mirror_tilt_angle:.1f}'
@@ -231,7 +259,7 @@ beam_me_up( poloidal_launch_angle_Torbeam,
 #                                       + '_'  + f'{efit_time:.3g}' + 'ms'
 
 #                                           )
-                
+#             #####
 
             
 #             beam_me_up( poloidal_launch_angle_Torbeam,
@@ -256,6 +284,44 @@ beam_me_up( poloidal_launch_angle_Torbeam,
     
 # poloidal_launch_angle_Torbeam = -poloidal_launch_angle_genray
 # toroidal_launch_angle_Torbeam = -toroidal_launch_angle_genray
-           
+       
+
+# # To benchmark with Torbeam
+# mirror_rotation_angle = -4
+# mirror_tilt_angle = -5
+# toroidal_launch_angle_genray, poloidal_launch_angle_genray = genray_angles_from_mirror_angles(mirror_rotation_angle,mirror_tilt_angle,offset_for_window_norm_to_R = np.rad2deg(math.atan2(125,2432)))
+# poloidal_launch_angle_Torbeam = - poloidal_launch_angle_genray
+# toroidal_launch_angle_Torbeam = - toroidal_launch_angle_genray
+
+# # poloidal_launch_angle_Torbeam = 10
+# # toroidal_launch_angle_Torbeam = 5
+# launch_freq_GHz = 30.0
+# # launch_position = np.asarray([2.2,0,0])
+# launch_position = np.asarray([2.43521,0,0])
+# launch_beam_width = 0.05
+# launch_beam_radius_of_curvature = 0.5
+# efit_time_index = None
+# poloidal_flux_enter = 1.28
+# find_B_method = 'torbeam'
+# mode_flag = -1
+
+# beam_me_up( poloidal_launch_angle_Torbeam,
+#             toroidal_launch_angle_Torbeam,
+#             launch_freq_GHz,
+#             mode_flag,
+#             vacuumLaunch_flag,
+#             launch_beam_width,
+#             launch_beam_radius_of_curvature,
+#             launch_position,
+#             find_B_method,
+#             efit_time_index,
+#             vacuum_propagation_flag,
+#             Psi_BC_flag,
+#             poloidal_flux_enter,
+#             output_filename_suffix='_Torbeam_benchmark',
+#             figure_flag= True,
+#             density_fit_parameters=None
+#             )# from ne_fit_radialcoord.py
+    
 
 

@@ -8,15 +8,19 @@ Created on Tue Nov  3 12:06:45 2020
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import cm
+
 
 from Scotty_fun_general import find_widths_and_curvatures, find_Psi_3D_lab_Cartesian, find_Psi_3D_lab, contract_special
 
-loadfile = np.load('data_input0.npz')
+suffix = ''
+
+loadfile = np.load('data_input' + suffix + '.npz')
 launch_position = loadfile['launch_position']
 launch_K = loadfile['launch_K']
 loadfile.close()
 
-loadfile = np.load('data_output0.npz')
+loadfile = np.load('data_output' + suffix + '.npz')
 g_magnitude_output = loadfile['g_magnitude_output']
 q_R_array = loadfile['q_R_array']
 q_zeta_array = loadfile['q_zeta_array']
@@ -35,7 +39,7 @@ dH_dKzeta_output = loadfile['dH_dKzeta_output']
 dH_dKZ_output = loadfile['dH_dKZ_output']
 loadfile.close()
 
-loadfile = np.load('analysis_output0.npz')
+loadfile = np.load('analysis_output' + suffix + '.npz')
 Psi_xx_output = loadfile['Psi_xx_output']
 Psi_xy_output = loadfile['Psi_xy_output']
 Psi_yy_output = loadfile['Psi_yy_output']
@@ -89,6 +93,43 @@ plt.subplot(1,2,2)
 plt.plot(rad_curv_ellipse_entry[:,0],rad_curv_ellipse_entry[:,1])
 plt.plot(rad_curv_ellipse_initial[:,0],rad_curv_ellipse_initial[:,1])
 plt.gca().set_aspect('equal', adjustable='box')
+
+
+
+def plot_curvature(curvature_x,curvature_y):
+    x_plot = np.linspace(-50,50,101)
+    y_plot = np.linspace(-50,50,101)
+    x_mesh, y_mesh = np.meshgrid(x_plot, y_plot, sparse=False, indexing='ij')
+    
+    z_mesh = -curvature_x * x_mesh**2 + -curvature_y * y_mesh**2
+    
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    surf = ax.plot_surface(x_mesh, y_mesh, z_mesh, 
+                           cmap=cm.coolwarm,
+                           linewidth=0, antialiased=False, 
+                           alpha=0.3)
+
+    ax.contourf(x_mesh, y_mesh, z_mesh,
+                  25,cmap=cm.coolwarm)
+
+    cset = ax.contour(x_mesh, y_mesh, z_mesh, zdir='z', offset=0, cmap=cm.coolwarm)
+    cset = ax.contour(x_mesh, y_mesh, z_mesh, zdir='x', offset=-50, cmap=cm.coolwarm)
+    cset = ax.contour(x_mesh, y_mesh, z_mesh, zdir='y', offset=50, cmap=cm.coolwarm)
+
+    ax.set_xlim(-60, 60)
+    ax.set_ylim(-60, 60)
+    ax.set_zlim(-100, z_mesh.max())
+    
+    # ax.plot_surface(X, Y, Z, rstride=8, cstride=8, alpha=0.3)
+    # cset = ax.contour(X, Y, Z, zdir='z', offset=-100, cmap=cm.coolwarm)
+    # cset = ax.contour(X, Y, Z, zdir='x', offset=-40, cmap=cm.coolwarm)
+    # cset = ax.contour(X, Y, Z, zdir='y', offset=40, cmap=cm.coolwarm)
+    
+    plt.show()
+    
+plot_curvature(Psi_w_initial_real_eigval_a,Psi_w_initial_real_eigval_b)
+plot_curvature(Psi_w_entry_real_eigval_a,Psi_w_entry_real_eigval_b)
 
 
 #

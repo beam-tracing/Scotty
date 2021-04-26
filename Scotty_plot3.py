@@ -8,9 +8,12 @@ Created on Sun Nov 24 20:15:24 2019
 import numpy as np
 import matplotlib.pyplot as plt
 from Scotty_fun_general import find_waist, find_distance_from_waist,find_q_lab_Cartesian, find_nearest, contract_special
+from Scotty_fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq
 import tikzplotlib
+import math
+from scipy import constants
 
-suffix = ''
+suffix = '_Torbeam_benchmark'
 
 loadfile = np.load('data_output' + suffix + '.npz')
 tau_array = loadfile['tau_array']
@@ -24,6 +27,11 @@ x_hat_output = loadfile['x_hat_output']
 y_hat_output = loadfile['y_hat_output']
 g_hat_output = loadfile['g_hat_output']
 b_hat_output = loadfile['b_hat_output']
+epsilon_para_output = loadfile['epsilon_para_output']
+epsilon_perp_output = loadfile['epsilon_perp_output']
+epsilon_g_output = loadfile['epsilon_g_output']
+B_magnitude = loadfile['B_magnitude']
+electron_density_output = loadfile['electron_density_output']
 loadfile.close()
 
 loadfile = np.load('analysis_output' + suffix + '.npz')
@@ -50,6 +58,7 @@ theta_output = loadfile['theta_output']
 theta_m_output = loadfile['theta_m_output']
 y_hat_Cartesian = loadfile['y_hat_Cartesian']
 x_hat_Cartesian = loadfile['x_hat_Cartesian']
+K_magnitude_array = loadfile['K_magnitude_array']
 loadfile.close()
 
 loadfile = np.load('data_input' + suffix + '.npz')
@@ -59,6 +68,7 @@ data_Z_coord = loadfile['data_Z_coord']
 launch_position = loadfile['launch_position']
 launch_beam_width = loadfile['launch_beam_width']
 launch_beam_radius_of_curvature = loadfile['launch_beam_radius_of_curvature']
+launch_freq_GHz = loadfile['launch_freq_GHz']
 loadfile.close()
 
 l_lc = distance_along_line-distance_along_line[cutoff_index] # Distance from cutoff
@@ -207,6 +217,9 @@ plt.xlabel(r'$l-l_c$')
 
 
 # ------------------
+# plt.figure()
+# plt.plot(l_lc,q_zeta_array)
+
 plt.figure()
 plt.plot(l_lc,np.rad2deg(theta_output),label='theta')
 plt.plot(l_lc,np.rad2deg(theta_m_output),label='theta_m')
@@ -214,21 +227,99 @@ plt.legend()
 plt.xlabel('l - l_c')
 plt.ylabel('deg')
 
-plot_index = 0
 
-x_hat_plot = x_hat_output[plot_index,:]
-y_hat_plot = y_hat_output[plot_index,:]
-g_hat_plot = g_hat_output[plot_index,:]
+factor=-1-theta_output/theta_m_output
 
-e_hat_plot = e_hat_output[plot_index,:]
-# e_hat has components e_1,e_2,e_b
+launch_angular_frequency = 2*math.pi*10.0**9 * launch_freq_GHz
+wavenumber_K0 = launch_angular_frequency / constants.c
 
-theta_plot = theta_output[plot_index]
+om_pe_norm = find_normalised_plasma_freq(electron_density_output, launch_angular_frequency)
+om_ce_norm = find_normalised_gyro_freq(B_magnitude, launch_angular_frequency)
 
+
+
+K_mag = K_magnitude_array
+eps_11 =epsilon_perp_output
+eps_12 = epsilon_g_output
+eps_bb = epsilon_para_output
+N_sq = K_mag**2 / wavenumber_K0**2
+
+
+factor2 = (
+    		  eps_11**2 
+    		- eps_12**2
+            - eps_11 * eps_bb
+            - eps_11 * N_sq
+            + eps_bb * N_sq
+        ) / (
+    		- eps_11**2 
+    		+ eps_12**2
+            - eps_11 * eps_bb
+            + eps_11 * N_sq * 2
+          )
+
+factor_O = - om_pe_norm**2
+
+factor_X = (om_pe_norm**2*(1-om_pe_norm**2))/(1-om_pe_norm**2-om_ce_norm**2)
+            
+plt.figure()
+plt.plot(l_lc,factor,'ko', label='-1 - theta / theta_m')
+plt.plot(l_lc,factor2,label='Either mode')
+plt.plot(l_lc,factor_X,label='X mode')
+plt.legend()
+plt.xlabel('l - l_c')
 
 plt.figure()
-plt.arrow(0, 0, -abs(e_hat_plot[2])*np.cos(theta_plot), abs(e_hat_plot[1]), length_includes_head=True, head_width=0.1 )
-plt.xlim(-1,1)
-plt.ylim(-1,1)
-plt.xlabel('x')
-plt.ylabel('y') #these are the beam coordinates x,y,
+plt.subplot(2,2,1)
+plt.plot(l_lc,eps_11)
+plt.title('eps11')
+plt.subplot(2,2,2)
+plt.plot(l_lc,eps_12)
+plt.title('eps12')
+plt.subplot(2,2,3)
+plt.plot(l_lc,eps_bb)
+plt.title('epsbb')
+plt.subplot(2,2,4)
+plt.plot(l_lc,N_sq)
+plt.title('N_sq')
+
+plt.figure()
+plt.subplot(1,2,1)
+plt.plot(l_lc,    		  eps_11**2 
+    		- eps_12**2
+            - eps_11 * eps_bb
+            - eps_11 * N_sq
+            + eps_bb * N_sq)
+plt.title('numerator')
+plt.subplot(1,2,2)
+plt.plot(l_lc,    		- eps_11**2 
+    		+ eps_12**2
+            - eps_11 * eps_bb
+            + eps_11 * N_sq * 2)
+plt.title('denominator')
+
+# plt.figure()
+# plt.plot(l_lc,np.rad2deg(theta_output),label='theta')
+# plt.plot(l_lc,np.rad2deg(theta_m_output),label='theta_m')
+# plt.legend()
+# plt.xlabel('l - l_c')
+# plt.ylabel('deg')
+
+# plot_index = 0
+
+# x_hat_plot = x_hat_output[plot_index,:]
+# y_hat_plot = y_hat_output[plot_index,:]
+# g_hat_plot = g_hat_output[plot_index,:]
+
+# e_hat_plot = e_hat_output[plot_index,:]
+# # e_hat has components e_1,e_2,e_b
+
+# theta_plot = theta_output[plot_index]
+
+
+# plt.figure()
+# plt.arrow(0, 0, -abs(e_hat_plot[2])*np.cos(theta_plot), abs(e_hat_plot[1]), length_includes_head=True, head_width=0.1 )
+# plt.xlim(-1,1)
+# plt.ylim(-1,1)
+# plt.xlabel('x')
+# plt.ylabel('y') #these are the beam coordinates x,y,
