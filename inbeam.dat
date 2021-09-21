@@ -12,9 +12,9 @@
  ncdroutine = 2
  nrela = 0
  xf = 5.5e+10
- xpoldeg = 0.0
- xtordeg = 0.0
- xxb = 145.0
+ xpoldeg = 10.0
+ xtordeg = 5.0
+ xxb = 220.0
  xyb = 0
  xzb = 0
  xdns = 1.02e+14
@@ -35,7 +35,7 @@
  xwyyb = 5.0
  xwzzb = 5.0
  xpw0 = 1
- xrmaj = 75.0
+ xrmaj = 150.0
  xrmin = 50.0
  xb0 = 2.01254
  xdel0 = 0.0
