@@ -78,7 +78,7 @@ kappa_dot_yhat_output = loadfile['kappa_dot_yhat_output']
 delta_k_perp_2 = loadfile['delta_k_perp_2']
 delta_theta_m = loadfile['delta_theta_m']
 theta_m_output = loadfile['theta_m_output']
-k_perp_1_backscattered = loadfile['k_perp_1_backscattered']
+k_perp_1_bs = loadfile['k_perp_1_bs']
 cutoff_index = loadfile['cutoff_index']
 K_magnitude_array = loadfile['K_magnitude_array']
 poloidal_flux_on_midplane = loadfile['poloidal_flux_on_midplane']
@@ -94,7 +94,7 @@ M_w_inv_yy_output = loadfile['M_w_inv_yy_output']
 loadfile.close()
 
 loadfile = np.load('data_input' + suffix + '.npz')
-data_poloidal_flux_grid = loadfile['data_poloidal_flux_grid']
+poloidalFlux_grid = loadfile['poloidalFlux_grid']
 data_R_coord = loadfile['data_R_coord']
 data_Z_coord = loadfile['data_Z_coord']
 launch_position = loadfile['launch_position']
@@ -174,7 +174,7 @@ l_lc = distance_along_line[:out_index:plot_every_n_points]-distance_along_line[c
 plt.figure(figsize=(5,5))
 plt.title('Poloidal Plane')
 contour_levels = np.linspace(0,1,11)
-CS = plt.contour(data_R_coord[R_start_index:R_end_index], data_Z_coord[Z_start_index:Z_end_index], np.transpose(data_poloidal_flux_grid[R_start_index:R_end_index,Z_start_index:Z_end_index]), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
+CS = plt.contour(data_R_coord[R_start_index:R_end_index], data_Z_coord[Z_start_index:Z_end_index], np.transpose(poloidalFlux_grid[R_start_index:R_end_index,Z_start_index:Z_end_index]), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
 plt.clabel(CS, inline=True, fontsize=10,inline_spacing=1,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
 plt.xlim(1.0,1.8)
 plt.ylim(-0.7,0.1)
