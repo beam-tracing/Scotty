@@ -22,6 +22,159 @@ from Scotty_fun_mix import find_d2H_dKR_dR, find_d2H_dKR_dZ, find_d2H_dKzeta_dR,
 
 from Scotty_fun_general import find_H_numba
 
+# Functions (gradients of H, vectorised)
+def find_grad_grad_H_vectorised(q_R, q_Z, K_R, K_zeta, K_Z,
+                                launch_angular_frequency, mode_flag,
+                                delta_R, delta_Z,
+                                interp_poloidal_flux, find_density_1D,
+                                find_B_R, find_B_T, find_B_Z):
+    # \nabla \nabla H
+    d2H_dR2   = find_d2H_dR2(q_R, q_Z, K_R, K_zeta, K_Z,
+                             launch_angular_frequency, mode_flag,
+                             delta_R,
+                             interp_poloidal_flux, find_density_1D,
+                             find_B_R, find_B_T, find_B_Z
+                             )
+    d2H_dR_dZ = find_d2H_dR_dZ(q_R ,q_Z, K_R, K_zeta, K_Z,
+                               launch_angular_frequency, mode_flag,
+                               delta_R, delta_Z,
+                               interp_poloidal_flux, find_density_1D,
+                               find_B_R, find_B_T, find_B_Z
+                               )
+    d2H_dZ2   = find_d2H_dZ2(q_R, q_Z, K_R, K_zeta, K_Z,
+                             launch_angular_frequency, mode_flag,
+                             delta_Z,
+                             interp_poloidal_flux, find_density_1D,
+                             find_B_R, find_B_T, find_B_Z
+                             )
+    
+    zeros = np.zeros_like(d2H_dR2)
+    grad_grad_H = np.moveaxis(
+            np.squeeze(
+                np.array([
+                    [d2H_dR2  , zeros, d2H_dR_dZ],
+                    [zeros    , zeros, zeros    ],
+                    [d2H_dR_dZ, zeros, d2H_dZ2  ]
+                ])
+            ),
+        2,0) # Such that shape is [points,3,3] instead of [3,3,points]
+    
+    return grad_grad_H
+
+def find_gradK_grad_H_vectorised(q_R, q_Z, K_R, K_zeta, K_Z,
+                                 launch_angular_frequency, mode_flag,
+                                 delta_K_R, delta_K_zeta, delta_K_Z, 
+                                 delta_R, delta_Z,
+                                 interp_poloidal_flux, find_density_1D,
+                                 find_B_R, find_B_T, find_B_Z
+                                 ):
+    # \nabla_K \nabla H
+    d2H_dKR_dR    = find_d2H_dKR_dR(q_R, q_Z, K_R, K_zeta, K_Z,
+                                    launch_angular_frequency, mode_flag,
+                                    delta_K_R, delta_R,
+                                    interp_poloidal_flux, find_density_1D,
+                                    find_B_R, find_B_T, find_B_Z
+                                    )
+    d2H_dKZ_dZ    = find_d2H_dKZ_dZ(q_R, q_Z, K_R, K_zeta, K_Z,
+                                    launch_angular_frequency, mode_flag,
+                                    delta_K_Z, delta_Z,
+                                    interp_poloidal_flux, find_density_1D,
+                                    find_B_R, find_B_T, find_B_Z
+                                    )
+    d2H_dKR_dZ    = find_d2H_dKR_dZ(q_R, q_Z, K_R, K_zeta, K_Z,
+                                    launch_angular_frequency, mode_flag,
+                                    delta_K_R, delta_Z,
+                                    interp_poloidal_flux, find_density_1D,
+                                    find_B_R, find_B_T, find_B_Z
+                                    )
+    d2H_dKzeta_dZ = find_d2H_dKzeta_dZ(q_R, q_Z, K_R, K_zeta, K_Z, 
+                                       launch_angular_frequency, mode_flag,
+                                       delta_K_zeta, delta_Z,
+                                       interp_poloidal_flux, find_density_1D,
+                                       find_B_R, find_B_T, find_B_Z
+                                       )
+    d2H_dKzeta_dR = find_d2H_dKzeta_dR(q_R, q_Z, K_R, K_zeta, K_Z,
+                                       launch_angular_frequency, mode_flag,
+                                       delta_K_zeta, delta_R,
+                                       interp_poloidal_flux, find_density_1D,
+                                       find_B_R, find_B_T, find_B_Z
+                                       )
+    d2H_dKZ_dR    = find_d2H_dKZ_dR(q_R, q_Z, K_R, K_zeta, K_Z,
+                                    launch_angular_frequency, mode_flag,
+                                    delta_K_Z, delta_R,
+                                    interp_poloidal_flux, find_density_1D,
+                                    find_B_R, find_B_T, find_B_Z
+                                    )
+    
+    zeros = np.zeros_like(d2H_dKR_dR)
+    gradK_grad_H = np.moveaxis(
+            np.squeeze(
+                np.array([
+                    [d2H_dKR_dR,    zeros, d2H_dKR_dZ   ],
+                    [d2H_dKzeta_dR, zeros, d2H_dKzeta_dZ],
+                    [d2H_dKZ_dR,    zeros, d2H_dKZ_dZ   ]
+                ])
+            ),
+        2,0) # Such that shape is [points,3,3] instead of [3,3,points]
+
+    return gradK_grad_H
+
+def find_gradK_gradK_H_vectorised(q_R, q_Z, K_R, K_zeta, K_Z,
+                                  launch_angular_frequency, mode_flag,
+                                  delta_K_R, delta_K_zeta, delta_K_Z,
+                                  interp_poloidal_flux, find_density_1D,
+                                  find_B_R, find_B_T, find_B_Z
+                                  ):
+    # \nabla_K \nabla_K H
+    d2H_dKR2       = find_d2H_dKR2(q_R, q_Z, K_R, K_zeta, K_Z,
+                                   launch_angular_frequency, mode_flag,
+                                   delta_K_R,
+                                   interp_poloidal_flux, find_density_1D,
+                                   find_B_R, find_B_T, find_B_Z
+                                   )
+    d2H_dKzeta2    = find_d2H_dKzeta2(q_R, q_Z, K_R, K_zeta, K_Z,
+                                      launch_angular_frequency, mode_flag,
+                                      delta_K_zeta,
+                                      interp_poloidal_flux, find_density_1D,
+                                      find_B_R, find_B_T, find_B_Z
+                                      )
+    d2H_dKZ2       = find_d2H_dKZ2(q_R, q_Z, K_R, K_zeta, K_Z,
+                                   launch_angular_frequency, mode_flag,
+                                   delta_K_Z,
+                                   interp_poloidal_flux, find_density_1D,
+                                   find_B_R, find_B_T, find_B_Z
+                                   )
+    d2H_dKR_dKzeta = find_d2H_dKR_dKzeta(q_R, q_Z, K_R, K_zeta, K_Z,
+                                         launch_angular_frequency, mode_flag,
+                                         delta_K_R, delta_K_zeta,
+                                         interp_poloidal_flux, find_density_1D,
+                                         find_B_R, find_B_T, find_B_Z
+                                         )
+    d2H_dKR_dKZ    = find_d2H_dKR_dKZ(q_R, q_Z, K_R, K_zeta, K_Z,
+                                      launch_angular_frequency, mode_flag,
+                                      delta_K_R, delta_K_Z,
+                                      interp_poloidal_flux, find_density_1D,
+                                      find_B_R, find_B_T, find_B_Z
+                                      )
+    d2H_dKzeta_dKZ = find_d2H_dKzeta_dKZ(q_R, q_Z, K_R, K_zeta, K_Z,
+                                         launch_angular_frequency, mode_flag,
+                                         delta_K_zeta, delta_K_Z,
+                                         interp_poloidal_flux, find_density_1D,
+                                         find_B_R, find_B_T, find_B_Z
+                                         )
+    gradK_gradK_H = np.moveaxis(
+            np.squeeze(
+                np.array([
+                    [d2H_dKR2      , d2H_dKR_dKzeta, d2H_dKR_dKZ   ],
+                    [d2H_dKR_dKzeta, d2H_dKzeta2   , d2H_dKzeta_dKZ],
+                    [d2H_dKR_dKZ   , d2H_dKzeta_dKZ, d2H_dKZ2      ]
+                ])
+            ),
+        2,0) # Such that shape is [points,3,3] instead of [3,3,points]
+    
+    return gradK_gradK_H
+
+# ---------------------------------
 
 
     # Functions (solver)
