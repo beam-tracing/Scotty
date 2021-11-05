@@ -15,6 +15,7 @@ import numpy as np
 from scipy import constants as constants
 from scipy import interpolate as interpolate
 from scipy import optimize as optimize
+from scipy import integrate as integrate
 import sys
 
 
@@ -73,6 +74,8 @@ def contract_special(arg_a,arg_b):
 def make_unit_vector_from_cross_product(vector_a, vector_b):
     """
     Assume np.shape(vector_a) = np.shape(vector_b) = (n,3) 
+    or
+    np.shape(vector_a) = (n,3) , np.shape(vector_b) = (3)
     """
     output_vector = np.cross(vector_a, vector_b)
     output_vector_magnitude = np.linalg.norm(output_vector,axis=-1)
@@ -118,9 +121,63 @@ def find_x0(xs,ys,y0):
     
     return x0
 
+def find_area_points(xs,ys,fraction_wanted):
+    """
+    ys = f(xs)
+    
+    Finds the maximum in ys, and finds an area around that
+    Used to find localisation
+    
+    Assume xs sorted in ascending order    
+    """
+    
+    if fraction_wanted > 0.5 or fraction_wanted < 0.0:
+        print('Invalid value given for fraction')
+    x_vals = np.zeros(2)    
+    y_vals = np.zeros(2)    
+    
+    cumulative_ys          = integrate.cumulative_trapezoid(ys,xs,initial=0)
+    cumulative_ys_at_y_max = cumulative_ys[ys.argmax()]
+    total_ys               = integrate.simps(ys,xs)
+    fraction_at_y_max      = cumulative_ys_at_y_max / total_ys
+
+    if (fraction_at_y_max - fraction_wanted) < 0:
+        lower_fraction = 0.0
+        upper_fraction = 2 * fraction_wanted
+
+    elif (fraction_at_y_max + fraction_wanted) > 1.0:
+        lower_fraction = 1 - 2 * fraction_wanted
+        upper_fraction = 1.0
+
+    else:
+        lower_fraction = fraction_at_y_max - fraction_wanted
+        upper_fraction = fraction_at_y_max + fraction_wanted
+
+    interp_x = interpolate.interp1d(cumulative_ys/total_ys, xs, fill_value='extrapolate')
+    x_vals[:] = interp_x([lower_fraction,upper_fraction])
+
+    interp_y = interpolate.interp1d(xs, ys, fill_value='extrapolate')
+    y_vals[:] = interp_y(x_vals)
+
+    return x_vals, y_vals
+
+
 #----------------------------------
     
 # Functions (Coordinate transformations)
+def find_vec_lab_Cartesian(vec_lab, q_zeta):
+    # vec_lab to have shape (n,3) or (3) # I've not tested the second case
+    
+    vec_R    = vec_lab.T[0]
+    vec_zeta = vec_lab.T[1]
+    vec_Z    = vec_lab.T[2]
+    
+    vec_lab_Cartesian = np.zeros_like(vec_lab)
+    vec_lab_Cartesian.T[0] = vec_R * np.cos(q_zeta) - vec_zeta*np.sin(q_zeta)
+    vec_lab_Cartesian.T[1] = vec_R * np.sin(q_zeta) + vec_zeta*np.cos(q_zeta)
+    vec_lab_Cartesian.T[2] = vec_Z   
+    return vec_lab_Cartesian
+
 def find_q_lab_Cartesian(q_lab):
     q_R    = q_lab[0]
     q_zeta = q_lab[1]
@@ -648,6 +705,17 @@ def find_distance_from_waist(width, wavenumber, curvature): #Finds how far you a
     waist = width / np.sqrt(1+curvature**2 * width**4 * wavenumber**2 / 4)
     distance_from_waist = np.sign(curvature)*np.sqrt((width**2 - waist**2)*waist**2*wavenumber**2/4)
     return distance_from_waist
+
+def propagate_circular_beam(distance,wavenumber,w0):
+    """
+    w0 : Width of beam waist
+    
+    Note that the curvature in this function returns has units of inverse length.
+    """
+    z_R = find_Rayleigh_length(w0, wavenumber)
+    widths = w0 * np.sqrt(1+(distance/z_R)**2)
+    curvatures = distance*(1+(z_R/distance)**2)
+    return widths, curvatures
 #----------------------------------
 
 
@@ -937,7 +1005,7 @@ def find_d2_poloidal_flux_dZ2(q_R, q_Z, delta_Z, interp_poloidal_flux):
 """
 Written by Neal Crocker, added to Scotty by Valerian.
 Converts mirror angles of the MAST DBS to launch angles (genray)
-Genray -> Scotty/Torbeam: poloidal launch angle has opposite sign
+Genray -> Scotty/Torbeam: poloidal and toroidal launch angles have opposite signs
 """
 def use_deg_args(func,*args,**kwargs):
     'transform args from degrees to radians before calling' #doc string
