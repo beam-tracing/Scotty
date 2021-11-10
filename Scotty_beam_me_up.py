@@ -66,6 +66,8 @@ from netCDF4 import Dataset
 import bisect
 import time
 
+
+
 from Scotty_fun_general import read_floats_into_list_until, find_nearest, contract_special, make_unit_vector_from_cross_product, find_x0, find_H, find_waist
 from Scotty_fun_general import find_inverse_2D, find_Psi_3D_lab, find_q_lab_Cartesian, find_K_lab_Cartesian, find_K_lab, find_Psi_3D_lab_Cartesian
 from Scotty_fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq
@@ -78,7 +80,7 @@ from Scotty_fun_general import find_d2_poloidal_flux_dR2, find_d2_poloidal_flux_
 from Scotty_fun_general import find_H_Cardano, find_D
 
 from Scotty_fun_evolution import ray_evolution_2D_fun, beam_evolution_fun
-
+from Scotty_fun_evolution import find_grad_grad_H_vectorised, find_gradK_grad_H_vectorised, find_gradK_gradK_H_vectorised
 
 from Scotty_fun_FFD import find_dH_dR, find_dH_dZ # \nabla H
 from Scotty_fun_CFD import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta # \nabla_K H
@@ -91,27 +93,33 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                toroidal_launch_angle_Torbeam,
                launch_freq_GHz,
                mode_flag,
-               vacuumLaunch_flag,
                launch_beam_width,
                launch_beam_radius_of_curvature,
                launch_position,
-               find_B_method,
-               efit_time_index=None,
-               vacuum_propagation_flag=False,
-               Psi_BC_flag = False,
-               poloidal_flux_enter=None,
-               input_filename_suffix='',
-               output_filename_suffix='',
-               figure_flag=True,
-               plasmaLaunch_K=np.zeros(3),
-               plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3,3]),
-               density_fit_parameters=None,
+               vacuumLaunch_flag                 = True,               
+               find_B_method                     = 'torbeam',
+               ne_data_path                      = None,
+               magnetic_data_path                = None,
+               shot                              = None,
+               equil_time                        = None,
+               vacuum_propagation_flag           = False,
+               Psi_BC_flag                       = False,
+               poloidal_flux_enter               = None,
+               input_filename_suffix             = '',
+               output_filename_suffix            = '',
+               figure_flag                       = True,
+               plasmaLaunch_K                    = np.zeros(3),
+               plasmaLaunch_Psi_3D_lab_Cartesian = np.zeros([3,3]),
+               density_fit_parameters            = None,
+               ### In development
+               B_T_axis                          = None,
+               R_axis                            = None
                ):
 
     """
-    find_B_method: 1) 'efit' finds B from efit files directly 2) 'torbeam' finds B from topfile
+    find_B_method: 1) 'efitpp' finds B from efitpp files directly 2) 'torbeam' finds B from topfile 3) UDA_saved
     """
-
+    
     delta_R = -0.0001 #in the same units as data_R_coord
     delta_Z = 0.0001 #in the same units as data_Z_coord
     delta_K_R = 0.1 #in the same units as K_R
@@ -171,7 +179,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     #data_B_T_grid = B_toroidal_fun(B_toroidal_max, data_R_coord, data_Z_coord, major_radius)
     #data_B_R_grid = B_r_fun(B_poloidal_max, data_R_coord, data_Z_coord, major_radius, minor_radius)
     #data_B_Z_grid = B_z_fun(B_poloidal_max, data_R_coord, data_Z_coord, major_radius, minor_radius)
-    #data_poloidal_flux_grid = psi_fun(x_grid,z_grid, major_radius, minor_radius)
+    #poloidalFlux_grid = psi_fun(x_grid,z_grid, major_radius, minor_radius)
     ## ------------------------------
 
     # Tidying up the input data
@@ -183,12 +191,15 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     # input_files_path ='D:\\Dropbox\\VHChen2020\\Data\\Input_Files_29Apr2019\\'
     # input_files_path ='D:\\Dropbox\\VHChen2018\\Data\\Input_Files_29Apr2019\\'
     # input_files_path ='D:\\Dropbox\\VHChen2019\\Code - Scotty\\Benchmark_9\\Torbeam\\'
-    input_files_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
+    if ne_data_path is None:
+        ne_data_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
+    if magnetic_data_path is None:
+        magnetic_data_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
     
     if density_fit_parameters is None:
         print('ne(psi): loading from input file')
         # Importing data from ne.dat
-        ne_filename = input_files_path + 'ne' +input_filename_suffix+ '.dat'
+        ne_filename = ne_data_path + 'ne' +input_filename_suffix+ '.dat'
         
         ne_data = np.fromfile(ne_filename,dtype=float, sep='   ') # electron density as a function of poloidal flux label
         
@@ -207,12 +218,11 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         
     elif len(density_fit_parameters) == 4:
         print('ne(psi): Using order_1_polynomial*tanh')
-        print('Warning: Scale factor of 1.1 used')
         ne_data_density_array=None # So that saving the input data later does not complain
         ne_data_radialcoord_array=None # So that saving the input data later does not complain
         
         def find_density_1D(poloidal_flux, poloidal_flux_enter=poloidal_flux_enter,density_fit_parameters=density_fit_parameters):
-            density_fit = 1.1*(density_fit_parameters[0]*poloidal_flux + density_fit_parameters[1])*np.tanh(density_fit_parameters[2] * poloidal_flux + density_fit_parameters[3])
+            density_fit = (density_fit_parameters[0]*poloidal_flux + density_fit_parameters[1])*np.tanh(density_fit_parameters[2] * poloidal_flux + density_fit_parameters[3])
             is_inside = poloidal_flux <= poloidal_flux_enter # Boolean array
             density = is_inside * density_fit # The Boolean array sets stuff outside poloidal_flux_enter to zero
             return density     
@@ -240,7 +250,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         # topfile
         #Others: inbeam.dat, Te.dat (not currently used in this code)
     
-        topfile_filename = input_files_path + 'topfile' +input_filename_suffix
+        topfile_filename = magnetic_data_path + 'topfile' + input_filename_suffix
     
         with open(topfile_filename) as f:
             while not 'X-coordinates' in f.readline(): pass # Start reading only from X-coords onwards
@@ -249,7 +259,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
             data_B_R_grid = read_floats_into_list_until('B_t', f)
             data_B_T_grid = read_floats_into_list_until('B_Z', f)
             data_B_Z_grid = read_floats_into_list_until('psi', f)
-            data_poloidal_flux_grid = read_floats_into_list_until('you fall asleep', f)
+            poloidalFlux_grid = read_floats_into_list_until('you fall asleep', f)
         # ------------------------------
 
         ## Converts some lists to arrays so that stuff later doesn't complain
@@ -260,7 +270,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         data_B_R_grid = np.transpose((np.asarray(data_B_R_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
         data_B_T_grid = np.transpose((np.asarray(data_B_T_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
         data_B_Z_grid = np.transpose((np.asarray(data_B_Z_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
-        data_poloidal_flux_grid = np.transpose((np.asarray(data_poloidal_flux_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
+        poloidalFlux_grid = np.transpose((np.asarray(poloidalFlux_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
         # -------------------
     
         # Interpolation functions declared
@@ -280,63 +290,127 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
             B_Z = interp_B_Z(q_R,q_Z,grid=False)
             return B_Z
 
-        interp_poloidal_flux = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_poloidal_flux_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
-        #    interp_poloidal_flux = interpolate.interp2d(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), kind='cubic',
+        interp_poloidal_flux = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,poloidalFlux_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        #    interp_poloidal_flux = interpolate.interp2d(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), kind='cubic',
         #                                           copy=True, bounds_error=False, fill_value=None) # Flux extrapolated outside region
         
         efit_time = None # To prevent the data-saving routines from complaining later on
         
-    elif find_B_method == 'efit':
-        print('Using efit output files directly for B and poloidal flux')
+    elif (find_B_method == 'EFITpp') or (find_B_method == 'UDA_saved'):
+        if find_B_method == 'EFITpp':
+            print('Using MSE-constrained EFIT++ output files directly for B and poloidal flux')
+    
+            dataset = Dataset(magnetic_data_path + 'efitOut.nc')
+            
+            efitpp_times = dataset.variables['time'][:]
+    #        equilibriumStatus_array = dataset.variables['equilibriumStatus'][:]
+            time_idx = find_nearest(efitpp_times,equil_time)
+            print('EFIT++ time', efitpp_times[time_idx])
+            
+            output_group = dataset.groups['output']
+    #        input_group = dataset.groups['input']
+            
+            profiles2D = output_group.groups['profiles2D']
+            unnormalised_poloidalFlux_grid = profiles2D.variables['poloidalFlux'][time_idx][:][:] #unnormalised, as a function of R and Z
+            data_R_coord = profiles2D.variables['r'][time_idx][:]
+            data_Z_coord = profiles2D.variables['z'][time_idx][:]
+            
+            # radialProfiles = output_group.groups['radialProfiles']
+            # Bt_array = radialProfiles.variables['Bt'][time_idx][:]
+            # r_array_B = radialProfiles.variables['r'][time_idx][:]
+            
+            # separatrixGeometry = output_group.groups['separatrixGeometry']
+            # geometricAxis = separatrixGeometry.variables['geometricAxis'][time_index] # R,Z location of the geometric axis
+            
+            # globalParameters = output_group.groups['globalParameters']
+            # bvacRgeom = globalParameters.variables['bvacRgeom'][time_index] # Vacuum B field (= B_zeta, in vacuum) at the geometric axis
+            
+            fluxFunctionProfiles = output_group.groups['fluxFunctionProfiles']
+            poloidalFlux = fluxFunctionProfiles.variables['normalizedPoloidalFlux'][:]
+            unnormalizedPoloidalFlux = fluxFunctionProfiles.variables['poloidalFlux'][time_idx][:] # poloidalFlux as a function of normalised poloidal flux
+            rBphi = fluxFunctionProfiles.variables['rBphi'][time_idx][:] 
+            dataset.close()
 
-        dataset = Dataset('efitOut_29908.nc')
-        
-        time_index = efit_time_index
-        time_array = dataset.variables['time'][:]
-#        equilibriumStatus_array = dataset.variables['equilibriumStatus'][:]
-        
-        efit_time = time_array[time_index]
-        print(efit_time)
-        
-        output_group = dataset.groups['output']
-#        input_group = dataset.groups['input']
-        
-        profiles2D = output_group.groups['profiles2D']
-        data_unnormalised_poloidal_flux_grid = profiles2D.variables['poloidalFlux'][time_index][:][:] #unnormalised, as a function of R and Z
-        data_R_coord = profiles2D.variables['r'][time_index][:]
-        data_Z_coord = profiles2D.variables['z'][time_index][:]
-        
-        # radialProfiles = output_group.groups['radialProfiles']
-        # Bt_array = radialProfiles.variables['Bt'][time_index][:]
-        # r_array_B = radialProfiles.variables['r'][time_index][:]
-        
-        # separatrixGeometry = output_group.groups['separatrixGeometry']
-        # geometricAxis = separatrixGeometry.variables['geometricAxis'][time_index] # R,Z location of the geometric axis
-        
-        # globalParameters = output_group.groups['globalParameters']
-        # bvacRgeom = globalParameters.variables['bvacRgeom'][time_index] # Vacuum B field (= B_zeta, in vacuum) at the geometric axis
-        
-        fluxFunctionProfiles = output_group.groups['fluxFunctionProfiles']
-        poloidalFlux = fluxFunctionProfiles.variables['normalizedPoloidalFlux'][:]
-        unnormalizedPoloidalFlux = fluxFunctionProfiles.variables['poloidalFlux'][time_index][:] # poloidalFlux as a function of normalised poloidal flux
-        rBphi = fluxFunctionProfiles.variables['rBphi'][time_index][:] 
+            # normalised_polflux = polflux_const_m * poloidalFlux + polflux_const_c (think y = mx + c)        
+            [polflux_const_m, polflux_const_c] = np.polyfit(unnormalizedPoloidalFlux,poloidalFlux,1) #linear fit
+            poloidalFlux_grid = unnormalised_poloidalFlux_grid*polflux_const_m + polflux_const_c
+    
+    
+        elif find_B_method == 'UDA_saved' and shot <= 30471: # MAST
+            print('marpmarpmarp')
+            print(shot)
+            # 30471 is the last shot on MAST
+            # data saved differently for MAST-U shots
+            loadfile                   = np.load(magnetic_data_path + str(shot) + '_equilibrium_data.npz')
+            rBphi_all_times            = loadfile['rBphi'] # On time base C
+            t_base_B                   = loadfile['t_base_B']
+            t_base_C                   = loadfile['t_base_C']
+            data_R_coord               = loadfile['R_EFIT']
+            data_Z_coord               = loadfile['Z_EFIT']    
+            polflux_axis_all_times     = loadfile['poloidal_flux_unnormalised_axis'] # Time base C
+            polflux_boundary_all_times = loadfile['poloidal_flux_unnormalised_boundary'] # Time base C
+            unnormalised_poloidalFlux_grid_all_times = loadfile['poloidal_flux_unnormalised'] # On time base B
+            loadfile.close()      
 
-        dataset.close()
+            t_base_B_idx = find_nearest(t_base_B, equil_time)
+            t_base_C_idx = find_nearest(t_base_C, t_base_B[t_base_B_idx]) # Get the same time slice
+            print('EFIT time', t_base_B[t_base_B_idx])
+            
+            rBphi            = rBphi_all_times[t_base_C_idx,:]
+            polflux_axis     = polflux_axis_all_times[t_base_C_idx]
+            polflux_boundary = polflux_boundary_all_times[t_base_C_idx]
+            unnormalised_poloidalFlux_grid = unnormalised_poloidalFlux_grid_all_times[t_base_B_idx,:,:].T         
 
+            # Taken from an old file of Sam Gibson's. Should probably check with Lucy or Sam.            
+            poloidalFlux = np.linspace(0,1.0,len(rBphi)) 
+            polflux_const_m = (1.0 - 0.0) / (polflux_boundary-polflux_axis)
+
+            poloidalFlux_grid = (unnormalised_poloidalFlux_grid - polflux_axis)/(polflux_boundary-polflux_axis)
+
+
+        elif find_B_method == 'UDA_saved' and shot > 30471: # MAST-U
+            # 30471 is the last shot on MAST
+            # data saved differently for MAST-U shots
+            loadfile                    = np.load(magnetic_data_path + str(shot) + '_equilibrium_data.npz')
+            rBphi_all_times             = loadfile['rBphi'] # On time base C
+            time_EFIT                   = loadfile['time_EFIT']
+            data_R_coord                = loadfile['R_EFIT']
+            data_Z_coord                = loadfile['Z_EFIT']    
+            poloidalFlux_grid_all_times = loadfile['poloidalFlux_grid'] 
+            poloidalFlux_all_times      = loadfile['poloidalFlux'] 
+            poloidalFlux_unnormalised_axis_all_times     = loadfile['poloidalFlux_unnormalised_axis']
+            poloidalFlux_unnormalised_boundary_all_times = loadfile['poloidalFlux_unnormalised_boundary']
+            loadfile.close()      
+
+            t_idx = find_nearest(time_EFIT, equil_time)
+            print('EFIT time', time_EFIT[t_idx])
+            
+            rBphi             = rBphi_all_times[t_idx,:]
+            poloidalFlux_grid = poloidalFlux_grid_all_times[t_idx,:,:]  
+            poloidalFlux      = poloidalFlux_all_times[t_idx,:]
+            
+            poloidalFlux_unnormalised_axis     = poloidalFlux_unnormalised_axis_all_times[t_idx,]
+            poloidalFlux_unnormalised_boundary = poloidalFlux_unnormalised_boundary_all_times[t_idx]
+            
+            polflux_const_m = (1.0 - 0.0) / (poloidalFlux_unnormalised_boundary-poloidalFlux_unnormalised_axis)
+            
+            plt.figure()
+            plt.plot(poloidalFlux)
+            print(poloidalFlux[-1])
+           
         interp_rBphi = interpolate.interp1d(poloidalFlux, rBphi, 
                                                  kind='cubic', axis=-1, copy=True, bounds_error=False, 
                                                  fill_value=rBphi[-1], assume_sorted=False)
  
-        # normalised_polflux = polflux_const_m * poloidalFlux + polflux_const_c (think y = mx + c)        
-        [polflux_const_m, polflux_const_c] = np.polyfit(unnormalizedPoloidalFlux,poloidalFlux,1) #linear fit
-        data_poloidal_flux_grid = data_unnormalised_poloidal_flux_grid*polflux_const_m + polflux_const_c
+
         
-        interp_poloidal_flux = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_poloidal_flux_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        interp_poloidal_flux = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,poloidalFlux_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
 
             # Extrapolation assumes the last element of rBphi corresponds to poloidalflux = 1
         rBphi_gradient_for_extrapolation = (rBphi[-1] - rBphi[-2])/(poloidalFlux[-1] - poloidalFlux[-2])
         last_poloidal_flux = poloidalFlux[-1]
         last_rBphi = rBphi[-1]
+        
         
         def find_B_R(q_R,q_Z,delta_R=delta_R,interp_poloidal_flux=interp_poloidal_flux,polflux_const_m=polflux_const_m):
             dpolflux_dZ = find_dpolflux_dZ(q_R,q_Z,delta_R,interp_poloidal_flux)
@@ -356,6 +430,10 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
             is_inside = polflux <= last_poloidal_flux # Boolean array. True if it's inside the range where the data is available
             is_outside = ~is_inside
             
+            # Let interp do the extrapolation
+            # rBphi = interp_rBphi(polflux)
+            
+            # Manually extrapolate
             rBphi = ( is_inside *   interp_rBphi(polflux)
                     + is_outside * (rBphi_gradient_for_extrapolation*(polflux-last_poloidal_flux) + last_rBphi)
                     )
@@ -369,13 +447,68 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
             B_Z = dpolflux_dR / (polflux_const_m * q_R)
             return B_Z
 
+    elif find_B_method == 'curvy_slab':
+        print('Analytical curvy slab geometry')
 
+        def find_B_R(q_R,q_Z):
+            return np.zeros_like(q_R)
+        
+        def find_B_T(q_R,q_Z,
+                     B_T_axis=B_T_axis, R_axis=R_axis):
+            B_T = B_T_axis * R_axis / q_R
+            return B_T
+        
+        def find_B_Z(q_R,q_Z):
+            return np.zeros_like(q_R)
+    
+    elif find_B_method == 'test':
+        # TODO: tidy up
+        # Works nicely with the new MAST-U UDA output
+        loadfile                    = np.load(magnetic_data_path + str(shot) + '_equilibrium_data.npz')
+        time_EFIT                   = loadfile['time_EFIT']
+        data_R_coord                = loadfile['R_EFIT']
+        data_Z_coord                = loadfile['Z_EFIT']    
+        poloidalFlux_grid_all_times = loadfile['poloidalFlux_grid'] 
+        Bphi_grid_all_times         = loadfile['Bphi_grid']
+        Br_grid_all_times           = loadfile['Br_grid']
+        Bz_grid_all_times           = loadfile['Bz_grid']
+        loadfile.close()      
+
+        t_idx = find_nearest(time_EFIT, equil_time)
+        print('EFIT time', time_EFIT[t_idx])    
+        
+        poloidalFlux_grid = poloidalFlux_grid_all_times[t_idx,:,:]          
+        data_B_R_grid     = Br_grid_all_times[t_idx,:,:] 
+        data_B_T_grid     = Bphi_grid_all_times[t_idx,:,:] 
+        data_B_Z_grid     = Bz_grid_all_times[t_idx,:,:] 
+        
+        # Interpolation functions declared
+        interp_B_R = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_R_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        interp_B_T = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_T_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        interp_B_Z = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_Z_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        
+        def find_B_R(q_R,q_Z):
+            B_R = interp_B_R(q_R,q_Z,grid=False)
+            return B_R
+    
+        def find_B_T(q_R,q_Z):
+            B_T = interp_B_T(q_R,q_Z,grid=False)
+            return B_T
+        
+        def find_B_Z(q_R,q_Z):
+            B_Z = interp_B_Z(q_R,q_Z,grid=False)
+            return B_Z
+
+        interp_poloidal_flux = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,poloidalFlux_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        #    interp_poloidal_flux = interpolate.interp2d(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), kind='cubic',
+        #                                           copy=True, bounds_error=False, fill_value=None) # Flux extrapolated outside region
+        
+        efit_time = None # To prevent the data-saving routines from complaining later on        
+    
     else:
         print('Invalid find_B_method')
         sys.exit()
         
-
-
 
 
 
@@ -665,7 +798,6 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     event_leave_simulation.direction = -1.0 # negative value, when function result goes from positive to negative
     # -------------------
 
-
     # Propagate the beam
         # Calls scipy's initial value problem solver   
         
@@ -686,13 +818,19 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                         ray_evolution_2D_fun, [0,tau_max], ray_parameters_2D_initial, 
                         method='RK45', t_eval=None, dense_output=False, 
                         events=solver_ray_events, vectorized=False, args=solver_arguments,
-                        max_step = 100
+                        max_step = 50
                     ) # This seems to be throwing a warning about ragged arrays, see if new scipy update fixes this
     solver_end_time = time.time()
     print('Time taken (ray solver)', solver_end_time-solver_start_time,'s')
 
     ray_parameters_2D = solver_ray_output.y
     tau_ray = solver_ray_output.t
+    
+    plt.title('Poloidal Plane')
+    contour_levels = np.linspace(0,1,11)
+    CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
+    plt.plot(ray_parameters_2D[0,:], ray_parameters_2D[1,:])
+    plt.clabel(CS, inline=True, fontsize=10,inline_spacing=1,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
     
     solver_ray_status = solver_ray_output.status
     if solver_ray_status != 1:
@@ -712,7 +850,6 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     ray_parameters_2D_events = solver_ray_output.y_events
     ray_parameters_LCFS      = ray_parameters_2D_events[1]
 
-    print(np.shape(ray_parameters_LCFS))
     
     if (len(tau_events[0]) != 0) and (len(tau_events[1]) == 0): 
         """
@@ -731,7 +868,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         If both event_leave_plasma and event_leave_LCFS occur
         """
         K_R_LCFS = ray_parameters_LCFS[0][2]
-        print(K_R_LCFS)
+
         if K_R_LCFS < 0:
             """
             Beam has gone through the plasma, terminate at LCFS
@@ -753,19 +890,19 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
           single step. The solver thus doesn't log the event when it really should
         """
         
-        plt.figure()
-        plt.plot(ray_parameters_2D[0,:],ray_parameters_2D[1,:],'o')
-        contour_levels = np.linspace(0,1,11)
-        CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
-        plt.clabel(CS, inline=True, fontsize=10,inline_spacing=-5,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
-        print(tau_events)
+        # plt.figure()
+        # plt.plot(ray_parameters_2D[0,:],ray_parameters_2D[1,:],'o')
+        # contour_levels = np.linspace(0,1,11)
+        # CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
+        # plt.clabel(CS, inline=True, fontsize=10,inline_spacing=-5,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
+        # print(tau_events)
 
 
         
         print('Warning: Ray has left the simulation region without leaving the LCFS.')
-        print('We should not be here. I am prematurely terminating this simulation.')
-        sys.exit()   
-        
+        # print('We should not be here. I am prematurely terminating this simulation.')
+        # sys.exit()   
+        tau_leave = np.squeeze(tau_events[2]) 
         ##
 
 
@@ -811,7 +948,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     tau_points = np.array(tau_points)
 
     tau_points = np.delete(tau_points,-1) # Remove the last point, probably does a good job of making sure that the new last point is inside the plasma
-    
+
     solver_start_time = time.time()
 
     solver_beam_output = integrate.solve_ivp(
@@ -856,7 +993,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     ## -------------------
     print('Saving data')    
     np.savez('data_input' + output_filename_suffix, 
-              data_poloidal_flux_grid=data_poloidal_flux_grid,
+              poloidalFlux_grid=poloidalFlux_grid,
               data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
               poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
               toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
@@ -867,7 +1004,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
               launch_position=launch_position,
               launch_K=launch_K,
               ne_data_density_array=ne_data_density_array,ne_data_radialcoord_array=ne_data_radialcoord_array,
-              efit_time=efit_time
+              equil_time=equil_time
              )    
     np.savez('solver_output' + output_filename_suffix, 
              solver_status=solver_status,
@@ -911,7 +1048,9 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                                    delta_K_Z,
                                    interp_poloidal_flux, find_density_1D,
                                    find_B_R, find_B_T, find_B_Z
+
                                    )
+
 
     
         # Calculates g_hat
@@ -948,7 +1087,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     # Components of the dielectric tensor
     epsilon_para_output = find_epsilon_para(electron_density_output, launch_angular_frequency)
     epsilon_perp_output = find_epsilon_perp(electron_density_output, B_magnitude, launch_angular_frequency)
-    epsilon_g_output = find_epsilon_g(electron_density_output, B_magnitude, launch_angular_frequency) 
+    epsilon_g_output    = find_epsilon_g(electron_density_output, B_magnitude, launch_angular_frequency) 
 
     ## -------------------
     ## Not useful for physics or data analysis
@@ -978,7 +1117,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     if vacuumLaunch_flag:
         # np.savez('data_input' + output_filename_suffix, 
         #           # tau_step=tau_step, 
-        #           data_poloidal_flux_grid=data_poloidal_flux_grid,
+        #           poloidalFlux_grid=poloidalFlux_grid,
         #           data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
         #           poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
         #           toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
@@ -1038,7 +1177,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     else:
         np.savez('data_input' + output_filename_suffix, 
                 # tau_step=tau_step, 
-                data_poloidal_flux_grid=data_poloidal_flux_grid,
+                poloidalFlux_grid=poloidalFlux_grid,
                 data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
                 launch_freq_GHz=launch_freq_GHz,
                 mode_flag=mode_flag,
@@ -1154,14 +1293,21 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     # Calculating intermediate terms that are needed for the corrections in M
     xhat_dot_grad_bhat              = contract_special(x_hat_output,grad_bhat_output)
     yhat_dot_grad_bhat              = contract_special(y_hat_output,grad_bhat_output)
-    ray_curvature_kappa_output      = np.zeros([numberOfDataPoints,3])
-    ray_curvature_kappa_output[:,0] = (1/g_magnitude_output) * np.gradient(g_hat_output[:,0],tau_array)
-    ray_curvature_kappa_output[:,1] = (1/g_magnitude_output) * np.gradient(g_hat_output[:,1],tau_array)
+    ray_curvature_kappa_output      = np.zeros([numberOfDataPoints,3]) 
+    ray_curvature_kappa_output[:,0] = (1/g_magnitude_output) * ( 
+                                        np.gradient(g_hat_output[:,0],tau_array)
+                                        - g_hat_output[:,1]*dH_dKzeta_output # See notes 07 June 2021
+                                      )
+    ray_curvature_kappa_output[:,1] = (1/g_magnitude_output) * ( 
+                                        np.gradient(g_hat_output[:,1],tau_array)
+                                        + g_hat_output[:,0]*dH_dKzeta_output # See notes 07 June 2021
+                                      ) 
     ray_curvature_kappa_output[:,2] = (1/g_magnitude_output) * np.gradient(g_hat_output[:,2],tau_array)
+    kappa_magnitude                 = np.linalg.norm(ray_curvature_kappa_output,axis=-1)
     d_theta_d_tau                   = np.gradient(theta_output,tau_array)
     d_xhat_d_tau_output             = np.zeros([numberOfDataPoints,3])
-    d_xhat_d_tau_output[:,0]        = np.gradient(x_hat_output[:,0],tau_array)    
-    d_xhat_d_tau_output[:,1]        = np.gradient(x_hat_output[:,1],tau_array)    
+    d_xhat_d_tau_output[:,0]        = np.gradient(x_hat_output[:,0],tau_array) - x_hat_output[:,1]*dH_dKzeta_output # See notes 07 June 2021
+    d_xhat_d_tau_output[:,1]        = np.gradient(x_hat_output[:,1],tau_array) + x_hat_output[:,0]*dH_dKzeta_output # See notes 07 June 2021
     d_xhat_d_tau_output[:,2]        = np.gradient(x_hat_output[:,2],tau_array)    
     
     xhat_dot_grad_bhat_dot_xhat_output = contract_special(xhat_dot_grad_bhat,x_hat_output) 
@@ -1170,8 +1316,9 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     yhat_dot_grad_bhat_dot_xhat_output = contract_special(yhat_dot_grad_bhat,x_hat_output)
     yhat_dot_grad_bhat_dot_yhat_output = contract_special(yhat_dot_grad_bhat,y_hat_output)
     yhat_dot_grad_bhat_dot_ghat_output = contract_special(yhat_dot_grad_bhat,g_hat_output)
-    kappa_dot_xhat_output              = contract_special(ray_curvature_kappa_output,xhat_dot_grad_bhat)
-    kappa_dot_yhat_output              = contract_special(ray_curvature_kappa_output,yhat_dot_grad_bhat)
+    kappa_dot_xhat_output              = contract_special(ray_curvature_kappa_output,x_hat_output)
+    kappa_dot_yhat_output              = contract_special(ray_curvature_kappa_output,y_hat_output)
+    kappa_dot_ghat_output              = contract_special(ray_curvature_kappa_output,g_hat_output) # This should be 0. Good to check.
     d_xhat_d_tau_dot_yhat_output       = contract_special(d_xhat_d_tau_output,y_hat_output)
     
     # bhat_dot_grad_bhat = contract_special(b_hat_output,grad_bhat_output)
@@ -1180,11 +1327,12 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     
     k_perp_2_bs = 0 # As argued with separation of scales and stuff
     
+    
     M_xx_output = (
                     Psi_xx_output
                     + (k_perp_1_bs/2) * ( 
-                          ( sin_theta_analysis / g_magnitude_output) * d_theta_d_tau
-                        - kappa_dot_xhat_output * sin_theta_analysis
+                           ( sin_theta_analysis / g_magnitude_output) * d_theta_d_tau
+                        - kappa_dot_xhat_output * sin_theta_analysis 
                         + xhat_dot_grad_bhat_dot_ghat_output    
                         - xhat_dot_grad_bhat_dot_xhat_output * tan_theta_analysis
                   )
@@ -1220,9 +1368,12 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     delta_theta_m  = np.sqrt( 
                               np.imag(M_w_inv_yy_output) / ( (np.imag(M_w_inv_xy_output))**2 - np.imag(M_w_inv_xx_output)*np.imag(M_w_inv_yy_output) ) 
                             ) / (K_magnitude_array)
+    loc_m = np.exp(-2*(theta_m_output/delta_theta_m)**2)
+    
+    print('polflux: ', poloidal_flux_output[cutoff_index])
     
     print('theta_m', theta_m_output[cutoff_index])
-    print('mismatch attenuation', np.exp(-theta_m_output[cutoff_index]**2/ (2*delta_theta_m[cutoff_index]**2)))    
+    print('mismatch attenuation', np.exp(-2*(theta_m_output[cutoff_index]/delta_theta_m[cutoff_index])**2) )    
     # -----
 
     
@@ -1340,7 +1491,10 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     epsilon_minus_identity[:,0,1] = -1j * epsilon_g_output
     epsilon_minus_identity[:,1,0] =  1j * epsilon_g_output
 
-    loc_p = abs(contract_special(np.conjugate(e_hat_output), contract_special(epsilon_minus_identity,e_hat_output)))**2 / (electron_density_output*10**19)**2
+    loc_p_unnormalised = abs(contract_special(np.conjugate(e_hat_output), contract_special(epsilon_minus_identity,e_hat_output)))**2 / (electron_density_output*10**19)**2
+    loc_p = ( launch_angular_frequency**2 * constants.epsilon_0 * constants.m_e / constants.e**2 )**2 * loc_p_unnormalised
+    # Note that loc_p is called varepsilon in my paper
+    
     
     # Note that K_1 = K cos theta_m, K_2 = 0, K_b = K sin theta_m, as a result of cold plasma dispersion
     K_hat_dot_e_hat = (
@@ -1454,21 +1608,154 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     cum_loc_b_r_plot = np.append(cum_loc_b_r[0], cum_loc_b_r)
     cum_loc_b_r_plot = np.append(cum_loc_b_r_plot, cum_loc_b_r[-1])
     
-    
-
-
-    
-
 
     # integrated_localisation_b_p_r_delta_kperp1_0 = find_x0(k_perp_1_bs[0:cutoff_index],integrated_localisation_b_p_r[0:cutoff_index],0)
 
-
-
 #     # -------------------
 
+        # Calculates localisation (relevant pieces of the Spherical Tokamak case)
+    d_theta_m_d_tau = np.gradient(theta_m_output,tau_array)
+    d_K_d_tau       = np.gradient(K_magnitude_array,tau_array)
+    d_tau_B_d_tau_C = g_magnitude_Cardano / g_magnitude_output # d tau_Booker / d tau_Cardano 
+    theta_m_min_idx = np.argmin(abs(theta_m_output))
+    delta_kperp1_ST = k_perp_1_bs - k_perp_1_bs[theta_m_min_idx]
+    G_full          = ((
+                          d_K_d_tau * g_magnitude_output
+                          - K_magnitude_array**2 * d_theta_m_d_tau**2 * M_w_inv_xx_output
+                      )*d_tau_B_d_tau_C**2)**(-1)
+    G_term1         = (d_K_d_tau * g_magnitude_output * d_tau_B_d_tau_C**2)**(-1)
+    G_term2         = (
+                            K_magnitude_array**2 * d_theta_m_d_tau**2 * M_w_inv_xx_output
+                          * G_term1**2
+                          * d_tau_B_d_tau_C**2
+                      )**(-1)
+    # print('ST 1st term: ', G_term1[theta_m_min_idx])
+    # print('ST 2nd term: ', G_term2[theta_m_min_idx])
+    # print('ST full: ', G_full[theta_m_min_idx])
+    # print('ST 2nd term / ST 1st term: ', abs(G_term2[theta_m_min_idx]/G_term1[theta_m_min_idx]))
+    # print('ST first 2 terms / ST full: ', abs((G_term2[theta_m_min_idx]+G_term1[theta_m_min_idx])/G_full[theta_m_min_idx]) )
 
+        # Calculates nabla nabla H, nabla_K nabla H, nabla_K nabla_K H 
+    grad_grad_H   = find_grad_grad_H_vectorised(
+                        q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array,
+                        launch_angular_frequency, mode_flag,
+                        delta_R, delta_Z,
+                        interp_poloidal_flux, find_density_1D,
+                        find_B_R, find_B_T, find_B_Z
+                    )
+        
+    gradK_grad_H  = find_gradK_grad_H_vectorised(
+                        q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array,
+                        launch_angular_frequency, mode_flag,
+                        delta_K_R, delta_K_zeta, delta_K_Z, 
+                        delta_R, delta_Z,
+                        interp_poloidal_flux, find_density_1D,
+                        find_B_R, find_B_T, find_B_Z
+                    )
+    grad_gradK_H  = np.swapaxes(gradK_grad_H,2,1)
+        
+    gradK_gradK_H = find_gradK_gradK_H_vectorised(
+                        q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array,
+                        launch_angular_frequency, mode_flag,
+                        delta_K_R, delta_K_zeta, delta_K_Z,
+                        interp_poloidal_flux, find_density_1D,
+                        find_B_R, find_B_T, find_B_Z
+                    )
 
+    # gradK_gradK_H[:,0,1] = - gradK_gradK_H[:,0,1]
+    
+    ## Running some tests
+    # Psi_3D_test = np.zeros_like(Psi_3D_output,dtype='complex128')
+    # d_Psi_d_tau_all = np.zeros_like(Psi_3D_output,dtype='complex128')
+    
+    # Psi_3D_test[0,:,:] = Psi_3D_output[0,:,:]
+    
+    # for ii in range(1,len(q_R_array)):
+    #     d_Psi_d_tau = ( - grad_grad_H[ii-1,:,:]
+    #             - np.matmul(
+    #                         Psi_3D_test[ii-1,:,:], gradK_grad_H[ii-1,:,:]
+    #                         )
+    #             - np.matmul(
+    #                         grad_gradK_H[ii-1,:,:], Psi_3D_test[ii-1,:,:]
+    #                         )
+    #             - np.matmul(np.matmul(
+    #                         Psi_3D_test[ii-1,:,:], gradK_gradK_H[ii-1,:,:]
+    #                         ),
+    #                         Psi_3D_test[ii-1,:,:]
+    #                         )
+    #         )
+    #     d_Psi_d_tau_all[ii-1,:,:] = d_Psi_d_tau
+        
+    #     if  ii<3:
+    #         Psi_3D_test[ii,:,:] =  Psi_3D_test[ii-1,:,:] + (tau_array[ii] - tau_array[ii-1]) * d_Psi_d_tau_all[ii-1,:,:]
+    #     else:
+    #         Psi_3D_test[ii,:,:] =  Psi_3D_test[ii-1,:,:] + (tau_array[ii] - tau_array[ii-1]) * (
+    #                   (23/12) * d_Psi_d_tau_all[ii-1,:,:]
+    #                 - (16/12) * d_Psi_d_tau_all[ii-2,:,:]
+    #                 + (5/12)  * d_Psi_d_tau_all[ii-3,:,:]
+    #             )
 
+    # Psi_3D_Cartesian_test = find_Psi_3D_lab_Cartesian(Psi_3D_test, q_R_array, q_zeta_array, K_R_array, K_zeta_initial)
+    # Psi_xx_test = contract_special(x_hat_Cartesian,contract_special(Psi_3D_Cartesian_test,x_hat_Cartesian))
+    # Psi_xy_test = contract_special(x_hat_Cartesian,contract_special(Psi_3D_Cartesian_test,y_hat_Cartesian))
+    # Psi_yy_test = contract_special(y_hat_Cartesian,contract_special(Psi_3D_Cartesian_test,y_hat_Cartesian))
+        
+    # plt.figure()
+    # plt.plot(l_lc,np.imag(Psi_3D_test[:,0,0]),'r')
+    # plt.plot(l_lc,np.imag(Psi_3D_output[:,0,0]),'k')
+    
+    # plt.figure()
+    # plt.subplot(2,3,1)    
+    # plt.plot(l_lc,np.imag(Psi_xx_test),'r')
+    # plt.plot(l_lc,np.imag(Psi_xx_output),'k')
+    # plt.subplot(2,3,2)    
+    # plt.plot(l_lc,np.imag(Psi_xy_test),'r')
+    # plt.plot(l_lc,np.imag(Psi_xy_output),'k')
+    # plt.subplot(2,3,3)    
+    # plt.plot(l_lc,np.imag(Psi_yy_test),'r')
+    # plt.plot(l_lc,np.imag(Psi_yy_output),'k')
+    # plt.subplot(2,3,4)    
+    # plt.plot(l_lc,np.real(Psi_xx_test),'r')
+    # plt.plot(l_lc,np.real(Psi_xx_output),'k')
+    # plt.subplot(2,3,5)    
+    # plt.plot(l_lc,np.real(Psi_xy_test),'r')
+    # plt.plot(l_lc,np.real(Psi_xy_output),'k')
+    # plt.subplot(2,3,6)    
+    # plt.plot(l_lc,np.real(Psi_yy_test),'r')
+    # plt.plot(l_lc,np.real(Psi_yy_output),'k')    
+    
+    # plt.figure()
+    # plt.subplot(3,3,1)    
+    # plt.plot(l_lc,gradK_gradK_H[:,0,0],'r')
+    # plt.subplot(3,3,2)    
+    # plt.plot(l_lc,gradK_gradK_H[:,1,0],'r')
+    # plt.subplot(3,3,3)    
+    # plt.plot(l_lc,gradK_gradK_H[:,2,0],'r')    
+    # plt.subplot(3,3,5)    
+    # plt.plot(l_lc,gradK_gradK_H[:,1,1],'r')
+    # plt.subplot(3,3,6)    
+    # plt.plot(l_lc,gradK_gradK_H[:,1,2],'r')
+    # plt.subplot(3,3,9)    
+    # plt.plot(l_lc,gradK_gradK_H[:,2,2],'r')  
+    ##
+
+    # plt.figure()
+    # plt.subplot(2,2,1)
+    # plt.plot(l_lc,loc_ST_decay,label=r'$\exp [ \frac{1}{2} Im [ (\Delta k_{\perp,1} K_0 \frac{d \theta_m}{d \tau})^2 M_{xx,0}^{-1} (\frac{d K}{d \tau})^{-2} ] ]$')
+    # plt.legend(fontsize=6)
+    # plt.subplot(2,2,2)
+    # plt.plot(l_lc,theta_m_output,label=r'$\theta_{m}$')
+    # plt.legend()
+    # plt.subplot(2,2,3)
+    # plt.plot(l_lc,delta_kperp1_ST,label=r'$\Delta k_{\perp,1}$')
+    # plt.legend()
+    # plt.subplot(2,2,4)
+    # plt.plot(l_lc,loc_m,label=r'$loc_m$')
+    # plt.legend()
+    # plt.gcf().set_dpi(300)
+
+    
+    
     ## -------------------
     ## This saves the data generated by the analysis after the main loop
     ## -------------------
@@ -1485,8 +1772,12 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
               yhat_dot_grad_bhat_dot_xhat_output=yhat_dot_grad_bhat_dot_xhat_output,
               yhat_dot_grad_bhat_dot_yhat_output=yhat_dot_grad_bhat_dot_yhat_output,
               yhat_dot_grad_bhat_dot_ghat_output=yhat_dot_grad_bhat_dot_ghat_output,
+              grad_grad_H=grad_grad_H, gradK_grad_H=gradK_grad_H,gradK_gradK_H=gradK_gradK_H,
+              d_theta_d_tau=d_theta_d_tau,
+              d_xhat_d_tau_dot_yhat_output=d_xhat_d_tau_dot_yhat_output,
               kappa_dot_xhat_output=kappa_dot_xhat_output,
               kappa_dot_yhat_output=kappa_dot_yhat_output,
+              kappa_magnitude=kappa_magnitude,
               delta_k_perp_2=delta_k_perp_2, delta_theta_m=delta_theta_m,
               theta_m_output=theta_m_output,
               RZ_distance_along_line=RZ_distance_along_line,
@@ -1504,6 +1795,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
               poloidal_flux_on_midplane=poloidal_flux_on_midplane,R_midplane_points=R_midplane_points,
               loc_b=loc_b,loc_p=loc_p,
               loc_r=loc_r,loc_s=loc_s,
+              loc_m=loc_m,
               loc_b_r_s=loc_b_r_s, loc_b_r=loc_b_r,
               loc_b_r_s_max_over_e2=loc_b_r_s_max_over_e2,loc_b_r_max_over_e2=loc_b_r_max_over_e2,
               loc_b_r_s_delta_l=loc_b_r_s_delta_l,loc_b_r_delta_l=loc_b_r_delta_l, # The 1/e2 distances,  (l - l_c)
@@ -1542,7 +1834,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         plt.ylabel('z / m')
     
         contour_levels = np.linspace(0,1.0,11)
-        CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels,vmin=0,vmax=1,cmap='plasma_r')
+        CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), contour_levels,vmin=0,vmax=1,cmap='plasma_r')
         plt.clabel(CS, inline=1, fontsize=10) # Labels the flux surfaces
         plt.plot(
                 np.concatenate([[launch_position[0],initial_position[0]],q_R_array ]),
