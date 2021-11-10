@@ -243,8 +243,8 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         sys.exit()
     
     # This part of the code defines find_B_R, find_B_T, find_B_zeta
-    interp_order = 3 # For the 2D interpolation functions
-    interp_smoothing = 0 # For the 2D interpolation functions. For no smoothing, set to 0
+    interp_order = 5 # For the 2D interpolation functions
+    interp_smoothing = 2 # For the 2D interpolation functions. For no smoothing, set to 0
     
     if find_B_method == 'torbeam':    
         print('Using Torbeam input files for B and poloidal flux')
@@ -337,7 +337,9 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
             poloidalFlux_grid = unnormalised_poloidalFlux_grid*polflux_const_m + polflux_const_c
     
     
-        if find_B_method == 'UDA_saved' and shot <= 30471: # MAST
+        elif find_B_method == 'UDA_saved' and shot <= 30471: # MAST
+            print('marpmarpmarp')
+            print(shot)
             # 30471 is the last shot on MAST
             # data saved differently for MAST-U shots
             loadfile                   = np.load(magnetic_data_path + str(shot) + '_equilibrium_data.npz')
@@ -367,7 +369,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
             poloidalFlux_grid = (unnormalised_poloidalFlux_grid - polflux_axis)/(polflux_boundary-polflux_axis)
 
 
-        if find_B_method == 'UDA_saved' and shot > 30471: # MAST-U
+        elif find_B_method == 'UDA_saved' and shot > 30471: # MAST-U
             # 30471 is the last shot on MAST
             # data saved differently for MAST-U shots
             loadfile                    = np.load(magnetic_data_path + str(shot) + '_equilibrium_data.npz')
@@ -461,6 +463,26 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
             return np.zeros_like(q_R)
     
     elif find_B_method == 'test':
+        # TODO: tidy up
+        # Works nicely with the new MAST-U UDA output
+        loadfile                    = np.load(magnetic_data_path + str(shot) + '_equilibrium_data.npz')
+        time_EFIT                   = loadfile['time_EFIT']
+        data_R_coord                = loadfile['R_EFIT']
+        data_Z_coord                = loadfile['Z_EFIT']    
+        poloidalFlux_grid_all_times = loadfile['poloidalFlux_grid'] 
+        Bphi_grid_all_times         = loadfile['Bphi_grid']
+        Br_grid_all_times           = loadfile['Br_grid']
+        Bz_grid_all_times           = loadfile['Bz_grid']
+        loadfile.close()      
+
+        t_idx = find_nearest(time_EFIT, equil_time)
+        print('EFIT time', time_EFIT[t_idx])    
+        
+        poloidalFlux_grid = poloidalFlux_grid_all_times[t_idx,:,:]          
+        data_B_R_grid     = Br_grid_all_times[t_idx,:,:] 
+        data_B_T_grid     = Bphi_grid_all_times[t_idx,:,:] 
+        data_B_Z_grid     = Bz_grid_all_times[t_idx,:,:] 
+        
         # Interpolation functions declared
         interp_B_R = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_R_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
         interp_B_T = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_T_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
@@ -488,7 +510,6 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         print('Invalid find_B_method')
         sys.exit()
         
-
 
 
 
@@ -1350,6 +1371,8 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                             ) / (K_magnitude_array)
     loc_m = np.exp(-2*(theta_m_output/delta_theta_m)**2)
     
+    print('polflux: ', poloidal_flux_output[cutoff_index])
+    
     print('theta_m', theta_m_output[cutoff_index])
     print('mismatch attenuation', np.exp(-2*(theta_m_output[cutoff_index]/delta_theta_m[cutoff_index])**2) )    
     # -----
@@ -1607,11 +1630,11 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                           * G_term1**2
                           * d_tau_B_d_tau_C**2
                       )**(-1)
-    print('ST 1st term: ', G_term1[theta_m_min_idx])
-    print('ST 2nd term: ', G_term2[theta_m_min_idx])
-    print('ST full: ', G_full[theta_m_min_idx])
-    print('ST 2nd term / ST 1st term: ', abs(G_term2[theta_m_min_idx]/G_term1[theta_m_min_idx]))
-    print('ST first 2 terms / ST full: ', abs((G_term2[theta_m_min_idx]+G_term1[theta_m_min_idx])/G_full[theta_m_min_idx]) )
+    # print('ST 1st term: ', G_term1[theta_m_min_idx])
+    # print('ST 2nd term: ', G_term2[theta_m_min_idx])
+    # print('ST full: ', G_full[theta_m_min_idx])
+    # print('ST 2nd term / ST 1st term: ', abs(G_term2[theta_m_min_idx]/G_term1[theta_m_min_idx]))
+    # print('ST first 2 terms / ST full: ', abs((G_term2[theta_m_min_idx]+G_term1[theta_m_min_idx])/G_full[theta_m_min_idx]) )
 
         # Calculates nabla nabla H, nabla_K nabla H, nabla_K nabla_K H 
     grad_grad_H   = find_grad_grad_H_vectorised(
