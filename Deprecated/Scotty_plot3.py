@@ -8,12 +8,13 @@ Created on Sun Nov 24 20:15:24 2019
 import numpy as np
 import matplotlib.pyplot as plt
 from Scotty_fun_general import find_waist, find_distance_from_waist,find_q_lab_Cartesian, find_nearest, contract_special
-from Scotty_fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq
+from Scotty_fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq, make_unit_vector_from_cross_product, find_vec_lab_Cartesian
 import tikzplotlib
 import math
 from scipy import constants
+import sys
 
-suffix = '_Torbeam_benchmark'
+suffix = ''
 
 loadfile = np.load('data_output' + suffix + '.npz')
 tau_array = loadfile['tau_array']
@@ -31,10 +32,12 @@ epsilon_para_output = loadfile['epsilon_para_output']
 epsilon_perp_output = loadfile['epsilon_perp_output']
 epsilon_g_output = loadfile['epsilon_g_output']
 B_magnitude = loadfile['B_magnitude']
+g_magnitude_output = loadfile['g_magnitude_output']
 electron_density_output = loadfile['electron_density_output']
 loadfile.close()
 
 loadfile = np.load('analysis_output' + suffix + '.npz')
+Psi_3D_Cartesian = loadfile['Psi_3D_Cartesian']
 Psi_xx_output = loadfile['Psi_xx_output']
 Psi_xy_output = loadfile['Psi_xy_output']
 Psi_yy_output = loadfile['Psi_yy_output']
@@ -47,6 +50,8 @@ xhat_dot_grad_bhat_dot_ghat_output = loadfile['xhat_dot_grad_bhat_dot_ghat_outpu
 yhat_dot_grad_bhat_dot_xhat_output = loadfile['yhat_dot_grad_bhat_dot_xhat_output']
 yhat_dot_grad_bhat_dot_yhat_output = loadfile['yhat_dot_grad_bhat_dot_yhat_output']
 yhat_dot_grad_bhat_dot_ghat_output = loadfile['yhat_dot_grad_bhat_dot_ghat_output']
+d_theta_d_tau = loadfile['d_theta_d_tau']
+d_xhat_d_tau_dot_yhat_output = loadfile['d_xhat_d_tau_dot_yhat_output']
 kappa_dot_xhat_output = loadfile['kappa_dot_xhat_output']
 kappa_dot_yhat_output = loadfile['kappa_dot_yhat_output']
 distance_along_line = loadfile['distance_along_line']
@@ -56,13 +61,18 @@ poloidal_flux_on_midplane = loadfile['poloidal_flux_on_midplane']
 e_hat_output = loadfile['e_hat_output']
 theta_output = loadfile['theta_output']
 theta_m_output = loadfile['theta_m_output']
+delta_theta_m = loadfile['delta_theta_m']
+delta_k_perp_2 = loadfile['delta_k_perp_2']
 y_hat_Cartesian = loadfile['y_hat_Cartesian']
 x_hat_Cartesian = loadfile['x_hat_Cartesian']
 K_magnitude_array = loadfile['K_magnitude_array']
+k_perp_1_bs = loadfile['k_perp_1_bs']
+loc_b_r_s = loadfile['loc_b_r_s']
+loc_b_r = loadfile['loc_b_r']
 loadfile.close()
 
 loadfile = np.load('data_input' + suffix + '.npz')
-data_poloidal_flux_grid = loadfile['data_poloidal_flux_grid']
+poloidalFlux_grid = loadfile['poloidalFlux_grid']
 data_R_coord = loadfile['data_R_coord']
 data_Z_coord = loadfile['data_Z_coord']
 launch_position = loadfile['launch_position']
@@ -120,12 +130,13 @@ g_hat_Cartesian[:,0] = g_hat_output[:,0] * np.cos(q_zeta_array ) - g_hat_output[
 g_hat_Cartesian[:,1] = g_hat_output[:,0] * np.sin(q_zeta_array ) + g_hat_output[:,1] * np.cos(q_zeta_array )
 g_hat_Cartesian[:,2] = g_hat_output[:,2]
 
-W_vec_XY = np.cross(g_hat_output,np.array([0,0,1]))
+W_vec_Rzeta = np.cross(g_hat_output,np.array([0,0,1]))
+W_vec_XY = np.cross(g_hat_Cartesian,np.array([0,0,1]))
 W_vec_XY_magnitude = np.linalg.norm(W_vec_XY,axis=1)
 W_vec_XY[:,0] = W_vec_XY[:,0] / W_vec_XY_magnitude
 W_vec_XY[:,1] = W_vec_XY[:,1] / W_vec_XY_magnitude
 W_vec_XY[:,2] = W_vec_XY[:,2] / W_vec_XY_magnitude
-width_XY = np.sqrt(2/np.imag( contract_special(W_vec_XY,contract_special(Psi_3D_output,W_vec_XY)) ))
+width_XY = np.sqrt(2/np.imag( contract_special(W_vec_Rzeta,contract_special(Psi_3D_output,W_vec_Rzeta)) ))
 W_line_XY_1_Xpoints = q_X_array + W_vec_XY[:,0] * width_XY
 W_line_XY_1_Ypoints = q_Y_array + W_vec_XY[:,1] * width_XY
 W_line_XY_2_Xpoints = q_X_array - W_vec_XY[:,0] * width_XY
@@ -135,7 +146,7 @@ W_line_XY_2_Ypoints = q_Y_array - W_vec_XY[:,1] * width_XY
 plt.figure(figsize=(5,5))
 plt.title('Poloidal Plane')
 contour_levels = np.linspace(0,1,11)
-CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
+CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
 plt.clabel(CS, inline=True, fontsize=10,inline_spacing=-5,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
 # plt.xlim(1.0,1.8)
 # plt.ylim(-0.7,0.1)
@@ -176,13 +187,93 @@ plt.savefig('propagation_toroidal.jpg',dpi=200)
 
 
 # ------------------
+plt.figure(figsize=(10,5))
+plt.plot(l_lc,-2*K_magnitude_array,label='Bragg')
+plt.plot(l_lc,k_perp_1_bs,label='Full Bragg')
+plt.legend()
+
+                        #   ( sin_theta_analysis / g_magnitude_output) * d_theta_d_tau
+                        # - kappa_dot_xhat_output * sin_theta_analysis 
+plt.figure()
+plt.subplot(1,2,1)
+plt.plot(l_lc,kappa_dot_xhat_output)
+plt.title(r'$\kappa \cdot \hat{x}$')
+plt.subplot(1,2,2)
+plt.plot(l_lc,kappa_dot_yhat_output)
+plt.title(r'$\kappa \cdot \hat{y}$')
 
 plt.figure()
 plt.subplot(1,2,1)
-plt.plot(l_lc,xhat_dot_grad_bhat_dot_ghat_output)
-plt.subplot(1,2,2)
-plt.plot(l_lc,yhat_dot_grad_bhat_dot_ghat_output)
+plt.plot(l_lc,np.real(Psi_xx_output) / (k_perp_1_bs/2),
+         'k',label=r'$Real (\Psi_{xx}) / (k_1 / 2)$'
+         )
+plt.plot(l_lc, xhat_dot_grad_bhat_dot_ghat_output,
+         label = r'$\hat{x} \cdot \nabla \hat{b} \cdot \hat{g} $'
+         )
+plt.plot(l_lc, - xhat_dot_grad_bhat_dot_xhat_output * np.tan(theta_output),
+         label = r'$- \hat{x} \cdot \nabla \hat{b} \cdot \hat{x} \tan \theta$'
+         )
+plt.plot(l_lc, ( np.sin(theta_output) / g_magnitude_output) * d_theta_d_tau,
+         label = r'$\sin \theta g d \theta / d \tau$'
+         )
+plt.plot(l_lc, - kappa_dot_xhat_output * np.sin(theta_output),
+         label = r'$-\kappa \cdot \hat{x} \sin \theta$'
+         )
+plt.xlabel(r'$(l - l_c)$')
+plt.legend(loc='center right', bbox_to_anchor=(-0.2, 0.5))
 
+plt.subplot(1,2,2)
+plt.plot(l_lc,np.real(Psi_xy_output) / (k_perp_1_bs/2),
+         'k',label=r'$Real (\Psi_{xy}) / (k_1 / 2)$'
+         )
+plt.plot(l_lc, - kappa_dot_yhat_output * np.sin(theta_output),
+         label = r'$-\kappa \cdot \hat{y} \sin \theta$'
+         )
+plt.plot(l_lc, yhat_dot_grad_bhat_dot_ghat_output,
+         label = r'$\hat{y} \cdot \nabla \hat{b} \cdot \hat{g}$'
+         )
+plt.plot(l_lc, (np.sin(theta_output)*np.tan(theta_output)/g_magnitude_output) * d_xhat_d_tau_dot_yhat_output,
+         label = r'$d \hat{x} / d \tau \cdot \hat{y} \sin \theta \tan \theta / g$'
+         )
+plt.xlabel(r'$(l - l_c)$')
+plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+loc_m = np.exp(-2*(theta_m_output/delta_theta_m)**2)
+
+plt.figure()
+plt.subplot(3,2,1)
+plt.plot(l_lc,np.rad2deg(theta_m_output),label=r'$\theta_m$')
+plt.plot(l_lc,np.rad2deg(delta_theta_m),label=r'$\Delta \theta_m$')     
+plt.legend()
+plt.xlabel('l - l_c')
+plt.ylabel('deg')
+plt.subplot(3,2,2)
+plt.plot(l_lc,loc_m,label='loc_m')
+plt.xlabel('l - l_c')
+plt.legend()
+
+plt.subplot(3,2,3)
+plt.plot(l_lc,loc_b_r,label='loc_b_r')
+plt.xlabel('l - l_c')
+plt.legend()
+plt.subplot(3,2,4)
+plt.plot(l_lc,loc_b_r_s,label='loc_b_r_s')
+plt.xlabel('l - l_c')
+plt.legend()
+
+plt.subplot(3,2,5)
+plt.plot(l_lc,loc_b_r*loc_m,label='loc_b_m_r')
+plt.xlabel('l - l_c')
+plt.legend()
+plt.subplot(3,2,6)
+plt.plot(l_lc,loc_b_r_s*loc_m,label='loc_b_m_r_s')
+plt.xlabel('l - l_c')
+plt.legend()
+
+print((loc_b_r*loc_m).max())
+print((loc_b_r_s*loc_m).max())
+
+sys.exit()
 
 plt.figure(figsize=(16,5))
 plt.subplot(2,3,1)
@@ -214,6 +305,10 @@ plt.plot(l_lc,np.imag(Psi_yy_output),'k')
 plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
 plt.title(r'Im$(\Psi_{yy})$')
 plt.xlabel(r'$l-l_c$')
+
+
+
+
 
 
 # ------------------
@@ -265,38 +360,39 @@ factor_X = (om_pe_norm**2*(1-om_pe_norm**2))/(1-om_pe_norm**2-om_ce_norm**2)
 plt.figure()
 plt.plot(l_lc,factor,'ko', label='-1 - theta / theta_m')
 plt.plot(l_lc,factor2,label='Either mode')
+plt.plot(l_lc,factor_O,label='O mode')
 plt.plot(l_lc,factor_X,label='X mode')
 plt.legend()
 plt.xlabel('l - l_c')
 
-plt.figure()
-plt.subplot(2,2,1)
-plt.plot(l_lc,eps_11)
-plt.title('eps11')
-plt.subplot(2,2,2)
-plt.plot(l_lc,eps_12)
-plt.title('eps12')
-plt.subplot(2,2,3)
-plt.plot(l_lc,eps_bb)
-plt.title('epsbb')
-plt.subplot(2,2,4)
-plt.plot(l_lc,N_sq)
-plt.title('N_sq')
+# plt.figure()
+# plt.subplot(2,2,1)
+# plt.plot(l_lc,eps_11)
+# plt.title('eps11')
+# plt.subplot(2,2,2)
+# plt.plot(l_lc,eps_12)
+# plt.title('eps12')
+# plt.subplot(2,2,3)
+# plt.plot(l_lc,eps_bb)
+# plt.title('epsbb')
+# plt.subplot(2,2,4)
+# plt.plot(l_lc,N_sq)
+# plt.title('N_sq')
 
-plt.figure()
-plt.subplot(1,2,1)
-plt.plot(l_lc,    		  eps_11**2 
-    		- eps_12**2
-            - eps_11 * eps_bb
-            - eps_11 * N_sq
-            + eps_bb * N_sq)
-plt.title('numerator')
-plt.subplot(1,2,2)
-plt.plot(l_lc,    		- eps_11**2 
-    		+ eps_12**2
-            - eps_11 * eps_bb
-            + eps_11 * N_sq * 2)
-plt.title('denominator')
+# plt.figure()
+# plt.subplot(1,2,1)
+# plt.plot(l_lc,    		  eps_11**2 
+#     		- eps_12**2
+#             - eps_11 * eps_bb
+#             - eps_11 * N_sq
+#             + eps_bb * N_sq)
+# plt.title('numerator')
+# plt.subplot(1,2,2)
+# plt.plot(l_lc,    		- eps_11**2 
+#     		+ eps_12**2
+#             - eps_11 * eps_bb
+#             + eps_11 * N_sq * 2)
+# plt.title('denominator')
 
 # plt.figure()
 # plt.plot(l_lc,np.rad2deg(theta_output),label='theta')

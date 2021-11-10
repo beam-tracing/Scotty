@@ -113,8 +113,8 @@ def plot_curvature(curvature_x,curvature_y):
     ax.contourf(x_mesh, y_mesh, z_mesh,
                   25,cmap=cm.coolwarm)
 
-    cset = ax.contour(x_mesh, y_mesh, z_mesh, zdir='z', offset=0, cmap=cm.coolwarm)
-    cset = ax.contour(x_mesh, y_mesh, z_mesh, zdir='x', offset=-50, cmap=cm.coolwarm)
+    cset = ax.contour(x_mesh, y_mesh, z_mesh, zdir='z', offset=-100, cmap=cm.coolwarm)
+    cset = ax.contour(x_mesh, y_mesh, z_mesh, zdir='x', offset=-60, cmap=cm.coolwarm)
     cset = ax.contour(x_mesh, y_mesh, z_mesh, zdir='y', offset=50, cmap=cm.coolwarm)
 
     ax.set_xlim(-60, 60)
