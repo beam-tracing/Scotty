@@ -95,10 +95,10 @@ class Conical_Horn(Horn):
         
         # self.is_symmetric = False # Whether the output beam is symmetric
         # Method for determining the beam width
-        self.width_method = 'Goldsmith_symmetric' # Uses Goldsmith's Quasioptics textbook
+        # self.width_method = 'Goldsmith_symmetric' # Uses Goldsmith's Quasioptics textbook
         # self.width_method = 'Goldsmith_asymmetric' # Uses Goldsmith's Quasioptics textbook
         # self.width_method = 'Speirs_symmetric' # Uses average of David Speirs's CST simulation data
-        # self.width_method = 'Speirs_asymmetric' # Uses David Speirs's CST simulation data
+        self.width_method = 'Speirs_asymmetric' # Uses David Speirs's CST simulation data
 
         # self.ratio_aperture_width = None # a / w at the aperture
         
@@ -115,10 +115,10 @@ class Conical_Horn(Horn):
         
         slant_length = self.aperture_radius / np.sin(self.semiflare_angle)
 
-        curvature = 1 / slant_length
         
         if self.width_method == 'Goldsmith_symmetric':
             width = 0.76 * self.aperture_radius 
+            curvature = 1 / slant_length
             
         elif self.width_method == 'Goldsmith_asymmetric':
             # w_E > w_H seems to be the opposite of what Jon measures, though
@@ -127,6 +127,7 @@ class Conical_Horn(Horn):
             width_E = 0.88 * self.aperture_radius 
             width_H = 0.64 * self.aperture_radius 
             width = [width_E,width_H]
+            curvature = 1 / slant_length
 
         elif self.width_method == 'Speirs_asymmetric':
             if freq_GHz is None:
@@ -134,22 +135,35 @@ class Conical_Horn(Horn):
                 sys.exit()            
             
             # Beam waist widths don't change very much, it seems
-            w0_E = 0.0124
-            w0_H = 0.01033   
+            # From horn simulation's electric field (35 GHz)
+            # in meters
+            w0_E = 0.012948291561049162
+            w0_H = 0.01731096934084839
         
-            # Calculates the width of the Rayleigh range
+            # Calculates the Rayleigh range
             zR_E = np.pi * w0_E**2 * (freq_GHz * (10**(9) / constants.c) )
             zR_H = np.pi * w0_H**2 * (freq_GHz * (10**(9) / constants.c) )
-            print(zR_E)
-            print(zR_H)
+            # print(zR_E)
+            # print(zR_H)
             
-            distance_from_w0 = self.aperture_radius / np.tan(self.semiflare_angle)
-
-            width_E = w0_E * np.sqrt(1 + (distance_from_w0/zR_E)**2)
-            width_H = w0_H * np.sqrt(1 + (distance_from_w0/zR_H)**2)
-            print(width_E/self.aperture_radius)
-            print(width_H/self.aperture_radius)
+            ## Simple assumption
+            # distance_from_w0 = self.aperture_radius / np.tan(self.semiflare_angle)
+            ## Simulations
+            distance_from_w0_E = 0.12785440710967151 # From 35 GHz simulation
+            distance_from_w0_H = 0.12406338776025922 # positive because we want curvature to be positive at aperture
+            
+            width_E = w0_E * np.sqrt(1 + (distance_from_w0_E/zR_E)**2)
+            width_H = w0_H * np.sqrt(1 + (distance_from_w0_H/zR_H)**2)
             width = [width_E,width_H]
+            # curvature = 1 / slant_length
+            curvature_E = distance_from_w0_E / (distance_from_w0_E**2 + zR_E**2)
+            curvature_H = distance_from_w0_H / (distance_from_w0_H**2 + zR_H**2)
+            curvature = [curvature_E,curvature_H]
+            
+            
+            # new simulations, with large simulation area to extract the properties
+            # width = np.array([0.029874, 0.033298])
+            # curvature = np.array([1/0.15743, 1/0.13844])
             
         elif self.width_method == 'Speirs_symmetric':
             if freq_GHz is None:
@@ -160,6 +174,7 @@ class Conical_Horn(Horn):
             width_E = 0.88 * self.aperture_radius 
             width_H = 0.64 * self.aperture_radius 
             width = [width_E,width_H]
+            curvature = 1 / slant_length
             
         else:
             print('Invalid width_method')
