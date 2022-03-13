@@ -23,7 +23,7 @@ from Scotty_init_bruv import get_parameters_for_Scotty
 
 
 equil_times = np.linspace(0.16,0.25,10)
-mirror_rotations = np.linspace(0,-7,36)
+mirror_rotations = np.linspace(1,-6,36)
 mirror_tilt = -4
 launch_freqs_GHz = np.array([55.0,57.5,60.0,62.5,67.5,70.0,72.5,75.0])
 
@@ -39,7 +39,7 @@ for equil_time in equil_times:
                                           find_B_method   = 'EFITpp', # EFITpp, UDA_saved, UDA, torbeam
                                           equil_time      = equil_time,
                                           shot            = 29908,
-                                          user            = 'Valerian_desktop'
+                                          user            = 'Valerian_laptop'
                                          )
             
             if args_dict['launch_freq_GHz'] > 52.5:
