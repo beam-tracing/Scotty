@@ -22,9 +22,8 @@ import sys
 from Scotty_init_bruv import get_parameters_for_Scotty
 
 
-equil_times = np.linspace(0.16,0.25,10)
-# equil_times = np.array([0.190])
-mirror_rotations = np.linspace(1,-6,36)
+equil_times = np.array([0.200])
+mirror_rotations = np.array([-4])
 mirror_tilt = -4
 launch_freqs_GHz = np.array([30.0,32.5,35.0,37.5,42.5,45.0,47.5,50.0])
 
@@ -37,9 +36,9 @@ for equil_time in equil_times:
                                           launch_freq_GHz = launch_freq_GHz,
                                           mirror_rotation = mirror_rotation, # angle, in deg
                                           mirror_tilt     = mirror_tilt, # angle, in deg
-                                          find_B_method   = 'EFITpp', # EFITpp, UDA_saved, UDA, torbeam
+                                          find_B_method   = 'UDA_saved', # EFITpp, UDA_saved, UDA, torbeam
                                           equil_time      = equil_time,
-                                          shot            = 29908,
+                                          shot            = 29980,
                                           user            = 'Valerian_laptop'
                                          )
             

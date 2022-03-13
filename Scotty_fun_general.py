@@ -714,7 +714,7 @@ def propagate_circular_beam(distance,wavenumber,w0):
     """
     z_R = find_Rayleigh_length(w0, wavenumber)
     widths = w0 * np.sqrt(1+(distance/z_R)**2)
-    curvatures = distance*(1+(z_R/distance)**2)
+    curvatures = distance / (distance**2 +z_R**2)
     return widths, curvatures
 #----------------------------------
 

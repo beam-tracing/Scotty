@@ -194,15 +194,35 @@ def get_parameters_for_Scotty(
         args_dict['launch_beam_width'] = launch_beam_width
         args_dict['launch_beam_radius_of_curvature'] = launch_beam_radius_of_curvature            
         ##    
-
+        
+    elif diagnostic == 'DBS_synthetic':    
+        args_dict['poloidal_launch_angle_Torbeam']   = 6.0
+        args_dict['toroidal_launch_angle_Torbeam']   = 0.0  
+        args_dict['launch_freq_GHz']                 = 55.0
+        args_dict['mode_flag']                       = 1
+        args_dict['launch_beam_width']               = 0.04
+        args_dict['launch_beam_radius_of_curvature'] = -4.0   
+        args_dict['launch_position']                 = np.array([2.2,0,0]) # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
+        
+        ne_fit_param = np.array([4.0, 1.0])
+        
+        kwargs_dict['density_fit_parameters']  = ne_fit_param
+        kwargs_dict['find_B_method']           = 'analytical'
+        kwargs_dict['Psi_BC_flag']             = True
+        kwargs_dict['figure_flag']             = False
+        kwargs_dict['vacuum_propagation_flag'] = True
+        kwargs_dict['vacuumLaunch_flag']       = True
+        kwargs_dict['poloidal_flux_enter']     = ne_fit_param[1]  
+        kwargs_dict['B_T_axis']                = 1.0  
+        kwargs_dict['B_p_a']                   = 0.1  
+        kwargs_dict['R_axis']                  = 1.5  
+        kwargs_dict['minor_radius_a']          = 0.5  
 
     return args_dict, kwargs_dict
 
-
-
 def beam_settings(
                   diagnostic,
-                  method          = 'horn_and_lens',
+                  method          = 'data',
                   launch_freq_GHz = None,
                   beam_data       = None                 
                   ):
@@ -211,6 +231,8 @@ def beam_settings(
         horn_and_lens
             - Uses information about the horn and lens to figure out what 
               the launch beam properties should be
+        data
+            - uses stored data
         experimental_data
             - Uses experimental measurements of the beam properties
 
@@ -250,6 +272,28 @@ def beam_settings(
             Psi_w_cartesian_launch = propagate_beam(Psi_w_lens_cartesian_output,lens_to_mirror,launch_freq_GHz)
             launch_beam_width = np.sqrt(2 / np.imag(Psi_w_cartesian_launch[0,0]))
             launch_beam_radius_of_curvature = wavenumber_K0 / np.real(Psi_w_cartesian_launch[0,0])
+
+        if method == 'data':
+            freqs = np.array([
+                30.0, 32.5, 35.0, 37.5, 42.5, 45.0, 47.5, 50.0,
+                55.0, 57.5, 60.0, 62.5, 67.5, 70.0, 72.5, 75.0
+                ])
+            launch_beam_widths = np.array([
+                46.90319593, 44.8730752 , 43.03016639, 41.40562031, 
+                38.50759751, 37.65323989, 36.80672175, 36.29814335,
+                38.43065497, 37.00251598, 35.72544826, 34.57900305, 
+                32.61150219, 31.76347845, 30.99132929, 30.28611839
+                ])*0.001
+            launch_beam_radii_of_curvature = np.array([
+                -9211.13447598, -5327.42027113, -3834.26164617, -2902.09214589,
+                -1961.58420391, -1636.82546574, -1432.59817651, -1296.20353095,
+                -1437.24234181, -1549.7853604 , -1683.5681014 , -1843.91364265,
+                -2277.59660009, -2577.93648944, -2964.57675092, -3479.14501841
+                ])*0.001
+            
+            freq_idx = find_nearest(freqs, launch_freq_GHz)
+            launch_beam_width = launch_beam_widths[freq_idx]
+            launch_beam_radius_of_curvature = launch_beam_radii_of_curvature[freq_idx]
     
     return launch_beam_width, launch_beam_radius_of_curvature
 
@@ -294,7 +338,7 @@ def ne_settings(shot,time):
                                 [2.3,-2.6,1.12] # 200ms
                                 ]
                                 )
-        ne_fit_times = np.array([200])          
+        ne_fit_times = np.array([0.200])          
         
     elif shot == 30073 or shot == 30074: #TODO: check 30074
         # Fit underestimates TS density when polflux < 0.2 (roughly, for some of the times)
@@ -319,13 +363,21 @@ def ne_settings(shot,time):
                                 )
         ne_fit_times = np.linspace(0.390,0.410,3)        
 
+    elif shot == 45154:
+        ne_fit_params = np.array([
+                                [2.4,-1.8,1.12], # 510ms
+                                ]
+                                )
+        ne_fit_times = np.array([0.510])  
+
     elif shot == 45189:
         ne_fit_params = np.array([
+                                [2.3,-1.8,1.12], # 200ms
                                 [3.5,-1.35,1.2] # 650ms
                                 ]
                                 )
-        ne_fit_times = np.array([650])  
-
+        ne_fit_times = np.array([0.200,0.650])  
+        
     else:
         print('No fit data saved for shot:',shot)
         sys.exit()
@@ -387,7 +439,12 @@ def user_settings(user,shot=None):
         else:
             efitpp_path = None
             
-        UDA_saved_path  = 'D:\\Dropbox\\VHChen2020\\Data\\Equilibrium\\MAST\\Equilibrium_pyuda\\'
+        if shot > 30471: # MAST-U
+            UDA_saved_path  = 'D:\\Dropbox\\VHChen2020\\Data\\Equilibrium\\MAST-U\\Equilibrium_pyuda\\'        
+        else:
+            UDA_saved_path  = 'D:\\Dropbox\\VHChen2020\\Data\\Equilibrium\\MAST\\Equilibrium_pyuda\\'
+         
+                        
             
     elif user == 'Valerian_laptop':
         ne_path     = default_input_files_path

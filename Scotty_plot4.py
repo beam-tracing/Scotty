@@ -11,7 +11,7 @@ from Scotty_fun_general import find_waist, find_distance_from_waist,find_q_lab_C
 from Scotty_fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq, make_unit_vector_from_cross_product, find_vec_lab_Cartesian
 import tikzplotlib
 import math
-from scipy import constants
+from scipy import constants, integrate
 import sys
 
 suffix = ''
@@ -166,20 +166,31 @@ plt.title('Toroidal Plane')
 plt.plot(circle_outboard[:,0],circle_outboard[:,1],'orange')
 plt.plot(circle_polmin[:,0],circle_polmin[:,1],'#00003F')
 plt.plot(circle_inboard[:,0],circle_inboard[:,1],'orange')
-# plt.xlim(1.0,1.8)
-# plt.ylim(-0.2,0.6)
 plt.plot(q_X_array[:out_index],q_Y_array[:out_index],'k')
 plt.plot( [launch_position_X, entry_position_X], [launch_position_Y, entry_position_Y],':k')
-plt.plot(W_line_XY_1_Xpoints[:out_index],W_line_XY_1_Ypoints[:out_index],'k--')
-plt.plot(W_line_XY_2_Xpoints[:out_index],W_line_XY_2_Ypoints[:out_index],'k--')
+plt.plot(W_line_XY_1_Xpoints[:out_index],W_line_XY_1_Ypoints[:out_index],'r--')
+plt.plot(W_line_XY_2_Xpoints[:out_index],W_line_XY_2_Ypoints[:out_index],'g--')
 plt.xlim(-data_R_coord[-1],data_R_coord[-1])
 plt.ylim(-data_R_coord[-1],data_R_coord[-1])
 plt.xlabel('X / m')
 plt.ylabel('Y / m')
 # tikzplotlib.save("propagation_toroidal.tex")
-plt.tight_layout(pad=1.08, h_pad=None, w_pad=None, rect=None)
+# plt.tight_layout(pad=1.08, h_pad=None, w_pad=None, rect=None)
+plt.xlim(0.5,1.8)
+plt.ylim(-0.5,0.5)
 plt.gca().set_aspect('equal', adjustable='box')
 plt.savefig('propagation_toroidal.jpg',dpi=200)
+
+# q_X_test = integrate.cumtrapz(g_magnitude_output*g_hat_Cartesian[:,0],tau_array,initial=0) + q_X_array[0]
+# q_Y_test = integrate.cumtrapz(g_magnitude_output*g_hat_Cartesian[:,1],tau_array,initial=0) + q_Y_array[0]
+
+# plt.figure()
+# plt.plot(q_Y_test,'b')
+# plt.plot(q_Y_array,'g')
+
+# sys.exit()
+# index = 78
+# plt.plot([W_line_XY_1_Xpoints[index], W_line_XY_2_Xpoints[index]], [W_line_XY_1_Ypoints[index], W_line_XY_2_Ypoints[index]])
 
 plt.figure()
 plt.plot(l_lc,poloidal_flux_output)
