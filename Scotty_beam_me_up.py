@@ -65,6 +65,7 @@ import sys
 from netCDF4 import Dataset
 import bisect
 import time
+import platform
 
 
 
@@ -154,9 +155,16 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     # input_files_path ='D:\\Dropbox\\VHChen2018\\Data\\Input_Files_29Apr2019\\'
     # input_files_path ='D:\\Dropbox\\VHChen2019\\Code - Scotty\\Benchmark_9\\Torbeam\\'
     if ne_data_path is None:
-        ne_data_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
+        if platform.system() == 'Windows':
+            ne_data_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
+        elif platform.system() == 'Linux':
+            ne_data_path = os.path.dirname(os.path.abspath(__file__)) + '/'
+
     if magnetic_data_path is None:
-        magnetic_data_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
+        if platform.system() == 'Windows':
+            magnetic_data_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
+        elif platform.system() == 'Linux':
+            magnetic_data_path = os.path.dirname(os.path.abspath(__file__)) + '/'
     
     if density_fit_parameters is None:
         print('ne(psi): loading from input file')
