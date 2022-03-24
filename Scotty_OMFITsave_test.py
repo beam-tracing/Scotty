@@ -32,7 +32,9 @@ args_dict['poloidal_launch_angle_Torbeam']   = 6.4
 args_dict['toroidal_launch_angle_Torbeam']   = -4.4
 # args_dict['launch_beam_width']               = 0.0397
 # args_dict['launch_beam_radius_of_curvature'] = -0.7286   
-# kwargs_dict['output_filename_suffix']        = '_O_many_points_new'
+kwargs_dict['find_B_method']        = 'torbeam'
+kwargs_dict['ne_data_path']        = None
+kwargs_dict['magnetic_data_path']        = None
 
 
 if args_dict['launch_freq_GHz'] > 52.5:
