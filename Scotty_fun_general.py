@@ -999,6 +999,20 @@ def find_d2_poloidal_flux_dZ2(q_R, q_Z, delta_Z, interp_poloidal_flux):
 
 #----------------------------------
 
+# Functions (Fitting)
+## Stefanikova. Adapted from Simon Freethy's code.
+def mtanh(x,b_slope):
+    return ((1+b_slope*x)*np.exp(x)-np.exp(-x))/(np.exp(x)+np.exp(-x))
+
+def f_ped(r,b_height,b_SOL,b_width,b_slope,b_pos):
+    mth = mtanh((b_pos-r)/(2*b_width), b_slope)
+    return (b_height-b_SOL)/2 *(mth+1)+b_SOL
+
+def f_full(r,a_height, a_width, a_exp,b_height,b_SOL,b_width,b_slope, b_pos):
+    # from this publication https://doi.org/10.1063/1.4961554
+    fp = f_ped(r,b_height,b_SOL,b_width,b_slope,b_pos)
+    return fp + (a_height - fp)*np.exp(-r/a_width)**a_exp
+#----------------------------------
 
 
 # Functions (Launch angle)

@@ -8,7 +8,8 @@ Created on Sun Nov 24 20:15:24 2019
 import numpy as np
 import matplotlib.pyplot as plt
 from Scotty_fun_general import find_waist, find_distance_from_waist,find_q_lab_Cartesian, find_nearest, contract_special
-import tikzplotlib
+# import tikzplotlib
+import sys
 
 suffix = ''
 
@@ -30,6 +31,9 @@ Psi_3D_output = loadfile['Psi_3D_output']
 #b_hat_Cartesian_output = loadfile['b_hat_Cartesian_output']
 x_hat_output = loadfile['x_hat_output']
 y_hat_output = loadfile['y_hat_output']
+B_R_output = loadfile['B_R_output']
+B_T_output = loadfile['B_T_output']
+B_Z_output = loadfile['B_Z_output']
 #B_total_output = loadfile['B_total_output']
 #grad_bhat_output = loadfile['grad_bhat_output']
 #g_hat_Cartesian_output = loadfile['g_hat_Cartesian_output']
@@ -58,11 +62,11 @@ g_hat_output = loadfile['g_hat_output']
 # gradK_grad_H_output = loadfile['gradK_grad_H_output']
 # gradK_gradK_H_output = loadfile['gradK_gradK_H_output']
 # grad_grad_H_output = loadfile['grad_grad_H_output']
-# dH_dR_output = loadfile['dH_dR_output']
-# dH_dZ_output = loadfile['dH_dZ_output']
-# dH_dKR_output = loadfile['dH_dKR_output']
-# dH_dKzeta_output = loadfile['dH_dKzeta_output']
-# dH_dKZ_output = loadfile['dH_dKZ_output']
+dH_dR_output = loadfile['dH_dR_output']
+dH_dZ_output = loadfile['dH_dZ_output']
+dH_dKR_output = loadfile['dH_dKR_output']
+dH_dKzeta_output = loadfile['dH_dKzeta_output']
+dH_dKZ_output = loadfile['dH_dKZ_output']
 # dB_dR_FFD_debugging = loadfile['dB_dR_FFD_debugging']
 # dB_dZ_FFD_debugging = loadfile['dB_dZ_FFD_debugging']
 # d2B_dR2_FFD_debugging = loadfile['d2B_dR2_FFD_debugging']
@@ -83,14 +87,14 @@ g_hat_output = loadfile['g_hat_output']
 # electron_density_debugging_3Z = loadfile['electron_density_debugging_3Z']
 # electron_density_debugging_2R_2Z = loadfile['electron_density_debugging_2R_2Z']
 # electron_density_output=loadfile['electron_density_output']
-# poloidal_flux_output = loadfile['poloidal_flux_output']
-# dpolflux_dR_FFD_debugging = loadfile['dpolflux_dR_FFD_debugging']
-# dpolflux_dZ_FFD_debugging = loadfile['dpolflux_dZ_FFD_debugging']
+poloidal_flux_output = loadfile['poloidal_flux_output']
+dpolflux_dR_debugging = loadfile['dpolflux_dR_debugging']
+dpolflux_dZ_debugging = loadfile['dpolflux_dZ_debugging']
 # d2polflux_dR2_FFD_debugging = loadfile['d2polflux_dR2_FFD_debugging']
 # d2polflux_dZ2_FFD_debugging = loadfile['d2polflux_dZ2_FFD_debugging']
-# epsilon_para_output = loadfile['epsilon_para_output']
-# epsilon_perp_output = loadfile['epsilon_perp_output']
-# epsilon_g_output = loadfile['epsilon_g_output']
+epsilon_para_output = loadfile['epsilon_para_output']
+epsilon_perp_output = loadfile['epsilon_perp_output']
+epsilon_g_output = loadfile['epsilon_g_output']
 loadfile.close()
 
 
@@ -111,7 +115,7 @@ numberOfDataPoints = np.size(q_R_array)
 Beam and ray path
 """
 
-stop_index = 1001
+stop_index = numberOfDataPoints
 
 
 ## For plotting the plasma in the toroidal plane
@@ -176,7 +180,7 @@ plt.subplot(2,3,4)
 plt.plot(tau_array[:stop_index],K_R_array[:stop_index],'r')
 #plt.axvline(tau_array[:stop_index]1[in_index],color='k')
 #plt.axvline(tau_array[:stop_index]1[out_index],color='k')
-plt.title('K_R')
+plt.title(r'$K_R$')
 
 plt.subplot(2,3,5)
 
@@ -185,43 +189,7 @@ plt.subplot(2,3,6)
 plt.plot(tau_array[:stop_index],K_Z_array[:stop_index],'r')
 #plt.axvline(tau_array[:stop_index]1[in_index],color='k')
 #plt.axvline(tau_array[:stop_index]1[out_index],color='k')
-plt.title('K_Z')
-
-
-plt.figure()
-plt.subplot(2,3,1)
-plt.plot(tau_array[:stop_index],dH_dR_output[:stop_index],'ro')
-#plt.axvline(tau_array[:stop_index]1[in_index],color='k')
-#plt.axvline(tau_array[:stop_index]1[out_index],color='k')
-plt.title('dH_dR')
-
-plt.subplot(2,3,2)
-
-
-plt.subplot(2,3,3)
-plt.plot(tau_array[:stop_index],dH_dZ_output[:stop_index],'r')
-#plt.axvline(tau_array[:stop_index]1[in_index],color='k')
-#plt.axvline(tau_array[:stop_index]1[out_index],color='k')
-plt.title('dH_dZ')
-
-plt.subplot(2,3,4)
-plt.plot(tau_array[:stop_index],dH_dKR_output[:stop_index],'r')
-#plt.axvline(tau_array[:stop_index]1[in_index],color='k')
-#plt.axvline(tau_array[:stop_index]1[out_index],color='k')
-plt.title('dH_dKR')
-
-plt.subplot(2,3,5)
-plt.plot(tau_array[:stop_index],dH_dKzeta_output[:stop_index],'r')
-#plt.axvline(tau_array[:stop_index]1[in_index],color='k')
-#plt.axvline(tau_array[:stop_index]1[out_index],color='k')
-plt.title('dH_dKzeta')
-
-plt.subplot(2,3,6)
-plt.plot(tau_array[:stop_index],dH_dKZ_output[:stop_index],'r')
-#plt.axvline(tau_array[:stop_index]1[in_index],color='k')
-#plt.axvline(tau_array[:stop_index]1[out_index],color='k')
-plt.title('dH_dKZ')
-
+plt.title(r'$K_Z$')
 
 
 plt.figure()
@@ -263,6 +231,52 @@ plt.subplot(3,3,8)
 #plt.plot(tau_array[:stop_index],np.imag(Psi_3D_output)[:,2,1],'r')
 plt.subplot(3,3,9)
 plt.plot(tau_array[:stop_index],np.real(Psi_3D_output)[:stop_index,2,2],'r')
+
+
+
+plt.figure()
+plt.subplot(2,3,1)
+plt.plot(tau_array[:stop_index],dH_dR_output[:stop_index],'ro')
+#plt.axvline(tau_array[:stop_index]1[in_index],color='k')
+#plt.axvline(tau_array[:stop_index]1[out_index],color='k')
+plt.title(r'$dH_dR$')
+
+plt.subplot(2,3,2)
+
+
+plt.subplot(2,3,3)
+plt.plot(tau_array[:stop_index],dH_dZ_output[:stop_index],'r')
+#plt.axvline(tau_array[:stop_index]1[in_index],color='k')
+#plt.axvline(tau_array[:stop_index]1[out_index],color='k')
+plt.title(r'$dH_dZ$')
+
+plt.subplot(2,3,4)
+plt.plot(tau_array[:stop_index],dH_dKR_output[:stop_index],'r')
+#plt.axvline(tau_array[:stop_index]1[in_index],color='k')
+#plt.axvline(tau_array[:stop_index]1[out_index],color='k')
+plt.title(r'$dH_dKR$')
+
+plt.subplot(2,3,5)
+plt.plot(tau_array[:stop_index],dH_dKzeta_output[:stop_index],'r')
+#plt.axvline(tau_array[:stop_index]1[in_index],color='k')
+#plt.axvline(tau_array[:stop_index]1[out_index],color='k')
+plt.title(r'$dH_dKzeta$')
+
+plt.subplot(2,3,6)
+plt.plot(tau_array[:stop_index],dH_dKZ_output[:stop_index],'r')
+#plt.axvline(tau_array[:stop_index]1[in_index],color='k')
+#plt.axvline(tau_array[:stop_index]1[out_index],color='k')
+plt.title(r'$dH_dKZ$')
+
+plt.figure()
+plt.subplot(1,2,1)
+plt.plot(tau_array[:stop_index],dpolflux_dR_debugging)
+
+plt.subplot(1,2,2)
+plt.plot(tau_array[:stop_index],dpolflux_dZ_debugging)
+
+sys.exit()
+
 
 plt.figure()
 plt.subplot(3,3,1)
