@@ -35,6 +35,7 @@ B_magnitude = loadfile['B_magnitude']
 g_magnitude_output = loadfile['g_magnitude_output']
 electron_density_output = loadfile['electron_density_output']
 poloidal_flux_output = loadfile['poloidal_flux_output']
+H_output = loadfile['H_output']
 loadfile.close()
 
 loadfile = np.load('analysis_output' + suffix + '.npz')
@@ -176,8 +177,8 @@ plt.xlabel('X / m')
 plt.ylabel('Y / m')
 # tikzplotlib.save("propagation_toroidal.tex")
 # plt.tight_layout(pad=1.08, h_pad=None, w_pad=None, rect=None)
-plt.xlim(0.5,1.8)
-plt.ylim(-0.5,0.5)
+plt.xlim(1.5,2.5)
+plt.ylim(-0.2,0.2)
 plt.gca().set_aspect('equal', adjustable='box')
 plt.savefig('propagation_toroidal.jpg',dpi=200)
 
@@ -336,6 +337,12 @@ plt.legend()
 
 print((loc_b_r*loc_m).max())
 print((loc_b_r_s*loc_m).max())
+
+plt.figure()
+plt.title('H (Booker quartic)')
+plt.plot(l_lc,H_output)
+
+
 
 sys.exit()
 

@@ -19,7 +19,7 @@ an angle theta'
 import numpy as np
 from scipy import constants
 
-def make_my_lens(name,lens_type='thin'):
+def make_my_lens(name,lens_type='thin',focal_length=None):
     
     if lens_type=='thin':
         myLens = Thin_Lens(name)
@@ -28,6 +28,8 @@ def make_my_lens(name,lens_type='thin'):
             myLens.focal_length = 0.125
         elif name == 'MAST_Q_band':
             myLens.focal_length = 0.27
+        elif name == 'DBS_UCLA_DIII-D_1':
+            myLens.focal_length = focal_length
             
     elif lens_type=='thick':
         myLens = Thick_Lens(name)

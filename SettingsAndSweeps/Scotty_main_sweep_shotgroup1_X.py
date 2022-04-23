@@ -38,9 +38,10 @@ for equil_time in equil_times:
                                           mirror_rotation = mirror_rotation, # angle, in deg
                                           mirror_tilt     = mirror_tilt, # angle, in deg
                                           find_B_method   = 'EFITpp', # EFITpp, UDA_saved, UDA, torbeam
+                                          find_ne_method  = 'poly3',                                          
                                           equil_time      = equil_time,
                                           shot            = 29908,
-                                          user            = 'Valerian_laptop'
+                                          user            = 'Valerian_desktop'
                                          )
             
             if args_dict['launch_freq_GHz'] > 52.5:
