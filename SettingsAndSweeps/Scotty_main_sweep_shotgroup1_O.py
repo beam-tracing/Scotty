@@ -37,9 +37,10 @@ for equil_time in equil_times:
                                           mirror_rotation = mirror_rotation, # angle, in deg
                                           mirror_tilt     = mirror_tilt, # angle, in deg
                                           find_B_method   = 'EFITpp', # EFITpp, UDA_saved, UDA, torbeam
+                                          find_ne_method  = 'poly3',
                                           equil_time      = equil_time,
                                           shot            = 29908,
-                                          user            = 'Valerian_laptop'
+                                          user            = 'Valerian_desktop'
                                          )
             
             if args_dict['launch_freq_GHz'] > 52.5:
@@ -50,8 +51,8 @@ for equil_time in equil_times:
             if args_dict['mode_flag'] == 1:
                 mode_string = 'O'
             elif args_dict['mode_flag'] == -1:
-                mode_string = 'X'
-    
+                mode_string = 'X' 
+
             kwargs_dict['output_filename_suffix'] = (
                                         '_r' + f'{mirror_rotation:.1f}'
                                         '_t' + f'{mirror_tilt:.1f}'
