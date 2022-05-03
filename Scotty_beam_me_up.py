@@ -97,7 +97,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                launch_freq_GHz,
                mode_flag,
                launch_beam_width,
-               launch_beam_radius_of_curvature,
+               launch_beam_curvature,
                launch_position,
                    ## keyword arguments begin
                vacuumLaunch_flag                 = True,               
@@ -107,12 +107,17 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                vacuum_propagation_flag           = False,
                Psi_BC_flag                       = False,
                poloidal_flux_enter               = None,
-               ## Finite-difference parameters
-               delta_R = -0.0001, #in the same units as data_R_coord
-               delta_Z = 0.0001, #in the same units as data_Z_coord
-               delta_K_R = 0.1, #in the same units as K_R
-               delta_K_zeta = 0.1, #in the same units as K_zeta
-               delta_K_Z = 0.1, #in the same units as K_z
+               ## Finite-difference and solver parameters
+               delta_R                           = -0.0001, #in the same units as data_R_coord
+               delta_Z                           = 0.0001, #in the same units as data_Z_coord
+               delta_K_R                         = 0.1, #in the same units as K_R
+               delta_K_zeta                      = 0.1, #in the same units as K_zeta
+               delta_K_Z                         = 0.1, #in the same units as K_z
+               interp_order                      = 5, # For the 2D interpolation functions
+               len_tau                           = 102, # Number of tau_points to output
+               rtol                              = 1e-3, # for solve_ivp of the beam solver
+               atol                              = 1e-6, # for solve_ivp of the beam solver 
+               interp_smoothing = 0, # For the 2D interpolation functions. For no smoothing, set to 0
                ## Input and output settings
                ne_data_path                      = None,
                magnetic_data_path                = None,
@@ -121,6 +126,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                output_filename_suffix            = '',
                figure_flag                       = True,
                detailed_analysis_flag            = True,
+               verbose_output_flag               = True,
                ## For launching within the plasma
                plasmaLaunch_K                    = np.zeros(3),
                plasmaLaunch_Psi_3D_lab_Cartesian = np.zeros([3,3]),
@@ -192,8 +198,11 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         interp_density_1D = interpolate.interp1d(ne_data_poloidal_flux_array, ne_data_density_array,
                                                  kind='cubic', axis=-1, copy=True, bounds_error=False,
                                                  fill_value=0, assume_sorted=False) # density is 0 outside the LCFS, hence the fill_value. Use 'linear' instead of 'cubic' if the density data has a discontinuity in the first derivative    
-        def find_density_1D(poloidal_flux, interp_density_1D=interp_density_1D):
-            density = interp_density_1D(poloidal_flux)
+        def find_density_1D(poloidal_flux, interp_density_1D=interp_density_1D,
+                            poloidal_flux_enter=poloidal_flux_enter):
+            density_interp = interp_density_1D(poloidal_flux)
+            is_inside = poloidal_flux <= poloidal_flux_enter # Boolean array
+            density = is_inside * density_interp
             return density
 
     elif len(density_fit_parameters) == 8:
@@ -262,9 +271,6 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         print('density_fit_parameters has an invalid length')
         sys.exit()
     
-    # This part of the code defines find_B_R, find_B_T, find_B_zeta
-    interp_order = 5 # For the 2D interpolation functions
-    interp_smoothing = 0 # For the 2D interpolation functions. For no smoothing, set to 0
     
     if find_B_method == 'torbeam':    
         print('Using Torbeam input files for B and poloidal flux')
@@ -629,8 +635,8 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     
         Psi_w_beam_launch_cartersian = np.array(
                 [
-                [ wavenumber_K0/launch_beam_radius_of_curvature+2j*launch_beam_width**(-2), 0],
-                [ 0, wavenumber_K0/launch_beam_radius_of_curvature+2j*launch_beam_width**(-2)]
+                [ wavenumber_K0*launch_beam_curvature+2j*launch_beam_width**(-2), 0],
+                [ 0, wavenumber_K0*launch_beam_curvature+2j*launch_beam_width**(-2)]
                 ]
                 )    
         identity_matrix_2D = np.array(
@@ -952,6 +958,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     
     ## Uncomment to help with troubleshooting
     # print(solver_ray_output.t_events)
+    # print(solver_ray_output.status)
     # plt.title('Poloidal Plane')
     # contour_levels = np.linspace(0,1,11)
     # CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
@@ -959,23 +966,23 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     # plt.clabel(CS, inline=True, fontsize=10,inline_spacing=1,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
     
     solver_ray_status = solver_ray_output.status
-    if solver_ray_status != 1:
+    if solver_ray_status == 0:
         print('Warning: Ray has not left plasma/simulation region. Increase tau_max or choose different initial conditions.')
         print('We should not be here. I am prematurely terminating this simulation.')
         
         sys.exit()
-
+    elif solver_ray_status == -1:
+        print('Warning: Integration step failed.')
+        ## This is sometimes due to negative values of ne due to the spline
+        ## interpolation of ne.dat
+        ## If this happens on the way out of the plasma, the next step will do the trick.
         
-    K_magnitude_ray = (  (np.real(ray_parameters_2D[2,:]))**2 
-                        + K_zeta_initial**2/(np.real(ray_parameters_2D[0,:]))**2 
-                        + (np.real(ray_parameters_2D[3,:]))**2)**(0.5)
-    
-    index_cutoff_estimate = K_magnitude_ray.argmin()
+        sys.exit()
 
     tau_events               = solver_ray_output.t_events
     ray_parameters_2D_events = solver_ray_output.y_events
     ray_parameters_LCFS      = ray_parameters_2D_events[1]
-    
+        
     if (len(tau_events[0]) != 0) and (len(tau_events[1]) == 0): 
         """
         If event_leave_plasma occurs and event_leave_LCFS does not
@@ -1041,7 +1048,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
 
     ## The beam solver outputs data at these values of tau
     ## Tell the solver which values of tau we want for the output
-    tau_points = np.linspace(0,tau_leave,102)
+    tau_points = np.linspace(0,tau_leave,len_tau)
     tau_points = np.delete(tau_points,-1).tolist()  # Remove the last point, probably does a good job of making sure that the new last point is inside the plasma
     ##
     
@@ -1054,6 +1061,14 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         - suffix _fine for variables in this section
         - I guess I could've used 'dense_output' for the section above and got the information from there, and one day I'll go and see which method works better/faster
         """
+        max_tau_idx = np.argmax(tau_ray[tau_ray<=tau_leave])
+        
+        K_magnitude_ray = (  (np.real(ray_parameters_2D[2,:max_tau_idx]))**2 
+                            + K_zeta_initial**2/(np.real(ray_parameters_2D[0,:max_tau_idx]))**2 
+                            + (np.real(ray_parameters_2D[3,:max_tau_idx]))**2)**(0.5)
+        
+        index_cutoff_estimate = K_magnitude_ray.argmin()
+
         ray_parameters_2D_initial_fine = ray_parameters_2D[:,max(0,index_cutoff_estimate-1)]
         tau_start_fine                 = tau_ray[max(0,index_cutoff_estimate-1)]
         tau_end_fine                   = tau_ray[min(len(tau_ray)-1,index_cutoff_estimate+1)]
@@ -1079,20 +1094,20 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         tau_ray_fine    = solver_ray_output_fine.t
         tau_cutoff_fine = tau_ray_fine[index_cutoff_fine]     
         
-        # I'm using a list because it makes the insertion of tau_cutoff_fine easier
+                # I'm using a list because it makes the insertion of tau_cutoff_fine easier
         bisect.insort(tau_points,tau_cutoff_fine) # This function modifies tau_points via a side-effect
         tau_points = np.array(tau_points)
     
     """
     - Propagates the beam
     """        
-    
     solver_start_time = time.time()
 
     solver_beam_output = integrate.solve_ivp(
                         beam_evolution_fun, [0,tau_leave], beam_parameters_initial, 
                         method='RK45', t_eval=tau_points, dense_output=False, 
-                        events=None, vectorized=False, args=solver_arguments
+                        events=None, vectorized=False, args=solver_arguments,
+                        rtol=rtol, atol=atol
                     )
     
     solver_end_time = time.time()
@@ -1129,31 +1144,35 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     ## -------------------
     ## This saves the data generated by the main loop and the input data
     ## -------------------
-    print('Saving data')    
-    np.savez(output_path + 'data_input' + output_filename_suffix, 
-              poloidalFlux_grid=poloidalFlux_grid,
-              data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
-              poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
-              toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
-              launch_freq_GHz=launch_freq_GHz,
-              mode_flag=mode_flag,
-              launch_beam_width=launch_beam_width,
-              launch_beam_radius_of_curvature=launch_beam_radius_of_curvature,
-              launch_position=launch_position,
-              launch_K=launch_K,
-              ne_data_density_array=ne_data_density_array,ne_data_radialcoord_array=ne_data_radialcoord_array,
-              equil_time=equil_time
-             )    
-    np.savez(output_path + 'solver_output' + output_filename_suffix, 
-             solver_status=solver_status,
-             tau_array=tau_array,
-             q_R_array=q_R_array,
-             q_zeta_array = q_zeta_array,
-             q_Z_array = q_Z_array,
-             K_R_array = K_R_array,
-             K_Z_array = K_Z_array,
-             Psi_3D_output = Psi_3D_output
-             )   
+    if verbose_output_flag:
+        print('Saving data')    
+        np.savez(output_path + 'data_input' + output_filename_suffix, 
+                poloidalFlux_grid=poloidalFlux_grid,
+                data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
+                poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
+                toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
+                launch_freq_GHz=launch_freq_GHz,
+                mode_flag=mode_flag,
+                launch_beam_width=launch_beam_width,
+                launch_beam_curvature=launch_beam_curvature,
+                launch_position=launch_position,
+                launch_K=launch_K,
+                ne_data_density_array=ne_data_density_array,ne_data_radialcoord_array=ne_data_radialcoord_array,
+                equil_time=equil_time,
+                delta_R=delta_R, delta_Z=delta_Z, 
+                delta_K_R=delta_K_R, delta_K_zeta=delta_K_zeta, delta_K_Z=delta_K_Z, 
+                interp_order=interp_order, interp_smoothing=interp_order
+                )    
+        np.savez(output_path + 'solver_output' + output_filename_suffix, 
+                 solver_status=solver_status,
+                 tau_array=tau_array,
+                 q_R_array=q_R_array,
+                 q_zeta_array = q_zeta_array,
+                 q_Z_array = q_Z_array,
+                 K_R_array = K_R_array,
+                 K_Z_array = K_Z_array,
+                 Psi_3D_output = Psi_3D_output
+                 )   
     
     if solver_status == -1:
         # If the solver doesn't finish, end the function here
@@ -1314,17 +1333,6 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                   # d2polflux_dZ2_FFD_debugging=d2polflux_dZ2_FFD_debugging, 
                   )
     else:
-        np.savez(output_path + 'data_input' + output_filename_suffix, 
-                # tau_step=tau_step, 
-                poloidalFlux_grid=poloidalFlux_grid,
-                data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
-                launch_freq_GHz=launch_freq_GHz,
-                mode_flag=mode_flag,
-                launch_position=launch_position,
-                plasmaLaunch_K=plasmaLaunch_K,
-                plasmaLaunch_Psi_3D_lab_Cartesian=plasmaLaunch_Psi_3D_lab_Cartesian,
-                ne_data_density_array=ne_data_density_array,ne_data_radialcoord_array=ne_data_radialcoord_array
-                )  
         np.savez(output_path + 'data_output' + output_filename_suffix, 
                 tau_array=tau_array, q_R_array=q_R_array, q_zeta_array=q_zeta_array, q_Z_array=q_Z_array,
                 K_R_array=K_R_array, K_zeta_initial=K_zeta_initial, K_Z_array=K_Z_array,
@@ -1582,7 +1590,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     det_imag_Psi_w_analysis = np.imag(Psi_xx_output)*np.imag(Psi_yy_output) - np.imag(Psi_xy_output)**2 # Determinant of the imaginary part of Psi_w
     det_real_Psi_w_analysis = np.real(Psi_xx_output)*np.real(Psi_yy_output) - np.real(Psi_xy_output)**2 # Determinant of the real part of Psi_w. Not needed for the calculation, but gives useful insight
 
-    beam_waist_y = find_waist(launch_beam_width, wavenumber_K0, 1/launch_beam_radius_of_curvature) # Assumes circular beam at launch
+    beam_waist_y = find_waist(launch_beam_width, wavenumber_K0, launch_beam_curvature) # Assumes circular beam at launch
     
     loc_b = (beam_waist_y/np.sqrt(2))* det_imag_Psi_w_analysis / ( abs(det_M_w_analysis) * np.sqrt(-np.imag(M_w_inv_yy_output)) )
     # --

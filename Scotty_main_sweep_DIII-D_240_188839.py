@@ -12,24 +12,27 @@ import numpy as np
 import os
 from Scotty_init_bruv import get_parameters_for_Scotty
 
-pol_launch_angles = np.linspace(-1.6,-15.4,70)
-tor_launch_angles = np.linspace(0,10.4,53)
-launch_freqs_GHz = np.array([60.0,62.5])
+# pol_launch_angles = np.linspace(-1.6,-15.4,70)
+pol_launch_angles = np.array([-11.4])
+tor_launch_angles = np.linspace(-4.0,9.0,131)
+# launch_freqs_GHz = np.array([55.0,57.5,60.0,62.5,65.0,67.5,70.0,72.5,75.0])
+launch_freqs_GHz = np.array([52.5,65.0,77.5])
 
-equil_time = 3000.0
+
+equil_time = 1900.0
 
 
 
-for launch_freq_GHz in launch_freqs_GHz:
-    for pol_launch_angle in pol_launch_angles:
-        for tor_launch_angle in tor_launch_angles:
+for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
+    for jj, pol_launch_angle in enumerate(pol_launch_angles):
+        for kk, tor_launch_angle in enumerate(tor_launch_angles):
             
             args_dict, kwargs_dict = get_parameters_for_Scotty(
-                                          'DBS_UCLA_DIII-D_1',
+                                          'DBS_UCLA_DIII-D_240',
                                           launch_freq_GHz = launch_freq_GHz,
                                           find_B_method   = 'torbeam', # EFITpp, UDA_saved, UDA, torbeam
                                           equil_time      = equil_time,
-                                          shot            = 187103,
+                                          shot            = 188839,
                                           user            = 'Valerian_desktop'
                                          )
             
@@ -38,17 +41,19 @@ for launch_freq_GHz in launch_freqs_GHz:
             args_dict['mode_flag'] = -1
             
             kwargs_dict['poloidal_flux_enter'] = 1.44
-            kwargs_dict['input_filename_suffix'] = '_187103_3000ms'
-            kwargs_dict['output_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 4\\'
+            kwargs_dict['input_filename_suffix'] = '_188839_1900ms'
+            # kwargs_dict['output_path'] = os.path.dirname(os.path.abspath(__file__)) + '\\Output\\'
+            kwargs_dict['output_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 11\\'
 
-            kwargs_dict['delta_R'] = -0.001
-            kwargs_dict['delta_Z'] = -0.001
+            kwargs_dict['delta_R'] = -0.00001
+            kwargs_dict['delta_Z'] = -0.00001
             kwargs_dict['delta_K_R'] = 0.1
             kwargs_dict['delta_K_zeta'] = 0.1
             kwargs_dict['delta_K_Z'] = 0.1
-            
-            args_dict['poloidal_launch_angle_Torbeam'] = pol_launch_angle
-            args_dict['toroidal_launch_angle_Torbeam'] = tor_launch_angle
+            kwargs_dict['interp_smoothing'] = 2.0
+            kwargs_dict['len_tau'] = 1002
+            kwargs_dict['rtol'] = 1e-4
+            kwargs_dict['atol'] = 1e-7
             
             if args_dict['mode_flag'] == 1:
                 mode_string = 'O'
@@ -63,6 +68,15 @@ for launch_freq_GHz in launch_freqs_GHz:
                                           )      
             kwargs_dict['figure_flag'] = False
             kwargs_dict['detailed_analysis_flag'] = False
-            
-            beam_me_up(**args_dict, **kwargs_dict)    
 
+            if ii == 0 and jj == 0 and kk == 0:
+                kwargs_dict['verbose_output_flag'] = True
+            else:
+                kwargs_dict['verbose_output_flag'] = False        
+
+            # an_output = kwargs_dict['output_path'] + 'data_output' + kwargs_dict['output_filename_suffix'] + '.npz'
+            # if os.path.exists(an_output):
+            #     continue
+            # else:   
+            #     beam_me_up(**args_dict, **kwargs_dict) 
+            beam_me_up(**args_dict, **kwargs_dict) 
