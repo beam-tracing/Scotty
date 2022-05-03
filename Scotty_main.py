@@ -25,14 +25,14 @@ from Scotty_init_bruv import get_parameters_for_Scotty
 args_dict, kwargs_dict = get_parameters_for_Scotty(
                               'DBS_NSTX_MAST',
                               launch_freq_GHz = 55.0,
-                              # mirror_rotation = -4.0, # angle, in deg
-                              # mirror_tilt     = -4.0, # angle, in deg
+                              mirror_rotation = -1.0, # angle, in deg
+                              mirror_tilt     = -4.0, # angle, in deg
                               find_B_method   = 'EFITpp', # EFITpp, UDA_saved, UDA, torbeam
                               equil_time      = 0.220,
                               shot            = 29908,
                               user            = 'Valerian_desktop'
                              )
-
+print(args_dict)
 
 args_dict['poloidal_launch_angle_Torbeam']   = 0.0
 args_dict['toroidal_launch_angle_Torbeam']   = -4.4

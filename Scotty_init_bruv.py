@@ -20,7 +20,7 @@ from netCDF4 import Dataset
 
 from hornpy import make_my_horn
 from lensalot import make_my_lens
-from Scotty_fun_general import propagate_beam, find_nearest, genray_angles_from_mirror_angles
+from Scotty_fun_general import propagate_beam, propagate_circular_beam, find_nearest, genray_angles_from_mirror_angles
 
 
 
@@ -76,7 +76,7 @@ def get_parameters_for_Scotty(
       'launch_freq_GHz'                 : None,
       'mode_flag'                       : None,
       'launch_beam_width'               : None,
-      'launch_beam_radius_of_curvature' : None,
+      'launch_beam_curvature'           : None,
       'launch_position'                 : None
     }   
     
@@ -129,7 +129,7 @@ def get_parameters_for_Scotty(
         
         ## Density settings
         if (find_B_method == 'EFITpp') or (find_B_method == 'UDA_saved') or (find_B_method == 'test'):
-            ne_fit_param, ne_fit_time, poloidal_flux_enter = ne_settings(diagnostic,equil_time,find_ne_method)
+            ne_fit_param, ne_fit_time, poloidal_flux_enter = ne_settings(diagnostic,shot,equil_time,find_ne_method)
             
             kwargs_dict['density_fit_parameters'] = ne_fit_param
             kwargs_dict['poloidal_flux_enter']    = poloidal_flux_enter 
@@ -189,39 +189,94 @@ def get_parameters_for_Scotty(
         
         
         ## Beam settings
-        launch_beam_width, launch_beam_radius_of_curvature = beam_settings(diagnostic, 
+        launch_beam_width, launch_beam_curvature = beam_settings(diagnostic, 
                                                                            launch_freq_GHz = launch_freq_GHz
                                                                            )
         args_dict['launch_beam_width'] = launch_beam_width
-        args_dict['launch_beam_radius_of_curvature'] = launch_beam_radius_of_curvature            
+        args_dict['launch_beam_curvature'] = launch_beam_curvature            
         ##    
 
-    elif diagnostic == 'DBS_UCLA_DIII-D_1':  
+    elif diagnostic == 'DBS_UCLA_MAST-U':  
         ## Default settings
-        args_dict['launch_position'] = np.array([2.6,0,0]) # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
+        args_dict['launch_position'] = np.array([2.278,0,0]) # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
         print('Warning: launch_position is an estimate')
+        ## Launch position changes ~1mm based on lens settings
         kwargs_dict['Psi_BC_flag']             = True
         kwargs_dict['figure_flag']             = True
         kwargs_dict['vacuum_propagation_flag'] = True
         kwargs_dict['vacuumLaunch_flag']       = True
         
         ## Beam settings
-        launch_beam_width, launch_beam_radius_of_curvature = beam_settings(diagnostic, 
+        launch_beam_width, launch_beam_curvature = beam_settings(diagnostic, 
+                                                                 launch_freq_GHz = launch_freq_GHz,
+                                                                 method = 'thin_lens'
+                                                                 )
+        args_dict['launch_beam_width'] = launch_beam_width
+        args_dict['launch_beam_curvature'] = launch_beam_curvature          
+        ##    
+        
+    elif diagnostic == 'DBS_SWIP_MAST-U':  
+        ## Default settings
+        args_dict['launch_position'] = np.array([2.43521,0,0]) # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
+        print('Warning: launch_position is an estimate')
+        ## I'm checking what this actually is from Peng. Currently using the
+        ## MAST UCLA DBS as a guide
+        kwargs_dict['Psi_BC_flag']             = True
+        kwargs_dict['figure_flag']             = True
+        kwargs_dict['vacuum_propagation_flag'] = True
+        kwargs_dict['vacuumLaunch_flag']       = True
+        
+        ## Beam settings
+        launch_beam_width, launch_beam_curvature = beam_settings(diagnostic,
                                                                            launch_freq_GHz = launch_freq_GHz,
-                                                                           method = 'thin_lens'
+                                                                           method = 'estimate_fix_w0'
                                                                            )
         args_dict['launch_beam_width'] = launch_beam_width
-        args_dict['launch_beam_radius_of_curvature'] = launch_beam_radius_of_curvature            
+        args_dict['launch_beam_curvature'] = launch_beam_curvature  
+
+        if (find_B_method == 'EFITpp') or (find_B_method == 'UDA_saved') or (find_B_method == 'test'):
+            ne_fit_param, ne_fit_time, poloidal_flux_enter = ne_settings(diagnostic,shot,equil_time,find_ne_method)
+            
+            kwargs_dict['density_fit_parameters'] = ne_fit_param
+            kwargs_dict['poloidal_flux_enter']    = poloidal_flux_enter 
+            kwargs_dict['ne_data_path']           = UDA_saved_path
+        
+        if (find_B_method == 'UDA_saved' and shot > 30471) or find_B_method == 'test': # MAST:
+            loadfile = np.load(UDA_saved_path + str(shot) + '_equilibrium_data.npz')
+            time_EFIT = loadfile['time_EFIT']
+            loadfile.close()
+            efit_time_index = find_nearest(time_EFIT,equil_time)
+
+            print('Nearest EFIT time:', time_EFIT[efit_time_index])
+
+            kwargs_dict['magnetic_data_path'] = UDA_saved_path            
+        ##    
+
+    elif diagnostic == 'DBS_UCLA_DIII-D_240':
+        ## Default settings
+        args_dict['launch_position'] = np.array([2.587,0,-0.0157]) # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
+        kwargs_dict['Psi_BC_flag']             = True
+        kwargs_dict['figure_flag']             = True
+        kwargs_dict['vacuum_propagation_flag'] = True
+        kwargs_dict['vacuumLaunch_flag']       = True
+        
+        ## Beam settings
+        launch_beam_width, launch_beam_curvature = beam_settings(diagnostic, 
+                                                                 launch_freq_GHz = launch_freq_GHz,
+                                                                 method = 'thin_lens'
+                                                                )
+        args_dict['launch_beam_width'] = launch_beam_width
+        args_dict['launch_beam_curvature'] = launch_beam_curvature            
         ##    
         
     elif diagnostic == 'DBS_synthetic':    
-        args_dict['poloidal_launch_angle_Torbeam']   = 6.0
-        args_dict['toroidal_launch_angle_Torbeam']   = 0.0  
-        args_dict['launch_freq_GHz']                 = 55.0
-        args_dict['mode_flag']                       = 1
-        args_dict['launch_beam_width']               = 0.04
-        args_dict['launch_beam_radius_of_curvature'] = -4.0   
-        args_dict['launch_position']                 = np.array([2.587,0,-0.0157]) # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
+        args_dict['poloidal_launch_angle_Torbeam'] = 6.0
+        args_dict['toroidal_launch_angle_Torbeam'] = 0.0  
+        args_dict['launch_freq_GHz']               = 55.0
+        args_dict['mode_flag']                     = 1
+        args_dict['launch_beam_width']             = 0.04
+        args_dict['launch_beam_curvature']         = 1/-4.0   
+        args_dict['launch_position']               = np.array([2.587,0,-0.0157]) # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
         
         ne_fit_param = np.array([4.0, 1.0])
         
@@ -290,7 +345,7 @@ def beam_settings(
 
             Psi_w_cartesian_launch = propagate_beam(Psi_w_lens_cartesian_output,lens_to_mirror,launch_freq_GHz)
             launch_beam_width = np.sqrt(2 / np.imag(Psi_w_cartesian_launch[0,0]))
-            launch_beam_radius_of_curvature = wavenumber_K0 / np.real(Psi_w_cartesian_launch[0,0])
+            launch_beam_curvature = np.real(Psi_w_cartesian_launch[0,0]) / wavenumber_K0
 
         if method == 'data':
             freqs = np.array([
@@ -312,7 +367,7 @@ def beam_settings(
             
             freq_idx = find_nearest(freqs, launch_freq_GHz)
             launch_beam_width = launch_beam_widths[freq_idx]
-            launch_beam_radius_of_curvature = launch_beam_radii_of_curvature[freq_idx]
+            launch_beam_curvature = 1/launch_beam_radii_of_curvature[freq_idx]
 
     elif diagnostic == 'DBS_CIEMAT_JT60SA':
         if method == 'data':
@@ -332,23 +387,34 @@ def beam_settings(
             # 
             # freq_idx = find_nearest(freqs, launch_freq_GHz)
             # launch_beam_width = launch_beam_widths[freq_idx]
-            # launch_beam_radius_of_curvature = launch_beam_radii_of_curvature[freq_idx]
+            # launch_beam_curvature = 1/launch_beam_radii_of_curvature[freq_idx]
             
             # 90 GHz
             launch_beam_width = 0.06323503329291348
-            launch_beam_radius_of_curvature = 1 / -0.5535179506038995
+            launch_beam_curvature = -0.5535179506038995
 
-    elif diagnostic == 'DBS_UCLA_DIII-D_1':    
+    elif diagnostic == 'DBS_UCLA_DIII-D_240':    
         if method == 'thin_lens':
-            name = 'DBS_UCLA_DIII-D_1'
+            name = 'DBS_UCLA_DIII-D_240'
             ## The lens is directly in front of the waveguide (wg)
             wg_width     = 0.025
             wg_curvature = 0.0
+            wg_to_mirror   = 0.08255
             
-            focal_lengths = np.array([0.57574337, 0.64106815, 0.70884843, 0.7791753 , 
-                                      0.92770038, 1.00597547, 1.08696085, 1.17067524])
-            freqs_GHz = np.array([55.0,57.5,60.0,62.5,
-                                 67.5,70.0,72.5,75.0]) 
+            focal_lengths = np.array([0.45181379, 0.46384668, 0.47595193, 0.488133  , 0.50039298,
+                                      0.51273458, 0.52516023, 0.53767209, 0.55027209, 0.56296199,
+                                      0.57574337, 0.58861765, 0.60158613, 0.61465001, 0.62781035,
+                                      0.64106815, 0.65442432, 0.66787969, 0.68143503, 0.69509106,
+                                      0.70884843, 0.72270775, 0.73666959, 0.75073448, 0.7649029 ,
+                                      0.7791753 , 0.79355212, 0.80803376, 0.82262058, 0.83731294,
+                                      0.85211116, 0.86701555, 0.8820264 , 0.89714399, 0.91236857,
+                                      0.92770038, 0.94313965, 0.95868659, 0.97434142, 0.99010431,
+                                      1.00597547, 1.02195505, 1.03804323, 1.05424016, 1.07054599,
+                                      1.08696085, 1.10348489, 1.12011823, 1.13686099, 1.15371329,
+                                      1.17067524, 1.18774694, 1.20492849, 1.22222   , 1.23962155,
+                                      1.25713322, 1.27475512, 1.2924873 , 1.31032986, 1.32828286,
+                                      1.34634637])
+            freqs_GHz = np.linspace(50,80,61) 
             nearest_freq_idx = find_nearest(freqs_GHz,launch_freq_GHz)
             focal_length = focal_lengths[nearest_freq_idx]
 
@@ -365,10 +431,39 @@ def beam_settings(
                         
             Psi_w_lens = myLens.output_beam(Psi_w_wg,launch_freq_GHz)
 
-            launch_beam_width = np.sqrt(2 / np.imag(Psi_w_lens[0,0]))
-            launch_beam_radius_of_curvature = wavenumber_K0 / np.real(Psi_w_lens[0,0])
+            Psi_w_mirror = propagate_beam(Psi_w_lens,wg_to_mirror,launch_freq_GHz)
             
-    return launch_beam_width, launch_beam_radius_of_curvature
+            launch_beam_width = np.sqrt(2 / np.imag(Psi_w_mirror[0,0]))
+            launch_beam_curvature = np.real(Psi_w_mirror[0,0]) / wavenumber_K0
+
+    elif diagnostic == 'DBS_SWIP_MAST-U':    
+        # if method == 'thin_lens':
+        #     name = 'DBS_SWIP_MAST-U0'
+        if method == 'estimate_var_w0':
+            if launch_freq_GHz <= 50.0: # Q band
+                w0 = np.sqrt(launch_freq_GHz/40) * 0.08
+            else: # V band
+                w0 = np.sqrt(launch_freq_GHz/60) * 0.04
+            distance = -0.277 # window to steering mirror, negative because the mirror is behind the window
+            
+            launch_angular_frequency = 2*np.pi*launch_freq_GHz*10**9
+            wavenumber_K0 = launch_angular_frequency / constants.c
+            
+            launch_beam_width, launch_beam_curvature = propagate_circular_beam(distance,wavenumber_K0,w0)
+
+        if method == 'estimate_fix_w0':
+            if launch_freq_GHz <= 50.0: # Q band
+                w0 = 0.08
+            else: # V band
+                w0 = 0.04
+            distance = -0.277 # window to steering mirror, negative because the mirror is behind the window
+            
+            launch_angular_frequency = 2*np.pi*launch_freq_GHz*10**9
+            wavenumber_K0 = launch_angular_frequency / constants.c
+            
+            launch_beam_width, launch_beam_curvature = propagate_circular_beam(distance,wavenumber_K0,w0)
+            
+    return launch_beam_width, launch_beam_curvature
 
 
 
@@ -497,7 +592,7 @@ def ne_settings(diagnostic,shot,time,find_ne_method):
         else:
             poloidal_flux_enter = ne_fit_params[2]
 
-    elif diagnostic == 'DBS_UCLA_DIII-D_1':    
+    elif diagnostic == 'DBS_UCLA_DIII-D_240':    
         print('Not yet implemented')
         
     return ne_fit_param, ne_fit_time, poloidal_flux_enter
@@ -535,7 +630,7 @@ def user_settings(diagnostic,user,shot):
         elif user == 'Valerian_laptop':
             prefix = 'C:\\Users\\chenv\\Dropbox\\'
 
-        if diagnostic == 'DBS_NSTX_MAST':
+        if diagnostic == 'DBS_NSTX_MAST' or diagnostic == 'DBS_SWIP_MAST-U':
             if shot == 29684:
                 # MAST reruns of EFIT. Done by Lucy Kogan.
                 # 29684: no MSE data, but reprocessed with more constraints, only good at the edge
@@ -544,13 +639,16 @@ def user_settings(diagnostic,user,shot):
                 # MAST reruns of EFIT. Done by Lucy Kogan.
                 # 30073--30077: MSE data, processed better than original runs
                 efitpp_path        = prefix + 'VHChen2020\\Data\\Equilibrium\\MAST\\Lucy_EFIT_runs\\' + str(shot) + '\\epi_lkogan_01\\'        
+            elif shot in [29908]:
+                # MAST EFIT runs. List of available shots not updated.
+                efitpp_path        = prefix + 'VHChen2020\\Data\\Equilibrium\\MAST\\MSE_efitruns\\' + str(shot) + '\\Pass0\\'                        
             ## If it's not any of the above shots, I'll assume that there's no efit++ data                
             elif shot > 30471: # MAST-U
                 UDA_saved_path     = prefix + 'VHChen2020\\Data\\Equilibrium\\MAST-U\\Equilibrium_pyuda\\'        
             else:
                 UDA_saved_path     = prefix + 'VHChen2020\\Data\\Equilibrium\\MAST\\Equilibrium_pyuda\\'
                 
-        elif diagnostic == 'DBS_UCLA_DIII-D_1':
+        elif diagnostic == 'DBS_UCLA_DIII-D_240':
             ne_path      = prefix + 'VHChen2021\Data - Equilibrium\DIII-D\\'        
             topfile_path = prefix + 'VHChen2021\Data - Equilibrium\DIII-D\\'       
          

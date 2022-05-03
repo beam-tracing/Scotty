@@ -28,8 +28,10 @@ def make_my_lens(name,lens_type='thin',focal_length=None):
             myLens.focal_length = 0.125
         elif name == 'MAST_Q_band':
             myLens.focal_length = 0.27
-        elif name == 'DBS_UCLA_DIII-D_1':
+        elif name == 'DBS_UCLA_DIII-D_240':
             myLens.focal_length = focal_length
+        elif name == 'DBS_UCLA_MAST-U':
+            myLens.focal_length = 0.1477692307692308 # Harmonic mean of front and back focal distances
             
     elif lens_type=='thick':
         myLens = Thick_Lens(name)

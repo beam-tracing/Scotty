@@ -20,7 +20,7 @@ poloidal_launch_angle_Torbeam = -5.0
 toroidal_launch_angle_Torbeam = 2.5
 
 args_dict, kwargs_dict = get_parameters_for_Scotty(
-                              'DBS_UCLA_DIII-D_240',
+                              'DBS_UCLA_MAST-U',
                               launch_freq_GHz = launch_freq_GHz,
                               find_B_method   = 'torbeam', # EFITpp, UDA_saved, UDA, torbeam
                               equil_time      = equil_time,
