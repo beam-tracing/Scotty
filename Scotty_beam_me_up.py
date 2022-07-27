@@ -79,6 +79,7 @@ from Scotty_fun_general import find_dB_dR_FFD, find_dB_dZ_FFD, find_d2B_dR2_FFD,
 from Scotty_fun_general import find_dB_dR_CFD, find_dB_dZ_CFD, find_d2B_dR2_CFD, find_d2B_dZ2_CFD#, find_d2B_dR_dZ_FFD          
 from Scotty_fun_general import find_d2_poloidal_flux_dR2, find_d2_poloidal_flux_dZ2
 from Scotty_fun_general import find_H_Cardano, find_D
+from Scotty_fun_general import f_ped
 
 from Scotty_fun_evolution import ray_evolution_2D_fun, beam_evolution_fun
 from Scotty_fun_evolution import find_grad_grad_H_vectorised, find_gradK_grad_H_vectorised, find_gradK_gradK_H_vectorised
@@ -88,14 +89,14 @@ from Scotty_fun_CFD import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta # \nabla_K H
 from Scotty_fun_FFD import find_d2H_dR2, find_d2H_dZ2, find_d2H_dR_dZ # \nabla \nabla H
 from Scotty_fun_CFD import find_d2H_dKR2, find_d2H_dKR_dKzeta, find_d2H_dKR_dKZ, find_d2H_dKzeta2, find_d2H_dKzeta_dKZ, find_d2H_dKZ2 # \nabla_K \nabla_K H
 from Scotty_fun_mix import find_d2H_dKR_dR, find_d2H_dKR_dZ, find_d2H_dKzeta_dR, find_d2H_dKzeta_dZ, find_d2H_dKZ_dR, find_d2H_dKZ_dZ # \nabla_K \nabla H
-from Scotty_fun_FFD import find_dpolflux_dR, find_dpolflux_dZ # For find_B if using efit files directly
+from Scotty_fun_CFD import find_dpolflux_dR, find_dpolflux_dZ # For find_B if using efit files directly
 
 def beam_me_up(poloidal_launch_angle_Torbeam,
                toroidal_launch_angle_Torbeam,
                launch_freq_GHz,
                mode_flag,
                launch_beam_width,
-               launch_beam_radius_of_curvature,
+               launch_beam_curvature,
                launch_position,
                    ## keyword arguments begin
                vacuumLaunch_flag                 = True,               
@@ -105,12 +106,26 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                vacuum_propagation_flag           = False,
                Psi_BC_flag                       = False,
                poloidal_flux_enter               = None,
+               ## Finite-difference and solver parameters
+               delta_R                           = -0.0001, #in the same units as data_R_coord
+               delta_Z                           = 0.0001, #in the same units as data_Z_coord
+               delta_K_R                         = 0.1, #in the same units as K_R
+               delta_K_zeta                      = 0.1, #in the same units as K_zeta
+               delta_K_Z                         = 0.1, #in the same units as K_z
+               interp_order                      = 5, # For the 2D interpolation functions
+               len_tau                           = 102, # Number of tau_points to output
+               rtol                              = 1e-3, # for solve_ivp of the beam solver
+               atol                              = 1e-6, # for solve_ivp of the beam solver 
+               interp_smoothing = 0, # For the 2D interpolation functions. For no smoothing, set to 0
                ## Input and output settings
                ne_data_path                      = None,
                magnetic_data_path                = None,
+               output_path                       = None,
                input_filename_suffix             = '',
                output_filename_suffix            = '',
                figure_flag                       = True,
+               detailed_analysis_flag            = True,
+               verbose_output_flag               = True,
                ## For launching within the plasma
                plasmaLaunch_K                    = np.zeros(3),
                plasmaLaunch_Psi_3D_lab_Cartesian = np.zeros([3,3]),
@@ -126,11 +141,6 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     find_B_method: 1) 'efitpp' finds B from efitpp files directly 2) 'torbeam' finds B from topfile 3) UDA_saved
     """
     
-    delta_R = -0.0001 #in the same units as data_R_coord
-    delta_Z = 0.0001 #in the same units as data_Z_coord
-    delta_K_R = 0.1 #in the same units as K_R
-    delta_K_zeta = 0.1 #in the same units as K_zeta
-    delta_K_Z = 0.1 #in the same units as K_z
 
     #major_radius = 0.9
 
@@ -151,9 +161,13 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
 
 
     ## Experimental Profile----------
-    # input_files_path ='D:\\Dropbox\\VHChen2020\\Data\\Input_Files_29Apr2019\\'
-    # input_files_path ='D:\\Dropbox\\VHChen2018\\Data\\Input_Files_29Apr2019\\'
-    # input_files_path ='D:\\Dropbox\\VHChen2019\\Code - Scotty\\Benchmark_9\\Torbeam\\'
+
+    if output_path is None:
+        if platform.system() == 'Windows':
+            output_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
+        elif platform.system() == 'Linux':
+            output_path = os.path.dirname(os.path.abspath(__file__)) + '/'
+
     if ne_data_path is None:
         if platform.system() == 'Windows':
             ne_data_path = os.path.dirname(os.path.abspath(__file__)) + '\\'
@@ -182,20 +196,46 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         interp_density_1D = interpolate.interp1d(ne_data_poloidal_flux_array, ne_data_density_array,
                                                  kind='cubic', axis=-1, copy=True, bounds_error=False,
                                                  fill_value=0, assume_sorted=False) # density is 0 outside the LCFS, hence the fill_value. Use 'linear' instead of 'cubic' if the density data has a discontinuity in the first derivative    
-        def find_density_1D(poloidal_flux, interp_density_1D=interp_density_1D):
-            density = interp_density_1D(poloidal_flux)
+        def find_density_1D(poloidal_flux, interp_density_1D=interp_density_1D,
+                            poloidal_flux_enter=poloidal_flux_enter):
+            density_interp = interp_density_1D(poloidal_flux)
+            is_inside = poloidal_flux <= poloidal_flux_enter # Boolean array
+            density = is_inside * density_interp
             return density
-        
-    elif len(density_fit_parameters) == 4:
-        print('ne(psi): Using order_1_polynomial*tanh')
+
+    elif len(density_fit_parameters) == 8:
+        print('ne(psi): Using Stefanikova')
         ne_data_density_array=None # So that saving the input data later does not complain
         ne_data_radialcoord_array=None # So that saving the input data later does not complain
         
         def find_density_1D(poloidal_flux, poloidal_flux_enter=poloidal_flux_enter,density_fit_parameters=density_fit_parameters):
-            density_fit = (density_fit_parameters[0]*poloidal_flux + density_fit_parameters[1])*np.tanh(density_fit_parameters[2] * poloidal_flux + density_fit_parameters[3])
+            a_height,a_width,a_exp,b_height,b_SOL,b_width,b_slope,b_pos = density_fit_parameters
+            fp = f_ped(poloidal_flux,b_height,0,b_width,b_slope,b_pos)
+            density_fit = fp + (a_height - fp)*np.exp(-poloidal_flux/a_width)**a_exp
             is_inside = poloidal_flux <= poloidal_flux_enter # Boolean array
             density = is_inside * density_fit # The Boolean array sets stuff outside poloidal_flux_enter to zero
-            return density     
+            return density  
+        
+    # elif len(density_fit_parameters) == 4:
+    #     print('ne(psi): Using order_1_polynomial*tanh')
+    #     ne_data_density_array=None # So that saving the input data later does not complain
+    #     ne_data_radialcoord_array=None # So that saving the input data later does not complain
+        
+    #     def find_density_1D(poloidal_flux, poloidal_flux_enter=poloidal_flux_enter,density_fit_parameters=density_fit_parameters):
+    #         density_fit = (density_fit_parameters[0]*poloidal_flux + density_fit_parameters[1])*np.tanh(density_fit_parameters[2] * poloidal_flux + density_fit_parameters[3])
+    #         is_inside = poloidal_flux <= poloidal_flux_enter # Boolean array
+    #         density = is_inside * density_fit # The Boolean array sets stuff outside poloidal_flux_enter to zero
+    #         return density    
+    elif len(density_fit_parameters) == 4:
+        print('ne(psi): Using order_3_polynomial')
+        ne_data_density_array=None # So that saving the input data later does not complain
+        ne_data_radialcoord_array=None # So that saving the input data later does not complain
+        
+        def find_density_1D(poloidal_flux, poloidal_flux_enter=poloidal_flux_enter,density_fit_parameters=density_fit_parameters):
+            density_fit = np.polyval(density_fit_parameters,poloidal_flux)
+            is_inside = poloidal_flux <= poloidal_flux_enter # Boolean array
+            density = is_inside * density_fit # The Boolean array sets stuff outside poloidal_flux_enter to zero
+            return density    
         
     elif len(density_fit_parameters) == 3:
         print('ne(psi): using constant*tanh')
@@ -229,9 +269,6 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         print('density_fit_parameters has an invalid length')
         sys.exit()
     
-    # This part of the code defines find_B_R, find_B_T, find_B_zeta
-    interp_order = 5 # For the 2D interpolation functions
-    interp_smoothing = 2 # For the 2D interpolation functions. For no smoothing, set to 0
     
     if find_B_method == 'torbeam':    
         print('Using Torbeam input files for B and poloidal flux')
@@ -323,7 +360,9 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         data_Z_coord = np.linspace(-minor_radius_a, minor_radius_a,101)
         poloidalFlux_grid = interp_poloidal_flux(*np.meshgrid(data_R_coord, data_Z_coord, sparse=False, indexing='ij'))
         
-    elif (find_B_method == 'EFITpp') or (find_B_method == 'UDA_saved'):
+    elif ((find_B_method == 'EFITpp') or 
+          (find_B_method == 'UDA_saved')
+          ):
         if find_B_method == 'EFITpp':
             print('Using MSE-constrained EFIT++ output files directly for B and poloidal flux')
     
@@ -363,7 +402,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
             poloidalFlux_grid = unnormalised_poloidalFlux_grid*polflux_const_m + polflux_const_c
     
     
-        elif find_B_method == 'UDA_saved' and shot <= 30471: # MAST
+        elif find_B_method == 'UDA_saved' and shot is not None and shot <= 30471: # MAST
             print(shot)
             # 30471 is the last shot on MAST
             # data saved differently for MAST-U shots
@@ -394,7 +433,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
             poloidalFlux_grid = (unnormalised_poloidalFlux_grid - polflux_axis)/(polflux_boundary-polflux_axis)
 
 
-        elif find_B_method == 'UDA_saved' and shot > 30471: # MAST-U
+        elif find_B_method == 'UDA_saved' and shot is not None and shot > 30471: # MAST-U
             # 30471 is the last shot on MAST
             # data saved differently for MAST-U shots
             loadfile                    = np.load(magnetic_data_path + str(shot) + '_equilibrium_data.npz')
@@ -423,13 +462,28 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
             # plt.figure()
             # plt.plot(poloidalFlux)
             # print(poloidalFlux[-1])
-           
+
+        elif find_B_method == 'UDA_saved' and shot is None: # 
+            # If using this part of the code, magnetic_data_path needs to include the filename
+            # Assuming only one time present in file
+            loadfile                           = np.load(magnetic_data_path)
+            rBphi                              = loadfile['rBphi'] 
+            data_R_coord                       = loadfile['R_EFIT']
+            data_Z_coord                       = loadfile['Z_EFIT']    
+            poloidalFlux_grid                  = loadfile['poloidalFlux_grid'] 
+            poloidalFlux_unnormalised_axis     = loadfile['poloidalFlux_unnormalised_axis']
+            poloidalFlux_unnormalised_boundary = loadfile['poloidalFlux_unnormalised_boundary']
+            loadfile.close()      
+            
+            polflux_const_m = (1.0 - 0.0) / (poloidalFlux_unnormalised_boundary-poloidalFlux_unnormalised_axis)
+            poloidalFlux = np.linspace(0,1.0,len(rBphi)) 
+                        
+
         interp_rBphi = interpolate.interp1d(poloidalFlux, rBphi, 
                                                  kind='cubic', axis=-1, copy=True, bounds_error=False, 
                                                  fill_value=rBphi[-1], assume_sorted=False)
  
 
-        
         interp_poloidal_flux = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,poloidalFlux_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
 
             # Extrapolation assumes the last element of rBphi corresponds to poloidalflux = 1
@@ -438,8 +492,8 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         last_rBphi = rBphi[-1]
         
         
-        def find_B_R(q_R,q_Z,delta_R=delta_R,interp_poloidal_flux=interp_poloidal_flux,polflux_const_m=polflux_const_m):
-            dpolflux_dZ = find_dpolflux_dZ(q_R,q_Z,delta_R,interp_poloidal_flux)
+        def find_B_R(q_R,q_Z,delta_Z=delta_Z,interp_poloidal_flux=interp_poloidal_flux,polflux_const_m=polflux_const_m):
+            dpolflux_dZ = find_dpolflux_dZ(q_R,q_Z,delta_Z,interp_poloidal_flux)
             B_R = -  dpolflux_dZ / (polflux_const_m * q_R)
             return B_R
         
@@ -468,8 +522,8 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
 
             return B_T
         
-        def find_B_Z(q_R,q_Z,delta_Z=delta_Z,interp_poloidal_flux=interp_poloidal_flux,polflux_const_m=polflux_const_m):
-            dpolflux_dR = find_dpolflux_dR(q_R,q_Z,delta_Z,interp_poloidal_flux)
+        def find_B_Z(q_R,q_Z,delta_R=delta_R,interp_poloidal_flux=interp_poloidal_flux,polflux_const_m=polflux_const_m):
+            dpolflux_dR = find_dpolflux_dR(q_R,q_Z,delta_R,interp_poloidal_flux)
             B_Z = dpolflux_dR / (polflux_const_m * q_R)
             return B_Z
 
@@ -487,26 +541,40 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         def find_B_Z(q_R,q_Z):
             return np.zeros_like(q_R)
     
-    elif find_B_method == 'test':
+    elif find_B_method == 'test' or find_B_method == 'test_notime':
         # TODO: tidy up
-        # Works nicely with the new MAST-U UDA output
-        loadfile                    = np.load(magnetic_data_path + str(shot) + '_equilibrium_data.npz')
-        time_EFIT                   = loadfile['time_EFIT']
-        data_R_coord                = loadfile['R_EFIT']
-        data_Z_coord                = loadfile['Z_EFIT']    
-        poloidalFlux_grid_all_times = loadfile['poloidalFlux_grid'] 
-        Bphi_grid_all_times         = loadfile['Bphi_grid']
-        Br_grid_all_times           = loadfile['Br_grid']
-        Bz_grid_all_times           = loadfile['Bz_grid']
-        loadfile.close()      
-
-        t_idx = find_nearest(time_EFIT, equil_time)
-        print('EFIT time', time_EFIT[t_idx])    
         
-        poloidalFlux_grid = poloidalFlux_grid_all_times[t_idx,:,:]          
-        data_B_R_grid     = Br_grid_all_times[t_idx,:,:] 
-        data_B_T_grid     = Bphi_grid_all_times[t_idx,:,:] 
-        data_B_Z_grid     = Bz_grid_all_times[t_idx,:,:] 
+        if find_B_method == 'test':
+        # Works nicely with the new MAST-U UDA output
+            loadfile                    = np.load(magnetic_data_path + str(shot) + '_equilibrium_data.npz')
+            data_R_coord                = loadfile['R_EFIT']
+            data_Z_coord                = loadfile['Z_EFIT']    
+            poloidalFlux_grid_all_times = loadfile['poloidalFlux_grid'] 
+            Bphi_grid_all_times         = loadfile['Bphi_grid']
+            Br_grid_all_times           = loadfile['Br_grid']
+            Bz_grid_all_times           = loadfile['Bz_grid']
+            time_EFIT                   = loadfile['time_EFIT']
+            loadfile.close()
+            
+            t_idx = find_nearest(time_EFIT, equil_time)
+            print('EFIT time', time_EFIT[t_idx])    
+            
+            poloidalFlux_grid = poloidalFlux_grid_all_times[t_idx,:,:]          
+            data_B_R_grid     = Br_grid_all_times[t_idx,:,:] 
+            data_B_T_grid     = Bphi_grid_all_times[t_idx,:,:] 
+            data_B_Z_grid     = Bz_grid_all_times[t_idx,:,:] 
+            
+        if find_B_method == 'test_notime':
+            loadfile          = np.load(magnetic_data_path)
+            data_R_coord      = loadfile['R_EFIT']
+            data_Z_coord      = loadfile['Z_EFIT']    
+            poloidalFlux_grid = loadfile['poloidalFlux_grid'] 
+            data_B_T_grid     = loadfile['Bphi_grid']
+            data_B_R_grid     = loadfile['Br_grid']
+            data_B_Z_grid     = loadfile['Bz_grid']
+            loadfile.close()
+            
+              
         
         # Interpolation functions declared
         interp_B_R = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_R_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
@@ -564,8 +632,8 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     
         Psi_w_beam_launch_cartersian = np.array(
                 [
-                [ wavenumber_K0/launch_beam_radius_of_curvature+2j*launch_beam_width**(-2), 0],
-                [ 0, wavenumber_K0/launch_beam_radius_of_curvature+2j*launch_beam_width**(-2)]
+                [ wavenumber_K0*launch_beam_curvature+2j*launch_beam_width**(-2), 0],
+                [ 0, wavenumber_K0*launch_beam_curvature+2j*launch_beam_width**(-2)]
                 ]
                 )    
         identity_matrix_2D = np.array(
@@ -822,6 +890,34 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         return is_inside
     event_leave_simulation.terminal = True # Stop the solver when the beam leaves the simulation region. Entering the simulation region is fine
     event_leave_simulation.direction = -1.0 # negative value, when function result goes from positive to negative
+
+
+    def event_cross_resonance(tau, ray_parameters_2D, K_zeta, 
+                              launch_angular_frequency, mode_flag,
+                              delta_R, delta_Z, delta_K_R, delta_K_zeta, delta_K_Z,
+                              interp_poloidal_flux, find_density_1D, 
+                              find_B_R, find_B_T, find_B_Z
+                             ): 
+        ## Currently only works when crossing resonance.
+        ## To implement crossing of higher harmonics as well
+        delta_gyro_freq = 0.01
+        
+        q_R = ray_parameters_2D[0]
+        q_Z = ray_parameters_2D[1]
+        
+        B_R = find_B_R(q_R,q_Z)
+        B_T = find_B_T(q_R,q_Z)
+        B_Z = find_B_Z(q_R,q_Z)
+        
+        B_Total   = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
+        gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
+
+        # The function's return value gives zero when the gyrofreq on the ray goes from either 
+        # above to below or below to above the resonance.
+        return (gyro_freq - 1.0 - delta_gyro_freq) * (gyro_freq - 1.0 + delta_gyro_freq)
+    event_cross_resonance.direction = 0.0 
+    event_cross_resonance.terminal = True # Stop the solver when the beam is in a region of resonance
+   
     # -------------------
 
     # Propagate the beam
@@ -837,9 +933,14 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     """
     Propagate a ray. Quickly finds tau at which the ray leaves the plasma, as well as estimates location of cut-off
     """
+    print('Starting the solvers')
     solver_start_time = time.time()
     
-    solver_ray_events = (event_leave_plasma, event_leave_LCFS, event_leave_simulation) 
+    solver_ray_events = (event_leave_plasma, 
+                         event_leave_LCFS, 
+                         event_leave_simulation,
+                         event_cross_resonance
+                        ) 
     solver_ray_output = integrate.solve_ivp(
                         ray_evolution_2D_fun, [0,tau_max], ray_parameters_2D_initial, 
                         method='RK45', t_eval=None, dense_output=False, 
@@ -853,6 +954,8 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     tau_ray = solver_ray_output.t
     
     ## Uncomment to help with troubleshooting
+    # print(solver_ray_output.t_events)
+    # print(solver_ray_output.status)
     # plt.title('Poloidal Plane')
     # contour_levels = np.linspace(0,1,11)
     # CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
@@ -860,30 +963,36 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     # plt.clabel(CS, inline=True, fontsize=10,inline_spacing=1,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
     
     solver_ray_status = solver_ray_output.status
-    if solver_ray_status != 1:
+    if solver_ray_status == 0:
         print('Warning: Ray has not left plasma/simulation region. Increase tau_max or choose different initial conditions.')
         print('We should not be here. I am prematurely terminating this simulation.')
         
         sys.exit()
-
+    elif solver_ray_status == -1:
+        print('Warning: Integration step failed.')
+        ## This is sometimes due to negative values of ne due to the spline
+        ## interpolation of ne.dat
+        ## If this happens on the way out of the plasma, the next step will do the trick.
         
-    K_magnitude_ray = (  (np.real(ray_parameters_2D[2,:]))**2 
-                        + K_zeta_initial**2/(np.real(ray_parameters_2D[0,:]))**2 
-                        + (np.real(ray_parameters_2D[3,:]))**2)**(0.5)
-    
-    index_cutoff_estimate = K_magnitude_ray.argmin()
+        sys.exit()
 
     tau_events               = solver_ray_output.t_events
     ray_parameters_2D_events = solver_ray_output.y_events
     ray_parameters_LCFS      = ray_parameters_2D_events[1]
-
-    
+        
     if (len(tau_events[0]) != 0) and (len(tau_events[1]) == 0): 
         """
         If event_leave_plasma occurs and event_leave_LCFS does not
         """
         tau_leave = np.squeeze(tau_events[0]) 
     
+    elif (len(tau_events[3]) != 0):
+        """
+        If the beam reaches a resonance
+        """    
+        tau_cross_resonance = np.squeeze(tau_events[3]) 
+        tau_leave = tau_cross_resonance
+
     elif (len(tau_events[0]) == 0) and (len(tau_events[1]) != 0): 
         """
         - If event_leave_plasma doesn't occur, but event_leave_LCFS does.   
@@ -933,55 +1042,69 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         ##
 
 
-    """
-    - Propagates another ray to find the cut-off location
-    - suffix _fine for variables in this section
-    - I guess I could've used 'dense_output' for the section above and got the information from there, and one day I'll go and see which method works better/faster
-    """
-    ray_parameters_2D_initial_fine = ray_parameters_2D[:,max(0,index_cutoff_estimate-1)]
-    tau_start_fine                 = tau_ray[max(0,index_cutoff_estimate-1)]
-    tau_end_fine                   = tau_ray[min(len(tau_ray)-1,index_cutoff_estimate+1)]
-    tau_points_fine                = np.linspace(tau_start_fine,tau_end_fine,1001)
-    # The max and min in the indices are to ensure that the index is not out of bounds
+
+    ## The beam solver outputs data at these values of tau
+    ## Tell the solver which values of tau we want for the output
+    tau_points = np.linspace(0,tau_leave,len_tau)
+    tau_points = np.delete(tau_points,-1).tolist()  # Remove the last point, probably does a good job of making sure that the new last point is inside the plasma
+    ##
     
-    solver_start_time = time.time()
-    
-    solver_ray_output_fine = integrate.solve_ivp(
-                        ray_evolution_2D_fun, [tau_start_fine,tau_end_fine], ray_parameters_2D_initial_fine, 
-                        method='RK45', t_eval=tau_points_fine, dense_output=False, 
-                        events=event_leave_plasma, vectorized=False, args=solver_arguments
-                    )
-    
-    solver_end_time = time.time()
-    print('Time taken (cut-off finder)', solver_end_time-solver_start_time,'s')
-    
-    ray_parameters_2D_fine = solver_ray_output_fine.y  
-    K_magnitude_ray_fine = (  (np.real(ray_parameters_2D_fine[2,:]))**2 
-                            + K_zeta_initial**2/(np.real(ray_parameters_2D_fine[0,:]))**2 
-                            + (np.real(ray_parameters_2D_fine[3,:]))**2)**(0.5)
-    index_cutoff_fine = K_magnitude_ray_fine.argmin()
-    tau_ray_fine    = solver_ray_output_fine.t
-    tau_cutoff_fine = tau_ray_fine[index_cutoff_fine]        
+    if (len(tau_events[3]) == 0):
+        """
+        Only run this part if the beam does NOT reach a resonance
+        Adds an additional tau point at the cut-off (minimum K)
+  
+        - Propagates another ray to find the cut-off location (minimum K)
+        - suffix _fine for variables in this section
+        - I guess I could've used 'dense_output' for the section above and got the information from there, and one day I'll go and see which method works better/faster
+        """
+        max_tau_idx = np.argmax(tau_ray[tau_ray<=tau_leave])
+        
+        K_magnitude_ray = (  (np.real(ray_parameters_2D[2,:max_tau_idx]))**2 
+                            + K_zeta_initial**2/(np.real(ray_parameters_2D[0,:max_tau_idx]))**2 
+                            + (np.real(ray_parameters_2D[3,:max_tau_idx]))**2)**(0.5)
+        
+        index_cutoff_estimate = K_magnitude_ray.argmin()
+
+        ray_parameters_2D_initial_fine = ray_parameters_2D[:,max(0,index_cutoff_estimate-1)]
+        tau_start_fine                 = tau_ray[max(0,index_cutoff_estimate-1)]
+        tau_end_fine                   = tau_ray[min(len(tau_ray)-1,index_cutoff_estimate+1)]
+        tau_points_fine                = np.linspace(tau_start_fine,tau_end_fine,1001)
+        # The max and min in the indices are to ensure that the index is not out of bounds
+        
+        solver_start_time = time.time()
+        
+        solver_ray_output_fine = integrate.solve_ivp(
+                            ray_evolution_2D_fun, [tau_start_fine,tau_end_fine], ray_parameters_2D_initial_fine, 
+                            method='RK45', t_eval=tau_points_fine, dense_output=False, 
+                            events=event_leave_plasma, vectorized=False, args=solver_arguments
+                        )
+        
+        solver_end_time = time.time()
+        print('Time taken (cut-off finder)', solver_end_time-solver_start_time,'s')
+        
+        ray_parameters_2D_fine = solver_ray_output_fine.y  
+        K_magnitude_ray_fine = (  (np.real(ray_parameters_2D_fine[2,:]))**2 
+                                + K_zeta_initial**2/(np.real(ray_parameters_2D_fine[0,:]))**2 
+                                + (np.real(ray_parameters_2D_fine[3,:]))**2)**(0.5)
+        index_cutoff_fine = K_magnitude_ray_fine.argmin()
+        tau_ray_fine    = solver_ray_output_fine.t
+        tau_cutoff_fine = tau_ray_fine[index_cutoff_fine]     
+        
+                # I'm using a list because it makes the insertion of tau_cutoff_fine easier
+        bisect.insort(tau_points,tau_cutoff_fine) # This function modifies tau_points via a side-effect
+        tau_points = np.array(tau_points)
     
     """
     - Propagates the beam
-    - But first, tell the solver which values of tau we want for the output
     """        
-    tau_points = np.linspace(0,tau_leave,102).tolist() 
-
-
-    # I'm using a list because it makes the insertion of tau_cutoff_fine easier
-    bisect.insort(tau_points,tau_cutoff_fine) # This function modifies tau_points via a side-effect
-    tau_points = np.array(tau_points)
-
-    tau_points = np.delete(tau_points,-1) # Remove the last point, probably does a good job of making sure that the new last point is inside the plasma
-
     solver_start_time = time.time()
 
     solver_beam_output = integrate.solve_ivp(
                         beam_evolution_fun, [0,tau_leave], beam_parameters_initial, 
                         method='RK45', t_eval=tau_points, dense_output=False, 
-                        events=None, vectorized=False, args=solver_arguments
+                        events=None, vectorized=False, args=solver_arguments,
+                        rtol=rtol, atol=atol
                     )
     
     solver_end_time = time.time()
@@ -1014,35 +1137,38 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     print('Main loop complete')
     # -------------------
 
-
     ## -------------------
     ## This saves the data generated by the main loop and the input data
     ## -------------------
-    print('Saving data')    
-    np.savez('data_input' + output_filename_suffix, 
-              poloidalFlux_grid=poloidalFlux_grid,
-              data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
-              poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
-              toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
-              launch_freq_GHz=launch_freq_GHz,
-              mode_flag=mode_flag,
-              launch_beam_width=launch_beam_width,
-              launch_beam_radius_of_curvature=launch_beam_radius_of_curvature,
-              launch_position=launch_position,
-              launch_K=launch_K,
-              ne_data_density_array=ne_data_density_array,ne_data_radialcoord_array=ne_data_radialcoord_array,
-              equil_time=equil_time
-             )    
-    np.savez('solver_output' + output_filename_suffix, 
-             solver_status=solver_status,
-             tau_array=tau_array,
-             q_R_array=q_R_array,
-             q_zeta_array = q_zeta_array,
-             q_Z_array = q_Z_array,
-             K_R_array = K_R_array,
-             K_Z_array = K_Z_array,
-             Psi_3D_output = Psi_3D_output
-             )   
+    if verbose_output_flag:
+        print('Saving data')    
+        np.savez(output_path + 'data_input' + output_filename_suffix, 
+                poloidalFlux_grid=poloidalFlux_grid,
+                data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
+                poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
+                toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
+                launch_freq_GHz=launch_freq_GHz,
+                mode_flag=mode_flag,
+                launch_beam_width=launch_beam_width,
+                launch_beam_curvature=launch_beam_curvature,
+                launch_position=launch_position,
+                launch_K=launch_K,
+                ne_data_density_array=ne_data_density_array,ne_data_radialcoord_array=ne_data_radialcoord_array,
+                equil_time=equil_time,
+                delta_R=delta_R, delta_Z=delta_Z, 
+                delta_K_R=delta_K_R, delta_K_zeta=delta_K_zeta, delta_K_Z=delta_K_Z, 
+                interp_order=interp_order, interp_smoothing=interp_order
+                )    
+        np.savez(output_path + 'solver_output' + output_filename_suffix, 
+                 solver_status=solver_status,
+                 tau_array=tau_array,
+                 q_R_array=q_R_array,
+                 q_zeta_array = q_zeta_array,
+                 q_Z_array = q_Z_array,
+                 K_R_array = K_R_array,
+                 K_Z_array = K_Z_array,
+                 Psi_3D_output = Psi_3D_output
+                 )   
     
     if solver_status == -1:
         # If the solver doesn't finish, end the function here
@@ -1075,10 +1201,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                                    delta_K_Z,
                                    interp_poloidal_flux, find_density_1D,
                                    find_B_R, find_B_T, find_B_Z
-
                                    )
-
-
     
         # Calculates g_hat
     g_hat_output = np.zeros([numberOfDataPoints,3])
@@ -1120,10 +1243,28 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     ## Not useful for physics or data analysis
     ## But good for checking whether things are working properly
     ## -------------------
+        #
+    H_output = find_H(q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, 
+                      launch_angular_frequency, mode_flag, 
+                      interp_poloidal_flux, find_density_1D, find_B_R, find_B_T, find_B_Z)    
         
+        # nabla H along the ray
+    dH_dR_output = find_dH_dR(q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array,
+                              launch_angular_frequency, mode_flag,
+                              delta_R,
+                              interp_poloidal_flux, find_density_1D,
+                              find_B_R, find_B_T, find_B_Z
+                             )
+    dH_dZ_output = find_dH_dZ(q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array,
+                              launch_angular_frequency, mode_flag,
+                              delta_Z,
+                              interp_poloidal_flux, find_density_1D,
+                              find_B_R, find_B_T, find_B_Z
+                             )    
+    
         # Gradients of poloidal flux along the ray
-    # dpolflux_dR_FFD_debugging   =
-    # dpolflux_dZ_FFD_debugging   =
+    dpolflux_dR_debugging   = find_dpolflux_dR(q_R_array, q_Z_array, delta_R, interp_poloidal_flux)
+    dpolflux_dZ_debugging   = find_dpolflux_dZ(q_R_array, q_Z_array, delta_Z, interp_poloidal_flux)
     # d2polflux_dR2_FFD_debugging =
     # d2polflux_dZ2_FFD_debugging = 
 
@@ -1142,21 +1283,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     ## Just in case the analysis fails to run, at least one can get the data from the main loop
     ## -------------------
     if vacuumLaunch_flag:
-        # np.savez('data_input' + output_filename_suffix, 
-        #           # tau_step=tau_step, 
-        #           poloidalFlux_grid=poloidalFlux_grid,
-        #           data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
-        #           poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
-        #           toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
-        #           launch_freq_GHz=launch_freq_GHz,
-        #           mode_flag=mode_flag,
-        #           launch_beam_width=launch_beam_width,
-        #           launch_beam_curvature=launch_beam_curvature,
-        #           launch_position=launch_position,
-        #           launch_K=launch_K,
-        #           ne_data_density_array=ne_data_density_array,ne_data_radialcoord_array=ne_data_radialcoord_array
-        #           )    
-        np.savez('data_output' + output_filename_suffix, 
+        np.savez(output_path + 'data_output' + output_filename_suffix, 
                   tau_array=tau_array, q_R_array=q_R_array, q_zeta_array=q_zeta_array, q_Z_array=q_Z_array,
                   K_R_array=K_R_array, K_zeta_initial=K_zeta_initial, K_Z_array=K_Z_array,
                   Psi_3D_output=Psi_3D_output, Psi_3D_lab_launch=Psi_3D_lab_launch,
@@ -1172,13 +1299,13 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                   b_hat_output=b_hat_output,
                   grad_bhat_output=grad_bhat_output,
                   dH_dKR_output=dH_dKR_output,dH_dKzeta_output=dH_dKzeta_output,dH_dKZ_output=dH_dKZ_output,
-                  # dH_dR_output=dH_dR_output,dH_dZ_output=dH_dZ_output,
+                  dH_dR_output=dH_dR_output,dH_dZ_output=dH_dZ_output,
                   # grad_grad_H_output=grad_grad_H_output,gradK_grad_H_output=gradK_grad_H_output,gradK_gradK_H_output=gradK_gradK_H_output,
-                  # d_poloidal_flux_dR_output=d_poloidal_flux_dR_output,
-                  # d_poloidal_flux_dZ_output=d_poloidal_flux_dZ_output,
+                  dpolflux_dR_debugging=dpolflux_dR_debugging,
+                  dpolflux_dZ_debugging=dpolflux_dZ_debugging,
                   epsilon_para_output=epsilon_para_output,epsilon_perp_output=epsilon_perp_output,epsilon_g_output=epsilon_g_output,
                   electron_density_output=electron_density_output,
-                  # H_output=H_output,
+                  H_output=H_output,
                   poloidal_flux_output=poloidal_flux_output
                   # dB_dR_FFD_debugging=dB_dR_FFD_debugging,dB_dZ_FFD_debugging=dB_dZ_FFD_debugging,
                   # d2B_dR2_FFD_debugging=d2B_dR2_FFD_debugging,d2B_dZ2_FFD_debugging=d2B_dZ2_FFD_debugging,d2B_dR_dZ_FFD_debugging=d2B_dR_dZ_FFD_debugging,
@@ -1202,18 +1329,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                   # d2polflux_dZ2_FFD_debugging=d2polflux_dZ2_FFD_debugging, 
                   )
     else:
-        np.savez('data_input' + output_filename_suffix, 
-                # tau_step=tau_step, 
-                poloidalFlux_grid=poloidalFlux_grid,
-                data_R_coord=data_R_coord, data_Z_coord=data_Z_coord,
-                launch_freq_GHz=launch_freq_GHz,
-                mode_flag=mode_flag,
-                launch_position=launch_position,
-                plasmaLaunch_K=plasmaLaunch_K,
-                plasmaLaunch_Psi_3D_lab_Cartesian=plasmaLaunch_Psi_3D_lab_Cartesian,
-                ne_data_density_array=ne_data_density_array,ne_data_radialcoord_array=ne_data_radialcoord_array
-                )  
-        np.savez('data_output' + output_filename_suffix, 
+        np.savez(output_path + 'data_output' + output_filename_suffix, 
                 tau_array=tau_array, q_R_array=q_R_array, q_zeta_array=q_zeta_array, q_Z_array=q_Z_array,
                 K_R_array=K_R_array, K_zeta_initial=K_zeta_initial, K_Z_array=K_Z_array,
                 Psi_3D_output=Psi_3D_output, Psi_3D_lab_launch=Psi_3D_lab_launch,
@@ -1226,7 +1342,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                 b_hat_output=b_hat_output,
                 grad_bhat_output=grad_bhat_output,
                 dH_dKR_output=dH_dKR_output,dH_dKzeta_output=dH_dKzeta_output,dH_dKZ_output=dH_dKZ_output,
-                # dH_dR_output=dH_dR_output,dH_dZ_output=dH_dZ_output,
+                dH_dR_output=dH_dR_output,dH_dZ_output=dH_dZ_output,
                 # grad_grad_H_output=grad_grad_H_output,gradK_grad_H_output=gradK_grad_H_output,gradK_gradK_H_output=gradK_gradK_H_output,
                 # d_poloidal_flux_dR_output=d_poloidal_flux_dR_output,
                 # d_poloidal_flux_dZ_output=d_poloidal_flux_dZ_output,
@@ -1256,7 +1372,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         # Calculates the index of the minimum magnitude of K
         # That is, finds when the beam hits the cut-off        
     K_magnitude_array = (K_R_array**2 + K_zeta_initial**2/q_R_array**2 + K_Z_array**2)**(0.5)        
-        
+    
     cutoff_index = find_nearest(abs(K_magnitude_array),  0) # Index of the cutoff, at the minimum value of K, use this with other arrays
 
     cyclotron_freq_output = launch_angular_frequency * find_normalised_gyro_freq(B_magnitude, launch_angular_frequency)
@@ -1400,6 +1516,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     print('polflux: ', poloidal_flux_output[cutoff_index])
     
     print('theta_m', theta_m_output[cutoff_index])
+    print('delta_theta_m', delta_theta_m[cutoff_index])
     print('mismatch attenuation', np.exp(-2*(theta_m_output[cutoff_index]/delta_theta_m[cutoff_index])**2) )    
     # -----
 
@@ -1470,7 +1587,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     det_imag_Psi_w_analysis = np.imag(Psi_xx_output)*np.imag(Psi_yy_output) - np.imag(Psi_xy_output)**2 # Determinant of the imaginary part of Psi_w
     det_real_Psi_w_analysis = np.real(Psi_xx_output)*np.real(Psi_yy_output) - np.real(Psi_xy_output)**2 # Determinant of the real part of Psi_w. Not needed for the calculation, but gives useful insight
 
-    beam_waist_y = find_waist(launch_beam_width, wavenumber_K0, 1/launch_beam_radius_of_curvature) # Assumes circular beam at launch
+    beam_waist_y = find_waist(launch_beam_width, wavenumber_K0, launch_beam_curvature) # Assumes circular beam at launch
     
     loc_b = (beam_waist_y/np.sqrt(2))* det_imag_Psi_w_analysis / ( abs(det_M_w_analysis) * np.sqrt(-np.imag(M_w_inv_yy_output)) )
     # --
@@ -1526,7 +1643,6 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
                                     out=np.zeros_like(electron_density_output), 
                                     where=electron_density_output > 1e-4)
     loc_p = ( launch_angular_frequency**2 * constants.epsilon_0 * constants.m_e / constants.e**2 )**2 * loc_p_unnormalised
-    print(max(loc_p))
     # Note that loc_p is called varepsilon in my paper
     
     
@@ -1553,95 +1669,128 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     loc_b_r_s = loc_b * loc_r * loc_s
     loc_b_r   = loc_b * loc_r
     
+    if detailed_analysis_flag and (cutoff_index+1 != len(tau_array)):
+        """
+        Now to do some more-complex analysis of the localisation.
+        This part of the code fails in some situations, hence I'm making
+        it possible to skip this section
+        """
         # Finds the 1/e2 values (localisation)
-    loc_b_r_s_max_over_e2 = loc_b_r_s.max() / (np.e)**2 # loc_b_r_s.max() / 2.71**2
-    loc_b_r_max_over_e2   = loc_b_r.max() / (np.e)**2 # loc_b_r.max() / 2.71**2
+        loc_b_r_s_max_over_e2 = loc_b_r_s.max() / (np.e)**2 # loc_b_r_s.max() / 2.71**2
+        loc_b_r_max_over_e2   = loc_b_r.max() / (np.e)**2 # loc_b_r.max() / 2.71**2
+        
+            # Gives the inter-e2 range (analogous to interquartile range) in l-lc
+        loc_b_r_s_delta_l_1 = find_x0(l_lc[0:cutoff_index], loc_b_r_s[0:cutoff_index], loc_b_r_s_max_over_e2)
+        loc_b_r_s_delta_l_2 = find_x0(l_lc[cutoff_index::], loc_b_r_s[cutoff_index::], loc_b_r_s_max_over_e2)
+        loc_b_r_s_delta_l = np.array([loc_b_r_s_delta_l_1, loc_b_r_s_delta_l_2])# The 1/e2 distances,  (l - l_c)
+        loc_b_r_s_half_width_l = (loc_b_r_s_delta_l_2 - loc_b_r_s_delta_l_1)/2
+        loc_b_r_delta_l_1 = find_x0(l_lc[0:cutoff_index], loc_b_r[0:cutoff_index], loc_b_r_max_over_e2)
+        loc_b_r_delta_l_2 = find_x0(l_lc[cutoff_index::], loc_b_r[cutoff_index::], loc_b_r_max_over_e2)
+        loc_b_r_delta_l = np.array([loc_b_r_delta_l_1, loc_b_r_delta_l_2])# The 1/e2 distances,  (l - l_c)   
+        loc_b_r_half_width_l = (loc_b_r_delta_l_1 - loc_b_r_delta_l_2)/2
     
-        # Gives the inter-e2 range (analogous to interquartile range) in l-lc
-    loc_b_r_s_delta_l_1 = find_x0(l_lc[0:cutoff_index], loc_b_r_s[0:cutoff_index], loc_b_r_s_max_over_e2)
-    loc_b_r_s_delta_l_2 = find_x0(l_lc[cutoff_index::], loc_b_r_s[cutoff_index::], loc_b_r_s_max_over_e2)
-    loc_b_r_s_delta_l = np.array([loc_b_r_s_delta_l_1, loc_b_r_s_delta_l_2])# The 1/e2 distances,  (l - l_c)
-    loc_b_r_s_half_width_l = (loc_b_r_s_delta_l_2 - loc_b_r_s_delta_l_1)/2
-    loc_b_r_delta_l_1 = find_x0(l_lc[0:cutoff_index], loc_b_r[0:cutoff_index], loc_b_r_max_over_e2)
-    loc_b_r_delta_l_2 = find_x0(l_lc[cutoff_index::], loc_b_r[cutoff_index::], loc_b_r_max_over_e2)
-    loc_b_r_delta_l = np.array([loc_b_r_delta_l_1, loc_b_r_delta_l_2])# The 1/e2 distances,  (l - l_c)   
-    loc_b_r_half_width_l = (loc_b_r_delta_l_1 - loc_b_r_delta_l_2)/2
-
-        # Estimates the inter-e2 range (analogous to interquartile range) in kperp1, from l-lc
-        # Bear in mind that since abs(kperp1) is minimised at cutoff, one really has to use that in addition to these.
-    loc_b_r_s_delta_kperp1_1 = find_x0(k_perp_1_bs[0:cutoff_index],l_lc[0:cutoff_index],loc_b_r_s_delta_l_1)
-    loc_b_r_s_delta_kperp1_2 = find_x0(k_perp_1_bs[cutoff_index::], l_lc[cutoff_index::], loc_b_r_s_delta_l_2)
-    loc_b_r_s_delta_kperp1 = np.array([loc_b_r_s_delta_kperp1_1,loc_b_r_s_delta_kperp1_2])
-    loc_b_r_delta_kperp1_1 = find_x0(k_perp_1_bs[0:cutoff_index], l_lc[0:cutoff_index], loc_b_r_delta_l_1)
-    loc_b_r_delta_kperp1_2 = find_x0(k_perp_1_bs[cutoff_index::], l_lc[cutoff_index::], loc_b_r_delta_l_2)
-    loc_b_r_delta_kperp1 = np.array([loc_b_r_delta_kperp1_1,loc_b_r_delta_kperp1_2])
-
-
-        # Calculate the cumulative integral of the localisation pieces
-    cum_loc_b_r_s = integrate.cumtrapz(loc_b_r_s, distance_along_line, initial=0)    
-    cum_loc_b_r_s = (cum_loc_b_r_s - max(cum_loc_b_r_s)/2)
-    cum_loc_b_r = integrate.cumtrapz(loc_b_r, distance_along_line, initial=0)
-    cum_loc_b_r = (cum_loc_b_r - max(cum_loc_b_r)/2)
+            # Estimates the inter-e2 range (analogous to interquartile range) in kperp1, from l-lc
+            # Bear in mind that since abs(kperp1) is minimised at cutoff, one really has to use that in addition to these.
+        loc_b_r_s_delta_kperp1_1 = find_x0(k_perp_1_bs[0:cutoff_index],l_lc[0:cutoff_index],loc_b_r_s_delta_l_1)
+        loc_b_r_s_delta_kperp1_2 = find_x0(k_perp_1_bs[cutoff_index::], l_lc[cutoff_index::], loc_b_r_s_delta_l_2)
+        loc_b_r_s_delta_kperp1 = np.array([loc_b_r_s_delta_kperp1_1,loc_b_r_s_delta_kperp1_2])
+        loc_b_r_delta_kperp1_1 = find_x0(k_perp_1_bs[0:cutoff_index], l_lc[0:cutoff_index], loc_b_r_delta_l_1)
+        loc_b_r_delta_kperp1_2 = find_x0(k_perp_1_bs[cutoff_index::], l_lc[cutoff_index::], loc_b_r_delta_l_2)
+        loc_b_r_delta_kperp1 = np.array([loc_b_r_delta_kperp1_1,loc_b_r_delta_kperp1_2])
     
-        # Finds the 1/e2 values (cumulative integral of localisation)
-    # cum_loc_b_r_s_max_over_e2_1 = cum_loc_b_r_s.min() * (1 - 1 / (np.e)**2)
-    # cum_loc_b_r_s_max_over_e2_2 = cum_loc_b_r_s.max() * (1 - 1 / (np.e)**2)
-    # cum_loc_b_r_max_over_e2_1 = cum_loc_b_r.min() * (1 - 1 / (np.e)**2)
-    # cum_loc_b_r_max_over_e2_2 = cum_loc_b_r.max() * (1 - 1 / (np.e)**2)
-    cum_loc_b_r_s_max_over_e2 = cum_loc_b_r_s.max() * (1 - 1 / (np.e)**2)
-    cum_loc_b_r_max_over_e2 = cum_loc_b_r.max() * (1 - 1 / (np.e)**2)
     
-        # Gives the inter-e range (analogous to interquartile range) in l-lc
-    cum_loc_b_r_s_delta_l_1 = find_x0(l_lc, cum_loc_b_r_s, -cum_loc_b_r_s_max_over_e2)
-    cum_loc_b_r_s_delta_l_2 = find_x0(l_lc, cum_loc_b_r_s,  cum_loc_b_r_s_max_over_e2)
-    cum_loc_b_r_s_delta_l = np.array([cum_loc_b_r_s_delta_l_1,cum_loc_b_r_s_delta_l_2])
-    cum_loc_b_r_s_half_width = (cum_loc_b_r_s_delta_l_2 - cum_loc_b_r_s_delta_l_1)/2
-    cum_loc_b_r_delta_l_1 = find_x0(l_lc, cum_loc_b_r, -cum_loc_b_r_max_over_e2)
-    cum_loc_b_r_delta_l_2 = find_x0(l_lc, cum_loc_b_r,  cum_loc_b_r_max_over_e2)
-    cum_loc_b_r_delta_l = np.array([cum_loc_b_r_delta_l_1,cum_loc_b_r_delta_l_2])
-    cum_loc_b_r_half_width = (cum_loc_b_r_delta_l_2 - cum_loc_b_r_delta_l_1)/2
-
-        # Gives the inter-e2 range (analogous to interquartile range) in kperp1. 
-        # Bear in mind that since abs(kperp1) is minimised at cutoff, one really has to use that in addition to these.
-    cum_loc_b_r_s_delta_kperp1_1 = find_x0(k_perp_1_bs[0:cutoff_index], cum_loc_b_r_s[0:cutoff_index], -cum_loc_b_r_s_max_over_e2)
-    cum_loc_b_r_s_delta_kperp1_2 = find_x0(k_perp_1_bs[cutoff_index::], cum_loc_b_r_s[cutoff_index::],  cum_loc_b_r_s_max_over_e2)
-    cum_loc_b_r_s_delta_kperp1   = np.array([cum_loc_b_r_s_delta_kperp1_1,cum_loc_b_r_s_delta_kperp1_2])
-    cum_loc_b_r_delta_kperp1_1 = find_x0(k_perp_1_bs[0:cutoff_index], cum_loc_b_r[0:cutoff_index], -cum_loc_b_r_max_over_e2)
-    cum_loc_b_r_delta_kperp1_2 = find_x0(k_perp_1_bs[cutoff_index::], cum_loc_b_r[cutoff_index::],  cum_loc_b_r_max_over_e2)
-    cum_loc_b_r_delta_kperp1   = np.array([cum_loc_b_r_delta_kperp1_1,cum_loc_b_r_delta_kperp1_2])
+            # Calculate the cumulative integral of the localisation pieces
+        cum_loc_b_r_s = integrate.cumtrapz(loc_b_r_s, distance_along_line, initial=0)    
+        cum_loc_b_r_s = (cum_loc_b_r_s - max(cum_loc_b_r_s)/2)
+        cum_loc_b_r = integrate.cumtrapz(loc_b_r, distance_along_line, initial=0)
+        cum_loc_b_r = (cum_loc_b_r - max(cum_loc_b_r)/2)
+        
+            # Finds the 1/e2 values (cumulative integral of localisation)
+        # cum_loc_b_r_s_max_over_e2_1 = cum_loc_b_r_s.min() * (1 - 1 / (np.e)**2)
+        # cum_loc_b_r_s_max_over_e2_2 = cum_loc_b_r_s.max() * (1 - 1 / (np.e)**2)
+        # cum_loc_b_r_max_over_e2_1 = cum_loc_b_r.min() * (1 - 1 / (np.e)**2)
+        # cum_loc_b_r_max_over_e2_2 = cum_loc_b_r.max() * (1 - 1 / (np.e)**2)
+        cum_loc_b_r_s_max_over_e2 = cum_loc_b_r_s.max() * (1 - 1 / (np.e)**2)
+        cum_loc_b_r_max_over_e2 = cum_loc_b_r.max() * (1 - 1 / (np.e)**2)
+        
+            # Gives the inter-e range (analogous to interquartile range) in l-lc
+        cum_loc_b_r_s_delta_l_1 = find_x0(l_lc, cum_loc_b_r_s, -cum_loc_b_r_s_max_over_e2)
+        cum_loc_b_r_s_delta_l_2 = find_x0(l_lc, cum_loc_b_r_s,  cum_loc_b_r_s_max_over_e2)
+        cum_loc_b_r_s_delta_l = np.array([cum_loc_b_r_s_delta_l_1,cum_loc_b_r_s_delta_l_2])
+        cum_loc_b_r_s_half_width = (cum_loc_b_r_s_delta_l_2 - cum_loc_b_r_s_delta_l_1)/2
+        cum_loc_b_r_delta_l_1 = find_x0(l_lc, cum_loc_b_r, -cum_loc_b_r_max_over_e2)
+        cum_loc_b_r_delta_l_2 = find_x0(l_lc, cum_loc_b_r,  cum_loc_b_r_max_over_e2)
+        cum_loc_b_r_delta_l = np.array([cum_loc_b_r_delta_l_1,cum_loc_b_r_delta_l_2])
+        cum_loc_b_r_half_width = (cum_loc_b_r_delta_l_2 - cum_loc_b_r_delta_l_1)/2
     
-        # Gives the mode l-lc for backscattering        
-    loc_b_r_s_max_index = find_nearest(loc_b_r_s, loc_b_r_s.max())    
-    loc_b_r_s_max_l_lc = distance_along_line[loc_b_r_s_max_index] - distance_along_line[cutoff_index]
-    loc_b_r_max_index = find_nearest(loc_b_r, loc_b_r.max())    
-    loc_b_r_max_l_lc = distance_along_line[loc_b_r_max_index] - distance_along_line[cutoff_index]
+            # Gives the inter-e2 range (analogous to interquartile range) in kperp1. 
+            # Bear in mind that since abs(kperp1) is minimised at cutoff, one really has to use that in addition to these.
+        cum_loc_b_r_s_delta_kperp1_1 = find_x0(k_perp_1_bs[0:cutoff_index], cum_loc_b_r_s[0:cutoff_index], -cum_loc_b_r_s_max_over_e2)
+        cum_loc_b_r_s_delta_kperp1_2 = find_x0(k_perp_1_bs[cutoff_index::], cum_loc_b_r_s[cutoff_index::],  cum_loc_b_r_s_max_over_e2)
+        cum_loc_b_r_s_delta_kperp1   = np.array([cum_loc_b_r_s_delta_kperp1_1,cum_loc_b_r_s_delta_kperp1_2])
+        cum_loc_b_r_delta_kperp1_1 = find_x0(k_perp_1_bs[0:cutoff_index], cum_loc_b_r[0:cutoff_index], -cum_loc_b_r_max_over_e2)
+        cum_loc_b_r_delta_kperp1_2 = find_x0(k_perp_1_bs[cutoff_index::], cum_loc_b_r[cutoff_index::],  cum_loc_b_r_max_over_e2)
+        cum_loc_b_r_delta_kperp1   = np.array([cum_loc_b_r_delta_kperp1_1,cum_loc_b_r_delta_kperp1_2])
+        
+            # Gives the mode l-lc for backscattering        
+        loc_b_r_s_max_index = find_nearest(loc_b_r_s, loc_b_r_s.max())    
+        loc_b_r_s_max_l_lc = distance_along_line[loc_b_r_s_max_index] - distance_along_line[cutoff_index]
+        loc_b_r_max_index = find_nearest(loc_b_r, loc_b_r.max())    
+        loc_b_r_max_l_lc = distance_along_line[loc_b_r_max_index] - distance_along_line[cutoff_index]
+        
+            # Gives the mean l-lc for backscattering    
+        cum_loc_b_r_s_mean_l_lc = np.trapz(loc_b_r_s*distance_along_line, distance_along_line) / np.trapz(loc_b_r_s, distance_along_line) - distance_along_line[cutoff_index]
+        cum_loc_b_r_mean_l_lc = np.trapz(loc_b_r*distance_along_line, distance_along_line) / np.trapz(loc_b_r, distance_along_line) - distance_along_line[cutoff_index]
     
-        # Gives the mean l-lc for backscattering    
-    cum_loc_b_r_s_mean_l_lc = np.trapz(loc_b_r_s*distance_along_line, distance_along_line) / np.trapz(loc_b_r_s, distance_along_line) - distance_along_line[cutoff_index]
-    cum_loc_b_r_mean_l_lc = np.trapz(loc_b_r*distance_along_line, distance_along_line) / np.trapz(loc_b_r, distance_along_line) - distance_along_line[cutoff_index]
-
-        # Gives the median l-lc for backscattering
-    cum_loc_b_r_s_delta_l_0 = find_x0(l_lc, cum_loc_b_r_s, 0) 
-    cum_loc_b_r_delta_l_0 = find_x0(l_lc, cum_loc_b_r, 0)
-
-        # Due to the divergency of the ray piece, the mode kperp1 for backscattering is exactly that at the cut-off
-
-        # Gives the mean kperp1 for backscattering    
-    cum_loc_b_r_s_mean_kperp1 = np.trapz(loc_b_r_s*k_perp_1_bs, k_perp_1_bs) / np.trapz(loc_b_r_s, k_perp_1_bs)
-    cum_loc_b_r_mean_kperp1   = np.trapz(loc_b_r  *k_perp_1_bs, k_perp_1_bs) / np.trapz(loc_b_r  , k_perp_1_bs)
-
-        # Gives the median kperp1 for backscattering
-    cum_loc_b_r_s_delta_kperp1_0 = find_x0(k_perp_1_bs, cum_loc_b_r_s, 0)    
-    cum_loc_b_r_delta_kperp1_0 = find_x0(k_perp_1_bs[0:cutoff_index], cum_loc_b_r[0:cutoff_index], 0) # Only works if point is before cutoff. To fix.
-
-        # To make the plots look nice
-    k_perp_1_bs_plot = np.append(-2*wavenumber_K0, k_perp_1_bs)    
-    k_perp_1_bs_plot = np.append(k_perp_1_bs_plot, -2*wavenumber_K0)
-    cum_loc_b_r_s_plot = np.append(cum_loc_b_r_s[0], cum_loc_b_r_s)
-    cum_loc_b_r_s_plot = np.append(cum_loc_b_r_s_plot, cum_loc_b_r_s[-1])
-    cum_loc_b_r_plot = np.append(cum_loc_b_r[0], cum_loc_b_r)
-    cum_loc_b_r_plot = np.append(cum_loc_b_r_plot, cum_loc_b_r[-1])
+            # Gives the median l-lc for backscattering
+        cum_loc_b_r_s_delta_l_0 = find_x0(l_lc, cum_loc_b_r_s, 0) 
+        cum_loc_b_r_delta_l_0 = find_x0(l_lc, cum_loc_b_r, 0)
     
+            # Due to the divergency of the ray piece, the mode kperp1 for backscattering is exactly that at the cut-off
+    
+            # Gives the mean kperp1 for backscattering    
+        cum_loc_b_r_s_mean_kperp1 = np.trapz(loc_b_r_s*k_perp_1_bs, k_perp_1_bs) / np.trapz(loc_b_r_s, k_perp_1_bs)
+        cum_loc_b_r_mean_kperp1   = np.trapz(loc_b_r  *k_perp_1_bs, k_perp_1_bs) / np.trapz(loc_b_r  , k_perp_1_bs)
+    
+            # Gives the median kperp1 for backscattering
+        cum_loc_b_r_s_delta_kperp1_0 = find_x0(k_perp_1_bs, cum_loc_b_r_s, 0)    
+        cum_loc_b_r_delta_kperp1_0 = find_x0(k_perp_1_bs[0:cutoff_index], cum_loc_b_r[0:cutoff_index], 0) # Only works if point is before cutoff. To fix.
+    
+            # To make the plots look nice
+        k_perp_1_bs_plot = np.append(-2*wavenumber_K0, k_perp_1_bs)    
+        k_perp_1_bs_plot = np.append(k_perp_1_bs_plot, -2*wavenumber_K0)
+        cum_loc_b_r_s_plot = np.append(cum_loc_b_r_s[0], cum_loc_b_r_s)
+        cum_loc_b_r_s_plot = np.append(cum_loc_b_r_s_plot, cum_loc_b_r_s[-1])
+        cum_loc_b_r_plot = np.append(cum_loc_b_r[0], cum_loc_b_r)
+        cum_loc_b_r_plot = np.append(cum_loc_b_r_plot, cum_loc_b_r[-1])
+    else:
+        loc_b_r_s_max_over_e2 = None
+        loc_b_r_max_over_e2 = None
+        loc_b_r_s_delta_l = None
+        loc_b_r_delta_l = None        
+        loc_b_r_s_delta_kperp1 = None
+        loc_b_r_delta_kperp1 = None
+        cum_loc_b_r_s = None
+        cum_loc_b_r = None
+        k_perp_1_bs_plot = None
+        cum_loc_b_r_s_plot = None
+        cum_loc_b_r_plot = None
+        cum_loc_b_r_s_max_over_e2 = None
+        cum_loc_b_r_max_over_e2 = None
+        cum_loc_b_r_s_delta_l = None
+        cum_loc_b_r_delta_l = None
+        cum_loc_b_r_s_delta_kperp1 = None
+        cum_loc_b_r_delta_kperp1 = None
+        loc_b_r_s_max_l_lc = None
+        loc_b_r_max_l_lc = None
+        cum_loc_b_r_s_mean_l_lc = None
+        cum_loc_b_r_mean_l_lc = None
+        cum_loc_b_r_s_delta_l_0 = None
+        cum_loc_b_r_delta_l_0 = None
+        cum_loc_b_r_s_mean_kperp1 = None
+        cum_loc_b_r_mean_kperp1 = None
+        cum_loc_b_r_s_delta_kperp1_0 = None
+        cum_loc_b_r_delta_kperp1_0 = None
 
     # integrated_localisation_b_p_r_delta_kperp1_0 = find_x0(k_perp_1_bs[0:cutoff_index],integrated_localisation_b_p_r[0:cutoff_index],0)
 
@@ -1698,10 +1847,55 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
 
     # gradK_gradK_H[:,0,1] = - gradK_gradK_H[:,0,1]
     
+    # ## Mode conversion stuff
+    # def find_N(Booker_alpha,Booker_beta,Booker_gamma,mode_flag):
+    #     N = np.sqrt( - (
+    #             Booker_beta - mode_flag *
+    #             np.sqrt(np.maximum(
+    #                     np.zeros_like(Booker_beta), 
+    #                     (Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
+    #                 )
+    #             )
+    #             # np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
+    #             ) / (2 * Booker_alpha) )
+        
+    #     return N
+    
+    # #
+    # sin_theta_m_sq = (np.sin(theta_m_output))**2
+    # Booker_alpha = epsilon_para_output*sin_theta_m_sq + epsilon_perp_output*(1-sin_theta_m_sq)
+    # Booker_beta = (
+    #         - epsilon_perp_output * epsilon_para_output * (1+sin_theta_m_sq)
+    #         - (epsilon_perp_output**2 - epsilon_g_output**2) * (1-sin_theta_m_sq)
+    #                )
+    # Booker_gamma = epsilon_para_output*(epsilon_perp_output**2 - epsilon_g_output**2)
+    
+    # N_X = find_N(Booker_alpha,Booker_beta,Booker_gamma,-1)
+    # N_O = find_N(Booker_alpha,Booker_beta,Booker_gamma,1)
+    
+    # B_Z_plus = find_B_Z(q_R_array+delta_R,q_Z_array)
+    # B_T_plus = find_B_T(q_R_array+delta_R,q_Z_array)
+    # B_Z_minus = find_B_Z(q_R_array-delta_R,q_Z_array)
+    # B_T_minus = find_B_T(q_R_array-delta_R,q_Z_array)
+    
+    # pitch_angle = np.arctan2(B_Z_output,B_T_output)
+    # pitch_angle_plus = np.arctan2(B_Z_plus,B_T_plus)
+    # pitch_angle_minus = np.arctan2(B_Z_minus,B_T_minus)
+
+    # d_pitch_angle_d_R = (pitch_angle_plus - pitch_angle_minus) / 2 * delta_R
+    
+    # # ---
+    # anisotropy_term = (1 - N_O**2 / N_X**2)
+    # shear_term = (1/(4 * wavenumber_K0)) * d_pitch_angle_d_R
+    # print((abs(anisotropy_term)-abs(shear_term)))
+    # plt.figure()
+    # plt.plot(l_lc, (abs(anisotropy_term)-abs(shear_term)))   
+    # ##
+    
+    
+    
+    
     ## Running some tests
-    # H_output = find_H(q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, 
-    #                   launch_angular_frequency, mode_flag, 
-    #                   interp_poloidal_flux, find_density_1D, find_B_R, find_B_T, find_B_Z)
     
     # plt.figure()
     # plt.plot(l_lc, H_output)
@@ -1816,7 +2010,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     ## This saves the data generated by the analysis after the main loop
     ## -------------------
     print('Saving analysis data')
-    np.savez('analysis_output' + output_filename_suffix, 
+    np.savez(output_path + 'analysis_output' + output_filename_suffix, 
               Psi_xx_output = Psi_xx_output, Psi_xy_output = Psi_xy_output, Psi_yy_output = Psi_yy_output,
               Psi_xx_entry=Psi_xx_entry, Psi_xy_entry=Psi_xy_entry, Psi_yy_entry=Psi_yy_entry,
               Psi_3D_Cartesian=Psi_3D_Cartesian,x_hat_Cartesian=x_hat_Cartesian,y_hat_Cartesian=y_hat_Cartesian,
@@ -1854,6 +2048,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
               loc_r=loc_r,loc_s=loc_s,
               loc_m=loc_m,
               loc_b_r_s=loc_b_r_s, loc_b_r=loc_b_r,
+              ## Detailed analysis
               loc_b_r_s_max_over_e2=loc_b_r_s_max_over_e2,loc_b_r_max_over_e2=loc_b_r_max_over_e2,
               loc_b_r_s_delta_l=loc_b_r_s_delta_l,loc_b_r_delta_l=loc_b_r_delta_l, # The 1/e2 distances,  (l - l_c)
               loc_b_r_s_delta_kperp1=loc_b_r_s_delta_kperp1,loc_b_r_delta_kperp1=loc_b_r_delta_kperp1,  # The 1/e2 distances, kperp1, estimated from (l - l_c)
@@ -1902,7 +2097,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         plt.xlim(data_R_coord[0],data_R_coord[-1])
         plt.ylim(data_Z_coord[0],data_Z_coord[-1])
 
-        plt.savefig('Ray1_' + output_figurename_suffix)
+        plt.savefig(output_path + 'Ray1_' + output_figurename_suffix)
         plt.close()
         
         """
@@ -1916,7 +2111,7 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         plt.plot(l_lc,abs(H_1_Cardano_array),'r')    
         plt.plot(l_lc,abs(H_2_Cardano_array),'g')    
         plt.plot(l_lc,abs(H_3_Cardano_array),'b')    
-        plt.savefig('H_' + output_figurename_suffix)
+        plt.savefig(output_path + 'H_' + output_figurename_suffix)
         plt.close()        
 
         # Commented out because this does not work properly
