@@ -165,6 +165,11 @@ def find_area_points(xs,ys,fraction_wanted):
 #----------------------------------
     
 # Functions (Coordinate transformations)
+def freq_GHz_to_wavenumber(freq_GHz):
+    angular_frequency = 2*np.pi*10.0**9 * freq_GHz
+    wavenumber = angular_frequency / constants.c
+    return wavenumber
+
 def find_vec_lab_Cartesian(vec_lab, q_zeta):
     # vec_lab to have shape (n,3) or (3) # I've not tested the second case
     
@@ -706,16 +711,48 @@ def find_distance_from_waist(width, wavenumber, curvature): #Finds how far you a
     distance_from_waist = np.sign(curvature)*np.sqrt((width**2 - waist**2)*waist**2*wavenumber**2/4)
     return distance_from_waist
 
-def propagate_circular_beam(distance,wavenumber,w0):
+# def propagate_circular_beam(distance,wavenumber,w0):
+#     """
+#     w0 : Width of beam waist
+    
+#     Note that the curvature in this function returns has units of inverse length.
+#     """
+#     z_R = find_Rayleigh_length(w0, wavenumber)
+#     widths = w0 * np.sqrt(1+(distance/z_R)**2)
+#     curvatures = distance / (distance**2 +z_R**2)
+#     return widths, curvatures
+def propagate_circular_beam(width, curvature, propagation_distance, freq_GHz):
     """
     w0 : Width of beam waist
-    
-    Note that the curvature in this function returns has units of inverse length.
     """
+    wavenumber = freq_GHz_to_wavenumber(freq_GHz)
+    
+    w0 = find_waist(width, wavenumber, curvature)
+    z0 = find_distance_from_waist(width, wavenumber, curvature)
     z_R = find_Rayleigh_length(w0, wavenumber)
-    widths = w0 * np.sqrt(1+(distance/z_R)**2)
-    curvatures = distance / (distance**2 +z_R**2)
+    
+    z = z0 + propagation_distance
+    
+    widths = w0 * np.sqrt(1+(z/z_R)**2)
+    curvatures = z / (z**2 +z_R**2)
     return widths, curvatures
+
+def modify_beam(width, curvature, freq_GHz, z0_shift, w0_shift):
+    """
+    positive z0_shift moves the waist in the direction of -infinity
+    """
+    wavenumber = freq_GHz_to_wavenumber(freq_GHz)
+
+    w0_i = find_waist(width, wavenumber, curvature)
+    z0_i = find_distance_from_waist(width, wavenumber, curvature)
+    
+    w0_f = w0_i + w0_shift
+    z0_f = z0_i + z0_shift
+    
+    # Propagate from the new waist back to the initial location
+    w_f, curv_f = propagate_circular_beam(w0_f, 0, z0_f, freq_GHz)
+    
+    return w_f, curv_f
 #----------------------------------
 
 
@@ -999,6 +1036,20 @@ def find_d2_poloidal_flux_dZ2(q_R, q_Z, delta_Z, interp_poloidal_flux):
 
 #----------------------------------
 
+# Functions (Fitting)
+## Stefanikova. Adapted from Simon Freethy's code.
+def mtanh(x,b_slope):
+    return ((1+b_slope*x)*np.exp(x)-np.exp(-x))/(np.exp(x)+np.exp(-x))
+
+def f_ped(r,b_height,b_SOL,b_width,b_slope,b_pos):
+    mth = mtanh((b_pos-r)/(2*b_width), b_slope)
+    return (b_height-b_SOL)/2 *(mth+1)+b_SOL
+
+def f_full(r,a_height, a_width, a_exp,b_height,b_SOL,b_width,b_slope, b_pos):
+    # from this publication https://doi.org/10.1063/1.4961554
+    fp = f_ped(r,b_height,b_SOL,b_width,b_slope,b_pos)
+    return fp + (a_height - fp)*np.exp(-r/a_width)**a_exp
+#----------------------------------
 
 
 # Functions (Launch angle)
