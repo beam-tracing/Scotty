@@ -35,6 +35,7 @@ B_magnitude = loadfile['B_magnitude']
 g_magnitude_output = loadfile['g_magnitude_output']
 electron_density_output = loadfile['electron_density_output']
 poloidal_flux_output = loadfile['poloidal_flux_output']
+H_output = loadfile['H_output']
 loadfile.close()
 
 loadfile = np.load('analysis_output' + suffix + '.npz')
@@ -176,8 +177,8 @@ plt.xlabel('X / m')
 plt.ylabel('Y / m')
 # tikzplotlib.save("propagation_toroidal.tex")
 # plt.tight_layout(pad=1.08, h_pad=None, w_pad=None, rect=None)
-plt.xlim(0.5,1.8)
-plt.ylim(-0.5,0.5)
+# plt.xlim(1.5,2.5)
+# plt.ylim(-0.2,0.2)
 plt.gca().set_aspect('equal', adjustable='box')
 plt.savefig('propagation_toroidal.jpg',dpi=200)
 
@@ -309,35 +310,41 @@ plt.title('mismatch')
 plt.plot(l_lc,np.rad2deg(theta_m_output),label=r'$\theta_m$')
 plt.plot(l_lc,np.rad2deg(delta_theta_m),label=r'$\Delta \theta_m$')     
 plt.legend()
-plt.xlabel('l - l_c')
+plt.xlabel(r'$(l - l_c)$')
 plt.ylabel('deg')
 plt.subplot(3,2,2)
 plt.plot(l_lc,loc_m,label='loc_m')
-plt.xlabel('l - l_c')
+plt.xlabel(r'$(l - l_c)$')
 plt.legend()
 
 plt.subplot(3,2,3)
 plt.plot(l_lc,loc_b_r,label='loc_b_r')
-plt.xlabel('l - l_c')
+plt.xlabel(r'$(l - l_c)$')
 plt.legend()
 plt.subplot(3,2,4)
 plt.plot(l_lc,loc_b_r_s,label='loc_b_r_s')
-plt.xlabel('l - l_c')
+plt.xlabel(r'$(l - l_c)$')
 plt.legend()
 
 plt.subplot(3,2,5)
 plt.plot(l_lc,loc_b_r*loc_m,label='loc_b_m_r')
-plt.xlabel('l - l_c')
+plt.xlabel(r'$(l - l_c)$')
 plt.legend()
 plt.subplot(3,2,6)
 plt.plot(l_lc,loc_b_r_s*loc_m,label='loc_b_m_r_s')
-plt.xlabel('l - l_c')
+plt.xlabel(r'$(l - l_c)$')
 plt.legend()
 
 print((loc_b_r*loc_m).max())
 print((loc_b_r_s*loc_m).max())
 
-sys.exit()
+plt.figure()
+plt.title('H (Booker quartic)')
+plt.plot(l_lc,H_output)
+
+
+
+# sys.exit()
 
 plt.figure(figsize=(16,5))
 plt.subplot(2,3,1)
@@ -381,9 +388,10 @@ plt.xlabel(r'$l-l_c$')
 
 plt.figure()
 plt.plot(l_lc,np.rad2deg(theta_output),label='theta')
-plt.plot(l_lc,np.rad2deg(theta_m_output),label='theta_m')
+plt.plot(l_lc,np.rad2deg(theta_m_output),label='theta m')
+plt.plot(l_lc,np.rad2deg(delta_theta_m),label='delta theta m')
 plt.legend()
-plt.xlabel('l - l_c')
+plt.xlabel(r'$(l - l_c)$')
 plt.ylabel('deg')
 
 
