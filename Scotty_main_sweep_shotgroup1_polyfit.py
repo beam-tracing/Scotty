@@ -18,19 +18,18 @@ from scipy import constants
 import math
 import numpy as np
 import sys
-import os
 
 from Scotty_init_bruv import get_parameters_for_Scotty
 
 
-equil_times = np.array([0.16,0.19,0.22,0.25])
-# equil_times = np.array([0.240])
-mirror_rotations = np.linspace(3,-6,46)
-# mirror_rotations = np.linspace(3,1.2,10)
+equil_times = np.linspace(0.16,0.25,10)
+# mirror_rotations = np.linspace(1,-6,36)
+mirror_rotations = np.linspace(1.2,3,10)
 mirror_tilt = -4
-launch_freqs_GHz = np.array([30.0,32.5,35.0,37.5,42.5,45.0,47.5,50.0])
+launch_freqs_GHz = np.array([30.0,32.5,35.0,37.5,42.5,45.0,47.5,50.0,
+                            55.0,57.5,60.0,62.5,67.5,70.0,72.5,75.0])
 
-
+counter = 0
 for ii, equil_time in enumerate(equil_times):
     for jj, mirror_rotation in enumerate(mirror_rotations):
         for kk, launch_freq_GHz in enumerate(launch_freqs_GHz):
@@ -40,7 +39,7 @@ for ii, equil_time in enumerate(equil_times):
                                           mirror_rotation = mirror_rotation, # angle, in deg
                                           mirror_tilt     = mirror_tilt, # angle, in deg
                                           find_B_method   = 'EFITpp', # EFITpp, UDA_saved, UDA, torbeam
-                                          find_ne_method  = 'poly3',                                          
+                                          find_ne_method  = 'poly3',
                                           equil_time      = equil_time,
                                           shot            = 29908,
                                           user            = 'Valerian_desktop'
@@ -54,7 +53,12 @@ for ii, equil_time in enumerate(equil_times):
             if args_dict['mode_flag'] == 1:
                 mode_string = 'O'
             elif args_dict['mode_flag'] == -1:
-                mode_string = 'X'  
+                mode_string = 'X'        
+
+            if counter == 0:
+                kwargs_dict['verbose_output_flag'] = True
+            else:
+                kwargs_dict['verbose_output_flag'] = False  
 
             kwargs_dict['output_filename_suffix'] = (
                                         '_r' + f'{mirror_rotation:.1f}'
@@ -63,21 +67,15 @@ for ii, equil_time in enumerate(equil_times):
                                       + '_'  + mode_string
                                       + '_'  + f'{equil_time*1000:.3g}' + 'ms'
                                           )      
-
             kwargs_dict['figure_flag'] = False
-            kwargs_dict['output_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 20\\'
-            kwargs_dict['density_fit_parameters'] = None
-            kwargs_dict['ne_data_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST\\'
-            kwargs_dict['input_filename_suffix'] = '_shotgroup1_avr_' + f'{equil_time*1000:.0f}' +'ms'
+            kwargs_dict['detailed_analysis_flag'] = False
+            kwargs_dict['output_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 18\\'
 
-            if equil_time == 0.16:
-                kwargs_dict['poloidal_flux_enter'] = 1.17280433**2
-            if equil_time == 0.19:
-                kwargs_dict['poloidal_flux_enter'] = 1.20481476**2
-            if equil_time == 0.22:
-                kwargs_dict['poloidal_flux_enter'] = 1.16129185**2
-            if equil_time == 0.25:
-                kwargs_dict['poloidal_flux_enter'] = 1.15082068**2
+            # an_output = kwargs_dict['output_path'] + 'data_output' + kwargs_dict['output_filename_suffix'] + '.npz'
+            # if os.path.exists(an_output):
+            #     continue
+            # else:   
+            #     beam_me_up(**args_dict, **kwargs_dict)  
 
             kwargs_dict['delta_R'] = -0.00001
             kwargs_dict['delta_Z'] = -0.00001
@@ -85,22 +83,13 @@ for ii, equil_time in enumerate(equil_times):
             kwargs_dict['delta_K_zeta'] = 0.1
             kwargs_dict['delta_K_Z'] = 0.1
             kwargs_dict['interp_smoothing'] = 2.0
-            kwargs_dict['len_tau'] = 1002
-            kwargs_dict['rtol'] = 1e-4
-            kwargs_dict['atol'] = 1e-7
-
-            if ii == 0 and jj == 0 and kk == 0:
-                kwargs_dict['verbose_output_flag'] = True
-            else:
-                kwargs_dict['verbose_output_flag'] = False          
-        
-            data_output = kwargs_dict['output_path'] + 'data_output' + kwargs_dict['output_filename_suffix'] + '.npz'
-            analysis_output = kwargs_dict['output_path'] + 'analysis_output' + kwargs_dict['output_filename_suffix'] + '.npz'
-            if os.path.exists(data_output) and os.path.exists(analysis_output):
-                continue
-            else:   
-                beam_me_up(**args_dict, **kwargs_dict)         
-        
+            kwargs_dict['len_tau'] = 102
+            kwargs_dict['rtol'] = 1e-3
+            kwargs_dict['atol'] = 1e-6
+            
             beam_me_up(**args_dict, **kwargs_dict)
     
+            counter = counter + 1
+            print('Sweep completion:' + str(counter) + ' of ' + str( len(equil_times)*len(mirror_rotations)*len(launch_freqs_GHz) ) )
+
 

@@ -15,7 +15,7 @@ tor_launch_angles = np.linspace(0,-20,41)
 freqs_GHz = np.linspace(50,110,13)
 
 args_dict = dict([
-                ('mode_flag',-1),
+                ('mode_flag',1),
                 ('launch_beam_width',0.06323503329291348),
                 ('launch_beam_curvature',-0.5535179506038995),
                 ('launch_position',np.array([4.5,0.0,-0.6])),

@@ -436,6 +436,33 @@ def beam_settings(
             launch_beam_width = np.sqrt(2 / np.imag(Psi_w_mirror[0,0]))
             launch_beam_curvature = np.real(Psi_w_mirror[0,0]) / wavenumber_K0
 
+
+    elif diagnostic == 'DBS_UCLA_MAST-U':    
+        myLens = make_my_lens(name)
+        horn_width = 0.0064
+        horn_curvature = 0.0
+        
+        horn_to_lens = 0.165
+        
+        angular_frequency = 2*np.pi*10.0**9 * launch_freq_GHz
+        wavenumber = angular_frequency / constants.c    
+        
+    
+        Psi_w_horn_cartersian = np.array(
+                [
+                [ wavenumber*horn_curvature+2j*horn_width**(-2), 0],
+                [ 0, wavenumber*horn_curvature+2j*horn_width**(-2)]
+                ]
+                )      
+    
+        Psi_w_lens_cartesian_input = propagate_beam(Psi_w_horn_cartersian,horn_to_lens,launch_freq_GHz)
+        
+        Psi_w_lens_cartesian_output = myLens.output_beam(Psi_w_lens_cartesian_input,launch_freq_GHz)
+        print('Warning: lens known to change output beam properties depending on its y position, ignoring this effect')
+        launch_beam_width = np.sqrt(2 / np.imag(Psi_w_cartesian_launch[0,0]))
+        launch_beam_curvature = np.real(Psi_w_cartesian_launch[0,0]) / wavenumber_K0
+
+
     elif diagnostic == 'DBS_SWIP_MAST-U':    
         # if method == 'thin_lens':
         #     name = 'DBS_SWIP_MAST-U0'
@@ -628,7 +655,7 @@ def user_settings(diagnostic,user,shot):
         if user == 'Valerian_desktop':
             prefix = 'D:\\Dropbox\\'
         elif user == 'Valerian_laptop':
-            prefix = 'C:\\Users\\chenv\\Dropbox\\'
+            prefix = 'C:\\Dropbox\\'
 
         if diagnostic == 'DBS_NSTX_MAST' or diagnostic == 'DBS_SWIP_MAST-U':
             if shot == 29684:

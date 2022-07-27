@@ -14,7 +14,7 @@ import os
 from Scotty_init_bruv import get_parameters_for_Scotty
 
 
-launch_freq_GHz = 65.0
+launch_freq_GHz = 30.0
 equil_time = 1900.0
 poloidal_launch_angle_Torbeam = -5.0
 toroidal_launch_angle_Torbeam = 2.5

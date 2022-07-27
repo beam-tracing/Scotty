@@ -23,27 +23,22 @@ import os
 from Scotty_init_bruv import get_parameters_for_Scotty
 
 
-equil_times = np.array([0.16,0.19,0.22,0.25])
+equil_times = np.array([0.15])
 # equil_times = np.array([0.240])
 mirror_rotations = np.linspace(3,-6,46)
 # mirror_rotations = np.linspace(3,1.2,10)
 mirror_tilt = -4
-launch_freqs_GHz = np.array([30.0,32.5,35.0,37.5,42.5,45.0,47.5,50.0])
+launch_freqs_GHz = np.array([30.0])
 
 
 for ii, equil_time in enumerate(equil_times):
     for jj, mirror_rotation in enumerate(mirror_rotations):
         for kk, launch_freq_GHz in enumerate(launch_freqs_GHz):
             args_dict, kwargs_dict = get_parameters_for_Scotty(
-                                          'DBS_NSTX_MAST',
+                                          'DBS_UCLA_MAST-U',
                                           launch_freq_GHz = launch_freq_GHz,
-                                          mirror_rotation = mirror_rotation, # angle, in deg
-                                          mirror_tilt     = mirror_tilt, # angle, in deg
-                                          find_B_method   = 'EFITpp', # EFITpp, UDA_saved, UDA, torbeam
-                                          find_ne_method  = 'poly3',                                          
-                                          equil_time      = equil_time,
-                                          shot            = 29908,
-                                          user            = 'Valerian_desktop'
+                                          find_B_method   = 'test', # EFITpp, UDA_saved, UDA, torbeam
+                                          user            = 'Valerian_laptop'
                                          )
             
             if args_dict['launch_freq_GHz'] > 52.5:
@@ -65,19 +60,14 @@ for ii, equil_time in enumerate(equil_times):
                                           )      
 
             kwargs_dict['figure_flag'] = False
-            kwargs_dict['output_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 20\\'
+            kwargs_dict['output_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 21\\'
             kwargs_dict['density_fit_parameters'] = None
-            kwargs_dict['ne_data_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST\\'
-            kwargs_dict['input_filename_suffix'] = '_shotgroup1_avr_' + f'{equil_time*1000:.0f}' +'ms'
+            kwargs_dict['ne_data_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\'
+            kwargs_dict['input_filename_suffix'] = '_shotgroup6_avr_' + f'{equil_time*1000:.0f}' +'ms'
 
-            if equil_time == 0.16:
+            if equil_time == 0.15:
                 kwargs_dict['poloidal_flux_enter'] = 1.17280433**2
-            if equil_time == 0.19:
-                kwargs_dict['poloidal_flux_enter'] = 1.20481476**2
-            if equil_time == 0.22:
-                kwargs_dict['poloidal_flux_enter'] = 1.16129185**2
-            if equil_time == 0.25:
-                kwargs_dict['poloidal_flux_enter'] = 1.15082068**2
+
 
             kwargs_dict['delta_R'] = -0.00001
             kwargs_dict['delta_Z'] = -0.00001
