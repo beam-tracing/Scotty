@@ -18,13 +18,15 @@ from scipy import constants
 import math
 import numpy as np
 import sys
+import os
 
 from Scotty_init_bruv import get_parameters_for_Scotty
 
 
-equil_times = np.array([0.18,0.19,0.21,0.24])
+equil_times = np.array([0.16,0.19,0.22,0.25])
 # equil_times = np.array([0.210])
-mirror_rotations = np.linspace(1,-6,36)
+mirror_rotations = np.linspace(3,-6,46)
+# mirror_rotations = np.linspace(3,1.2,10)
 mirror_tilt = -4
 launch_freqs_GHz = np.array([55.0,57.5,60.0,62.5,67.5,70.0,72.5,75.0])
 
@@ -63,19 +65,19 @@ for ii, equil_time in enumerate(equil_times):
                                           )      
 
             kwargs_dict['figure_flag'] = False
-            kwargs_dict['output_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 12\\'
+            kwargs_dict['output_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 20\\'
             kwargs_dict['density_fit_parameters'] = None
             kwargs_dict['ne_data_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST\\'
-            kwargs_dict['input_filename_suffix'] = '_' + str(int(29908)) + '_' + f'{equil_time*1000:.0f}' +'ms'
+            kwargs_dict['input_filename_suffix'] = '_shotgroup1_avr_' + f'{equil_time*1000:.0f}' +'ms'
 
-            if equil_time == 0.18:
-                kwargs_dict['poloidal_flux_enter'] = 1.09496553**2
+            if equil_time == 0.16:
+                kwargs_dict['poloidal_flux_enter'] = 1.17280433**2
             if equil_time == 0.19:
-                kwargs_dict['poloidal_flux_enter'] = 1.21345964**2
-            if equil_time == 0.21:
-                kwargs_dict['poloidal_flux_enter'] = 1.06142009**2
-            if equil_time == 0.24:
-                kwargs_dict['poloidal_flux_enter'] = 1.13933946**2
+                kwargs_dict['poloidal_flux_enter'] = 1.20481476**2
+            if equil_time == 0.22:
+                kwargs_dict['poloidal_flux_enter'] = 1.16129185**2
+            if equil_time == 0.25:
+                kwargs_dict['poloidal_flux_enter'] = 1.15082068**2
 
             kwargs_dict['delta_R'] = -0.00001
             kwargs_dict['delta_Z'] = -0.00001
@@ -92,6 +94,14 @@ for ii, equil_time in enumerate(equil_times):
             else:
                 kwargs_dict['verbose_output_flag'] = False  
                 
-            beam_me_up(**args_dict, **kwargs_dict)
+                
+            data_output = kwargs_dict['output_path'] + 'data_output' + kwargs_dict['output_filename_suffix'] + '.npz'
+            analysis_output = kwargs_dict['output_path'] + 'analysis_output' + kwargs_dict['output_filename_suffix'] + '.npz'
+            if os.path.exists(data_output) and os.path.exists(analysis_output):
+                continue
+            else:   
+                beam_me_up(**args_dict, **kwargs_dict)                 
+                
+            # beam_me_up(**args_dict, **kwargs_dict)
     
 
