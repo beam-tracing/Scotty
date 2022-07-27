@@ -24,18 +24,18 @@ from Scotty_init_bruv import get_parameters_for_Scotty
 
 args_dict, kwargs_dict = get_parameters_for_Scotty(
                               'DBS_NSTX_MAST',
-                              launch_freq_GHz = 55.0,
+                              launch_freq_GHz = 400.0,
                               mirror_rotation = -1.0, # angle, in deg
                               mirror_tilt     = -4.0, # angle, in deg
                               find_B_method   = 'EFITpp', # EFITpp, UDA_saved, UDA, torbeam
+                              find_ne_method  = 'poly3',
                               equil_time      = 0.220,
                               shot            = 29908,
-                              user            = 'Valerian_desktop'
+                              user            = 'Valerian_laptop'
                              )
-print(args_dict)
 
-args_dict['poloidal_launch_angle_Torbeam']   = 0.0
-args_dict['toroidal_launch_angle_Torbeam']   = -4.4
+# args_dict['poloidal_launch_angle_Torbeam']   = 4.0
+# args_dict['toroidal_launch_angle_Torbeam']   = -4.4
 # args_dict['launch_beam_width']               = 0.0397
 # args_dict['launch_beam_radius_of_curvature'] = -0.7286   
 # kwargs_dict['output_filename_suffix']        = '_O_many_points_new'
@@ -45,7 +45,11 @@ if args_dict['launch_freq_GHz'] > 52.5:
     args_dict['mode_flag'] = 1
 else:
     args_dict['mode_flag'] = 1
-  
+
+print(args_dict)
+print(kwargs_dict)
+    
+
 beam_me_up(**args_dict, **kwargs_dict)
     
 
