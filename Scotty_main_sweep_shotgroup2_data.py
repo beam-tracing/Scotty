@@ -23,42 +23,44 @@ import os
 from Scotty_init_bruv import get_parameters_for_Scotty
 
 
-equil_times = np.array([0.15])
-poloidal_launch_angles_Torbeam = np.array([-2.5])
-toroidal_launch_angles_Torbeam = np.array([3.0])
-# toroidal_launch_angles_Torbeam = np.linspace(-5,5,101)
-launch_freqs_GHz = np.array([30.0])
-# launch_freqs_GHz = np.array([32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50])
+equil_times = np.array([0.194])
+mirror_rotations = np.linspace(-2,6,81)
+mirror_tilts = np.array([1.0])
+launch_freqs_GHz = np.array([30.0,32.5,35.0,37.5,42.5,45.0,47.5,50.0,55.0,57.5,60.0,62.5,67.5,70.0,72.5])
+# shot_array2A = np.array([29677, 29678, 29679, 29681, 29683, 29684])
+# shot_array2B = np.array([29692, 29693])
 
-total_simulations = len(equil_times)*len(poloidal_launch_angles_Torbeam)*len(toroidal_launch_angles_Torbeam)*len(launch_freqs_GHz)
+total_simulations = len(equil_times)*len(mirror_tilts)*len(mirror_rotations)*len(launch_freqs_GHz)
 counter = 0
 for ii, equil_time in enumerate(equil_times):
-    for jj, poloidal_launch_angle_Torbeam in enumerate(poloidal_launch_angles_Torbeam):
-        for kk, toroidal_launch_angle_Torbeam in enumerate(toroidal_launch_angles_Torbeam):
+    for jj, mirror_tilt in enumerate(mirror_tilts):
+        for kk, mirror_rotation in enumerate(mirror_rotations):
             for ll, launch_freq_GHz in enumerate(launch_freqs_GHz):
                 
                 args_dict, kwargs_dict = get_parameters_for_Scotty(
-                                              'DBS_UCLA_MAST-U',
+                                              'DBS_NSTX_MAST',
                                               launch_freq_GHz = launch_freq_GHz,
-                                              find_B_method   = 'test', # EFITpp, UDA_saved, UDA, torbeam
-                                              user            = 'Valerian_laptop'
+                                              mirror_rotation = mirror_rotation, # angle, in deg
+                                              mirror_tilt     = mirror_tilt, # angle, in deg
+                                              find_B_method   = 'EFITpp', # EFITpp, UDA_saved, UDA, torbeam
+                                              equil_time      = equil_time,
+                                              shot            = 29677,
+                                              user            = 'Valerian_laptop'                    
                                              )
-                
-                args_dict['mode_flag'] = -1
-                args_dict['poloidal_launch_angle_Torbeam'] = poloidal_launch_angle_Torbeam
-                args_dict['toroidal_launch_angle_Torbeam'] = toroidal_launch_angle_Torbeam
-                
-                kwargs_dict['shot'] = 45290 # To load the EFIT output
-                kwargs_dict['equil_time'] = equil_time # To load the EFIT output
-                
+                if args_dict['launch_freq_GHz'] > 52.5:
+                    args_dict['mode_flag'] = 1
+                else:
+                    args_dict['mode_flag'] = -1
+        
                 if args_dict['mode_flag'] == 1:
                     mode_string = 'O'
                 elif args_dict['mode_flag'] == -1:
-                    mode_string = 'X'  
+                    mode_string = 'X'
+
     
                 kwargs_dict['output_filename_suffix'] = (
-                                            '_pol' + f'{poloidal_launch_angle_Torbeam:.1f}'
-                                          + '_tor' + f'{toroidal_launch_angle_Torbeam:.1f}'
+                                            '_t' + f'{mirror_tilt:.1f}'
+                                          + '_r' + f'{mirror_rotation:.1f}'
                                           + '_f' + f'{launch_freq_GHz:.1f}'
                                           + '_'  + mode_string
                                           + '_'  + f'{equil_time*1000:.3g}' + 'ms'

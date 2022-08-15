@@ -19,25 +19,28 @@ import math
 import numpy as np
 import sys
 import os
+from joblib import Parallel, delayed
 
 from Scotty_init_bruv import get_parameters_for_Scotty
 
 
-# equil_times = np.linspace(0.16,0.25,10)
-# polflux_enter = np.array([1.18662487,1.16317467,1.16060602,
-#                           1.17713456,1.19524207,1.15081960,
-#                           1.15031088,1.13624193,1.16034804,
-#                           1.14965615])**2
-equil_times = np.linspace(0.23,0.25,3)
-polflux_enter = np.array([1.13624193,1.16034804,1.14965615])**2
+equil_times = np.linspace(0.16,0.25,10)
+polflux_enter = np.array([1.18662487,1.16317467,1.16060602,
+                          1.17713456,1.19524207,1.15081960,
+                          1.15031088,1.13624193,1.16034804,
+                          1.14965615])**2
+
 
 mirror_rotations = np.linspace(3,-6,46)
 # mirror_rotations = np.linspace(3,1.2,10)
 mirror_tilt = -4
 launch_freqs_GHz = np.array([30.0,32.5,35.0,37.5,42.5,45.0,47.5,50.0])
 
+def loop(equil_time,
+         mirror_tilt=mirror_tilt,
+         mirror_rotations=mirror_rotations,
+         launch_freqs_GHz=launch_freqs_GHz):
 
-for ii, equil_time in enumerate(equil_times):
     for jj, mirror_rotation in enumerate(mirror_rotations):
         for kk, launch_freq_GHz in enumerate(launch_freqs_GHz):
             args_dict, kwargs_dict = get_parameters_for_Scotty(
@@ -71,12 +74,12 @@ for ii, equil_time in enumerate(equil_times):
                                           )      
 
             kwargs_dict['figure_flag'] = False
-            kwargs_dict['output_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 24\\'
+            kwargs_dict['output_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 25\\'
             kwargs_dict['density_fit_parameters'] = None
             kwargs_dict['ne_data_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST\\'
             kwargs_dict['input_filename_suffix'] = '_shotgroup1_avr_' + f'{equil_time*1000:.0f}' +'ms'
 
-            kwargs_dict['poloidal_flux_enter'] = polflux_enter[ii]
+            kwargs_dict['poloidal_flux_enter'] = 1.4
 
             kwargs_dict['delta_R'] = -0.0001
             kwargs_dict['delta_Z'] = -0.0001
@@ -86,20 +89,10 @@ for ii, equil_time in enumerate(equil_times):
             kwargs_dict['interp_smoothing'] = 0.0
             kwargs_dict['len_tau'] = 1002
             kwargs_dict['rtol'] = 1e-3
-            kwargs_dict['atol'] = 1e-6
-
-            if ii == 0 and jj == 0 and kk == 0:
-                kwargs_dict['verbose_output_flag'] = True
-            else:
-                kwargs_dict['verbose_output_flag'] = False          
-        
-            data_output = kwargs_dict['output_path'] + 'data_output' + kwargs_dict['output_filename_suffix'] + '.npz'
-            analysis_output = kwargs_dict['output_path'] + 'analysis_output' + kwargs_dict['output_filename_suffix'] + '.npz'
-            # if os.path.exists(data_output) and os.path.exists(analysis_output):
-            #     continue
-            # else:   
-            #     beam_me_up(**args_dict, **kwargs_dict)         
+            kwargs_dict['atol'] = 1e-6       
         
             beam_me_up(**args_dict, **kwargs_dict)
-    
+    return
+
+Parallel(n_jobs=2)(delayed(loop)(equil_time) for equil_time in equil_times)
 
