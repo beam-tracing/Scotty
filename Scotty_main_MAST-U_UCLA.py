@@ -25,7 +25,7 @@ args_dict, kwargs_dict = get_parameters_for_Scotty(
                               find_B_method   = 'torbeam', # EFITpp, UDA_saved, UDA, torbeam
                               equil_time      = equil_time,
                               shot            = 188839,
-                              user            = 'Valerian_desktop'
+                              user            = 'Valerian_laptop'
                              )
 
 args_dict['poloidal_launch_angle_Torbeam'] = poloidal_launch_angle_Torbeam
