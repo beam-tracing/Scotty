@@ -437,11 +437,14 @@ def beam_settings(
             launch_beam_curvature = np.real(Psi_w_mirror[0,0]) / wavenumber_K0
 
 
-    elif diagnostic == 'DBS_UCLA_MAST-U':    
+    elif diagnostic == 'DBS_UCLA_MAST-U':  
+        name = 'DBS_UCLA_MAST-U'
         myLens = make_my_lens(name)
+        angular_frequency = 2*np.pi*10.0**9 * launch_freq_GHz
+        wavenumber_K0 = angular_frequency / constants.c    
+            
         horn_width = 0.0064
         horn_curvature = 0.0
-        
         horn_to_lens = 0.165
         
         angular_frequency = 2*np.pi*10.0**9 * launch_freq_GHz
@@ -459,8 +462,8 @@ def beam_settings(
         
         Psi_w_lens_cartesian_output = myLens.output_beam(Psi_w_lens_cartesian_input,launch_freq_GHz)
         print('Warning: lens known to change output beam properties depending on its y position, ignoring this effect')
-        launch_beam_width = np.sqrt(2 / np.imag(Psi_w_cartesian_launch[0,0]))
-        launch_beam_curvature = np.real(Psi_w_cartesian_launch[0,0]) / wavenumber_K0
+        launch_beam_width = np.sqrt(2 / np.imag(Psi_w_lens_cartesian_output[0,0]))
+        launch_beam_curvature = np.real(Psi_w_lens_cartesian_output[0,0]) / wavenumber_K0
 
 
     elif diagnostic == 'DBS_SWIP_MAST-U':    
@@ -661,7 +664,8 @@ def user_settings(diagnostic,user,shot):
             if shot == 29684:
                 # MAST reruns of EFIT. Done by Lucy Kogan.
                 # 29684: no MSE data, but reprocessed with more constraints, only good at the edge
-                efitpp_path        = prefix + 'VHChen2020\\Data\\Equilibrium\\MAST\\Lucy_EFIT_runs\\' + str(shot) + '\\epk_lkogan_01\\'        
+                efitpp_path        = prefix + 'VHChen2020\\Data\\Equilibrium\\MAST\\Lucy_EFIT_runs\\' + str(shot) + '\\epk_lkogan_01\\'
+                ne_path            = prefix + 'VHChen2021\\Data - Equilibrium\\MAST\\'
             elif shot in [30073,30074,30075,30076,30077]:
                 # MAST reruns of EFIT. Done by Lucy Kogan.
                 # 30073--30077: MSE data, processed better than original runs

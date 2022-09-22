@@ -30,6 +30,12 @@ toroidal_launch_angles_Torbeam = np.linspace(-5,5,101)
 # launch_freqs_GHz = np.array([30.0])
 launch_freqs_GHz = np.array([32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50])
 
+q_R_all     = np.zeros([len(equil_times),len(poloidal_launch_angles_Torbeam),len(toroidal_launch_angles_Torbeam),len(launch_freqs_GHz)])
+q_Z_all     = np.zeros_like(q_R_all)
+K_mag_all   = np.zeros_like(q_R_all)
+polflux_all = np.zeros_like(q_R_all)
+theta_m_all = np.zeros_like(q_R_all)
+
 total_simulations = len(equil_times)*len(poloidal_launch_angles_Torbeam)*len(toroidal_launch_angles_Torbeam)*len(launch_freqs_GHz)
 counter = 0
 for ii, equil_time in enumerate(equil_times):
@@ -41,7 +47,7 @@ for ii, equil_time in enumerate(equil_times):
                                               'DBS_UCLA_MAST-U',
                                               launch_freq_GHz = launch_freq_GHz,
                                               find_B_method   = 'test', # EFITpp, UDA_saved, UDA, torbeam
-                                              user            = 'Valerian_desktop'
+                                              user            = 'Valerian_laptop'
                                              )
                 
                 args_dict['mode_flag'] = -1
@@ -64,24 +70,23 @@ for ii, equil_time in enumerate(equil_times):
                                           + '_'  + f'{equil_time*1000:.3g}' + 'ms'
                                               )   
                 
-                kwargs_dict['quick_run'] = False    
+                kwargs_dict['quick_run'] = True    
                 kwargs_dict['figure_flag'] = False
-                kwargs_dict['output_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 29\\'
+                kwargs_dict['output_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 21\\'
                 kwargs_dict['density_fit_parameters'] = None
-                kwargs_dict['ne_data_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\'
-                kwargs_dict['magnetic_data_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\'
+                kwargs_dict['ne_data_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\'
+                kwargs_dict['magnetic_data_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\'
                 kwargs_dict['input_filename_suffix'] = '_shotgroup6_avr_' + f'{equil_time*1000:.0f}' +'ms'
     
                 if equil_time == 0.15:
-                    kwargs_dict['poloidal_flux_enter'] = 1.06520296**2
-                    # kwargs_dict['Psi_BC_flag'] = False
+                    kwargs_dict['poloidal_flux_enter'] = 1.21573759**2
     
     
                 kwargs_dict['delta_R'] = -0.00001
                 kwargs_dict['delta_Z'] = -0.00001
-                kwargs_dict['delta_K_R'] = 0.1
-                kwargs_dict['delta_K_zeta'] = 0.1
-                kwargs_dict['delta_K_Z'] = 0.1
+                kwargs_dict['delta_K_R'] = 0.01
+                kwargs_dict['delta_K_zeta'] = 0.01
+                kwargs_dict['delta_K_Z'] = 0.01
                 kwargs_dict['interp_smoothing'] = 0.0
                 kwargs_dict['len_tau'] = 1002
                 kwargs_dict['rtol'] = 1e-4
@@ -96,12 +101,25 @@ for ii, equil_time in enumerate(equil_times):
                 analysis_output = kwargs_dict['output_path'] + 'analysis_output' + kwargs_dict['output_filename_suffix'] + '.npz'
                 
                 counter=counter+1
-                
-                if os.path.exists(data_output) and os.path.exists(analysis_output):
-                    continue
-                else:   
-                    print('simulation ', counter, 'of', total_simulations)
-                    beam_me_up(**args_dict, **kwargs_dict)         
-                
-                # beam_me_up(**args_dict, **kwargs_dict)
 
+                print('simulation ', counter, 'of', total_simulations)
+                [q_R, q_Z, K_mag, polflux, theta_m] = beam_me_up(**args_dict, **kwargs_dict)   
+                
+                q_R_all[ii,jj,kk,ll]     = q_R
+                q_Z_all[ii,jj,kk,ll]     = q_Z
+                K_mag_all[ii,jj,kk,ll]   = K_mag
+                polflux_all[ii,jj,kk,ll] = polflux
+                theta_m_all[ii,jj,kk,ll] = theta_m
+
+                
+np.savez(kwargs_dict['output_path'] + 'Cutoff_sweep',
+         equil_times=equil_times,
+         poloidal_launch_angles_Torbeam=poloidal_launch_angles_Torbeam,
+         toroidal_launch_angles_Torbeam=toroidal_launch_angles_Torbeam,
+         launch_freqs_GHz=launch_freqs_GHz,
+         q_R_all=q_R_all,
+         q_Z_all=q_Z_all,
+         K_mag_all=K_mag_all,
+         polflux_all=polflux_all,
+         theta_m_all=theta_m_all
+         )
