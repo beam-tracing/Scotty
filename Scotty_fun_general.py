@@ -694,8 +694,58 @@ def find_H_Cardano(K_magnitude,launch_angular_frequency,epsilon_para,epsilon_per
     H_2_Cardano = - (1 - 1j*np.sqrt(3))/(6*2**(1/3))*h_t_coefficient + (1 + 1j*np.sqrt(3))*(3*h_1_coefficient - h_2_coefficient**2)/(3*2**(2/3)*h_t_coefficient) - h_2_coefficient/3
     H_3_Cardano = - (1 + 1j*np.sqrt(3))/(6*2**(1/3))*h_t_coefficient + (1 - 1j*np.sqrt(3))*(3*h_1_coefficient - h_2_coefficient**2)/(3*2**(2/3)*h_t_coefficient) - h_2_coefficient/3
     return H_1_Cardano, H_2_Cardano, H_3_Cardano
+
+def find_ST_terms(tau_array, 
+                  K_magnitude_array, k_perp_1_bs,
+                  g_magnitude_Cardano, g_magnitude_output,
+                  theta_m_output,
+                  M_w_inv_xx_output):
+    ## Calculates how far into the 'large mismatch' ordering we are
+    d_theta_m_d_tau = np.gradient(theta_m_output, tau_array)
+    d_K_d_tau = np.gradient(K_magnitude_array, tau_array)
+    d_tau_B_d_tau_C = g_magnitude_Cardano / \
+        g_magnitude_output  # d tau_Booker / d tau_Cardano
+        
+    cutoff_idx = np.argmin(K_magnitude_array)
+    theta_m_min_idx = np.argmin(abs(theta_m_output))
+    # delta_kperp1_ST = k_perp_1_bs - k_perp_1_bs[theta_m_min_idx]
+    
+    G_full = ((
+        d_K_d_tau * g_magnitude_output
+        - K_magnitude_array**2 * d_theta_m_d_tau**2 * M_w_inv_xx_output
+    )*d_tau_B_d_tau_C**2)**(-1)
+    G_term1 = (d_K_d_tau * g_magnitude_output * d_tau_B_d_tau_C**2)**(-1)
+    G_term2 = (
+        K_magnitude_array**2 * d_theta_m_d_tau**2 * M_w_inv_xx_output
+        * G_term1**2
+        * d_tau_B_d_tau_C**2
+    )**(-1)    
+    indicator = np.divide((G_term1+G_term2 - G_full), 
+                          (0.5*(G_term1+G_term2 + G_full)), 
+                          out=np.zeros_like(tau_array), 
+                          where=(0.5*(G_term1+G_term2 + G_full))!=0)    
+    return indicator, indicator[theta_m_min_idx]
 #----------------------------------
     
+# Functions (for runs with only ray tracing and no beam tracing)
+## Not used yet, still being written
+def find_quick_output(ray_parameters_2D, K_zeta_initial,
+                      find_B_R, find_B_T, find_B_Z):
+    """
+    Finds mismatch at cut-off location
+    Cut-off location where K is minimised
+    """
+    q_R = np.real(ray_parameters_2D[0,:])
+    q_Z = np.real(ray_parameters_2D[1,:])
+    K_R = np.real(ray_parameters_2D[2,:])
+    K_Z = np.real(ray_parameters_2D[3,:])
+    K_magnitude = np.sqrt(K_R**2 + (K_zeta_initial/q_R)**2 + K_Z**2)
+    
+    # cutoff_index = np.argwhere
+    quick_output = 0
+    
+    return quick_output
+#----------------------------------
 
 # Functions (circular Gaussian beam in vacuum)
 def find_Rayleigh_length(waist, wavenumber): #Finds the size of the waist (assumes vacuum propagation and circular beam)
@@ -1132,3 +1182,8 @@ def genray_angles_from_mirror_angles(rot_ang_deg,tilt_ang_deg,offset_for_window_
     tor_ang_genray_deg,pol_ang_genray_deg = tor_ang_genray*180/np.pi,pol_ang_genray*180/np.pi
 
     return tor_ang_genray_deg,pol_ang_genray_deg
+#----------------------------------
+
+
+# Functions ()
+#----------------------------------
