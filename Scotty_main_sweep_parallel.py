@@ -24,75 +24,83 @@ from joblib import Parallel, delayed
 from Scotty_init_bruv import get_parameters_for_Scotty
 
 
-equil_times = np.linspace(0.16,0.25,10)
-polflux_enter = np.array([1.18662487,1.16317467,1.16060602,
-                          1.17713456,1.19524207,1.15081960,
-                          1.15031088,1.13624193,1.16034804,
-                          1.14965615])**2
+# poloidal_launch_angles_Torbeam = np.linspace(2.0,6.0,5)
+poloidal_launch_angles_Torbeam = np.linspace(4.0,15.0,12)
+toroidal_launch_angles_Torbeam = np.linspace(3.0,10.0,8)
+launch_freqs_GHz = np.array([32.5,50.0])
 
-
-mirror_rotations = np.linspace(3,-6,46)
-# mirror_rotations = np.linspace(3,1.2,10)
-mirror_tilt = -4
-launch_freqs_GHz = np.array([30.0,32.5,35.0,37.5,42.5,45.0,47.5,50.0])
-
-def loop(equil_time,
-         mirror_tilt=mirror_tilt,
-         mirror_rotations=mirror_rotations,
+def loop(poloidal_launch_angle_Torbeam,
+         toroidal_launch_angles_Torbeam=toroidal_launch_angles_Torbeam,
          launch_freqs_GHz=launch_freqs_GHz):
 
-    for jj, mirror_rotation in enumerate(mirror_rotations):
-        for kk, launch_freq_GHz in enumerate(launch_freqs_GHz):
-            args_dict, kwargs_dict = get_parameters_for_Scotty(
-                                          'DBS_NSTX_MAST',
-                                          launch_freq_GHz = launch_freq_GHz,
-                                          mirror_rotation = mirror_rotation, # angle, in deg
-                                          mirror_tilt     = mirror_tilt, # angle, in deg
-                                          find_B_method   = 'EFITpp', # EFITpp, UDA_saved, UDA, torbeam
-                                          find_ne_method  = 'poly3',                                          
-                                          equil_time      = equil_time,
-                                          shot            = 29908,
-                                          user            = 'Valerian_laptop'
-                                         )
-            
-            if args_dict['launch_freq_GHz'] > 52.5:
-                args_dict['mode_flag'] = 1
-            else:
-                args_dict['mode_flag'] = -1
+    shot = 45118
+    equil_time = 0.6
     
-            if args_dict['mode_flag'] == 1:
-                mode_string = 'O'
-            elif args_dict['mode_flag'] == -1:
-                mode_string = 'X'  
-
-            kwargs_dict['output_filename_suffix'] = (
-                                        '_r' + f'{mirror_rotation:.1f}'
-                                        '_t' + f'{mirror_tilt:.1f}'
-                                      + '_f' + f'{launch_freq_GHz:.1f}'
-                                      + '_'  + mode_string
-                                      + '_'  + f'{equil_time*1000:.3g}' + 'ms'
-                                          )      
-
-            kwargs_dict['figure_flag'] = False
-            kwargs_dict['output_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 25\\'
-            kwargs_dict['density_fit_parameters'] = None
-            kwargs_dict['ne_data_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST\\'
-            kwargs_dict['input_filename_suffix'] = '_shotgroup1_avr_' + f'{equil_time*1000:.0f}' +'ms'
-
-            kwargs_dict['poloidal_flux_enter'] = 1.4
-
-            kwargs_dict['delta_R'] = -0.0001
-            kwargs_dict['delta_Z'] = -0.0001
-            kwargs_dict['delta_K_R'] = 0.1
-            kwargs_dict['delta_K_zeta'] = 0.1
-            kwargs_dict['delta_K_Z'] = 0.1
-            kwargs_dict['interp_smoothing'] = 0.0
-            kwargs_dict['len_tau'] = 1002
-            kwargs_dict['rtol'] = 1e-3
-            kwargs_dict['atol'] = 1e-6       
+    for kk, mode_flag in enumerate([1,-1]):
+        for ii, toroidal_launch_angle_Torbeam in enumerate(toroidal_launch_angles_Torbeam):
+            for jj, launch_freq_GHz in enumerate(launch_freqs_GHz):
+                args_dict, kwargs_dict = get_parameters_for_Scotty(
+                                              'DBS_UCLA_MAST-U',
+                                              launch_freq_GHz = launch_freq_GHz,
+                                              find_B_method   = 'test', # EFITpp, UDA_saved, UDA, torbeam
+                                              find_ne_method  = None,                                          
+                                              equil_time      = equil_time,
+                                              shot            = shot,
+                                              user            = 'Valerian_laptop'
+                                             )
+                
+    
+                args_dict['mode_flag'] = mode_flag
+                args_dict['poloidal_launch_angle_Torbeam'] = poloidal_launch_angle_Torbeam
+                args_dict['toroidal_launch_angle_Torbeam'] = toroidal_launch_angle_Torbeam
         
-            beam_me_up(**args_dict, **kwargs_dict)
-    return
+                if args_dict['mode_flag'] == 1:
+                    mode_string = 'O'
+                elif args_dict['mode_flag'] == -1:
+                    mode_string = 'X'  
+    
+                kwargs_dict['output_filename_suffix'] = (
+                                            '_pol' + f'{poloidal_launch_angle_Torbeam:.1f}'
+                                            '_tor' + f'{toroidal_launch_angle_Torbeam:.1f}'
+                                          + '_f' + f'{launch_freq_GHz:.1f}'
+                                          + '_'  + mode_string
+                                          + '_'  + f'{equil_time*1000:.3g}' + 'ms'
+                                              )      
+    
+                kwargs_dict['figure_flag'] = False
+                kwargs_dict['output_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 26\\'
+                kwargs_dict['density_fit_parameters'] = None
+                kwargs_dict['ne_data_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\'
+                kwargs_dict['magnetic_data_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\'
+                kwargs_dict['input_filename_suffix'] = '_' + str(shot) + '_' + f'{equil_time*1000:.0f}' +'ms'
+                kwargs_dict['detailed_analysis_flag'] = False
+    
+                kwargs_dict['poloidal_flux_enter'] = 1.04080884**2
+                kwargs_dict['Psi_BC_flag'] = True
+                kwargs_dict['vacuum_propagation_flag'] = True
+    
+                kwargs_dict['delta_R'] = -0.0001
+                kwargs_dict['delta_Z'] = 0.0001
+                kwargs_dict['delta_K_R'] = 0.1
+                kwargs_dict['delta_K_zeta'] = 0.1
+                kwargs_dict['delta_K_Z'] = 0.1
+                kwargs_dict['interp_smoothing'] = 0.0
+                kwargs_dict['len_tau'] = 1002
+                kwargs_dict['rtol'] = 1e-3
+                kwargs_dict['atol'] = 1e-6       
+            
+                data_output = kwargs_dict['output_path'] + 'data_output' + kwargs_dict['output_filename_suffix'] + '.npz'
+                analysis_output = kwargs_dict['output_path'] + 'analysis_output' + kwargs_dict['output_filename_suffix'] + '.npz'            
+                if os.path.exists(data_output) and os.path.exists(analysis_output):
+                    continue
+                else:   
+                    beam_me_up(**args_dict, **kwargs_dict)      
+                # beam_me_up(**args_dict, **kwargs_dict)      
+               
+                return
 
-Parallel(n_jobs=2)(delayed(loop)(equil_time) for equil_time in equil_times)
+Parallel(n_jobs=3)(
+    delayed(loop)(poloidal_launch_angle_Torbeam) 
+    for poloidal_launch_angle_Torbeam in poloidal_launch_angles_Torbeam
+    )
 
