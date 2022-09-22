@@ -676,12 +676,8 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
             np.sin(poloidal_launch_angle_Torbeam/180.0*math.pi)  # K_z
         launch_K = np.array([K_R_launch, K_zeta_launch, K_Z_launch])
 
-        poloidal_launch_angle_Rz = (
-            180.0+poloidal_launch_angle_Torbeam)/180.0*np.pi
-        poloidal_rotation_angle = (
-            90.0+poloidal_launch_angle_Torbeam)/180.0*np.pi
-        toroidal_launch_angle_Rz = (
-            180.0+toroidal_launch_angle_Torbeam)/180.0*np.pi
+        poloidal_rotation_angle = (90.0+poloidal_launch_angle_Torbeam)/180.0*np.pi
+
 
         Psi_w_beam_launch_cartersian = np.array(
             [
@@ -699,18 +695,14 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         )
 
         rotation_matrix_pol = np.array([
-            [np.cos(poloidal_rotation_angle), 0,
-             np.sin(poloidal_rotation_angle)],
+            [ np.cos(poloidal_rotation_angle), 0, np.sin(poloidal_rotation_angle)],
             [0, 1, 0],
-            [-np.sin(poloidal_rotation_angle), 0,
-             np.cos(poloidal_rotation_angle)]
+            [-np.sin(poloidal_rotation_angle), 0, np.cos(poloidal_rotation_angle)]
         ])
 
         rotation_matrix_tor = np.array([
-            [np.cos(toroidal_launch_angle_Torbeam/180.0*math.pi),
-             np.sin(toroidal_launch_angle_Torbeam/180.0*math.pi), 0],
-            [-np.sin(toroidal_launch_angle_Torbeam/180.0*math.pi),
-             np.cos(toroidal_launch_angle_Torbeam/180.0*math.pi), 0],
+            [ np.cos(toroidal_launch_angle_Torbeam/180.0*math.pi), np.sin(toroidal_launch_angle_Torbeam/180.0*math.pi), 0],
+            [-np.sin(toroidal_launch_angle_Torbeam/180.0*math.pi), np.cos(toroidal_launch_angle_Torbeam/180.0*math.pi), 0],
             [0, 0, 1]
         ])
 
@@ -718,14 +710,13 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         rotation_matrix_inverse = np.transpose(rotation_matrix)
 
         Psi_3D_beam_launch_cartersian = np.array([
-            [Psi_w_beam_launch_cartersian[0][0],
-                Psi_w_beam_launch_cartersian[0][1], 0],
-            [Psi_w_beam_launch_cartersian[1][0],
-                Psi_w_beam_launch_cartersian[1][1], 0],
+            [Psi_w_beam_launch_cartersian[0][0], Psi_w_beam_launch_cartersian[0][1], 0],
+            [Psi_w_beam_launch_cartersian[1][0], Psi_w_beam_launch_cartersian[1][1], 0],
             [0, 0, 0]
         ])
-        Psi_3D_lab_launch_cartersian = np.matmul(rotation_matrix_inverse, np.matmul(
-            Psi_3D_beam_launch_cartersian, rotation_matrix))
+        Psi_3D_lab_launch_cartersian = np.matmul(rotation_matrix_inverse, 
+            np.matmul(Psi_3D_beam_launch_cartersian, rotation_matrix)
+        )
         Psi_3D_lab_launch = find_Psi_3D_lab(
             Psi_3D_lab_launch_cartersian, launch_position[0], launch_position[1], K_R_launch, K_zeta_launch)
 

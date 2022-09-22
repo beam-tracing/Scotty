@@ -25,10 +25,10 @@ from Scotty_init_bruv import get_parameters_for_Scotty
 
 equil_times = np.array([0.15])
 poloidal_launch_angles_Torbeam = np.array([-2.5])
-toroidal_launch_angles_Torbeam = np.array([3.0])
-# toroidal_launch_angles_Torbeam = np.linspace(-5,5,101)
-launch_freqs_GHz = np.array([30.0])
-# launch_freqs_GHz = np.array([32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50])
+# toroidal_launch_angles_Torbeam = np.array([3.0])
+toroidal_launch_angles_Torbeam = np.linspace(-5,5,101)
+# launch_freqs_GHz = np.array([30.0])
+launch_freqs_GHz = np.array([32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50])
 
 total_simulations = len(equil_times)*len(poloidal_launch_angles_Torbeam)*len(toroidal_launch_angles_Torbeam)*len(launch_freqs_GHz)
 counter = 0
@@ -41,7 +41,7 @@ for ii, equil_time in enumerate(equil_times):
                                               'DBS_UCLA_MAST-U',
                                               launch_freq_GHz = launch_freq_GHz,
                                               find_B_method   = 'test', # EFITpp, UDA_saved, UDA, torbeam
-                                              user            = 'Valerian_laptop'
+                                              user            = 'Valerian_desktop'
                                              )
                 
                 args_dict['mode_flag'] = -1
@@ -66,21 +66,22 @@ for ii, equil_time in enumerate(equil_times):
                 
                 kwargs_dict['quick_run'] = False    
                 kwargs_dict['figure_flag'] = False
-                kwargs_dict['output_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 22\\'
+                kwargs_dict['output_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 29\\'
                 kwargs_dict['density_fit_parameters'] = None
-                kwargs_dict['ne_data_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\'
-                kwargs_dict['magnetic_data_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\'
+                kwargs_dict['ne_data_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\'
+                kwargs_dict['magnetic_data_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\'
                 kwargs_dict['input_filename_suffix'] = '_shotgroup6_avr_' + f'{equil_time*1000:.0f}' +'ms'
     
                 if equil_time == 0.15:
-                    kwargs_dict['poloidal_flux_enter'] = 1.21573759**2
+                    kwargs_dict['poloidal_flux_enter'] = 1.06520296**2
+                    # kwargs_dict['Psi_BC_flag'] = False
     
     
                 kwargs_dict['delta_R'] = -0.00001
                 kwargs_dict['delta_Z'] = -0.00001
-                kwargs_dict['delta_K_R'] = 0.01
-                kwargs_dict['delta_K_zeta'] = 0.01
-                kwargs_dict['delta_K_Z'] = 0.01
+                kwargs_dict['delta_K_R'] = 0.1
+                kwargs_dict['delta_K_zeta'] = 0.1
+                kwargs_dict['delta_K_Z'] = 0.1
                 kwargs_dict['interp_smoothing'] = 0.0
                 kwargs_dict['len_tau'] = 1002
                 kwargs_dict['rtol'] = 1e-4
