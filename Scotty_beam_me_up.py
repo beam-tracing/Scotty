@@ -66,7 +66,8 @@ from netCDF4 import Dataset
 import bisect
 import time
 import platform
-
+import json
+import ast
 
 from Scotty_fun_general import read_floats_into_list_until, find_nearest, contract_special, make_unit_vector_from_cross_product, find_x0, find_H, find_waist
 from Scotty_fun_general import find_inverse_2D, find_Psi_3D_lab, find_q_lab_Cartesian, find_K_lab_Cartesian, find_K_lab, find_Psi_3D_lab_Cartesian
@@ -347,6 +348,51 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         #                                           copy=True, bounds_error=False, fill_value=None) # Flux extrapolated outside region
 
         efit_time = None  # To prevent the data-saving routines from complaining later on
+
+    elif find_B_method =='omfit':
+        topfile_filename = './topfile.json'
+        f = open(topfile_filename)
+        data = f.read()
+        data = ast.literal_eval(data)
+        data_R_coord = data['R']
+        data_Z_coord = data['Z']
+        data_B_R_grid = data['Br']
+        data_B_T_grid = data['Bt']
+        data_B_Z_grid = data['Bz']
+        poloidalFlux_grid = data['pol_flux']
+        f.close()        
+        data_R_coord = np.array(data_R_coord)
+        data_Z_coord = np.array(data_Z_coord)
+        
+        ## Row-major and column-major business (Torbeam is in Fortran and Scotty is in Python)
+        data_B_R_grid = np.transpose((np.asarray(data_B_R_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
+        data_B_T_grid = np.transpose((np.asarray(data_B_T_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
+        data_B_Z_grid = np.transpose((np.asarray(data_B_Z_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
+        poloidalFlux_grid = np.transpose((np.asarray(poloidalFlux_grid)).reshape(len(data_Z_coord),len(data_R_coord), order='C'))
+        # -------------------
+    
+        # Interpolation functions declared
+        interp_B_R = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_R_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        interp_B_T = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_T_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        interp_B_Z = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_B_Z_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        
+        def find_B_R(q_R,q_Z):
+            B_R = interp_B_R(q_R,q_Z,grid=False)
+            return B_R
+    
+        def find_B_T(q_R,q_Z):
+            B_T = interp_B_T(q_R,q_Z,grid=False)
+            return B_T
+        
+        def find_B_Z(q_R,q_Z):
+            B_Z = interp_B_Z(q_R,q_Z,grid=False)
+            return B_Z
+
+        interp_poloidal_flux = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,poloidalFlux_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+        #    interp_poloidal_flux = interpolate.interp2d(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), kind='cubic',
+        #                                           copy=True, bounds_error=False, fill_value=None) # Flux extrapolated outside region
+        
+        efit_time = None # To prevent the data-saving routines from complaining later on      
 
     elif find_B_method == 'analytical':
         # B_p (hence B_R and B_Z) physical when inside the LCFS, have not
