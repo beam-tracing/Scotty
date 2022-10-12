@@ -1,0 +1,18 @@
+args_dict['poloidal_launch_angle_Torbeam'] = 6.0
+args_dict['toroidal_launch_angle_Torbeam'] = 0.0
+args_dict['launch_freq_GHz'] = 55
+args_dict['mode_flag'] = 1
+args_dict['launch_beam_width'] = 0.04
+args_dict['launch_beam_curvature'] = 1/(-4.0)
+args_dict['launch_position'] = np.array([1.5, 0.0, 0.0])
+
+kwargs_dict['vacuumLaunch_flag'] = True
+kwargs_dict['shot'] = 45118
+kwargs_dict['equil_time'] = 0.510
+kwargs_dict['vacuum_propagation_flag'] = True
+kwargs_dict['Psi_BC_flag'] = False
+kwargs_dict['poloidal_flux_enter'] = 4.0
+kwargs_dict['B_T_axis'] = 1.0
+kwargs_dict['B_p_a'] = 0.1
+kwargs_dict['R_axis'] = 1.5
+kwargs_dict['minor_radius_a'] = 0.5
