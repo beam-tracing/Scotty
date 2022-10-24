@@ -21,38 +21,39 @@ import sys
 
 from scotty.init_bruv import get_parameters_for_Scotty
 
-args_dict = {'poloidal_launch_angle_Torbeam': -6.151787276,
-             'toroidal_launch_angle_Torbeam': 4.3821909,
-             'launch_freq_GHz': 32.5,
-             'mode_flag': 1,
-             'launch_beam_width': 0.07596928872724663,
-             'launch_beam_curvature': -0.7497156475519201,
-             'launch_position': np.array([2.278, 0.   , 0.   ])}
+args_dict = {
+    "poloidal_launch_angle_Torbeam": -6.151787276,
+    "toroidal_launch_angle_Torbeam": 4.3821909,
+    "launch_freq_GHz": 32.5,
+    "mode_flag": 1,
+    "launch_beam_width": 0.07596928872724663,
+    "launch_beam_curvature": -0.7497156475519201,
+    "launch_position": np.array([2.278, 0.0, 0.0]),
+}
 
-kwargs_dict = {'ne_data_path': 'C:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST-U\\',
-               'magnetic_data_path': 'C:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST-U\\',
-               'input_filename_suffix': '_45176_400ms',
-               'find_B_method': 'test',
-               'equil_time': 0.4,
-               'shot': 45176,
-               'poloidal_flux_enter': 1.06520296**2,
-               'Psi_BC_flag': True,
-               'figure_flag': True,
-               'vacuum_propagation_flag': True,
-               'vacuumLaunch_flag': True,
-               'delta_R': -0.00001,
-               'delta_Z': -0.00001,
-               'delta_K_R': 0.1,
-               'delta_K_zeta': 0.1,
-               'delta_K_Z': 0.1,
-               'interp_smoothing': 0.0,
-               'len_tau': 1002,
-               'rtol': 1e-4,
-               'atol': 1e-7               
-               }
+kwargs_dict = {
+    "ne_data_path": "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST-U\\",
+    "magnetic_data_path": "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST-U\\",
+    "input_filename_suffix": "_45176_400ms",
+    "find_B_method": "test",
+    "equil_time": 0.4,
+    "shot": 45176,
+    "poloidal_flux_enter": 1.06520296**2,
+    "Psi_BC_flag": True,
+    "figure_flag": True,
+    "vacuum_propagation_flag": True,
+    "vacuumLaunch_flag": True,
+    "delta_R": -0.00001,
+    "delta_Z": -0.00001,
+    "delta_K_R": 0.1,
+    "delta_K_zeta": 0.1,
+    "delta_K_Z": 0.1,
+    "interp_smoothing": 0.0,
+    "len_tau": 1002,
+    "rtol": 1e-4,
+    "atol": 1e-7,
+}
 
 # sys.exit()
 
 beam_me_up(**args_dict, **kwargs_dict)
-    
-
