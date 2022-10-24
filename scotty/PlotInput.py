@@ -10,16 +10,16 @@ import matplotlib.pyplot as plt
 
 
 def plot():
-    loadfile = np.load('data_input3.npz')
-    ne_data_density_array = loadfile['ne_data_density_array']
-    ne_data_radialcoord_array = loadfile['ne_data_radialcoord_array']
+    loadfile = np.load("data_input3.npz")
+    ne_data_density_array = loadfile["ne_data_density_array"]
+    ne_data_radialcoord_array = loadfile["ne_data_radialcoord_array"]
     loadfile.close()
 
     ne_data_poloidal_flux_array = ne_data_radialcoord_array**2
 
     plt.figure()
-    plt.plot(ne_data_poloidal_flux_array,ne_data_density_array)
-    plt.ylabel('density / 1e19 m-3')
+    plt.plot(ne_data_poloidal_flux_array, ne_data_density_array)
+    plt.ylabel("density / 1e19 m-3")
 
 
 if __name__ == "__main__":
