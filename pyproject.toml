@@ -24,7 +24,8 @@ tests = [
     "pytest",
 ]
 docs = [
-    "sphinx>=3.4,<5",
+    "sphinx >= 4.0",
+    "sphinx-book-theme ~= 0.3.3",
 ]
 
 [tool.setuptools]
