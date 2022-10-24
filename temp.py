@@ -30,6 +30,9 @@ toroidal_launch_angles_Torbeam = np.array([3.0])
 # launch_freqs_GHz = np.array([30.0])
 launch_freqs_GHz = np.array([32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50])
 
+widths = np.zeros_like(launch_freqs_GHz)
+curvs = np.zeros_like(launch_freqs_GHz)
+
 total_simulations = len(equil_times)*len(poloidal_launch_angles_Torbeam)*len(toroidal_launch_angles_Torbeam)*len(launch_freqs_GHz)
 counter = 0
 for ii, equil_time in enumerate(equil_times):
@@ -86,9 +89,6 @@ for ii, equil_time in enumerate(equil_times):
                 kwargs_dict['len_tau'] = 1002
                 kwargs_dict['rtol'] = 1e-4
                 kwargs_dict['atol'] = 1e-7
-                
-                print(args_dict['launch_beam_width'])
-                continue
     
                 if ii == 0 and jj == 0 and kk == 0  and kk == ll:
                     kwargs_dict['verbose_output_flag'] = True
@@ -100,11 +100,9 @@ for ii, equil_time in enumerate(equil_times):
                 
                 counter=counter+1
                 
-                if os.path.exists(data_output) and os.path.exists(analysis_output):
-                    continue
-                else:   
-                    print('simulation ', counter, 'of', total_simulations)
-                    beam_me_up(**args_dict, **kwargs_dict)         
+                widths[ll] = args_dict['launch_beam_width']
+                curvs[ll]  = args_dict['launch_beam_curvature']
+                continue         
                 
                 # beam_me_up(**args_dict, **kwargs_dict)
 
