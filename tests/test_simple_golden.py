@@ -1,5 +1,5 @@
-from Scotty_beam_me_up import beam_me_up
-from Scotty_init_bruv import get_parameters_for_Scotty
+from scotty.beam_me_up import beam_me_up
+from scotty.init_bruv import get_parameters_for_Scotty
 
 import numpy as np
 from numpy.testing import assert_allclose

@@ -27,7 +27,7 @@ args_dict, kwargs_dict = get_parameters_for_Scotty(
 
 B_p_a_sweep       = np.linspace(0.0,0.2,5) 
 tor_launch_angles = np.linspace(0.0,4,5) 
-
+sys.exit()
 for B_p_a in B_p_a_sweep:
     args_dict, kwargs_dict = get_parameters_for_Scotty(
                                   'DBS_synthetic'
