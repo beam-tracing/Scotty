@@ -6,42 +6,52 @@ Created on Fri Jun  8 10:44:34 2018
 Valerian Hongjie Hall-Chen
 valerian@hall-chen.com
 
+## Initial beam properties (width, curv) are a function of frequency ##
+launch_freqs_GHz       = np.array([32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50])
+launch_beam_widths     = np.array([0.07596929, 0.07058289, 0.06591742, 0.0618377 , 
+                                   0.05824036, 0.05504499, 0.05218812, 0.04961897])
+launch_beam_curvatures = np.array([-0.74971565, -0.75653105, -0.76383412, -0.77162126, 
+                                   -0.77988862, -0.78863216, -0.7978476 , -0.80753047])
+
 """
 from Scotty_beam_me_up import beam_me_up
 import numpy as np
 import os
+import sys
 
 from Scotty_init_bruv import get_parameters_for_Scotty
 
+args_dict = {'poloidal_launch_angle_Torbeam': -6.151787276,
+             'toroidal_launch_angle_Torbeam': 4.3821909,
+             'launch_freq_GHz': 32.5,
+             'mode_flag': 1,
+             'launch_beam_width': 0.07596928872724663,
+             'launch_beam_curvature': -0.7497156475519201,
+             'launch_position': np.array([2.278, 0.   , 0.   ])}
 
-launch_freq_GHz = 30.0
-equil_time = 1900.0
-poloidal_launch_angle_Torbeam = -5.0
-toroidal_launch_angle_Torbeam = 2.5
+kwargs_dict = {'ne_data_path': 'C:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST-U\\',
+               'magnetic_data_path': 'C:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST-U\\',
+               'input_filename_suffix': '_45176_400ms',
+               'find_B_method': 'test',
+               'equil_time': 0.4,
+               'shot': 45176,
+               'poloidal_flux_enter': 1.06520296**2,
+               'Psi_BC_flag': True,
+               'figure_flag': True,
+               'vacuum_propagation_flag': True,
+               'vacuumLaunch_flag': True,
+               'delta_R': -0.00001,
+               'delta_Z': -0.00001,
+               'delta_K_R': 0.1,
+               'delta_K_zeta': 0.1,
+               'delta_K_Z': 0.1,
+               'interp_smoothing': 0.0,
+               'len_tau': 1002,
+               'rtol': 1e-4,
+               'atol': 1e-7               
+               }
 
-args_dict, kwargs_dict = get_parameters_for_Scotty(
-                              'DBS_UCLA_MAST-U',
-                              launch_freq_GHz = launch_freq_GHz,
-                              find_B_method   = 'torbeam', # EFITpp, UDA_saved, UDA, torbeam
-                              equil_time      = equil_time,
-                              shot            = 188839,
-                              user            = 'Valerian_laptop'
-                             )
-
-args_dict['poloidal_launch_angle_Torbeam'] = poloidal_launch_angle_Torbeam
-args_dict['toroidal_launch_angle_Torbeam'] = toroidal_launch_angle_Torbeam
-args_dict['mode_flag'] = -1
-
-kwargs_dict['poloidal_flux_enter'] = 1.44
-kwargs_dict['input_filename_suffix'] = '_188839_1900ms'
-kwargs_dict['output_path'] = os.path.dirname(os.path.abspath(__file__)) + '\\Output\\'
-
-kwargs_dict['delta_R'] = -0.001
-kwargs_dict['delta_Z'] = -0.001
-kwargs_dict['delta_K_R'] = 0.1
-kwargs_dict['delta_K_zeta'] = 0.1
-kwargs_dict['delta_K_Z'] = 0.1
-
+# sys.exit()
 
 beam_me_up(**args_dict, **kwargs_dict)
     
