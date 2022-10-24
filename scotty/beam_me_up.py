@@ -12,6 +12,8 @@ Version history
 v1 - Renaming of variables, cleaning up
 
 Plan
+~~~~
+
 Output everything to a file, and then do the analysis on that file.
 
 1) Check that gradK_xi and such are done correctly, check that K_mag is calculated correctly when K_zeta is nonzero
@@ -20,28 +22,38 @@ Output everything to a file, and then do the analysis on that file.
 
 
 Notes
+~~~~~
+
 - The loading of the input files was taken from integral_5 and modified.
 - I should launch the beam inside the last closed flux surface
 - K**2 = K_R**2 + K_z**2 + (K_zeta/r_R)**2, and K_zeta is constant (mode number). See 14 Sep 2018 notes.
 
 Coordinates
-X,Y,Z - Lab Cartesian coordinates
-R,zeta,Z - Lab cylindrical coordinates
-x,y,g - Beam coordinates
-u1,u2,u_parallel - Field-aligned coordinates
+~~~~~~~~~~~
+
+- ``X, Y, Z`` - Lab Cartesian coordinates
+- ``R, zeta, Z`` - Lab cylindrical coordinates
+- ``x, y, g`` - Beam coordinates
+- ``u1, u2, u_parallel`` - Field-aligned coordinates
 
 Abbreviations
-bs - backscattered
-loc - localisation
-cum_loc - cumulative_localisation
-ne - equilibrium electron density
+~~~~~~~~~~~~~
+
+- ``bs`` - backscattered
+- ``loc`` - localisation
+- ``cum_loc`` - cumulative_localisation
+- ``ne`` - equilibrium electron density
 
 Angles
-theta - angle between g and u1, small when mismatch is small
-theta_m - mismatch angle, angle between u1 and K
+~~~~~~
+
+- `theta` - angle between g and u1, small when mismatch is small
+- `theta_m` - mismatch angle, angle between u1 and K
 
 
 Units
+~~~~~
+
 - SI units
 - Distance in m
 - Angles in rad
@@ -49,7 +61,6 @@ Units
 - K normalised such that K = 1 in vacuum. (Not implemented yet)
 - Distance not normalised yet, should give it thought
 - Start in vacuum, otherwise Psi_3D_beam_initial_cartersian does not get done properly
--
 
 """
 
