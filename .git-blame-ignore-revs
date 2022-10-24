@@ -1,0 +1,8 @@
+# Reorganise project into main `scotty` package and `examples`
+faa0cf971ad8707279da28efdbef5242bd56968f
+
+# Enable modules to be imported without executing code
+cfbfee92985b1fc41276c2a224165e1c45c1315e
+
+# Apply black formatting
+2134cc1380fb670117a60cff7ef7f97d611a67aa
