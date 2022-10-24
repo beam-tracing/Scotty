@@ -5,12 +5,12 @@ Created on Tue Dec  1 11:53:31 2020
 @author: VH Chen
 """
 import numpy as np
-from Scotty_fun_general import read_floats_into_list_until
+from scotty.fun_general import read_floats_into_list_until
 import math
 from scipy import interpolate as interpolate
 from scipy import constants as constants
 import matplotlib.pyplot as plt
-from Scotty_fun_FFD import find_dpolflux_dR, find_dpolflux_dZ # For find_B if using efit files directly
+from scotty.fun_FFD import find_dpolflux_dR, find_dpolflux_dZ # For find_B if using efit files directly
 from netCDF4 import Dataset
 
 

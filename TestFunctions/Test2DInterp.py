@@ -6,7 +6,7 @@ Created on Tue Nov 17 12:16:49 2020
 """
 
 import numpy as np
-from Scotty_fun_general import read_floats_into_list_until
+from scotty.fun_general import read_floats_into_list_until
 import math
 from scipy import interpolate as interpolate
 from scipy import constants as constants
