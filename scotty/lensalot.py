@@ -121,7 +121,7 @@ class Thick_Lens(Lens):
     def __repr__(self):
         return (
             f"Thick_Lens('{self.name}', focal_length={self.focal_length}, "
-            "thickness={self.thickness}, ref_index={self.ref_index})"
+            f"thickness={self.thickness}, ref_index={self.ref_index})"
         )
 
 
