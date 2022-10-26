@@ -26,6 +26,8 @@ Description of the Scotty [[1]](#1), derivation of beam tracing given in Appendi
 ## References
 <a id="1">[1]</a> 
 Hall-Chen, V. H., Parra, F. I., & Hillesheim, J. C. (2022). 
-Beam model of Doppler backscattering. 
-*Plasma Physics and Controlled Fusion*, *64*(9), 095002.
+[Beam model of Doppler backscattering](https://iopscience.iop.org/article/10.1088/1361-6587/ac57a1). 
+*Plasma Physics and Controlled Fusion*, **64**(9), 095002.
+
+
 
