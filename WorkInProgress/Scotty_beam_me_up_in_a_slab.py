@@ -69,26 +69,26 @@ import time
 
 
 
-from Scotty_fun_general import read_floats_into_list_until, find_nearest, contract_special, make_unit_vector_from_cross_product, find_x0, find_H, find_waist
-from Scotty_fun_general import find_inverse_2D, find_Psi_3D_lab, find_q_lab_Cartesian, find_K_lab_Cartesian, find_K_lab, find_Psi_3D_lab_Cartesian
-from Scotty_fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq
-from Scotty_fun_general import find_epsilon_para, find_epsilon_perp,find_epsilon_g
-from Scotty_fun_general import find_dbhat_dR, find_dbhat_dZ
-from Scotty_fun_general import find_d_poloidal_flux_dR, find_d_poloidal_flux_dZ,find_Psi_3D_plasma
-from Scotty_fun_general import find_dB_dR_FFD, find_dB_dZ_FFD, find_d2B_dR2_FFD, find_d2B_dZ2_FFD, find_d2B_dR_dZ_FFD          
-from Scotty_fun_general import find_dB_dR_CFD, find_dB_dZ_CFD, find_d2B_dR2_CFD, find_d2B_dZ2_CFD#, find_d2B_dR_dZ_FFD          
-from Scotty_fun_general import find_d2_poloidal_flux_dR2, find_d2_poloidal_flux_dZ2
-from Scotty_fun_general import find_H_Cardano, find_D
+from scotty.fun_general import read_floats_into_list_until, find_nearest, contract_special, make_unit_vector_from_cross_product, find_x0, find_H, find_waist
+from scotty.fun_general import find_inverse_2D, find_Psi_3D_lab, find_q_lab_Cartesian, find_K_lab_Cartesian, find_K_lab, find_Psi_3D_lab_Cartesian
+from scotty.fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq
+from scotty.fun_general import find_epsilon_para, find_epsilon_perp,find_epsilon_g
+from scotty.fun_general import find_dbhat_dR, find_dbhat_dZ
+from scotty.fun_general import find_d_poloidal_flux_dR, find_d_poloidal_flux_dZ,find_Psi_3D_plasma
+from scotty.fun_general import find_dB_dR_FFD, find_dB_dZ_FFD, find_d2B_dR2_FFD, find_d2B_dZ2_FFD, find_d2B_dR_dZ_FFD          
+from scotty.fun_general import find_dB_dR_CFD, find_dB_dZ_CFD, find_d2B_dR2_CFD, find_d2B_dZ2_CFD#, find_d2B_dR_dZ_FFD          
+from scotty.fun_general import find_d2_poloidal_flux_dR2, find_d2_poloidal_flux_dZ2
+from scotty.fun_general import find_H_Cardano, find_D
 
-from Scotty_fun_evolution import ray_evolution_2D_fun, beam_evolution_fun
+from scotty.fun_evolution import ray_evolution_2D_fun, beam_evolution_fun
 
 
-from Scotty_fun_FFD import find_dH_dR, find_dH_dZ # \nabla H
-from Scotty_fun_CFD import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta # \nabla_K H
-from Scotty_fun_FFD import find_d2H_dR2, find_d2H_dZ2, find_d2H_dR_dZ # \nabla \nabla H
-from Scotty_fun_CFD import find_d2H_dKR2, find_d2H_dKR_dKzeta, find_d2H_dKR_dKZ, find_d2H_dKzeta2, find_d2H_dKzeta_dKZ, find_d2H_dKZ2 # \nabla_K \nabla_K H
-from Scotty_fun_mix import find_d2H_dKR_dR, find_d2H_dKR_dZ, find_d2H_dKzeta_dR, find_d2H_dKzeta_dZ, find_d2H_dKZ_dR, find_d2H_dKZ_dZ # \nabla_K \nabla H
-from Scotty_fun_FFD import find_dpolflux_dR, find_dpolflux_dZ # For find_B if using efit files directly
+from scotty.fun_FFD import find_dH_dR, find_dH_dZ # \nabla H
+from scotty.fun_CFD import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta # \nabla_K H
+from scotty.fun_FFD import find_d2H_dR2, find_d2H_dZ2, find_d2H_dR_dZ # \nabla \nabla H
+from scotty.fun_CFD import find_d2H_dKR2, find_d2H_dKR_dKzeta, find_d2H_dKR_dKZ, find_d2H_dKzeta2, find_d2H_dKzeta_dKZ, find_d2H_dKZ2 # \nabla_K \nabla_K H
+from scotty.fun_mix import find_d2H_dKR_dR, find_d2H_dKR_dZ, find_d2H_dKzeta_dR, find_d2H_dKzeta_dZ, find_d2H_dKZ_dR, find_d2H_dKZ_dZ # \nabla_K \nabla H
+from scotty.fun_FFD import find_dpolflux_dR, find_dpolflux_dZ # For find_B if using efit files directly
 
 def beam_me_up(poloidal_launch_angle_Torbeam,
                toroidal_launch_angle_Torbeam,
