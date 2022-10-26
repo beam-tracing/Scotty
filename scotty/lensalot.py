@@ -146,9 +146,6 @@ class ABCD_Lens(Lens):
 
             Psi_w_out[ii, ii] = 1 / np.conj(q_out[ii, ii]) * wavenumber
 
-        # q_out = q_in
-        # Psi_w_out = Psi_w_out2
-
         return Psi_w_out
 
 
