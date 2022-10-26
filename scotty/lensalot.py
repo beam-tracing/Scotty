@@ -29,69 +29,7 @@ at a distance :math:`r'`, and an angle :math:`\theta'`
 
 import numpy as np
 from scipy import constants
-
-
-def make_my_lens(name: str, lens_type: str = "thin", focal_length=None):
-    known_lens_types = ["thin", "thick", "hyperbolic"]
-    if lens_type not in known_lens_types:
-        raise ValueError(
-            f"Unknown lens type '{lens_type}', expected one of {known_lens_types}"
-        )
-
-    if lens_type == "thin":
-        lenses = {
-            "MAST_V_band": Thin_Lens("MAST_V_band", 0.125),
-            "MAST_Q_band": Thin_Lens("MAST_Q_band", 0.27),
-            "DBS_UCLA_DIII-D_240": Thin_Lens("DBS_UCLA_DIII-D_240", focal_length),
-            # Harmonic mean of front and back focal distances
-            "DBS_UCLA_MAST-U": Thin_Lens("DBS_UCLA_MAST-U", 0.1477692307692308),
-        }
-        try:
-            return lenses[name]
-        except KeyError:
-            return ValueError(
-                f"Unknown thin lens '{name}', expected one of {lenses.keys()}"
-            )
-
-    elif lens_type == "thick":
-        lenses = {
-            "MAST_V_band": Thick_Lens(
-                "MAST_V_band", focal_length=0.125, thickness=0.0633, ref_index=1.53
-            ),
-            "MAST_Q_band": Thick_Lens(
-                "MAST_Q_band", focal_length=0.27, thickness=0.0338, ref_index=1.53
-            ),
-        }
-        try:
-            return lenses[name]
-        except KeyError:
-            return ValueError(
-                f"Unknown thick lens '{name}', expected one of {lenses.keys()}"
-            )
-
-    elif lens_type == "hyperbolic":
-        lenses = {
-            "MAST_V_band": ABCD_Lens(
-                "MAST_V_band",
-                A=1.000000000000,
-                B=41.347131119605e-3,  # convert
-                C=-0.006016900790e3,
-                D=0.751218414102,
-            ),
-            "MAST_Q_band": ABCD_Lens(
-                "MAST_Q_band",
-                A=1.000000000000,
-                B=22.103343171495e-3,  # convert
-                C=-0.003423517875e3,
-                D=0.924328809548,
-            ),
-        }
-        try:
-            return lenses[name]
-        except KeyError:
-            return ValueError(
-                f"Unknown thick lens '{name}', expected one of {lenses.keys()}"
-            )
+from typing import Optional
 
 
 def _frequency_to_wavenumber(frequency_GHz: float) -> float:
@@ -212,3 +150,67 @@ class ABCD_Lens(Lens):
         # Psi_w_out = Psi_w_out2
 
         return Psi_w_out
+
+
+def make_my_lens(
+    name: str, lens_type: str = "thin", focal_length: Optional[float] = None
+) -> Lens:
+    """Create one of a pre-existing set of parameterised lenses.
+
+    Arguments
+    =========
+    name:
+        Name of the known lenses
+    lens_type:
+        One of "thin", "thick", "hyperbolic"
+    focal_length:
+        Focal length for the DBS_UCLA_DIII-D_240 lens
+    """
+
+    lenses = {
+        "thin": {
+            "MAST_V_band": Thin_Lens("MAST_V_band", 0.125),
+            "MAST_Q_band": Thin_Lens("MAST_Q_band", 0.27),
+            "DBS_UCLA_DIII-D_240": Thin_Lens("DBS_UCLA_DIII-D_240", focal_length),
+            # Harmonic mean of front and back focal distances
+            "DBS_UCLA_MAST-U": Thin_Lens("DBS_UCLA_MAST-U", 0.1477692307692308),
+        },
+        "thick": {
+            "MAST_V_band": Thick_Lens(
+                "MAST_V_band", focal_length=0.125, thickness=0.0633, ref_index=1.53
+            ),
+            "MAST_Q_band": Thick_Lens(
+                "MAST_Q_band", focal_length=0.27, thickness=0.0338, ref_index=1.53
+            ),
+        },
+        "hyperbolic": {
+            "MAST_V_band": ABCD_Lens(
+                "MAST_V_band",
+                A=1.000000000000,
+                B=41.347131119605e-3,  # convert
+                C=-0.006016900790e3,
+                D=0.751218414102,
+            ),
+            "MAST_Q_band": ABCD_Lens(
+                "MAST_Q_band",
+                A=1.000000000000,
+                B=22.103343171495e-3,  # convert
+                C=-0.003423517875e3,
+                D=0.924328809548,
+            ),
+        },
+    }
+
+    try:
+        lens_type_dict = lenses[lens_type]
+    except KeyError:
+        raise ValueError(
+            f"Unknown lens type '{lens_type}', expected one of {lenses.keys()}"
+        )
+
+    try:
+        return lens_type_dict[name]
+    except KeyError:
+        return ValueError(
+            f"Unknown {lens_type} lens '{name}', expected one of {lens_type_dict.keys()}"
+        )
