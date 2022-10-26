@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
+r"""
 lens-a-lot
 
 Created on Sat Apr 17 16:23:01 2021
@@ -8,13 +8,23 @@ Created on Sat Apr 17 16:23:01 2021
 
 Transfer matrix (2x2):
 
-(   r'   )     ( A   B )  (   r   )
-(        )  =  (       )  (       )
-( theta' )     ( C   D )  ( theta )
+.. math::
+    \begin{pmatrix}
+        r' \\
+        \theta' \\
+    \end{pmatrix} =
+    \begin{pmatrix}
+        A & B \\
+        C & D \\
+    \end{pmatrix}
+    \begin{pmatrix}
+        r \\
+        \theta \\
+    \end{pmatrix}
 
-Consider a ray entering and leaving an optical system. It is distance r above
-the system axis, entering at an angle theta. It leaves at a distance r', and 
-an angle theta'
+Consider a ray entering and leaving an optical system. It is distance
+:math:`r` above the system axis, entering at an angle :math:`\theta`. It leaves
+at a distance :math:`r'`, and an angle :math:`\theta'`
 """
 
 import numpy as np
@@ -85,11 +95,13 @@ def make_my_lens(name: str, lens_type: str = "thin", focal_length=None):
 
 
 def _frequency_to_wavenumber(frequency_GHz: float) -> float:
+    """Converts frequency in GHz to wavenumber"""
     angular_frequency = 2 * np.pi * 1e9 * frequency_GHz
     return angular_frequency / constants.c
 
 
 def _check_matrix_is_2x2(Psi_w_in):
+    """Raise an exception if input matrix is not 2x2"""
     if Psi_w_in.shape != (2, 2):
         raise ValueError(
             f"`Psi_w_in` must be 2x2 matrix, actual shape: {Psi_w_in.shape}"
@@ -123,9 +135,7 @@ class Lens:
 
 
 class Thin_Lens(Lens):
-    """
-    Thin lens approximation
-    """
+    """Thin lens approximation"""
 
     def __init__(self, name, focal_length):
         super().__init__(name, focal_length)
@@ -138,12 +148,9 @@ class Thin_Lens(Lens):
 
 
 class Thick_Lens(Lens):
-    """
-    inherits Lens
-    """
+    """Lens with finite thickness and refractive index"""
 
     def __init__(self, name, focal_length, thickness, ref_index):
-        # Calling init of parent class
         super().__init__(name, focal_length)
         self.thickness = thickness
         self.ref_index = ref_index
@@ -175,9 +182,7 @@ class Thick_Lens(Lens):
 
 
 class ABCD_Lens(Lens):
-    """
-    inherits Lens
-    """
+    """Generalised lens"""
 
     def __init__(self, name, A, B, C, D):
         self.name = name
