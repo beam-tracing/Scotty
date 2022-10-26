@@ -53,9 +53,6 @@ class Lens:
         self.name = name
         self.focal_length = focal_length
 
-    def __repr__(self):
-        return f"Lens('{self.name}', focal_length={self.focal_length})"
-
     def output_beam(self, Psi_w_in, freq_GHz):
         """Return the refracted beam
 
@@ -83,6 +80,9 @@ class Thin_Lens(Lens):
         wavenumber = _frequency_to_wavenumber(freq_GHz)
         Psi_w_out = Psi_w_in - np.eye(2) * wavenumber / self.focal_length
         return Psi_w_out
+
+    def __repr__(self):
+        return f"Thin_lens('{self.name}', focal_length={self.focal_length})"
 
 
 class Thick_Lens(Lens):
@@ -118,6 +118,12 @@ class Thick_Lens(Lens):
 
         return Psi_w_out
 
+    def __repr__(self):
+        return (
+            f"Thick_Lens('{self.name}', focal_length={self.focal_length}, "
+            "thickness={self.thickness}, ref_index={self.ref_index})"
+        )
+
 
 class ABCD_Lens(Lens):
     """Generalised lens"""
@@ -147,6 +153,11 @@ class ABCD_Lens(Lens):
             Psi_w_out[ii, ii] = 1 / np.conj(q_out[ii, ii]) * wavenumber
 
         return Psi_w_out
+
+    def __repr__(self):
+        return (
+            f"ABCD_Lens('{self.name}', A={self.A}, B={self.B}, C={self.C}, D={self.D}"
+        )
 
 
 def make_my_lens(
