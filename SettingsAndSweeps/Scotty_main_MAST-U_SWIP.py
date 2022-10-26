@@ -7,11 +7,11 @@ Valerian Hongjie Hall-Chen
 valerian@hall-chen.com
 
 """
-from Scotty_beam_me_up import beam_me_up
+from scotty.beam_me_up import beam_me_up
 import numpy as np
 import os
 
-from Scotty_init_bruv import get_parameters_for_Scotty
+from scotty.init_bruv import get_parameters_for_Scotty
 
 
 launch_freq_GHz = 30.0

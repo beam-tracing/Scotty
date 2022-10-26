@@ -10,16 +10,16 @@ valerian@hall-chen.com
 For shot 29908, the EFIT++ times are efit_times = np.linspace(0.155,0.25,20)
 I want efit_times[np.arange(0,10)*2 + 1]. 160ms, 170ms, ..., 250ms
 """
-from Scotty_beam_me_up import beam_me_up
-from Scotty_fun_general import find_q_lab_Cartesian, find_q_lab, find_K_lab_Cartesian, find_K_lab, find_waist, find_Rayleigh_length, genray_angles_from_mirror_angles
-from Scotty_fun_general import propagate_beam
+from scotty.beam_me_up import beam_me_up
+from scotty.fun_general import find_q_lab_Cartesian, find_q_lab, find_K_lab_Cartesian, find_K_lab, find_waist, find_Rayleigh_length, genray_angles_from_mirror_angles
+from scotty.fun_general import propagate_beam
 
 from scipy import constants
 import math
 import numpy as np
 import sys
 
-from Scotty_init_bruv import get_parameters_for_Scotty
+from scotty.init_bruv import get_parameters_for_Scotty
 
 
 equil_times = np.linspace(0.16,0.25,10)
