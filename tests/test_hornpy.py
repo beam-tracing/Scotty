@@ -1,4 +1,4 @@
-from scotty.hornpy import make_my_horn
+from scotty.hornpy import make_my_horn, GoldsmithAsymmetricConicalHorn, inch2m
 
 import numpy as np
 import numpy.testing as nt
@@ -18,9 +18,11 @@ def test_MAST_V_band():
 
 
 def test_MAST_Q_band():
-    horn = make_my_horn("MAST_Q_band")
-    horn.width_method = "Goldsmith_asymmetric"
-
+    horn = GoldsmithAsymmetricConicalHorn(
+        "test",
+        aperture_radius=inch2m(1.44 / 2),
+        semiflare_angle=np.deg2rad(30.0 / 2),
+    )
     width, curvature = horn.output_beam()
 
     expected_width = [0.01609344, 0.01170432]
