@@ -51,5 +51,5 @@ def test_simple_check(tmp_path):
         ]
     )
 
-    assert_allclose(output["tau_array"], tau_expected)
-    assert_allclose(output["B_magnitude"], B_expected)
+    assert_allclose(output["tau_array"], tau_expected, rtol=1e-5)
+    assert_allclose(output["B_magnitude"], B_expected, rtol=1e-5)
