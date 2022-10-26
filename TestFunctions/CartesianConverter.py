@@ -14,7 +14,7 @@ Useful for benchmarking with Torbeam
 
 import matplotlib.pyplot as plt
 import numpy as np
-from Scotty_fun import find_q_lab_Cartesian, find_q_lab, find_K_lab_Cartesian, find_K_lab
+from scotty.fun import find_q_lab_Cartesian, find_q_lab, find_K_lab_Cartesian, find_K_lab
 
 loadfile = np.load('data_output.npz')
 tau_array = loadfile['tau_array']
