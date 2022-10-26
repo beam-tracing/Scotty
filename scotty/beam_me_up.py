@@ -79,6 +79,7 @@ import time
 import platform
 import json
 import ast
+import pathlib
 
 from scotty.fun_general import (
     read_floats_into_list_until,
@@ -184,9 +185,9 @@ def beam_me_up(
     atol=1e-6,  # for solve_ivp of the beam solver
     interp_smoothing=0,  # For the 2D interpolation functions. For no smoothing, set to 0
     ## Input and output settings
-    ne_data_path=None,
-    magnetic_data_path=None,
-    output_path=None,
+    ne_data_path=pathlib.Path("."),
+    magnetic_data_path=pathlib.Path("."),
+    output_path=pathlib.Path("."),
     input_filename_suffix="",
     output_filename_suffix="",
     figure_flag=True,
@@ -221,25 +222,12 @@ def beam_me_up(
     launch_angular_frequency = 2 * math.pi * 10.0**9 * launch_freq_GHz
     wavenumber_K0 = launch_angular_frequency / constants.c
 
+    # Ensure paths are `pathlib.Path`
+    ne_data_path = pathlib.Path(ne_data_path)
+    magnetic_data_path = pathlib.Path(magnetic_data_path)
+    output_path = pathlib.Path(output_path)
+
     # Experimental Profile----------
-
-    if output_path is None:
-        if platform.system() == "Windows":
-            output_path = os.path.dirname(os.path.abspath(__file__)) + "\\"
-        elif platform.system() == "Linux":
-            output_path = os.path.dirname(os.path.abspath(__file__)) + "/"
-
-    if ne_data_path is None:
-        if platform.system() == "Windows":
-            ne_data_path = os.path.dirname(os.path.abspath(__file__)) + "\\"
-        elif platform.system() == "Linux":
-            ne_data_path = os.path.dirname(os.path.abspath(__file__)) + "/"
-
-    if magnetic_data_path is None:
-        if platform.system() == "Windows":
-            magnetic_data_path = os.path.dirname(os.path.abspath(__file__)) + "\\"
-        elif platform.system() == "Linux":
-            magnetic_data_path = os.path.dirname(os.path.abspath(__file__)) + "/"
 
     if density_fit_parameters is None:
         print("ne(psi): loading from input file")
@@ -398,7 +386,7 @@ def beam_me_up(
         # topfile
         # Others: inbeam.dat, Te.dat (not currently used in this code)
 
-        topfile_filename = magnetic_data_path + "topfile" + input_filename_suffix
+        topfile_filename = magnetic_data_path / f"topfile{input_filename_suffix}"
 
         with open(topfile_filename) as f:
             while not "X-coordinates" in f.readline():
@@ -640,7 +628,7 @@ def beam_me_up(
                 "Using MSE-constrained EFIT++ output files directly for B and poloidal flux"
             )
 
-            dataset = Dataset(magnetic_data_path + "efitOut.nc")
+            dataset = Dataset(magnetic_data_path / "efitOut.nc")
 
             efitpp_times = dataset.variables["time"][:]
             #        equilibriumStatus_array = dataset.variables['equilibriumStatus'][:]
@@ -691,7 +679,7 @@ def beam_me_up(
             print(shot)
             # 30471 is the last shot on MAST
             # data saved differently for MAST-U shots
-            loadfile = np.load(magnetic_data_path + str(shot) + "_equilibrium_data.npz")
+            loadfile = np.load(magnetic_data_path / f"{shot}_equilibrium_data.npz")
             rBphi_all_times = loadfile["rBphi"]  # On time base C
             t_base_B = loadfile["t_base_B"]
             t_base_C = loadfile["t_base_C"]
@@ -732,7 +720,7 @@ def beam_me_up(
         ):  # MAST-U
             # 30471 is the last shot on MAST
             # data saved differently for MAST-U shots
-            loadfile = np.load(magnetic_data_path + str(shot) + "_equilibrium_data.npz")
+            loadfile = np.load(magnetic_data_path / f"{shot}_equilibrium_data.npz")
             rBphi_all_times = loadfile["rBphi"]  # On time base C
             time_EFIT = loadfile["time_EFIT"]
             data_R_coord = loadfile["R_EFIT"]
@@ -891,7 +879,7 @@ def beam_me_up(
 
         if find_B_method == "test":
             # Works nicely with the new MAST-U UDA output
-            loadfile = np.load(magnetic_data_path + str(shot) + "_equilibrium_data.npz")
+            loadfile = np.load(magnetic_data_path / f"{shot}_equilibrium_data.npz")
             data_R_coord = loadfile["R_EFIT"]
             data_Z_coord = loadfile["Z_EFIT"]
             poloidalFlux_grid_all_times = loadfile["poloidalFlux_grid"]
@@ -1926,7 +1914,7 @@ def beam_me_up(
     if verbose_output_flag:
         print("Saving data")
         np.savez(
-            output_path + "data_input" + output_filename_suffix,
+            output_path / f"data_input{output_filename_suffix}",
             poloidalFlux_grid=poloidalFlux_grid,
             data_R_coord=data_R_coord,
             data_Z_coord=data_Z_coord,
@@ -1950,7 +1938,7 @@ def beam_me_up(
             interp_smoothing=interp_order,
         )
         np.savez(
-            output_path + "solver_output" + output_filename_suffix,
+            output_path / f"solver_output{output_filename_suffix}",
             solver_status=solver_status,
             tau_array=tau_array,
             q_R_array=q_R_array,
@@ -2167,7 +2155,7 @@ def beam_me_up(
     # -------------------
     if vacuumLaunch_flag:
         np.savez(
-            output_path + "data_output" + output_filename_suffix,
+            output_path / f"data_output{output_filename_suffix}",
             tau_array=tau_array,
             q_R_array=q_R_array,
             q_zeta_array=q_zeta_array,
@@ -2229,7 +2217,7 @@ def beam_me_up(
         )
     else:
         np.savez(
-            output_path + "data_output" + output_filename_suffix,
+            output_path / f"data_output{output_filename_suffix}",
             tau_array=tau_array,
             q_R_array=q_R_array,
             q_zeta_array=q_zeta_array,
@@ -3257,7 +3245,7 @@ def beam_me_up(
     # -------------------
     print("Saving analysis data")
     np.savez(
-        output_path + "analysis_output" + output_filename_suffix,
+        output_path / f"analysis_output{output_filename_suffix}",
         Psi_xx_output=Psi_xx_output,
         Psi_xy_output=Psi_xy_output,
         Psi_yy_output=Psi_yy_output,
@@ -3393,7 +3381,7 @@ def beam_me_up(
         plt.xlim(data_R_coord[0], data_R_coord[-1])
         plt.ylim(data_Z_coord[0], data_Z_coord[-1])
 
-        plt.savefig(output_path + "Ray1_" + output_figurename_suffix)
+        plt.savefig(output_path / f"Ray1_{output_figurename_suffix}")
         plt.close()
 
         """
@@ -3407,7 +3395,7 @@ def beam_me_up(
         plt.plot(l_lc, abs(H_1_Cardano_array), "r")
         plt.plot(l_lc, abs(H_2_Cardano_array), "g")
         plt.plot(l_lc, abs(H_3_Cardano_array), "b")
-        plt.savefig(output_path + "H_" + output_figurename_suffix)
+        plt.savefig(output_path / f"H_{output_figurename_suffix}")
         plt.close()
 
         # Commented out because this does not work properly
