@@ -35,7 +35,6 @@ kwargs_dict = {
     "B_p_a": 0.1,
     "R_axis": 1.5,
     "minor_radius_a": 0.5,
-    "output_path": "D:\\Dropbox\\VHChen\\GitHub\\Scotty\\Output\\",
 }
 
 beam_me_up(**args_dict, **kwargs_dict)
