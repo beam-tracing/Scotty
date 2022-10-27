@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
+r"""
 lens-a-lot
 
 Created on Sat Apr 17 16:23:01 2021
@@ -8,134 +8,94 @@ Created on Sat Apr 17 16:23:01 2021
 
 Transfer matrix (2x2):
 
-(   r'   )     ( A   B )  (   r   )
-(        )  =  (       )  (       )
-( theta' )     ( C   D )  ( theta )
+.. math::
+    \begin{pmatrix}
+        r' \\
+        \theta' \\
+    \end{pmatrix} =
+    \begin{pmatrix}
+        A & B \\
+        C & D \\
+    \end{pmatrix}
+    \begin{pmatrix}
+        r \\
+        \theta \\
+    \end{pmatrix}
 
-Consider a ray entering and leaving an optical system. It is distance r above
-the system axis, entering at an angle theta. It leaves at a distance r', and 
-an angle theta'
+Consider a ray entering and leaving an optical system. It is distance
+:math:`r` above the system axis, entering at an angle :math:`\theta`. It leaves
+at a distance :math:`r'`, and an angle :math:`\theta'`
 """
+
 import numpy as np
 from scipy import constants
+from typing import Optional
 
 
-def make_my_lens(name, lens_type="thin", focal_length=None):
+def _frequency_to_wavenumber(frequency_GHz: float) -> float:
+    """Converts frequency in GHz to wavenumber"""
+    angular_frequency = 2 * np.pi * 1e9 * frequency_GHz
+    return angular_frequency / constants.c
 
-    if lens_type == "thin":
-        myLens = Thin_Lens(name)
 
-        if name == "MAST_V_band":
-            myLens.focal_length = 0.125
-        elif name == "MAST_Q_band":
-            myLens.focal_length = 0.27
-        elif name == "DBS_UCLA_DIII-D_240":
-            myLens.focal_length = focal_length
-        elif name == "DBS_UCLA_MAST-U":
-            myLens.focal_length = (
-                0.1477692307692308  # Harmonic mean of front and back focal distances
-            )
-
-    elif lens_type == "thick":
-        myLens = Thick_Lens(name)
-
-        if name == "MAST_V_band":
-            myLens.focal_length = 0.125
-            myLens.thickness = 0.0633
-            myLens.ref_index = 1.53
-        elif name == "MAST_Q_band":
-            myLens.focal_length = 0.27
-            myLens.thickness = 0.0338
-            myLens.ref_index = 1.53
-
-    elif lens_type == "hyperbolic":
-        myLens = ABCD_Lens(name)
-
-        if name == "MAST_V_band":
-            myLens.matrix_A = 1.000000000000
-            myLens.matrix_B = 41.347131119605 * 10 ** (-3)  # convert
-            myLens.matrix_C = -0.006016900790 * 10 ** (3)
-            myLens.matrix_D = 0.751218414102
-        elif name == "MAST_Q_band":
-            myLens.matrix_A = 1.000000000000
-            myLens.matrix_B = 22.103343171495 * 10 ** (-3)  # convert
-            myLens.matrix_C = -0.003423517875 * 10 ** (3)
-            myLens.matrix_D = 0.924328809548
-
-            ## Thick lens
-            # myLens.matrix_B = 0.022091503267973853
-            # myLens.matrix_C = -3.7037037037037033
-            # myLens.matrix_D = 0.9181796175260227
-
-            ## Thin lens
-            # myLens.matrix_B = 0.0
-            # myLens.matrix_C = -1/0.27
-            # myLens.matrix_D = 1.0
-
-    return myLens
+def _check_matrix_is_2x2(Psi_w_in):
+    """Raise an exception if input matrix is not 2x2"""
+    if Psi_w_in.shape != (2, 2):
+        raise ValueError(
+            f"`Psi_w_in` must be 2x2 matrix, actual shape: {Psi_w_in.shape}"
+        )
 
 
 class Lens:
-    # init method or constructor
-    def __init__(self, name):
+    """Abstract base class for different lens approximations"""
+
+    def __init__(self, name: str, focal_length: float):
         self.name = name
-        self.focal_length = None
-
-    # Sample Method
-    def who_am_I(self):
-        print("Lens name: ", self.name)
-
-
-class Thin_Lens(Lens):
-    """
-    inherits Lens
-    """
-
-    def __init__(self, name):
-        # Calling init of parent class
-        super().__init__(name)
+        self.focal_length = focal_length
 
     def output_beam(self, Psi_w_in, freq_GHz):
-        """
-        - Psi_w_in should be a 2x2 matrix
-        - Assumes the real part of Psi_w is diagonalised
-        - Doesn't assume that the diagnoalised Re(Psi_w)'s components are equal
-          to each other, that is, the curvatures are allowed to be 'elliptical'
-        """
-        if self.focal_length is None:
-            print("Warning: focal length not initialised")
+        """Return the refracted beam
 
-        angular_frequency = 2 * np.pi * 10.0**9 * freq_GHz
-        wavenumber = angular_frequency / constants.c
-
-        Psi_w_out = Psi_w_in - np.eye(2) * wavenumber / self.focal_length
-
-        return Psi_w_out
-
-
-class Thick_Lens(Lens):
-    """
-    inherits Lens
-    """
-
-    def __init__(self, name):
-        # Calling init of parent class
-        super().__init__(name)
-        self.thickness = None
-        self.ref_index = None
-
-    def output_beam(self, Psi_w_in, freq_GHz):
-        """
-        - Psi_w_in should be a 2x2 matrix
         - Assumes Psi_w is diagonalised
         - Doesn't assume that the diagnoalised Re(Psi_w)'s components are equal
           to each other, that is, the curvatures are allowed to be 'elliptical'
-        """
-        if self.focal_length is None:
-            print("Warning: focal length not initialised")
 
-        angular_frequency = 2 * np.pi * 10.0**9 * freq_GHz
-        wavenumber = angular_frequency / constants.c
+        Arguments
+        =========
+        Psi_w_in:
+            Incident beam as a 2x2 matrix
+        """
+
+        raise NotImplementedError
+
+
+class Thin_Lens(Lens):
+    """Thin lens approximation"""
+
+    def __init__(self, name, focal_length):
+        super().__init__(name, focal_length)
+
+    def output_beam(self, Psi_w_in, freq_GHz):
+        _check_matrix_is_2x2(Psi_w_in)
+        wavenumber = _frequency_to_wavenumber(freq_GHz)
+        Psi_w_out = Psi_w_in - np.eye(2) * wavenumber / self.focal_length
+        return Psi_w_out
+
+    def __repr__(self):
+        return f"Thin_lens('{self.name}', focal_length={self.focal_length})"
+
+
+class Thick_Lens(Lens):
+    """Lens with finite thickness and refractive index"""
+
+    def __init__(self, name, focal_length, thickness, ref_index):
+        super().__init__(name, focal_length)
+        self.thickness = thickness
+        self.ref_index = ref_index
+
+    def output_beam(self, Psi_w_in, freq_GHz):
+        _check_matrix_is_2x2(Psi_w_in)
+        wavenumber = _frequency_to_wavenumber(freq_GHz)
 
         T_over_N = self.thickness / self.ref_index
         Psi_w_out2 = np.zeros_like(Psi_w_in, dtype="complex128")
@@ -158,38 +118,26 @@ class Thick_Lens(Lens):
 
         return Psi_w_out
 
+    def __repr__(self):
+        return (
+            f"Thick_Lens('{self.name}', focal_length={self.focal_length}, "
+            f"thickness={self.thickness}, ref_index={self.ref_index})"
+        )
+
 
 class ABCD_Lens(Lens):
-    """
-    inherits Lens
-    """
+    """Generalised lens"""
 
-    def __init__(self, name):
-        # Calling init of parent class
-        super().__init__(name)
-        self.matrix_A = None
-        self.matrix_B = None
-        self.matrix_C = None
-        self.matrix_D = None
+    def __init__(self, name, A, B, C, D):
+        self.name = name
+        self.matrix_A = A
+        self.matrix_B = B
+        self.matrix_C = C
+        self.matrix_D = D
 
     def output_beam(self, Psi_w_in, freq_GHz):
-        """
-        - Psi_w_in should be a 2x2 matrix
-        - Assumes Psi_w is diagonalised
-        - Doesn't assume that the diagnoalised Re(Psi_w)'s components are equal
-          to each other, that is, the curvatures are allowed to be 'elliptical'
-        """
-        if self.matrix_A is None:
-            print("Warning: element A of the ABCD matrix not defined")
-        if self.matrix_B is None:
-            print("Warning: element A of the ABCD matrix not defined")
-        if self.matrix_C is None:
-            print("Warning: element A of the ABCD matrix not defined")
-        if self.matrix_D is None:
-            print("Warning: element A of the ABCD matrix not defined")
-
-        angular_frequency = 2 * np.pi * freq_GHz * 10.0**9
-        wavenumber = angular_frequency / constants.c
+        _check_matrix_is_2x2(Psi_w_in)
+        wavenumber = _frequency_to_wavenumber(freq_GHz)
 
         q_out = np.zeros_like(Psi_w_in, dtype="complex128")
         q_in = np.zeros_like(Psi_w_in, dtype="complex128")
@@ -204,7 +152,73 @@ class ABCD_Lens(Lens):
 
             Psi_w_out[ii, ii] = 1 / np.conj(q_out[ii, ii]) * wavenumber
 
-        # q_out = q_in
-        # Psi_w_out = Psi_w_out2
-
         return Psi_w_out
+
+    def __repr__(self):
+        return (
+            f"ABCD_Lens('{self.name}', A={self.A}, B={self.B}, C={self.C}, D={self.D}"
+        )
+
+
+def make_my_lens(
+    name: str, lens_type: str = "thin", focal_length: Optional[float] = None
+) -> Lens:
+    """Create one of a pre-existing set of parameterised lenses.
+
+    Arguments
+    =========
+    name:
+        Name of the known lenses
+    lens_type:
+        One of "thin", "thick", "hyperbolic"
+    focal_length:
+        Focal length for the DBS_UCLA_DIII-D_240 lens
+    """
+
+    lenses = {
+        "thin": {
+            "MAST_V_band": Thin_Lens("MAST_V_band", 0.125),
+            "MAST_Q_band": Thin_Lens("MAST_Q_band", 0.27),
+            "DBS_UCLA_DIII-D_240": Thin_Lens("DBS_UCLA_DIII-D_240", focal_length),
+            # Harmonic mean of front and back focal distances
+            "DBS_UCLA_MAST-U": Thin_Lens("DBS_UCLA_MAST-U", 0.1477692307692308),
+        },
+        "thick": {
+            "MAST_V_band": Thick_Lens(
+                "MAST_V_band", focal_length=0.125, thickness=0.0633, ref_index=1.53
+            ),
+            "MAST_Q_band": Thick_Lens(
+                "MAST_Q_band", focal_length=0.27, thickness=0.0338, ref_index=1.53
+            ),
+        },
+        "hyperbolic": {
+            "MAST_V_band": ABCD_Lens(
+                "MAST_V_band",
+                A=1.000000000000,
+                B=41.347131119605e-3,  # convert
+                C=-0.006016900790e3,
+                D=0.751218414102,
+            ),
+            "MAST_Q_band": ABCD_Lens(
+                "MAST_Q_band",
+                A=1.000000000000,
+                B=22.103343171495e-3,  # convert
+                C=-0.003423517875e3,
+                D=0.924328809548,
+            ),
+        },
+    }
+
+    try:
+        lens_type_dict = lenses[lens_type]
+    except KeyError:
+        raise ValueError(
+            f"Unknown lens type '{lens_type}', expected one of {lenses.keys()}"
+        )
+
+    try:
+        return lens_type_dict[name]
+    except KeyError:
+        return ValueError(
+            f"Unknown {lens_type} lens '{name}', expected one of {lens_type_dict.keys()}"
+        )
