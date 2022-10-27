@@ -10,13 +10,15 @@ Initialisation.
 
 This file contains the default settings for a range of various cases.
 """
-import os
 import sys
 import math
 import numpy as np
-from scipy import constants
+from numpy.typing import ArrayLike
 import pathlib
+from typing import NamedTuple, Optional
+
 from netCDF4 import Dataset
+
 
 from .hornpy import make_my_horn
 from .lensalot import make_my_lens
@@ -638,92 +640,79 @@ def beam_settings(diagnostic, method="data", launch_freq_GHz=None, beam_data=Non
     return launch_beam_width, launch_beam_curvature
 
 
-def ne_settings(diagnostic, shot, time, find_ne_method):
-    ne_fit_param = None
-    ne_fit_time = None
-    poloidal_flux_enter = None
-    poloidal_fluxes_enter = None
-
-    if find_ne_method is None or shot is None:
-        return ne_fit_param, ne_fit_time, poloidal_flux_enter
-
-    if diagnostic == "DBS_NSTX_MAST":
-        if shot == 29684:
-            #
-            ne_fit_params = np.array(
-                [
+DENSITY_FIT_PARAMETERS = {
+    "DBS_NSTX_MAST": {
+        29684: {
+            "tanh": {
+                "ne_fit_params": [
                     [2.1, -1.9, 1.2],  # 167ms
                     [2.1, -1.9, 1.25],  # 179ms
                     [2.3, -1.9, 1.2],  # 192ms
                     [2.4, -2.0, 1.2],  # 200ms
                     [2.5, -2.1, 1.2],  # 217ms
-                ]
-            )
-            ne_fit_times = np.array([0.167, 0.179, 0.192, 0.200, 0.217])
-
-        elif shot == 29908:
-            #
-            if find_ne_method == "tanh":
-                ne_fit_params = np.array(
-                    [
-                        [2.3, -1.9, 1.18],  # 150ms
-                        [2.55, -2.2, 1.15],  # 160ms
-                        [2.8, -2.2, 1.15],  # 170ms
-                        [3.0, -2.35, 1.2],  # 180ms
-                        [3.25, -2.4, 1.22],  # 190ms
-                        [3.7, -2.7, 1.15],  # 200ms
-                        [4.2, -2.0, 1.2],  # 210ms
-                        [4.5, -1.8, 1.24],  # 220ms
-                        [4.8, -1.8, 1.2],  # 230ms
-                        [5.2, -1.8, 1.2],  # 240ms
-                        [5.2, -2.8, 1.1],  # 250ms
-                        [5.7, -1.9, 1.15],  # 260ms
-                        [5.8, -2.2, 1.1],  # 270ms
-                        [6.5, -1.7, 1.15],  # 280ms
-                        [6.6, -1.8, 1.1],  # 290ms
-                    ]
-                )
-                ne_fit_times = np.linspace(0.150, 0.290, 15)
-
-            if find_ne_method == "poly3":
-                ne_fit_params = np.array(
-                    [
-                        [-3.39920666, 3.3767761, -1.55984715, 2.49116064],
-                        [-3.31670147, 2.24970438, -0.46971473, 2.47113803],
-                        [-3.44610169, 1.69591882, 0.22709583, 2.62872259],
-                        [-4.91157473, 3.12397459, 0.30956902, 2.71940548],
-                        [-6.99408536, 4.98094795, 0.36188724, 2.86325923],
-                        [-4.01026147, 0.89218099, 1.24564799, 3.24225355],
-                        [-4.21483706, 1.73180927, 0.63975703, 3.48532344],
-                        [-3.89636166, 1.00604874, 0.5745085, 3.85908854],
-                        [-4.75241047, 1.34810624, 0.7207821, 4.11300423],
-                        [-2.98806121, -1.48680106, 1.51977942, 4.54713015],
-                    ]
-                )
-                poloidal_fluxes_enter = np.array(
-                    [
-                        1.14908613,
-                        1.13336773,
-                        1.13850717,
-                        1.1274871,
-                        1.09851547,
-                        1.1302204,
-                        1.15828467,
-                        1.14394922,
-                        1.1153502,
-                        1.13408871,
-                    ]
-                )
-                ne_fit_times = np.linspace(0.160, 0.250, 10)
-
-        elif shot == 29980:
-            ne_fit_params = np.array([[2.3, -2.6, 1.12]])  # 200ms
-            ne_fit_times = np.array([0.200])
-
-        elif shot == 30073 or shot == 30074:  # TODO: check 30074
-            # Fit underestimates TS density when polflux < 0.2 (roughly, for some of the times)
-            ne_fit_params = np.array(
-                [
+                ],
+                "ne_fit_times": [0.167, 0.179, 0.192, 0.200, 0.217],
+            }
+        },
+        29908: {
+            "tanh": {
+                "ne_fit_params": [
+                    [2.3, -1.9, 1.18],  # 150ms
+                    [2.55, -2.2, 1.15],  # 160ms
+                    [2.8, -2.2, 1.15],  # 170ms
+                    [3.0, -2.35, 1.2],  # 180ms
+                    [3.25, -2.4, 1.22],  # 190ms
+                    [3.7, -2.7, 1.15],  # 200ms
+                    [4.2, -2.0, 1.2],  # 210ms
+                    [4.5, -1.8, 1.24],  # 220ms
+                    [4.8, -1.8, 1.2],  # 230ms
+                    [5.2, -1.8, 1.2],  # 240ms
+                    [5.2, -2.8, 1.1],  # 250ms
+                    [5.7, -1.9, 1.15],  # 260ms
+                    [5.8, -2.2, 1.1],  # 270ms
+                    [6.5, -1.7, 1.15],  # 280ms
+                    [6.6, -1.8, 1.1],  # 290ms
+                ],
+                "ne_fit_times": np.linspace(0.150, 0.290, 15),
+            },
+            "poly3": {
+                "ne_fit_params": [
+                    [-3.39920666, 3.3767761, -1.55984715, 2.49116064],
+                    [-3.31670147, 2.24970438, -0.46971473, 2.47113803],
+                    [-3.44610169, 1.69591882, 0.22709583, 2.62872259],
+                    [-4.91157473, 3.12397459, 0.30956902, 2.71940548],
+                    [-6.99408536, 4.98094795, 0.36188724, 2.86325923],
+                    [-4.01026147, 0.89218099, 1.24564799, 3.24225355],
+                    [-4.21483706, 1.73180927, 0.63975703, 3.48532344],
+                    [-3.89636166, 1.00604874, 0.5745085, 3.85908854],
+                    [-4.75241047, 1.34810624, 0.7207821, 4.11300423],
+                    [-2.98806121, -1.48680106, 1.51977942, 4.54713015],
+                ],
+                "ne_fit_times": np.linspace(0.160, 0.250, 10),
+                "poloidal_fluxes_enter": [
+                    1.14908613,
+                    1.13336773,
+                    1.13850717,
+                    1.1274871,
+                    1.09851547,
+                    1.1302204,
+                    1.15828467,
+                    1.14394922,
+                    1.1153502,
+                    1.13408871,
+                ],
+            },
+        },
+        29980: {
+            "tanh": {
+                "ne_fit_params": [[2.3, -2.6, 1.12]],
+                "ne_fit_times": [0.200],
+            }
+        },
+        30073: {
+            "tanh": {
+                # Fit underestimates TS density when polflux < 0.2 (roughly, for some of the times)
+                "ne_fit_params": [
                     [2.8, -1.4, 1.1],  # 190ms
                     [2.9, -1.4, 1.15],  # 200ms
                     [3.0, -1.3, 1.2],  # 210ms
@@ -731,51 +720,101 @@ def ne_settings(diagnostic, shot, time, find_ne_method):
                     [3.6, -1.2, 1.2],  # 230ms
                     [4.0, -1.2, 1.2],  # 240ms
                     [4.4, -1.2, 1.2],  # 250ms
-                ]
-            )
-            ne_fit_times = np.linspace(0.190, 0.250, 7)
-
-        elif shot == 45091:
-            ne_fit_params = np.array(
-                [
+                ],
+                "ne_fit_times": np.linspace(0.190, 0.250, 7),
+            }
+        },
+        45091: {
+            "tanh": {
+                "ne_fit_params": [
                     [5.5, -0.6, 1.2],  # 390ms
                     [4.8, -0.6, 1.2],  # 400ms
                     [3.0, -1.3, 1.2],  # 410ms
-                ]
-            )
-            ne_fit_times = np.linspace(0.390, 0.410, 3)
+                ],
+                "ne_fit_times": np.linspace(0.390, 0.410, 3),
+            }
+        },
+        45154: {
+            "tanh": {
+                "ne_fit_params": [[2.4, -1.8, 1.12]],
+                "ne_fit_times": [0.510],
+            }
+        },
+        45189: {
+            "tanh": {
+                "ne_fit_params": [[2.3, -1.8, 1.12], [3.5, -1.35, 1.2]],
+                "ne_fit_times": [0.200, 0.650],
+            }
+        },
+    }
+}
 
-        elif shot == 45154:
-            ne_fit_params = np.array(
-                [
-                    [2.4, -1.8, 1.12],  # 510ms
-                ]
-            )
-            ne_fit_times = np.array([0.510])
 
-        elif shot == 45189:
-            ne_fit_params = np.array(
-                [[2.3, -1.8, 1.12], [3.5, -1.35, 1.2]]  # 200ms  # 650ms
-            )
-            ne_fit_times = np.array([0.200, 0.650])
+class DensityFitParameters(NamedTuple):
+    """Coefficients for a parameterised density
 
-        else:
-            print("No fit data saved for shot:", shot)
-            sys.exit()
+    Attributes
+    ==========
+    ne_fit_param
+        Set of fitting parameters
+    ne_fit_time
+        Actual shot time (in milliseconds) that parameters correspond to
+    poloidal_flux_enter
+        FIXME
+    """
 
-        nearest_time_idx = find_nearest(ne_fit_times, time)
+    ne_fit_param: Optional[ArrayLike]
+    ne_fit_time: Optional[float]
+    poloidal_flux_enter: Optional[ArrayLike]
 
-        ne_fit_param = ne_fit_params[nearest_time_idx, :]
-        ne_fit_time = ne_fit_times[nearest_time_idx]
-        print("Nearest ne fit time:", ne_fit_time)
 
-        if poloidal_fluxes_enter is not None:
-            poloidal_flux_enter = poloidal_fluxes_enter[nearest_time_idx]
-        else:
-            poloidal_flux_enter = ne_fit_params[2]
+def ne_settings(
+    diagnostic: str, shot: int, time: float, find_ne_method: str
+) -> DensityFitParameters:
+    """Get pre-existing density fit parameters from `DENSITY_FIT_PARAMETERS`"""
 
-    elif diagnostic == "DBS_UCLA_DIII-D_240":
-        print("Not yet implemented")
+    if find_ne_method is None or shot is None:
+        return DensityFitParameters(None, None, None)
+
+    try:
+        diagnostic_parameters = DENSITY_FIT_PARAMETERS[diagnostic]
+    except KeyError:
+        raise ValueError(
+            f"No density fit data for diagnostic '{diagnostic}'. "
+            f"Known diagnostics: {DENSITY_FIT_PARAMETERS.keys()}"
+        )
+
+    try:
+        shot_parameters = diagnostic_parameters[shot]
+    except KeyError:
+        raise ValueError(
+            f"No density fit data saved for shot {shot} and diagnostic '{diagnostic}'. "
+            f"Available shots: {diagnostic_parameters.keys()}"
+        )
+
+    try:
+        method_parameters = shot_parameters[find_ne_method]
+    except KeyError:
+        raise ValueError(
+            f"No density fit data for method '{find_ne_method}' "
+            f"(diagnostic: '{diagnostic}', shot: {shot}). "
+            f"Available methods: {shot_parameters.keys()}"
+        )
+
+    ne_fit_times = np.asarray(method_parameters["ne_fit_times"])
+    ne_fit_params = np.asarray(method_parameters["ne_fit_params"])
+
+    nearest_time_idx = find_nearest(ne_fit_times, time)
+
+    ne_fit_param = ne_fit_params[nearest_time_idx, :]
+    ne_fit_time = ne_fit_times[nearest_time_idx]
+    print("Nearest ne fit time:", ne_fit_time)
+
+    poloidal_fluxes_enter = method_parameters.get("poloidal_fluxes_enter", None)
+    if poloidal_fluxes_enter:
+        poloidal_flux_enter = poloidal_fluxes_enter[nearest_time_idx]
+    else:
+        poloidal_flux_enter = ne_fit_params[2]
 
     return ne_fit_param, ne_fit_time, poloidal_flux_enter
 
