@@ -192,10 +192,10 @@ def find_area_points(xs, ys, fraction_wanted):
 # ----------------------------------
 
 # Functions (Coordinate transformations)
-def freq_GHz_to_wavenumber(freq_GHz):
-    angular_frequency = 2 * np.pi * 10.0**9 * freq_GHz
-    wavenumber = angular_frequency / constants.c
-    return wavenumber
+def freq_GHz_to_wavenumber(freq_GHz: float) -> float:
+    """Converts frequency in GHz to wavenumber"""
+    angular_frequency = 2 * np.pi * 1e9 * freq_GHz
+    return angular_frequency / constants.c
 
 
 def find_vec_lab_Cartesian(vec_lab, q_zeta):
@@ -1040,8 +1040,7 @@ def propagate_beam(Psi_w_initial_cartesian, propagation_distance, freq_GHz):
     Uses the vacuum solution of the beam tracing equations to propagate the beam
     Works for arbitrary Gaussian beam in vacuum
     """
-    angular_frequency = 2 * np.pi * 10.0**9 * freq_GHz
-    wavenumber_K0 = angular_frequency / constants.c
+    wavenumber_K0 = freq_GHz_to_wavenumber(freq_GHz)
 
     Psi_w_inv_initial_cartersian = find_inverse_2D(Psi_w_initial_cartesian)
 

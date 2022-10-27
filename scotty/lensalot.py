@@ -27,15 +27,11 @@ Consider a ray entering and leaving an optical system. It is distance
 at a distance :math:`r'`, and an angle :math:`\theta'`
 """
 
+from .fun_general import freq_GHz_to_wavenumber
+
 import numpy as np
 from scipy import constants
 from typing import Optional
-
-
-def _frequency_to_wavenumber(frequency_GHz: float) -> float:
-    """Converts frequency in GHz to wavenumber"""
-    angular_frequency = 2 * np.pi * 1e9 * frequency_GHz
-    return angular_frequency / constants.c
 
 
 def _check_matrix_is_2x2(Psi_w_in):
@@ -77,7 +73,7 @@ class Thin_Lens(Lens):
 
     def output_beam(self, Psi_w_in, freq_GHz):
         _check_matrix_is_2x2(Psi_w_in)
-        wavenumber = _frequency_to_wavenumber(freq_GHz)
+        wavenumber = freq_GHz_to_wavenumber(freq_GHz)
         Psi_w_out = Psi_w_in - np.eye(2) * wavenumber / self.focal_length
         return Psi_w_out
 
@@ -95,7 +91,7 @@ class Thick_Lens(Lens):
 
     def output_beam(self, Psi_w_in, freq_GHz):
         _check_matrix_is_2x2(Psi_w_in)
-        wavenumber = _frequency_to_wavenumber(freq_GHz)
+        wavenumber = freq_GHz_to_wavenumber(freq_GHz)
 
         T_over_N = self.thickness / self.ref_index
         Psi_w_out2 = np.zeros_like(Psi_w_in, dtype="complex128")
@@ -137,7 +133,7 @@ class ABCD_Lens(Lens):
 
     def output_beam(self, Psi_w_in, freq_GHz):
         _check_matrix_is_2x2(Psi_w_in)
-        wavenumber = _frequency_to_wavenumber(freq_GHz)
+        wavenumber = freq_GHz_to_wavenumber(freq_GHz)
 
         q_out = np.zeros_like(Psi_w_in, dtype="complex128")
         q_in = np.zeros_like(Psi_w_in, dtype="complex128")

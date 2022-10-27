@@ -25,6 +25,7 @@ from .fun_general import (
     propagate_circular_beam,
     find_nearest,
     genray_angles_from_mirror_angles,
+    freq_GHz_to_wavenumber,
 )
 
 
@@ -351,8 +352,7 @@ def beam_settings(diagnostic, method="data", launch_freq_GHz=None, beam_data=Non
 
             myLens = make_my_lens(name)
             myHorn = make_my_horn(name)
-            angular_frequency = 2 * np.pi * 10.0**9 * launch_freq_GHz
-            wavenumber_K0 = angular_frequency / constants.c
+            wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
 
             horn_width, horn_curvature = myHorn.output_beam()
 
@@ -553,8 +553,7 @@ def beam_settings(diagnostic, method="data", launch_freq_GHz=None, beam_data=Non
             focal_length = focal_lengths[nearest_freq_idx]
 
             myLens = make_my_lens(name, lens_type="thin", focal_length=focal_length)
-            angular_frequency = 2 * np.pi * 10.0**9 * launch_freq_GHz
-            wavenumber_K0 = angular_frequency / constants.c
+            wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
 
             Psi_w_wg = np.array(
                 [
@@ -573,15 +572,13 @@ def beam_settings(diagnostic, method="data", launch_freq_GHz=None, beam_data=Non
     elif diagnostic == "DBS_UCLA_MAST-U":
         name = "DBS_UCLA_MAST-U"
         myLens = make_my_lens(name)
-        angular_frequency = 2 * np.pi * 10.0**9 * launch_freq_GHz
-        wavenumber_K0 = angular_frequency / constants.c
+        wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
 
         horn_width = 0.0064
         horn_curvature = 0.0
         horn_to_lens = 0.165
 
-        angular_frequency = 2 * np.pi * 10.0**9 * launch_freq_GHz
-        wavenumber = angular_frequency / constants.c
+        wavenumber = freq_GHz_to_wavenumber(launch_freq_GHz)
 
         Psi_w_horn_cartersian = np.array(
             [
@@ -617,8 +614,7 @@ def beam_settings(diagnostic, method="data", launch_freq_GHz=None, beam_data=Non
                 -0.277
             )  # window to steering mirror, negative because the mirror is behind the window
 
-            launch_angular_frequency = 2 * np.pi * launch_freq_GHz * 10**9
-            wavenumber_K0 = launch_angular_frequency / constants.c
+            wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
 
             launch_beam_width, launch_beam_curvature = propagate_circular_beam(
                 distance, wavenumber_K0, w0
@@ -633,8 +629,7 @@ def beam_settings(diagnostic, method="data", launch_freq_GHz=None, beam_data=Non
                 -0.277
             )  # window to steering mirror, negative because the mirror is behind the window
 
-            launch_angular_frequency = 2 * np.pi * launch_freq_GHz * 10**9
-            wavenumber_K0 = launch_angular_frequency / constants.c
+            wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
 
             launch_beam_width, launch_beam_curvature = propagate_circular_beam(
                 distance, wavenumber_K0, w0
