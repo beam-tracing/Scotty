@@ -794,8 +794,8 @@ def user_settings(diagnostic, user, shot):
     default_input_files_path = pathlib.Path(".")
 
     #########################
-    ## Initialising default paths
-    ## Paths are overwritten if specific users are chosen
+    # Initialising default paths
+    # Paths are overwritten if specific users are chosen
     ne_path = default_input_files_path
     topfile_path = default_input_files_path
     inbeam_path = default_input_files_path
@@ -804,20 +804,21 @@ def user_settings(diagnostic, user, shot):
     #########################
 
     if user == "Freia":
-        ## Not yet properly implemented
+        # Not yet properly implemented
         efitpp_path = None
 
-    elif user == "Valerian_desktop" or user == "Valerian_laptop":
+    elif user in ["Valerian_desktop", "Valerian_laptop"]:
 
         if user == "Valerian_desktop":
             prefix = pathlib.Path("D:\\Dropbox\\")
         elif user == "Valerian_laptop":
             prefix = pathlib.Path("C:\\Dropbox\\")
 
-        if diagnostic == "DBS_NSTX_MAST" or diagnostic == "DBS_SWIP_MAST-U":
-            if shot == 29684:
+        if diagnostic in ["DBS_NSTX_MAST", "DBS_SWIP_MAST-U"]:
+            if shot in [29684]:
                 # MAST reruns of EFIT. Done by Lucy Kogan.
-                # 29684: no MSE data, but reprocessed with more constraints, only good at the edge
+                # 29684: no MSE data, but reprocessed with more constraints,
+                # only good at the edge
                 efitpp_path = (
                     prefix
                     / f"VHChen2020/Data/Equilibrium/MAST/Lucy_EFIT_runs/{shot}/epk_lkogan_01/"
@@ -837,7 +838,7 @@ def user_settings(diagnostic, user, shot):
                     prefix
                     / f"VHChen2020/Data/Equilibrium/MAST/MSE_efitruns/{shot}/Pass0/"
                 )
-            ## If it's not any of the above shots, I'll assume that there's no efit++ data
+            # If it's not any of the above shots, I'll assume that there's no efit++ data
             elif shot > 30471:  # MAST-U
                 UDA_saved_path = (
                     prefix / "VHChen2020/Data/Equilibrium/MAST-U/Equilibrium_pyuda/"
