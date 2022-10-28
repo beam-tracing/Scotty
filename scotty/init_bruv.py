@@ -156,10 +156,9 @@ def get_parameters_for_Scotty(
             sys.exit()
 
         elif find_B_method == "EFITpp":
+            with Dataset(efitpp_path / "efitOut.nc") as dataset:
+                efitpp_times = dataset.variables["time"][:]
 
-            dataset = Dataset(efitpp_path / "efitOut.nc")
-            efitpp_times = dataset.variables["time"][:]
-            dataset.close()
             efit_time_index = find_nearest(efitpp_times, equil_time)
 
             print("Nearest EFIT++ time:", efitpp_times[efit_time_index])
@@ -167,9 +166,9 @@ def get_parameters_for_Scotty(
             kwargs_dict["magnetic_data_path"] = efitpp_path
 
         elif find_B_method == "UDA_saved" and shot <= 30471:  # MAST:
-            loadfile = np.load(UDA_saved_path / f"{shot}_equilibrium_data.npz")
-            t_base_C = loadfile["t_base_C"]
-            loadfile.close()
+            with np.load(UDA_saved_path / f"{shot}_equilibrium_data.npz") as loadfile:
+                t_base_C = loadfile["t_base_C"]
+
             efit_time_index = find_nearest(t_base_C, equil_time)
 
             print("Nearest EFIT time:", t_base_C[efit_time_index])
@@ -179,9 +178,9 @@ def get_parameters_for_Scotty(
         elif (
             find_B_method == "UDA_saved" and shot > 30471
         ) or find_B_method == "test":  # MAST:
-            loadfile = np.load(UDA_saved_path / f"{shot}_equilibrium_data.npz")
-            time_EFIT = loadfile["time_EFIT"]
-            loadfile.close()
+            with np.load(UDA_saved_path / f"{shot}_equilibrium_data.npz") as loadfile:
+                time_EFIT = loadfile["time_EFIT"]
+
             efit_time_index = find_nearest(time_EFIT, equil_time)
 
             print("Nearest EFIT time:", time_EFIT[efit_time_index])
@@ -272,9 +271,9 @@ def get_parameters_for_Scotty(
         if (
             find_B_method == "UDA_saved" and shot > 30471
         ) or find_B_method == "test":  # MAST:
-            loadfile = np.load(UDA_saved_path / f"{shot}_equilibrium_data.npz")
-            time_EFIT = loadfile["time_EFIT"]
-            loadfile.close()
+            with np.load(UDA_saved_path / f"{shot}_equilibrium_data.npz") as loadfile:
+                time_EFIT = loadfile["time_EFIT"]
+
             efit_time_index = find_nearest(time_EFIT, equil_time)
 
             print("Nearest EFIT time:", time_EFIT[efit_time_index])
