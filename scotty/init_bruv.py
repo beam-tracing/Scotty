@@ -619,7 +619,7 @@ def beam_settings(diagnostic, method="data", launch_freq_GHz=None, beam_data=Non
             wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
 
             launch_beam_width, launch_beam_curvature = propagate_circular_beam(
-                distance, wavenumber_K0, w0
+                distance, wavenumber_K0, w0, launch_freq_GHz
             )
 
         if method == "estimate_fix_w0":
@@ -634,7 +634,7 @@ def beam_settings(diagnostic, method="data", launch_freq_GHz=None, beam_data=Non
             wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
 
             launch_beam_width, launch_beam_curvature = propagate_circular_beam(
-                distance, wavenumber_K0, w0
+                distance, wavenumber_K0, w0, launch_freq_GHz
             )
 
     return launch_beam_width, launch_beam_curvature
