@@ -28,113 +28,6 @@ from .fun_general import (
 )
 
 
-def parameters_DBS_NSTX_MAST(launch_freq_GHz: float) -> dict:
-    launch_beam = beam_settings("DBS_NSTX_MAST", launch_freq_GHz, method="data")
-
-    return {
-        # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
-        "launch_position": np.array([2.43521, 0, 0]),
-        "launch_beam_width": launch_beam.width,
-        "launch_beam_curvature": launch_beam.curvature,
-    }, {
-        "Psi_BC_flag": True,
-        "figure_flag": True,
-        "vacuum_propagation_flag": True,
-        "vacuumLaunch_flag": True,
-    }
-
-
-def parameters_DBS_UCLA_MAST_U(launch_freq_GHz: float) -> dict:
-    print("Warning: launch_position is an estimate")
-    launch_beam = beam_settings("DBS_UCLA_MAST-U", launch_freq_GHz, method="thin_lens")
-
-    return {
-        # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
-        # Launch position changes ~1mm based on lens settings
-        "launch_position": np.array([2.278, 0, 0]),
-        "launch_beam_width": launch_beam.width,
-        "launch_beam_curvature": launch_beam.curvature,
-    }, {
-        "Psi_BC_flag": True,
-        "figure_flag": True,
-        "vacuum_propagation_flag": True,
-        "vacuumLaunch_flag": True,
-    }
-
-
-def parameters_DBS_SWIP_MAST_U(launch_freq_GHz: float) -> dict:
-    print("Warning: launch_position is an estimate")
-    launch_beam = beam_settings(
-        "DBS_SWIP_MAST-U", launch_freq_GHz, method="estimate_fix_w0"
-    )
-    return {
-        # Default settings
-        # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
-        "launch_position": np.array([2.43521, 0, 0]),
-        "launch_beam_width": launch_beam.width,
-        "launch_beam_curvature": launch_beam.curvature,
-    }, {
-        # I'm checking what this actually is from Peng. Currently using the
-        # MAST UCLA DBS as a guide
-        "Psi_BC_flag": True,
-        "figure_flag": True,
-        "vacuum_propagation_flag": True,
-        "vacuumLaunch_flag": True,
-    }
-
-
-def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
-    launch_beam = beam_settings(
-        "DBS_UCLA_DIII-D_240", launch_freq_GHz, method="thin_lens"
-    )
-    return {
-        # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
-        "launch_position": np.array([2.587, 0, -0.0157]),
-        "launch_beam_width": launch_beam.width,
-        "launch_beam_curvature": launch_beam.curvature,
-    }, {
-        "Psi_BC_flag": True,
-        "figure_flag": True,
-        "vacuum_propagation_flag": True,
-        "vacuumLaunch_flag": True,
-    }
-
-
-def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
-    ne_fit_param = np.array([4.0, 1.0])
-    return {
-        "poloidal_launch_angle_Torbeam": 6.0,
-        "toroidal_launch_angle_Torbeam": 0.0,
-        "launch_freq_GHz": 55.0,
-        "mode_flag": 1,
-        "launch_beam_width": 0.04,
-        "launch_beam_curvature": 1 / -4.0,
-        # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
-        "launch_position": np.array([2.587, 0, -0.0157]),
-    }, {
-        "density_fit_parameters": ne_fit_param,
-        "find_B_method": "analytical",
-        "Psi_BC_flag": True,
-        "figure_flag": False,
-        "vacuum_propagation_flag": True,
-        "vacuumLaunch_flag": True,
-        "poloidal_flux_enter": ne_fit_param[1],
-        "B_T_axis": 1.0,
-        "B_p_a": 0.1,
-        "R_axis": 1.5,
-        "minor_radius_a": 0.5,
-    }
-
-
-DEFAULT_DIAGNOSTIC_PARAMETERS = {
-    "DBS_NSTX_MAST": parameters_DBS_NSTX_MAST,
-    "DBS_UCLA_MAST-U": parameters_DBS_UCLA_MAST_U,
-    "DBS_SWIP_MAST-U": parameters_DBS_SWIP_MAST_U,
-    "DBS_UCLA_DIII-D_240": parameters_DBS_UCLA_DIII_D_240,
-    "DBS_synthetic": parameters_DBS_synthetic,
-}
-
-
 def get_parameters_for_Scotty(
     diagnostic,
     launch_freq_GHz: Optional[float] = None,
@@ -146,7 +39,7 @@ def get_parameters_for_Scotty(
     shot: Optional[int] = None,
     user: Optional[str] = None,
 ):
-    """
+    """Return default settings and parameters for the given diagnostic
 
     Arguments
     =========
@@ -266,6 +159,305 @@ def get_parameters_for_Scotty(
         kwargs_dict["magnetic_data_path"] = UDA_saved_path
 
     return args_dict, kwargs_dict
+
+
+class LaunchBeamParameters(NamedTuple):
+    width: float
+    """Width of the beam"""
+    curvature: float
+    """Curvature of the beam"""
+
+
+def beam_settings(
+    diagnostic: float, launch_freq_GHz: float, method: str = "data"
+) -> LaunchBeamParameters:
+    """Return the launch beam width and curvature
+
+    Arguments
+    =========
+    diagnostic:
+        Name of the diagnostic
+    launch_freq_GHz:
+        Frequency of the launch beam in GHz
+    method:
+        One of the following:
+
+        - ``"horn_and_lens"``: Uses information about the horn and lens to
+          calculate the launch beam properties
+        - ``"thin_lens"``: Uses the thin lens approximation to calculate launch
+          beam properties
+        - ``"data"``: Uses pre-computed values
+        - ``"estimate_var_w0"``: Estimate beam properties using
+          frequency-dependent beam waist
+        - ``"estimate_fix_w0"``: Estimate beam properties using
+          frequency-independent beam waist
+
+
+    .. note:: Not all methods are available for all diagnostics
+    """
+
+    try:
+        diagnostic_methods = LAUNCH_BEAM_METHODS[diagnostic]
+    except KeyError:
+        raise ValueError(
+            f"No launch beam settings for '{diagnostic}', available diagnostics are: "
+            f"{LAUNCH_BEAM_METHODS.keys()}"
+        )
+
+    try:
+        selected_method = diagnostic_methods[method]
+    except KeyError:
+        raise ValueError(
+            f"No launch beam settings for method '{method}' on diagnostic "
+            f"'{diagnostic}'. Available methods are: {diagnostic_methods.keys()}"
+        )
+
+    return LaunchBeamParameters(*selected_method(launch_freq_GHz))
+
+
+class DensityFitParameters(NamedTuple):
+    """Coefficients for a parameterised density"""
+
+    ne_fit_param: Optional[ArrayLike]
+    """Set of fitting parameters"""
+    ne_fit_time: Optional[float]
+    """Actual shot time (in milliseconds) that parameters correspond to"""
+    poloidal_flux_enter: Optional[ArrayLike]
+    """FIXME"""
+
+
+def ne_settings(
+    diagnostic: str, shot: int, time: float, find_ne_method: str
+) -> DensityFitParameters:
+    """Get pre-existing density fit parameters from `DENSITY_FIT_PARAMETERS`"""
+
+    if find_ne_method is None or shot is None:
+        return DensityFitParameters(None, None, None)
+
+    try:
+        diagnostic_parameters = DENSITY_FIT_PARAMETERS[diagnostic]
+    except KeyError:
+        raise ValueError(
+            f"No density fit data for diagnostic '{diagnostic}'. "
+            f"Known diagnostics: {DENSITY_FIT_PARAMETERS.keys()}"
+        )
+
+    try:
+        shot_parameters = diagnostic_parameters[shot]
+    except KeyError:
+        raise ValueError(
+            f"No density fit data saved for shot {shot} and diagnostic '{diagnostic}'. "
+            f"Available shots: {diagnostic_parameters.keys()}"
+        )
+
+    try:
+        method_parameters = shot_parameters[find_ne_method]
+    except KeyError:
+        raise ValueError(
+            f"No density fit data for method '{find_ne_method}' "
+            f"(diagnostic: '{diagnostic}', shot: {shot}). "
+            f"Available methods: {shot_parameters.keys()}"
+        )
+
+    ne_fit_times = np.asarray(method_parameters["ne_fit_times"])
+    ne_fit_params = np.asarray(method_parameters["ne_fit_params"])
+
+    nearest_time_idx = find_nearest(ne_fit_times, time)
+
+    ne_fit_param = ne_fit_params[nearest_time_idx, :]
+    ne_fit_time = ne_fit_times[nearest_time_idx]
+    print("Nearest ne fit time:", ne_fit_time)
+
+    poloidal_fluxes_enter = method_parameters.get("poloidal_fluxes_enter", None)
+    if poloidal_fluxes_enter:
+        poloidal_flux_enter = poloidal_fluxes_enter[nearest_time_idx]
+    else:
+        poloidal_flux_enter = ne_fit_params[2]
+
+    return ne_fit_param, ne_fit_time, poloidal_flux_enter
+
+
+def user_settings(diagnostic, user, shot):
+    """
+    Choosing paths appropriately
+    """
+
+    # Default path: all input files in current working directory
+    default_input_files_path = pathlib.Path(".")
+
+    #########################
+    # Initialising default paths
+    # Paths are overwritten if specific users are chosen
+    ne_path = default_input_files_path
+    topfile_path = default_input_files_path
+    inbeam_path = default_input_files_path
+    efitpp_path = default_input_files_path
+    UDA_saved_path = default_input_files_path
+    #########################
+
+    if user == "Freia":
+        # Not yet properly implemented
+        efitpp_path = None
+
+    elif user in ["Valerian_desktop", "Valerian_laptop"]:
+
+        if user == "Valerian_desktop":
+            prefix = pathlib.Path("D:\\Dropbox\\")
+        elif user == "Valerian_laptop":
+            prefix = pathlib.Path("C:\\Dropbox\\")
+
+        if diagnostic in ["DBS_NSTX_MAST", "DBS_SWIP_MAST-U"]:
+            if shot in [29684]:
+                # MAST reruns of EFIT. Done by Lucy Kogan.
+                # 29684: no MSE data, but reprocessed with more constraints,
+                # only good at the edge
+                efitpp_path = (
+                    prefix
+                    / f"VHChen2020/Data/Equilibrium/MAST/Lucy_EFIT_runs/{shot}/epk_lkogan_01/"
+                )
+                ne_path = prefix / "VHChen2021/Data - Equilibrium/MAST/"
+
+            elif shot in [30073, 30074, 30075, 30076, 30077]:
+                # MAST reruns of EFIT. Done by Lucy Kogan.
+                # 30073--30077: MSE data, processed better than original runs
+                efitpp_path = (
+                    prefix
+                    / f"VHChen2020/Data/Equilibrium/MAST/Lucy_EFIT_runs/{shot}/epi_lkogan_01/"
+                )
+            elif shot in [29908]:
+                # MAST EFIT runs. List of available shots not updated.
+                efitpp_path = (
+                    prefix
+                    / f"VHChen2020/Data/Equilibrium/MAST/MSE_efitruns/{shot}/Pass0/"
+                )
+            # If it's not any of the above shots, I'll assume that there's no efit++ data
+            elif shot > 30471:  # MAST-U
+                UDA_saved_path = (
+                    prefix / "VHChen2020/Data/Equilibrium/MAST-U/Equilibrium_pyuda/"
+                )
+            else:
+                UDA_saved_path = (
+                    prefix / "VHChen2020/Data/Equilibrium/MAST/Equilibrium_pyuda/"
+                )
+
+        elif diagnostic == "DBS_UCLA_DIII-D_240":
+            ne_path = prefix / "VHChen2021/Data - Equilibrium/DIII-D/"
+            topfile_path = prefix / "VHChen2021/Data - Equilibrium/DIII-D/"
+
+    return ne_path, topfile_path, inbeam_path, efitpp_path, UDA_saved_path
+
+
+################################################################################
+# Default parameters and parameterisations
+
+
+def parameters_DBS_NSTX_MAST(launch_freq_GHz: float) -> dict:
+    launch_beam = beam_settings("DBS_NSTX_MAST", launch_freq_GHz, method="data")
+
+    return {
+        # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
+        "launch_position": np.array([2.43521, 0, 0]),
+        "launch_beam_width": launch_beam.width,
+        "launch_beam_curvature": launch_beam.curvature,
+    }, {
+        "Psi_BC_flag": True,
+        "figure_flag": True,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+    }
+
+
+def parameters_DBS_UCLA_MAST_U(launch_freq_GHz: float) -> dict:
+    print("Warning: launch_position is an estimate")
+    launch_beam = beam_settings("DBS_UCLA_MAST-U", launch_freq_GHz, method="thin_lens")
+
+    return {
+        # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
+        # Launch position changes ~1mm based on lens settings
+        "launch_position": np.array([2.278, 0, 0]),
+        "launch_beam_width": launch_beam.width,
+        "launch_beam_curvature": launch_beam.curvature,
+    }, {
+        "Psi_BC_flag": True,
+        "figure_flag": True,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+    }
+
+
+def parameters_DBS_SWIP_MAST_U(launch_freq_GHz: float) -> dict:
+    print("Warning: launch_position is an estimate")
+    launch_beam = beam_settings(
+        "DBS_SWIP_MAST-U", launch_freq_GHz, method="estimate_fix_w0"
+    )
+    return {
+        # Default settings
+        # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
+        "launch_position": np.array([2.43521, 0, 0]),
+        "launch_beam_width": launch_beam.width,
+        "launch_beam_curvature": launch_beam.curvature,
+    }, {
+        # I'm checking what this actually is from Peng. Currently using the
+        # MAST UCLA DBS as a guide
+        "Psi_BC_flag": True,
+        "figure_flag": True,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+    }
+
+
+def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
+    launch_beam = beam_settings(
+        "DBS_UCLA_DIII-D_240", launch_freq_GHz, method="thin_lens"
+    )
+    return {
+        # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
+        "launch_position": np.array([2.587, 0, -0.0157]),
+        "launch_beam_width": launch_beam.width,
+        "launch_beam_curvature": launch_beam.curvature,
+    }, {
+        "Psi_BC_flag": True,
+        "figure_flag": True,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+    }
+
+
+def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
+    ne_fit_param = np.array([4.0, 1.0])
+    return {
+        "poloidal_launch_angle_Torbeam": 6.0,
+        "toroidal_launch_angle_Torbeam": 0.0,
+        "launch_freq_GHz": 55.0,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": 1 / -4.0,
+        # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
+        "launch_position": np.array([2.587, 0, -0.0157]),
+    }, {
+        "density_fit_parameters": ne_fit_param,
+        "find_B_method": "analytical",
+        "Psi_BC_flag": True,
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": ne_fit_param[1],
+        "B_T_axis": 1.0,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+
+
+DEFAULT_DIAGNOSTIC_PARAMETERS = {
+    "DBS_NSTX_MAST": parameters_DBS_NSTX_MAST,
+    "DBS_UCLA_MAST-U": parameters_DBS_UCLA_MAST_U,
+    "DBS_SWIP_MAST-U": parameters_DBS_SWIP_MAST_U,
+    "DBS_UCLA_DIII-D_240": parameters_DBS_UCLA_DIII_D_240,
+    "DBS_synthetic": parameters_DBS_synthetic,
+}
+"""Functions that return default parameters for the corresponding diagnostic
+"""
 
 
 def launch_beam_DBS_NSTX_MAST_horn_and_lens(launch_freq_GHz):
@@ -487,60 +679,7 @@ LAUNCH_BEAM_METHODS = {
         "estimate_fix_w0": launch_beam_DBS_SWIP_MAST_U_estimate_fix_w0,
     },
 }
-
-
-class LaunchBeamParameters(NamedTuple):
-    width: float
-    """Width of the beam"""
-    curvature: float
-    """Curvature of the beam"""
-
-
-def beam_settings(
-    diagnostic: float, launch_freq_GHz: float, method: str = "data"
-) -> LaunchBeamParameters:
-    """Return the launch beam width and curvature
-
-    Arguments
-    =========
-    diagnostic:
-        Name of the diagnostic
-    launch_freq_GHz:
-        Frequency of the launch beam in GHz
-    method:
-        One of the following:
-
-        - ``"horn_and_lens"``: Uses information about the horn and lens to
-          calculate the launch beam properties
-        - ``"thin_lens"``: Uses the thin lens approximation to calculate launch
-          beam properties
-        - ``"data"``: Uses pre-computed values
-        - ``"estimate_var_w0"``: Estimate beam properties using
-          frequency-dependent beam waist
-        - ``"estimate_fix_w0"``: Estimate beam properties using
-          frequency-independent beam waist
-
-
-    .. note:: Not all methods are available for all diagnostics
-    """
-
-    try:
-        diagnostic_methods = LAUNCH_BEAM_METHODS[diagnostic]
-    except KeyError:
-        raise ValueError(
-            f"No launch beam settings for '{diagnostic}', available diagnostics are: "
-            f"{LAUNCH_BEAM_METHODS.keys()}"
-        )
-
-    try:
-        selected_method = diagnostic_methods[method]
-    except KeyError:
-        raise ValueError(
-            f"No launch beam settings for method '{method}' on diagnostic "
-            f"'{diagnostic}'. Available methods are: {diagnostic_methods.keys()}"
-        )
-
-    return LaunchBeamParameters(*selected_method(launch_freq_GHz))
+"""Functions that return launch beam parameters for the corresponding diagnostic"""
 
 
 DENSITY_FIT_PARAMETERS = {
@@ -651,142 +790,4 @@ DENSITY_FIT_PARAMETERS = {
         },
     }
 }
-
-
-class DensityFitParameters(NamedTuple):
-    """Coefficients for a parameterised density
-
-    Attributes
-    ==========
-    ne_fit_param
-        Set of fitting parameters
-    ne_fit_time
-        Actual shot time (in milliseconds) that parameters correspond to
-    poloidal_flux_enter
-        FIXME
-    """
-
-    ne_fit_param: Optional[ArrayLike]
-    ne_fit_time: Optional[float]
-    poloidal_flux_enter: Optional[ArrayLike]
-
-
-def ne_settings(
-    diagnostic: str, shot: int, time: float, find_ne_method: str
-) -> DensityFitParameters:
-    """Get pre-existing density fit parameters from `DENSITY_FIT_PARAMETERS`"""
-
-    if find_ne_method is None or shot is None:
-        return DensityFitParameters(None, None, None)
-
-    try:
-        diagnostic_parameters = DENSITY_FIT_PARAMETERS[diagnostic]
-    except KeyError:
-        raise ValueError(
-            f"No density fit data for diagnostic '{diagnostic}'. "
-            f"Known diagnostics: {DENSITY_FIT_PARAMETERS.keys()}"
-        )
-
-    try:
-        shot_parameters = diagnostic_parameters[shot]
-    except KeyError:
-        raise ValueError(
-            f"No density fit data saved for shot {shot} and diagnostic '{diagnostic}'. "
-            f"Available shots: {diagnostic_parameters.keys()}"
-        )
-
-    try:
-        method_parameters = shot_parameters[find_ne_method]
-    except KeyError:
-        raise ValueError(
-            f"No density fit data for method '{find_ne_method}' "
-            f"(diagnostic: '{diagnostic}', shot: {shot}). "
-            f"Available methods: {shot_parameters.keys()}"
-        )
-
-    ne_fit_times = np.asarray(method_parameters["ne_fit_times"])
-    ne_fit_params = np.asarray(method_parameters["ne_fit_params"])
-
-    nearest_time_idx = find_nearest(ne_fit_times, time)
-
-    ne_fit_param = ne_fit_params[nearest_time_idx, :]
-    ne_fit_time = ne_fit_times[nearest_time_idx]
-    print("Nearest ne fit time:", ne_fit_time)
-
-    poloidal_fluxes_enter = method_parameters.get("poloidal_fluxes_enter", None)
-    if poloidal_fluxes_enter:
-        poloidal_flux_enter = poloidal_fluxes_enter[nearest_time_idx]
-    else:
-        poloidal_flux_enter = ne_fit_params[2]
-
-    return ne_fit_param, ne_fit_time, poloidal_flux_enter
-
-
-def user_settings(diagnostic, user, shot):
-    """
-    Choosing paths appropriately
-    """
-
-    # Default path: all input files in current working directory
-    default_input_files_path = pathlib.Path(".")
-
-    #########################
-    # Initialising default paths
-    # Paths are overwritten if specific users are chosen
-    ne_path = default_input_files_path
-    topfile_path = default_input_files_path
-    inbeam_path = default_input_files_path
-    efitpp_path = default_input_files_path
-    UDA_saved_path = default_input_files_path
-    #########################
-
-    if user == "Freia":
-        # Not yet properly implemented
-        efitpp_path = None
-
-    elif user in ["Valerian_desktop", "Valerian_laptop"]:
-
-        if user == "Valerian_desktop":
-            prefix = pathlib.Path("D:\\Dropbox\\")
-        elif user == "Valerian_laptop":
-            prefix = pathlib.Path("C:\\Dropbox\\")
-
-        if diagnostic in ["DBS_NSTX_MAST", "DBS_SWIP_MAST-U"]:
-            if shot in [29684]:
-                # MAST reruns of EFIT. Done by Lucy Kogan.
-                # 29684: no MSE data, but reprocessed with more constraints,
-                # only good at the edge
-                efitpp_path = (
-                    prefix
-                    / f"VHChen2020/Data/Equilibrium/MAST/Lucy_EFIT_runs/{shot}/epk_lkogan_01/"
-                )
-                ne_path = prefix / "VHChen2021/Data - Equilibrium/MAST/"
-
-            elif shot in [30073, 30074, 30075, 30076, 30077]:
-                # MAST reruns of EFIT. Done by Lucy Kogan.
-                # 30073--30077: MSE data, processed better than original runs
-                efitpp_path = (
-                    prefix
-                    / f"VHChen2020/Data/Equilibrium/MAST/Lucy_EFIT_runs/{shot}/epi_lkogan_01/"
-                )
-            elif shot in [29908]:
-                # MAST EFIT runs. List of available shots not updated.
-                efitpp_path = (
-                    prefix
-                    / f"VHChen2020/Data/Equilibrium/MAST/MSE_efitruns/{shot}/Pass0/"
-                )
-            # If it's not any of the above shots, I'll assume that there's no efit++ data
-            elif shot > 30471:  # MAST-U
-                UDA_saved_path = (
-                    prefix / "VHChen2020/Data/Equilibrium/MAST-U/Equilibrium_pyuda/"
-                )
-            else:
-                UDA_saved_path = (
-                    prefix / "VHChen2020/Data/Equilibrium/MAST/Equilibrium_pyuda/"
-                )
-
-        elif diagnostic == "DBS_UCLA_DIII-D_240":
-            ne_path = prefix / "VHChen2021/Data - Equilibrium/DIII-D/"
-            topfile_path = prefix / "VHChen2021/Data - Equilibrium/DIII-D/"
-
-    return ne_path, topfile_path, inbeam_path, efitpp_path, UDA_saved_path
+"""Density fitting parameters for diagnostic/shot combinations"""
