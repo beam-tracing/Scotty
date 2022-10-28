@@ -1,4 +1,4 @@
-from scotty.init_bruv import ne_settings, beam_settings
+from scotty.init_bruv import ne_settings, beam_settings, get_parameters_for_Scotty
 
 import numpy as np
 import numpy.testing as nt
@@ -55,3 +55,64 @@ def test_bad_beam_settings():
 
     with pytest.raises(ValueError):
         beam_settings("DBS_NSTX_MAST", 52.0, "unknown method")
+
+
+def test_parameters_DBS_NSTX_MAST():
+    """Golden answer test"""
+
+    parameters, kwargs = get_parameters_for_Scotty(
+        "DBS_NSTX_MAST", launch_freq_GHz=52.0, mirror_rotation=2, mirror_tilt=4
+    )
+
+    parameters.update(kwargs)
+
+    expected = {
+        "poloidal_launch_angle_Torbeam": -5.446475141297062,
+        "toroidal_launch_angle_Torbeam": 1.3370817251108178,
+        "launch_freq_GHz": 52,
+        "mode_flag": None,
+        "launch_beam_width": 0.03629814335,
+        "launch_beam_curvature": -0.7714837802263125,
+        "launch_position": np.array([2.43521, 0.0, 0.0]),
+        "Psi_BC_flag": True,
+        "figure_flag": True,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+    }
+    assert sorted(expected.keys()) == sorted(parameters.keys())
+    for key, value in expected.items():
+        if isinstance(value, (bool, type(None))):
+            assert parameters[key] is value, key
+        else:
+            assert np.allclose(parameters[key], value), key
+
+
+def test_parameters_DBS_UCLA_DIII_D_240():
+    """Golden answer test"""
+
+    parameters, kwargs = get_parameters_for_Scotty(
+        "DBS_UCLA_DIII-D_240", launch_freq_GHz=52.0
+    )
+
+    parameters.update(kwargs)
+
+    expected = {
+        "poloidal_launch_angle_Torbeam": None,
+        "toroidal_launch_angle_Torbeam": None,
+        "launch_freq_GHz": 52,
+        "mode_flag": None,
+        "launch_beam_width": 0.02173742019305591,
+        "launch_beam_curvature": -1.2659055507320647,
+        "launch_position": np.array([2.587, 0.0, -0.0157]),
+        "Psi_BC_flag": True,
+        "figure_flag": True,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+    }
+    assert sorted(expected.keys()) == sorted(parameters.keys())
+    for key, value in expected.items():
+        print(key, value, parameters[key])
+        if isinstance(value, (bool, type(None))):
+            assert parameters[key] is value, key
+        else:
+            assert np.allclose(parameters[key], value), key
