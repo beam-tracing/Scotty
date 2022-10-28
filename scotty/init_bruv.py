@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Created on 26 April 2021
+"""Created on 26 April 2021
 
 @author: VH Hall-Chen
 Valerian Hongjie Hall-Chen
@@ -8,13 +7,19 @@ valerian@hall-chen.com
 
 Initialisation.
 
-This file contains the default settings for a range of various cases.
+This file contains the default settings for a range of various cases. This is
+split into a set of dictionaries (`DEFAULT_DIAGNOSTIC_PARAMETERS`,
+`LAUNCH_BEAM_METHODS`, and `DENSITY_FIT_PARAMETERS`) and functions
+(`get_parameters_for_Scotty`, `beam_settings`, `ne_settings`, and
+`user_settings`) that look up and parse the requested case.
+
 """
+from __future__ import annotations
 import math
 import numpy as np
 from numpy.typing import ArrayLike
 import pathlib
-from typing import NamedTuple, Optional
+from typing import Callable, Dict, NamedTuple, Optional
 import warnings
 
 from .hornpy import make_my_horn
@@ -449,7 +454,7 @@ def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
     }
 
 
-DEFAULT_DIAGNOSTIC_PARAMETERS = {
+DEFAULT_DIAGNOSTIC_PARAMETERS: Dict[str, Callable[[float], dict]] = {
     "DBS_NSTX_MAST": parameters_DBS_NSTX_MAST,
     "DBS_UCLA_MAST-U": parameters_DBS_UCLA_MAST_U,
     "DBS_SWIP_MAST-U": parameters_DBS_SWIP_MAST_U,
@@ -666,7 +671,7 @@ def launch_beam_DBS_SWIP_MAST_U_estimate_fix_w0(launch_freq_GHz):
     return propagate_circular_beam(distance, wavenumber_K0, w0, launch_freq_GHz)
 
 
-LAUNCH_BEAM_METHODS = {
+LAUNCH_BEAM_METHODS: Dict[str, Callable[[float], DensityFitParameters]] = {
     "DBS_NSTX_MAST": {
         "horn_and_lens": launch_beam_DBS_NSTX_MAST_horn_and_lens,
         "data": launch_beam_DBS_NSTX_MAST_data,
