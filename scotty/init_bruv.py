@@ -356,7 +356,7 @@ def beam_settings(diagnostic, method="data", launch_freq_GHz=None, beam_data=Non
             myHorn = make_my_horn(name)
             wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
 
-            horn_width, horn_curvature = myHorn.output_beam()
+            horn_width, horn_curvature = myHorn.output_beam(launch_freq_GHz)
 
             Psi_w_horn_cartersian = np.array(
                 [
