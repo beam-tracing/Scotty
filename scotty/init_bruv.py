@@ -16,6 +16,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 import pathlib
 from typing import NamedTuple, Optional
+import warnings
 
 from netCDF4 import Dataset
 
@@ -327,317 +328,279 @@ def get_parameters_for_Scotty(
     return args_dict, kwargs_dict
 
 
-def beam_settings(diagnostic, method="data", launch_freq_GHz=None, beam_data=None):
-    """
-    method:
-        horn_and_lens
-            - Uses information about the horn and lens to figure out what
-              the launch beam properties should be
-        data
-            - uses stored data
-        experimental_data
-            - Uses experimental measurements of the beam properties
+def launch_beam_DBS_NSTX_MAST_horn_and_lens(launch_freq_GHz):
+    if launch_freq_GHz > 52.5:
+        name = "MAST_V_band"
+        horn_to_lens = 0.139  # V Band
+        lens_to_mirror = 0.644  # lens to steering mirror
 
+    elif launch_freq_GHz < 52.5:
+        name = "MAST_Q_band"
+        horn_to_lens = 0.270  # Q Band
+        lens_to_mirror = 0.6425  # lens to steering mirror
 
-    """
-    if diagnostic == "DBS_NSTX_MAST":
-        if method == "horn_and_lens":
-            if launch_freq_GHz > 52.5:
-                name = "MAST_V_band"
-                horn_to_lens = 0.139  # V Band
-                lens_to_mirror = 0.644  # lens to steering mirror
+    myLens = make_my_lens(name)
+    myHorn = make_my_horn(name)
+    wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
 
-            elif launch_freq_GHz < 52.5:
-                name = "MAST_Q_band"
-                horn_to_lens = 0.270  # Q Band
-                lens_to_mirror = 0.6425  # lens to steering mirror
+    horn_width, horn_curvature = myHorn.output_beam(launch_freq_GHz)
 
-            myLens = make_my_lens(name)
-            myHorn = make_my_horn(name)
-            wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
+    Psi_w_horn_cartersian = np.array(
+        [
+            [wavenumber_K0 * horn_curvature + 2j / (horn_width**2), 0],
+            [0, wavenumber_K0 * horn_curvature + 2j / (horn_width**2)],
+        ]
+    )
 
-            horn_width, horn_curvature = myHorn.output_beam(launch_freq_GHz)
+    Psi_w_lens_cartesian_input = propagate_beam(
+        Psi_w_horn_cartersian, horn_to_lens, launch_freq_GHz
+    )
 
-            Psi_w_horn_cartersian = np.array(
-                [
-                    [wavenumber_K0 * horn_curvature + 2j * horn_width ** (-2), 0],
-                    [0, wavenumber_K0 * horn_curvature + 2j * horn_width ** (-2)],
-                ]
-            )
+    Psi_w_lens_cartesian_output = myLens.output_beam(
+        Psi_w_lens_cartesian_input, launch_freq_GHz
+    )
 
-            Psi_w_lens_cartesian_input = propagate_beam(
-                Psi_w_horn_cartersian, horn_to_lens, launch_freq_GHz
-            )
-
-            Psi_w_lens_cartesian_output = myLens.output_beam(
-                Psi_w_lens_cartesian_input, launch_freq_GHz
-            )
-
-            Psi_w_cartesian_launch = propagate_beam(
-                Psi_w_lens_cartesian_output, lens_to_mirror, launch_freq_GHz
-            )
-            launch_beam_width = np.sqrt(2 / np.imag(Psi_w_cartesian_launch[0, 0]))
-            launch_beam_curvature = (
-                np.real(Psi_w_cartesian_launch[0, 0]) / wavenumber_K0
-            )
-
-        if method == "data":
-            freqs = np.array(
-                [
-                    30.0,
-                    32.5,
-                    35.0,
-                    37.5,
-                    42.5,
-                    45.0,
-                    47.5,
-                    50.0,
-                    55.0,
-                    57.5,
-                    60.0,
-                    62.5,
-                    67.5,
-                    70.0,
-                    72.5,
-                    75.0,
-                ]
-            )
-            launch_beam_widths = (
-                np.array(
-                    [
-                        46.90319593,
-                        44.8730752,
-                        43.03016639,
-                        41.40562031,
-                        38.50759751,
-                        37.65323989,
-                        36.80672175,
-                        36.29814335,
-                        38.43065497,
-                        37.00251598,
-                        35.72544826,
-                        34.57900305,
-                        32.61150219,
-                        31.76347845,
-                        30.99132929,
-                        30.28611839,
-                    ]
-                )
-                * 0.001
-            )
-            launch_beam_radii_of_curvature = (
-                np.array(
-                    [
-                        -9211.13447598,
-                        -5327.42027113,
-                        -3834.26164617,
-                        -2902.09214589,
-                        -1961.58420391,
-                        -1636.82546574,
-                        -1432.59817651,
-                        -1296.20353095,
-                        -1437.24234181,
-                        -1549.7853604,
-                        -1683.5681014,
-                        -1843.91364265,
-                        -2277.59660009,
-                        -2577.93648944,
-                        -2964.57675092,
-                        -3479.14501841,
-                    ]
-                )
-                * 0.001
-            )
-
-            freq_idx = find_nearest(freqs, launch_freq_GHz)
-            launch_beam_width = launch_beam_widths[freq_idx]
-            launch_beam_curvature = 1 / launch_beam_radii_of_curvature[freq_idx]
-
-    elif diagnostic == "DBS_CIEMAT_JT60SA":
-        if method == "data":
-            # freqs = np.linspace(50,110,13)
-            # launch_beam_widths = np.array([
-            #     46.90319593, 44.8730752 , 43.03016639, 41.40562031,
-            #     38.50759751, 37.65323989, 36.80672175, 36.29814335,
-            #     38.43065497, 37.00251598, 35.72544826, 34.57900305,
-            #     32.61150219, 31.76347845, 30.99132929, 30.28611839
-            #     ])*0.001
-            # launch_beam_radii_of_curvature = np.array([
-            #     -9211.13447598, -5327.42027113, -3834.26164617, -2902.09214589,
-            #     -1961.58420391, -1636.82546574, -1432.59817651, -1296.20353095,
-            #     -1437.24234181, -1549.7853604 , -1683.5681014 , -1843.91364265,
-            #     -2277.59660009, -2577.93648944, -2964.57675092, -3479.14501841
-            #     ])*0.001
-            #
-            # freq_idx = find_nearest(freqs, launch_freq_GHz)
-            # launch_beam_width = launch_beam_widths[freq_idx]
-            # launch_beam_curvature = 1/launch_beam_radii_of_curvature[freq_idx]
-
-            # 90 GHz
-            launch_beam_width = 0.06323503329291348
-            launch_beam_curvature = -0.5535179506038995
-
-    elif diagnostic == "DBS_UCLA_DIII-D_240":
-        if method == "thin_lens":
-            name = "DBS_UCLA_DIII-D_240"
-            ## The lens is directly in front of the waveguide (wg)
-            wg_width = 0.025
-            wg_curvature = 0.0
-            wg_to_mirror = 0.08255
-
-            focal_lengths = np.array(
-                [
-                    0.45181379,
-                    0.46384668,
-                    0.47595193,
-                    0.488133,
-                    0.50039298,
-                    0.51273458,
-                    0.52516023,
-                    0.53767209,
-                    0.55027209,
-                    0.56296199,
-                    0.57574337,
-                    0.58861765,
-                    0.60158613,
-                    0.61465001,
-                    0.62781035,
-                    0.64106815,
-                    0.65442432,
-                    0.66787969,
-                    0.68143503,
-                    0.69509106,
-                    0.70884843,
-                    0.72270775,
-                    0.73666959,
-                    0.75073448,
-                    0.7649029,
-                    0.7791753,
-                    0.79355212,
-                    0.80803376,
-                    0.82262058,
-                    0.83731294,
-                    0.85211116,
-                    0.86701555,
-                    0.8820264,
-                    0.89714399,
-                    0.91236857,
-                    0.92770038,
-                    0.94313965,
-                    0.95868659,
-                    0.97434142,
-                    0.99010431,
-                    1.00597547,
-                    1.02195505,
-                    1.03804323,
-                    1.05424016,
-                    1.07054599,
-                    1.08696085,
-                    1.10348489,
-                    1.12011823,
-                    1.13686099,
-                    1.15371329,
-                    1.17067524,
-                    1.18774694,
-                    1.20492849,
-                    1.22222,
-                    1.23962155,
-                    1.25713322,
-                    1.27475512,
-                    1.2924873,
-                    1.31032986,
-                    1.32828286,
-                    1.34634637,
-                ]
-            )
-            freqs_GHz = np.linspace(50, 80, 61)
-            nearest_freq_idx = find_nearest(freqs_GHz, launch_freq_GHz)
-            focal_length = focal_lengths[nearest_freq_idx]
-
-            myLens = make_my_lens(name, lens_type="thin", focal_length=focal_length)
-            wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
-
-            Psi_w_wg = np.array(
-                [
-                    [wavenumber_K0 * wg_curvature + 2j * wg_width ** (-2), 0],
-                    [0, wavenumber_K0 * wg_curvature + 2j * wg_width ** (-2)],
-                ]
-            )
-
-            Psi_w_lens = myLens.output_beam(Psi_w_wg, launch_freq_GHz)
-
-            Psi_w_mirror = propagate_beam(Psi_w_lens, wg_to_mirror, launch_freq_GHz)
-
-            launch_beam_width = np.sqrt(2 / np.imag(Psi_w_mirror[0, 0]))
-            launch_beam_curvature = np.real(Psi_w_mirror[0, 0]) / wavenumber_K0
-
-    elif diagnostic == "DBS_UCLA_MAST-U":
-        name = "DBS_UCLA_MAST-U"
-        myLens = make_my_lens(name)
-        wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
-
-        horn_width = 0.0064
-        horn_curvature = 0.0
-        horn_to_lens = 0.165
-
-        wavenumber = freq_GHz_to_wavenumber(launch_freq_GHz)
-
-        Psi_w_horn_cartersian = np.array(
-            [
-                [wavenumber * horn_curvature + 2j * horn_width ** (-2), 0],
-                [0, wavenumber * horn_curvature + 2j * horn_width ** (-2)],
-            ]
-        )
-
-        Psi_w_lens_cartesian_input = propagate_beam(
-            Psi_w_horn_cartersian, horn_to_lens, launch_freq_GHz
-        )
-
-        Psi_w_lens_cartesian_output = myLens.output_beam(
-            Psi_w_lens_cartesian_input, launch_freq_GHz
-        )
-        print(
-            "Warning: lens known to change output beam properties depending on its y position, ignoring this effect"
-        )
-        launch_beam_width = np.sqrt(2 / np.imag(Psi_w_lens_cartesian_output[0, 0]))
-        launch_beam_curvature = (
-            np.real(Psi_w_lens_cartesian_output[0, 0]) / wavenumber_K0
-        )
-
-    elif diagnostic == "DBS_SWIP_MAST-U":
-        # if method == 'thin_lens':
-        #     name = 'DBS_SWIP_MAST-U0'
-        if method == "estimate_var_w0":
-            if launch_freq_GHz <= 50.0:  # Q band
-                w0 = np.sqrt(launch_freq_GHz / 40) * 0.08
-            else:  # V band
-                w0 = np.sqrt(launch_freq_GHz / 60) * 0.04
-            distance = (
-                -0.277
-            )  # window to steering mirror, negative because the mirror is behind the window
-
-            wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
-
-            launch_beam_width, launch_beam_curvature = propagate_circular_beam(
-                distance, wavenumber_K0, w0, launch_freq_GHz
-            )
-
-        if method == "estimate_fix_w0":
-            if launch_freq_GHz <= 50.0:  # Q band
-                w0 = 0.08
-            else:  # V band
-                w0 = 0.04
-            distance = (
-                -0.277
-            )  # window to steering mirror, negative because the mirror is behind the window
-
-            wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
-
-            launch_beam_width, launch_beam_curvature = propagate_circular_beam(
-                distance, wavenumber_K0, w0, launch_freq_GHz
-            )
+    Psi_w_cartesian_launch = propagate_beam(
+        Psi_w_lens_cartesian_output, lens_to_mirror, launch_freq_GHz
+    )
+    launch_beam_width = np.sqrt(2 / np.imag(Psi_w_cartesian_launch[0, 0]))
+    launch_beam_curvature = np.real(Psi_w_cartesian_launch[0, 0]) / wavenumber_K0
 
     return launch_beam_width, launch_beam_curvature
+
+
+def launch_beam_DBS_NSTX_MAST_data(launch_freq_GHz):
+    data = np.array(
+        [
+            (30.0, 46.90319593e-3, -9211.13447598e-3),
+            (32.5, 44.8730752e-3, -5327.42027113e-3),
+            (35.0, 43.03016639e-3, -3834.26164617e-3),
+            (37.5, 41.40562031e-3, -2902.09214589e-3),
+            (42.5, 38.50759751e-3, -1961.58420391e-3),
+            (45.0, 37.65323989e-3, -1636.82546574e-3),
+            (47.5, 36.80672175e-3, -1432.59817651e-3),
+            (50.0, 36.29814335e-3, -1296.20353095e-3),
+            (55.0, 38.43065497e-3, -1437.24234181e-3),
+            (57.5, 37.00251598e-3, -1549.7853604e-3),
+            (60.0, 35.72544826e-3, -1683.5681014e-3),
+            (62.5, 34.57900305e-3, -1843.91364265e-3),
+            (67.5, 32.61150219e-3, -2277.59660009e-3),
+            (70.0, 31.76347845e-3, -2577.93648944e-3),
+            (72.5, 30.99132929e-3, -2964.57675092e-3),
+            (75.0, 30.28611839e-3, -3479.14501841e-3),
+        ],
+        dtype=[
+            ("freqs", np.float64),
+            ("widths", np.float64),
+            ("curvature", np.float64),
+        ],
+    )
+
+    freq_idx = find_nearest(data["freqs"], launch_freq_GHz)
+    launch_beam_width = data["widths"][freq_idx]
+    launch_beam_curvature = 1 / data["curvature"][freq_idx]
+    return launch_beam_width, launch_beam_curvature
+
+
+def launch_beam_DBS_CIEMAT_JT60A_data(launch_freq_GHz):
+    # 90 GHz
+    launch_beam_width = 0.06323503329291348
+    launch_beam_curvature = -0.5535179506038995
+    return launch_beam_width, launch_beam_curvature
+
+
+def launch_beam_DBS_UCLA_DIII_D_240_thin_lens(launch_freq_GHz):
+    # The lens is directly in front of the waveguide (wg)
+    wg_width = 0.025
+    wg_curvature = 0.0
+    wg_to_mirror = 0.08255
+
+    # fmt: off
+    data = np.array(
+        [
+            (50.0, 0.45181379), (50.5, 0.46384668),
+            (51.0, 0.47595193), (51.5, 0.488133),
+            (52.0, 0.50039298), (52.5, 0.51273458),
+            (53.0, 0.52516023), (53.5, 0.53767209),
+            (54.0, 0.55027209), (54.5, 0.56296199),
+            (55.0, 0.57574337), (55.5, 0.58861765),
+            (56.0, 0.60158613), (56.5, 0.61465001),
+            (57.0, 0.62781035), (57.5, 0.64106815),
+            (58.0, 0.65442432), (58.5, 0.66787969),
+            (59.0, 0.68143503), (59.5, 0.69509106),
+            (60.0, 0.70884843), (60.5, 0.72270775),
+            (61.0, 0.73666959), (61.5, 0.75073448),
+            (62.0, 0.7649029),  (62.5, 0.7791753),
+            (63.0, 0.79355212), (63.5, 0.80803376),
+            (64.0, 0.82262058), (64.5, 0.83731294),
+            (65.0, 0.85211116), (65.5, 0.86701555),
+            (66.0, 0.8820264),  (66.5, 0.89714399),
+            (67.0, 0.91236857), (67.5, 0.92770038),
+            (68.0, 0.94313965), (68.5, 0.95868659),
+            (69.0, 0.97434142), (69.5, 0.99010431),
+            (70.0, 1.00597547), (70.5, 1.02195505),
+            (71.0, 1.03804323), (71.5, 1.05424016),
+            (72.0, 1.07054599), (72.5, 1.08696085),
+            (73.0, 1.10348489), (73.5, 1.12011823),
+            (74.0, 1.13686099), (74.5, 1.15371329),
+            (75.0, 1.17067524), (75.5, 1.18774694),
+            (76.0, 1.20492849), (76.5, 1.22222),
+            (77.0, 1.23962155), (77.5, 1.25713322),
+            (78.0, 1.27475512), (78.5, 1.2924873),
+            (79.0, 1.31032986), (79.5, 1.32828286),
+            (80.0, 1.34634637),
+        ],
+        dtype=[("freqs_GHz", np.float64), ("focal_length", np.float64)],
+    )
+    # fmt: on
+    nearest_freq_idx = find_nearest(data["freqs_GHz"], launch_freq_GHz)
+    focal_length = data["focal_length"][nearest_freq_idx]
+
+    myLens = make_my_lens(
+        name="DBS_UCLA_DIII-D_240", lens_type="thin", focal_length=focal_length
+    )
+    wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
+
+    Psi_w_wg = np.array(
+        [
+            [wavenumber_K0 * wg_curvature + 2j / (wg_width**2), 0],
+            [0, wavenumber_K0 * wg_curvature + 2j / (wg_width**2)],
+        ]
+    )
+
+    Psi_w_lens = myLens.output_beam(Psi_w_wg, launch_freq_GHz)
+    Psi_w_mirror = propagate_beam(Psi_w_lens, wg_to_mirror, launch_freq_GHz)
+
+    launch_beam_width = np.sqrt(2 / np.imag(Psi_w_mirror[0, 0]))
+    launch_beam_curvature = np.real(Psi_w_mirror[0, 0]) / wavenumber_K0
+    return launch_beam_width, launch_beam_curvature
+
+
+def launch_beam_DBS_UCLA_MAST_U_thin_lens(launch_freq_GHz):
+    warnings.warn(
+        "WARNING: DBS_UCLA_MAST-U lens known to change output beam properties "
+        "depending on its y position, ignoring this effect"
+    )
+
+    myLens = make_my_lens("DBS_UCLA_MAST-U")
+    wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
+
+    horn_width = 0.0064
+    horn_curvature = 0.0
+    horn_to_lens = 0.165
+
+    wavenumber = freq_GHz_to_wavenumber(launch_freq_GHz)
+
+    Psi_w_horn_cartersian = np.array(
+        [
+            [wavenumber * horn_curvature + 2j * horn_width ** (-2), 0],
+            [0, wavenumber * horn_curvature + 2j * horn_width ** (-2)],
+        ]
+    )
+
+    Psi_w_lens_cartesian_input = propagate_beam(
+        Psi_w_horn_cartersian, horn_to_lens, launch_freq_GHz
+    )
+
+    Psi_w_lens_cartesian_output = myLens.output_beam(
+        Psi_w_lens_cartesian_input, launch_freq_GHz
+    )
+    launch_beam_width = np.sqrt(2 / np.imag(Psi_w_lens_cartesian_output[0, 0]))
+    launch_beam_curvature = np.real(Psi_w_lens_cartesian_output[0, 0]) / wavenumber_K0
+    return launch_beam_width, launch_beam_curvature
+
+
+def launch_beam_DBS_SWIP_MAST_U_estimate_var_w0(launch_freq_GHz):
+    if launch_freq_GHz <= 50.0:  # Q band
+        w0 = np.sqrt(launch_freq_GHz / 40) * 0.08
+    else:  # V band
+        w0 = np.sqrt(launch_freq_GHz / 60) * 0.04
+
+    # window to steering mirror, negative because the mirror is behind the window
+    distance = -0.277
+    wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
+    return propagate_circular_beam(distance, wavenumber_K0, w0, launch_freq_GHz)
+
+
+def launch_beam_DBS_SWIP_MAST_U_estimate_fix_w0(launch_freq_GHz):
+    if launch_freq_GHz <= 50.0:  # Q band
+        w0 = 0.08
+    else:  # V band
+        w0 = 0.04
+
+    # window to steering mirror, negative because the mirror is behind the window
+    distance = -0.277
+    wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
+    return propagate_circular_beam(distance, wavenumber_K0, w0, launch_freq_GHz)
+
+
+LAUNCH_BEAM_METHODS = {
+    "DBS_NSTX_MAST": {
+        "horn_and_lens": launch_beam_DBS_NSTX_MAST_horn_and_lens,
+        "data": launch_beam_DBS_NSTX_MAST_data,
+    },
+    "DBS_CIEMAT_JT60SA": {"data": launch_beam_DBS_CIEMAT_JT60A_data},
+    "DBS_UCLA_DIII-D_240": {"thin_lens": launch_beam_DBS_UCLA_DIII_D_240_thin_lens},
+    "DBS_UCLA_MAST-U": {"thin_lens": launch_beam_DBS_UCLA_MAST_U_thin_lens},
+    "DBS_SWIP_MAST-U": {
+        "estimate_var_w0": launch_beam_DBS_SWIP_MAST_U_estimate_var_w0,
+        "estimate_fix_w0": launch_beam_DBS_SWIP_MAST_U_estimate_fix_w0,
+    },
+}
+
+
+class LaunchBeamParameters(NamedTuple):
+    width: float
+    """Width of the beam"""
+    curvature: float
+    """Curvature of the beam"""
+
+
+def beam_settings(
+    diagnostic: float, launch_freq_GHz: float, method: str = "data"
+) -> LaunchBeamParameters:
+    """Return the launch beam width and curvature
+
+    Arguments
+    =========
+    diagnostic:
+        Name of the diagnostic
+    launch_freq_GHz:
+        Frequency of the launch beam in GHz
+    method:
+        One of the following:
+
+        - ``"horn_and_lens"``: Uses information about the horn and lens to
+          calculate the launch beam properties
+        - ``"thin_lens"``: Uses the thin lens approximation to calculate launch
+          beam properties
+        - ``"data"``: Uses pre-computed values
+        - ``"estimate_var_w0"``: Estimate beam properties using
+          frequency-dependent beam waist
+        - ``"estimate_fix_w0"``: Estimate beam properties using
+          frequency-independent beam waist
+
+
+    .. note:: Not all methods are available for all diagnostics
+    """
+
+    try:
+        diagnostic_methods = LAUNCH_BEAM_METHODS[diagnostic]
+    except KeyError:
+        raise ValueError(
+            f"No launch beam settings for '{diagnostic}', available diagnostics are: "
+            f"{LAUNCH_BEAM_METHODS.keys()}"
+        )
+
+    try:
+        selected_method = diagnostic_methods[method]
+    except KeyError:
+        raise ValueError(
+            f"No launch beam settings for method '{method}' on diagnostic "
+            f"'{diagnostic}'. Available methods are: {diagnostic_methods.keys()}"
+        )
+
+    return LaunchBeamParameters(*selected_method(launch_freq_GHz))
 
 
 DENSITY_FIT_PARAMETERS = {

@@ -43,6 +43,15 @@ def test_beam_settings(
     diagnostic, method, launch_freq_GHz, expected_width, expected_curvature
 ):
     """Golden answer test for various diagnostics"""
-    width, curvature = beam_settings(diagnostic, method, launch_freq_GHz)
+    width, curvature = beam_settings(diagnostic, launch_freq_GHz, method)
     assert np.isclose(width, expected_width)
     assert np.isclose(curvature, expected_curvature)
+
+
+def test_bad_beam_settings():
+    # Check we get an error for known non-values
+    with pytest.raises(ValueError):
+        beam_settings("NOT A DIAGNOSTIC", 52.0, "data")
+
+    with pytest.raises(ValueError):
+        beam_settings("DBS_NSTX_MAST", 52.0, "unknown method")
