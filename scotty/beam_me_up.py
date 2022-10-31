@@ -76,7 +76,6 @@ import sys
 from netCDF4 import Dataset
 import bisect
 import time
-import platform
 import json
 import ast
 import pathlib
@@ -232,7 +231,7 @@ def beam_me_up(
     if density_fit_parameters is None:
         print("ne(psi): loading from input file")
         # Importing data from ne.dat
-        ne_filename = ne_data_path + "ne" + input_filename_suffix + ".dat"
+        ne_filename = ne_data_path / f"ne{input_filename_suffix}.dat"
 
         # electron density as a function of poloidal flux label
         ne_data = np.fromfile(ne_filename, dtype=float, sep="   ")
