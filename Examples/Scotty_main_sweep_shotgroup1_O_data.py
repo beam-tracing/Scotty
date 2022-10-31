@@ -49,7 +49,7 @@ launch_freqs_GHz = np.array([55.0, 57.5, 60.0, 62.5, 67.5, 70.0, 72.5, 75.0])
 for ii, equil_time in enumerate(equil_times):
     for jj, mirror_rotation in enumerate(mirror_rotations):
         for kk, launch_freq_GHz in enumerate(launch_freqs_GHz):
-            args_dict, kwargs_dict = get_parameters_for_Scotty(
+            kwargs_dict = get_parameters_for_Scotty(
                 "DBS_NSTX_MAST",
                 launch_freq_GHz=launch_freq_GHz,
                 mirror_rotation=mirror_rotation,  # angle, in deg
@@ -61,14 +61,14 @@ for ii, equil_time in enumerate(equil_times):
                 user="Valerian_laptop",
             )
 
-            if args_dict["launch_freq_GHz"] > 52.5:
-                args_dict["mode_flag"] = 1
+            if kwargs_dict["launch_freq_GHz"] > 52.5:
+                kwargs_dict["mode_flag"] = 1
             else:
-                args_dict["mode_flag"] = -1
+                kwargs_dict["mode_flag"] = -1
 
-            if args_dict["mode_flag"] == 1:
+            if kwargs_dict["mode_flag"] == 1:
                 mode_string = "O"
-            elif args_dict["mode_flag"] == -1:
+            elif kwargs_dict["mode_flag"] == -1:
                 mode_string = "X"
 
             kwargs_dict["output_filename_suffix"] = (
@@ -128,9 +128,9 @@ for ii, equil_time in enumerate(equil_times):
             # if os.path.exists(data_output) and os.path.exists(analysis_output):
             #     continue
             # else:
-            #     beam_me_up(**args_dict, **kwargs_dict)
+            #     beam_me_up(**kwargs_dict)
 
-            beam_me_up(**args_dict, **kwargs_dict)
+            beam_me_up(**kwargs_dict)
 
             # if equil_time == 0.16:
             #     kwargs_dict['poloidal_flux_enter'] = 1.17280433**2

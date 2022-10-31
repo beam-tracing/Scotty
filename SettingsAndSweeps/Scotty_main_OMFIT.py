@@ -10,10 +10,7 @@ from scotty.beam_me_up import beam_me_up
 import numpy as np
 
 loadfile = np.load('inScotty.npz', allow_pickle=True)
-args_dict = loadfile['args_dict']
 kwargs_dict = loadfile['kwargs_dict']
 loadfile.close()
 
-beam_me_up(**args_dict.item(), **kwargs_dict.item())
-    
-
+beam_me_up(**kwargs_dict)

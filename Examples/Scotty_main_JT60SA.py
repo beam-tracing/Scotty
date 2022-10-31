@@ -11,7 +11,7 @@ from scotty.beam_me_up import beam_me_up
 import numpy as np
 
 
-args_dict = dict(
+kwargs_dict = dict(
     [
         ("poloidal_launch_angle_Torbeam", -35.0),
         ("toroidal_launch_angle_Torbeam", -14.5),  # -12.8
@@ -60,4 +60,4 @@ kwargs_dict = dict(
 )
 
 
-beam_me_up(**args_dict, **kwargs_dict)
+beam_me_up(**kwargs_dict)

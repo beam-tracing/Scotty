@@ -8,14 +8,14 @@ from numpy.testing import assert_allclose
 def test_simple_check(tmp_path):
     """This does a really simple golden answer test to check basic functionality"""
 
-    args_dict, kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
+    kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
     kwargs_dict["B_p_a"] = 0.10
     kwargs_dict["output_filename_suffix"] = "_Bpa0.10"
     kwargs_dict["output_path"] = str(tmp_path) + "/"
     kwargs_dict["figure_flag"] = False
     kwargs_dict["len_tau"] = 10
 
-    beam_me_up(**args_dict, **kwargs_dict)
+    beam_me_up(**kwargs_dict)
 
     assert len(list(tmp_path.glob("*.npz"))) == 4
 

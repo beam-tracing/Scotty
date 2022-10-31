@@ -21,7 +21,7 @@ import sys
 
 from scotty.init_bruv import get_parameters_for_Scotty
 
-args_dict = {
+kwargs_dict = {
     "poloidal_launch_angle_Torbeam": -6.151787276,
     "toroidal_launch_angle_Torbeam": 4.3821909,
     "launch_freq_GHz": 32.5,
@@ -56,4 +56,4 @@ kwargs_dict = {
 
 # sys.exit()
 
-beam_me_up(**args_dict, **kwargs_dict)
+beam_me_up(**kwargs_dict)

@@ -32,7 +32,7 @@ launch_freqs_GHz = np.array([30.0,32.5,35.0,37.5,42.5,45.0,47.5,50.0])
 for equil_time in equil_times:
     for mirror_rotation in mirror_rotations:
         for launch_freq_GHz in launch_freqs_GHz:
-            args_dict, kwargs_dict = get_parameters_for_Scotty(
+            kwargs_dict = get_parameters_for_Scotty(
                                           'DBS_NSTX_MAST',
                                           launch_freq_GHz = launch_freq_GHz,
                                           mirror_rotation = mirror_rotation, # angle, in deg
@@ -44,14 +44,14 @@ for equil_time in equil_times:
                                           user            = 'Valerian_desktop'
                                          )
             
-            if args_dict['launch_freq_GHz'] > 52.5:
-                args_dict['mode_flag'] = 1
+            if kwargs_dict['launch_freq_GHz'] > 52.5:
+                kwargs_dict['mode_flag'] = 1
             else:
-                args_dict['mode_flag'] = -1
+                kwargs_dict['mode_flag'] = -1
     
-            if args_dict['mode_flag'] == 1:
+            if kwargs_dict['mode_flag'] == 1:
                 mode_string = 'O'
-            elif args_dict['mode_flag'] == -1:
+            elif kwargs_dict['mode_flag'] == -1:
                 mode_string = 'X'
     
             kwargs_dict['output_filename_suffix'] = (
@@ -62,6 +62,6 @@ for equil_time in equil_times:
                                       + '_'  + f'{equil_time*1000:.3g}' + 'ms'
                                           )      
       
-            beam_me_up(**args_dict, **kwargs_dict)
+            beam_me_up(**kwargs_dict)
     
 

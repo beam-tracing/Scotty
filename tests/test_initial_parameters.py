@@ -60,11 +60,9 @@ def test_bad_beam_settings():
 def test_parameters_DBS_NSTX_MAST():
     """Golden answer test"""
 
-    parameters, kwargs = get_parameters_for_Scotty(
+    parameters = get_parameters_for_Scotty(
         "DBS_NSTX_MAST", launch_freq_GHz=52.0, mirror_rotation=2, mirror_tilt=4
     )
-
-    parameters.update(kwargs)
 
     expected = {
         "poloidal_launch_angle_Torbeam": -5.446475141297062,
@@ -90,11 +88,7 @@ def test_parameters_DBS_NSTX_MAST():
 def test_parameters_DBS_UCLA_DIII_D_240():
     """Golden answer test"""
 
-    parameters, kwargs = get_parameters_for_Scotty(
-        "DBS_UCLA_DIII-D_240", launch_freq_GHz=52.0
-    )
-
-    parameters.update(kwargs)
+    parameters = get_parameters_for_Scotty("DBS_UCLA_DIII-D_240", launch_freq_GHz=52.0)
 
     expected = {
         "poloidal_launch_angle_Torbeam": None,

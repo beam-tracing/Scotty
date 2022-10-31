@@ -43,7 +43,7 @@ for ii, equil_time in enumerate(equil_times):
         for kk, mirror_tilt in enumerate(mirror_tilts):
             for ll, launch_freq_GHz in enumerate(launch_freqs_GHz):
                 for mm, mode_flag in enumerate([-1, 1]):
-                    args_dict, kwargs_dict = get_parameters_for_Scotty(
+                    kwargs_dict = get_parameters_for_Scotty(
                         "DBS_NSTX_MAST",
                         launch_freq_GHz=launch_freq_GHz,
                         mirror_rotation=mirror_rotation,  # angle, in deg
@@ -54,11 +54,11 @@ for ii, equil_time in enumerate(equil_times):
                         user="Valerian_laptop",
                     )
 
-                    args_dict["mode_flag"] = mode_flag
+                    kwargs_dict["mode_flag"] = mode_flag
 
-                    if args_dict["mode_flag"] == 1:
+                    if kwargs_dict["mode_flag"] == 1:
                         mode_string = "O"
-                    elif args_dict["mode_flag"] == -1:
+                    elif kwargs_dict["mode_flag"] == -1:
                         mode_string = "X"
 
                     kwargs_dict["output_filename_suffix"] = (
@@ -124,9 +124,9 @@ for ii, equil_time in enumerate(equil_times):
                     # if os.path.exists(data_output) and os.path.exists(analysis_output):
                     #     continue
                     # else:
-                    #     beam_me_up(**args_dict, **kwargs_dict)
+                    #     beam_me_up(**kwargs_dict)
 
-                    beam_me_up(**args_dict, **kwargs_dict)
+                    beam_me_up(**kwargs_dict)
 
                     # if equil_time == 0.16:
                     #     kwargs_dict['poloidal_flux_enter'] = 1.17280433**2

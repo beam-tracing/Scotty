@@ -14,7 +14,7 @@ pol_launch_angles = np.linspace(-20.0, -40.0, 21)
 tor_launch_angles = np.linspace(0, -20, 41)
 freqs_GHz = np.linspace(50, 110, 13)
 
-args_dict = dict(
+kwargs_dict = dict(
     [
         ("mode_flag", 1),
         ("launch_beam_width", 0.06323503329291348),
@@ -67,13 +67,13 @@ counter = 0
 for freq_GHz in freqs_GHz:
     for pol_launch_angle in pol_launch_angles:
         for tor_launch_angle in tor_launch_angles:
-            args_dict["poloidal_launch_angle_Torbeam"] = pol_launch_angle
-            args_dict["toroidal_launch_angle_Torbeam"] = tor_launch_angle
-            args_dict["launch_freq_GHz"] = freq_GHz
+            kwargs_dict["poloidal_launch_angle_Torbeam"] = pol_launch_angle
+            kwargs_dict["toroidal_launch_angle_Torbeam"] = tor_launch_angle
+            kwargs_dict["launch_freq_GHz"] = freq_GHz
 
-            if args_dict["mode_flag"] == 1:
+            if kwargs_dict["mode_flag"] == 1:
                 mode_string = "O"
-            elif args_dict["mode_flag"] == -1:
+            elif kwargs_dict["mode_flag"] == -1:
                 mode_string = "X"
 
             kwargs_dict["output_filename_suffix"] = (
@@ -96,7 +96,7 @@ for freq_GHz in freqs_GHz:
             else:
                 kwargs_dict["verbose_output_flag"] = False
 
-            beam_me_up(**args_dict, **kwargs_dict)
+            beam_me_up(**kwargs_dict)
 
             counter = counter + 1
             print(

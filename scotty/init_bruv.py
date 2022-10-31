@@ -98,8 +98,7 @@ def get_parameters_for_Scotty(
         User profile settings
     """
     # Initialise dictionaries
-    kwargs_dict = dict()
-    args_dict = {
+    parameters = {
         "poloidal_launch_angle_Torbeam": None,
         "toroidal_launch_angle_Torbeam": None,
         "launch_freq_GHz": launch_freq_GHz,
@@ -116,13 +115,13 @@ def get_parameters_for_Scotty(
 
     # Assign keys that we already have
     if find_B_method is not None:
-        kwargs_dict["find_B_method"] = find_B_method
+        parameters["find_B_method"] = find_B_method
 
     if equil_time is not None:
-        kwargs_dict["equil_time"] = equil_time
+        parameters["equil_time"] = equil_time
 
     if shot is not None:
-        kwargs_dict["shot"] = shot
+        parameters["shot"] = shot
 
     # Default settings for each diagnostic
     try:
@@ -131,9 +130,8 @@ def get_parameters_for_Scotty(
         raise ValueError(
             f"Unknown diagnostic '{diagnostic}', available kinds are: {DEFAULT_DIAGNOSTIC_PARAMETERS.keys()}"
         )
-    default_args, default_kwargs = default_parameters(launch_freq_GHz)
-    args_dict.update(default_args)
-    kwargs_dict.update(default_kwargs)
+
+    parameters.update(default_parameters(launch_freq_GHz))
 
     # Convert mirror angles to launch angles
     if mirror_rotation and mirror_tilt:
@@ -142,28 +140,28 @@ def get_parameters_for_Scotty(
             mirror_rotation, mirror_tilt, offset_for_window_norm_to_R=offset
         )
 
-        args_dict["poloidal_launch_angle_Torbeam"] = -poloidal_launch_angle
-        args_dict["toroidal_launch_angle_Torbeam"] = -toroidal_launch_angle
+        parameters["poloidal_launch_angle_Torbeam"] = -poloidal_launch_angle
+        parameters["toroidal_launch_angle_Torbeam"] = -toroidal_launch_angle
 
     # Density settings
     if find_B_method == "torbeam":
-        kwargs_dict["ne_data_path"] = ne_path
-        kwargs_dict["magnetic_data_path"] = topfile_path
+        parameters["ne_data_path"] = ne_path
+        parameters["magnetic_data_path"] = topfile_path
     elif find_B_method in ["EFITpp", "UDA_saved", "test"]:
         density_fit = ne_settings(diagnostic, shot, equil_time, find_ne_method)
-        kwargs_dict["density_fit_parameters"] = density_fit.ne_fit_param
-        kwargs_dict["poloidal_flux_enter"] = density_fit.poloidal_flux_enter
-        kwargs_dict["ne_data_path"] = UDA_saved_path
+        parameters["density_fit_parameters"] = density_fit.ne_fit_param
+        parameters["poloidal_flux_enter"] = density_fit.poloidal_flux_enter
+        parameters["ne_data_path"] = UDA_saved_path
 
     # MAST and MAST-U specific B-field and poloidal flux settings
     if find_B_method == "UDA":
         raise NotImplementedError
     elif find_B_method == "EFITpp":
-        kwargs_dict["magnetic_data_path"] = efitpp_path
+        parameters["magnetic_data_path"] = efitpp_path
     elif find_B_method == "UDA_saved":
-        kwargs_dict["magnetic_data_path"] = UDA_saved_path
+        parameters["magnetic_data_path"] = UDA_saved_path
 
-    return args_dict, kwargs_dict
+    return parameters
 
 
 class LaunchBeamParameters(NamedTuple):
@@ -364,7 +362,6 @@ def parameters_DBS_NSTX_MAST(launch_freq_GHz: float) -> dict:
         "launch_position": np.array([2.43521, 0, 0]),
         "launch_beam_width": launch_beam.width,
         "launch_beam_curvature": launch_beam.curvature,
-    }, {
         "Psi_BC_flag": True,
         "figure_flag": True,
         "vacuum_propagation_flag": True,
@@ -382,7 +379,6 @@ def parameters_DBS_UCLA_MAST_U(launch_freq_GHz: float) -> dict:
         "launch_position": np.array([2.278, 0, 0]),
         "launch_beam_width": launch_beam.width,
         "launch_beam_curvature": launch_beam.curvature,
-    }, {
         "Psi_BC_flag": True,
         "figure_flag": True,
         "vacuum_propagation_flag": True,
@@ -401,7 +397,6 @@ def parameters_DBS_SWIP_MAST_U(launch_freq_GHz: float) -> dict:
         "launch_position": np.array([2.43521, 0, 0]),
         "launch_beam_width": launch_beam.width,
         "launch_beam_curvature": launch_beam.curvature,
-    }, {
         # I'm checking what this actually is from Peng. Currently using the
         # MAST UCLA DBS as a guide
         "Psi_BC_flag": True,
@@ -420,7 +415,6 @@ def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
         "launch_position": np.array([2.587, 0, -0.0157]),
         "launch_beam_width": launch_beam.width,
         "launch_beam_curvature": launch_beam.curvature,
-    }, {
         "Psi_BC_flag": True,
         "figure_flag": True,
         "vacuum_propagation_flag": True,
@@ -439,7 +433,6 @@ def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
         "launch_beam_curvature": 1 / -4.0,
         # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
         "launch_position": np.array([2.587, 0, -0.0157]),
-    }, {
         "density_fit_parameters": ne_fit_param,
         "find_B_method": "analytical",
         "Psi_BC_flag": True,
