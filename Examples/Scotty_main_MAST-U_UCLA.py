@@ -16,10 +16,6 @@ launch_beam_curvatures = np.array([-0.74971565, -0.75653105, -0.76383412, -0.771
 """
 from scotty.beam_me_up import beam_me_up
 import numpy as np
-import os
-import sys
-
-from scotty.init_bruv import get_parameters_for_Scotty
 
 kwargs_dict = {
     "poloidal_launch_angle_Torbeam": -6.151787276,
@@ -29,9 +25,6 @@ kwargs_dict = {
     "launch_beam_width": 0.07596928872724663,
     "launch_beam_curvature": -0.7497156475519201,
     "launch_position": np.array([2.278, 0.0, 0.0]),
-}
-
-kwargs_dict = {
     "ne_data_path": "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST-U\\",
     "magnetic_data_path": "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST-U\\",
     "input_filename_suffix": "_45176_400ms",

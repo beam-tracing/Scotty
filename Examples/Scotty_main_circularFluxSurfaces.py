@@ -21,9 +21,6 @@ kwargs_dict = {
     "launch_beam_width": 0.04,
     "launch_beam_curvature": -0.25,
     "launch_position": np.array([2.587, 0.0, -0.0157]),
-}
-
-kwargs_dict = {
     "density_fit_parameters": np.array([4.0, 1.0]),
     "find_B_method": "analytical",
     "Psi_BC_flag": True,
