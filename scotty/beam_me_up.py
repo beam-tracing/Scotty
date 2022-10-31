@@ -1962,7 +1962,7 @@ def beam_me_up(
             delta_K_zeta=delta_K_zeta,
             delta_K_Z=delta_K_Z,
             interp_order=interp_order,
-            interp_smoothing=interp_order,
+            interp_smoothing=interp_smoothing,
         )
         np.savez(
             output_path / f"solver_output{output_filename_suffix}",
