@@ -35,3 +35,4 @@ Submodules
    scotty.plot3_pretty
    scotty.plot4
    scotty.postmortem2
+   scotty.typing
