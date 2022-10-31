@@ -40,23 +40,23 @@ for ii, equil_time in enumerate(equil_times):
         for kk, toroidal_launch_angle_Torbeam in enumerate(toroidal_launch_angles_Torbeam):
             for ll, launch_freq_GHz in enumerate(launch_freqs_GHz):
                 
-                args_dict, kwargs_dict = get_parameters_for_Scotty(
+                kwargs_dict = get_parameters_for_Scotty(
                                               'DBS_UCLA_MAST-U',
                                               launch_freq_GHz = launch_freq_GHz,
                                               find_B_method   = 'test', # EFITpp, UDA_saved, UDA, torbeam
                                               user            = 'Valerian_desktop'
                                              )
                 
-                args_dict['mode_flag'] = -1
-                args_dict['poloidal_launch_angle_Torbeam'] = poloidal_launch_angle_Torbeam
-                args_dict['toroidal_launch_angle_Torbeam'] = toroidal_launch_angle_Torbeam
+                kwargs_dict['mode_flag'] = -1
+                kwargs_dict['poloidal_launch_angle_Torbeam'] = poloidal_launch_angle_Torbeam
+                kwargs_dict['toroidal_launch_angle_Torbeam'] = toroidal_launch_angle_Torbeam
                 
                 kwargs_dict['shot'] = 45290 # To load the EFIT output
                 kwargs_dict['equil_time'] = equil_time # To load the EFIT output
                 
-                if args_dict['mode_flag'] == 1:
+                if kwargs_dict['mode_flag'] == 1:
                     mode_string = 'O'
-                elif args_dict['mode_flag'] == -1:
+                elif kwargs_dict['mode_flag'] == -1:
                     mode_string = 'X'  
     
                 kwargs_dict['output_filename_suffix'] = (
@@ -100,9 +100,9 @@ for ii, equil_time in enumerate(equil_times):
                 
                 counter=counter+1
                 
-                widths[ll] = args_dict['launch_beam_width']
-                curvs[ll]  = args_dict['launch_beam_curvature']
+                widths[ll] = kwargs_dict['launch_beam_width']
+                curvs[ll]  = kwargs_dict['launch_beam_curvature']
                 continue         
                 
-                # beam_me_up(**args_dict, **kwargs_dict)
+                # beam_me_up(**kwargs_dict)
 

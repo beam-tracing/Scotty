@@ -53,7 +53,7 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
         for kk, launch_beam_curvature_scaling in enumerate(
             launch_beam_curvature_scalings
         ):
-            args_dict, kwargs_dict = get_parameters_for_Scotty(
+            kwargs_dict = get_parameters_for_Scotty(
                 "DBS_NSTX_MAST",
                 launch_freq_GHz=launch_freq_GHz,
                 mirror_rotation=mirror_rotation,  # angle, in deg
@@ -65,23 +65,23 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
                 user="Valerian_desktop",
             )
 
-            test_width = launch_beam_width_scaling * args_dict["launch_beam_width"]
+            test_width = launch_beam_width_scaling * kwargs_dict["launch_beam_width"]
 
-            args_dict["launch_beam_width"] = (
-                launch_beam_width_scaling * args_dict["launch_beam_width"]
+            kwargs_dict["launch_beam_width"] = (
+                launch_beam_width_scaling * kwargs_dict["launch_beam_width"]
             )
-            args_dict["launch_beam_curvature"] = (
-                launch_beam_curvature_scaling * args_dict["launch_beam_curvature"]
+            kwargs_dict["launch_beam_curvature"] = (
+                launch_beam_curvature_scaling * kwargs_dict["launch_beam_curvature"]
             )
 
-            if args_dict["launch_freq_GHz"] > 52.5:
-                args_dict["mode_flag"] = 1
+            if kwargs_dict["launch_freq_GHz"] > 52.5:
+                kwargs_dict["mode_flag"] = 1
             else:
-                args_dict["mode_flag"] = -1
+                kwargs_dict["mode_flag"] = -1
 
-            if args_dict["mode_flag"] == 1:
+            if kwargs_dict["mode_flag"] == 1:
                 mode_string = "O"
-            elif args_dict["mode_flag"] == -1:
+            elif kwargs_dict["mode_flag"] == -1:
                 mode_string = "X"
 
             kwargs_dict["verbose_output_flag"] = True
@@ -92,9 +92,9 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
                 + "_t"
                 + f"{mirror_tilt:.1f}"
                 + "_w"
-                + f"{args_dict['launch_beam_width']:.6f}"
+                + f"{kwargs_dict['launch_beam_width']:.6f}"
                 + "_curv"
-                + f"{args_dict['launch_beam_curvature']:.3f}"
+                + f"{kwargs_dict['launch_beam_curvature']:.3f}"
                 + "_f"
                 + f"{launch_freq_GHz:.1f}"
                 + "_"
@@ -118,7 +118,7 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
             # if os.path.exists(an_output):
             #     continue
             # else:
-            #     beam_me_up(**args_dict, **kwargs_dict)
+            #     beam_me_up(**kwargs_dict)
 
             kwargs_dict["delta_R"] = -0.00001
             kwargs_dict["delta_Z"] = -0.00001
@@ -130,7 +130,7 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
             kwargs_dict["rtol"] = 1e-3
             kwargs_dict["atol"] = 1e-6
 
-            beam_me_up(**args_dict, **kwargs_dict)
+            beam_me_up(**kwargs_dict)
 
             counter = counter + 1
             # print('Sweep completion:' + str(counter) + ' of ' + str( len(equil_times)*len(mirror_rotations)*len(launch_freqs_GHz) ) )

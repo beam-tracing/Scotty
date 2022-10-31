@@ -19,7 +19,7 @@ equil_time = 0.780
 poloidal_launch_angle_Torbeam = -2.0
 toroidal_launch_angle_Torbeam = 0.0
 
-args_dict, kwargs_dict = get_parameters_for_Scotty(
+kwargs_dict = get_parameters_for_Scotty(
                               'DBS_SWIP_MAST-U',
                               launch_freq_GHz = launch_freq_GHz,
                               find_B_method   = 'test', # EFITpp, UDA_saved, UDA, torbeam
@@ -28,9 +28,9 @@ args_dict, kwargs_dict = get_parameters_for_Scotty(
                               user            = 'Valerian_desktop'
                              )
 
-args_dict['mode_flag'] = 1
-args_dict['poloidal_launch_angle_Torbeam'] = poloidal_launch_angle_Torbeam
-args_dict['toroidal_launch_angle_Torbeam'] = toroidal_launch_angle_Torbeam
+kwargs_dict['mode_flag'] = 1
+kwargs_dict['poloidal_launch_angle_Torbeam'] = poloidal_launch_angle_Torbeam
+kwargs_dict['toroidal_launch_angle_Torbeam'] = toroidal_launch_angle_Torbeam
 
 kwargs_dict['poloidal_flux_enter'] = 1.22
 # kwargs_dict['output_path'] = os.path.dirname(os.path.abspath(__file__)) + '\\Output\\'
@@ -47,6 +47,4 @@ kwargs_dict['delta_K_zeta'] = 0.1
 kwargs_dict['delta_K_Z'] = 0.1
 
 
-beam_me_up(**args_dict, **kwargs_dict)
-    
-
+beam_me_up(**kwargs_dict)

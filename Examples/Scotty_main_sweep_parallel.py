@@ -52,7 +52,7 @@ def loop(
             toroidal_launch_angles_Torbeam
         ):
             for jj, launch_freq_GHz in enumerate(launch_freqs_GHz):
-                args_dict, kwargs_dict = get_parameters_for_Scotty(
+                kwargs_dict = get_parameters_for_Scotty(
                     "DBS_UCLA_MAST-U",
                     launch_freq_GHz=launch_freq_GHz,
                     find_B_method="test",  # EFITpp, UDA_saved, UDA, torbeam
@@ -62,17 +62,17 @@ def loop(
                     user="Valerian_laptop",
                 )
 
-                args_dict["mode_flag"] = mode_flag
-                args_dict[
+                kwargs_dict["mode_flag"] = mode_flag
+                kwargs_dict[
                     "poloidal_launch_angle_Torbeam"
                 ] = poloidal_launch_angle_Torbeam
-                args_dict[
+                kwargs_dict[
                     "toroidal_launch_angle_Torbeam"
                 ] = toroidal_launch_angle_Torbeam
 
-                if args_dict["mode_flag"] == 1:
+                if kwargs_dict["mode_flag"] == 1:
                     mode_string = "O"
-                elif args_dict["mode_flag"] == -1:
+                elif kwargs_dict["mode_flag"] == -1:
                     mode_string = "X"
 
                 kwargs_dict["output_filename_suffix"] = (
@@ -133,9 +133,7 @@ def loop(
                 if os.path.exists(data_output) and os.path.exists(analysis_output):
                     continue
                 else:
-                    beam_me_up(**args_dict, **kwargs_dict)
-                # beam_me_up(**args_dict, **kwargs_dict)
-
+                    beam_me_up(**kwargs_dict)
                 return
 
 

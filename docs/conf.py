@@ -88,9 +88,15 @@ html_theme_options = dict(
 
 # -- Extension configuration -------------------------------------------------
 
+autodoc_typehints = "description"
+autodoc_type_aliases = {
+    "ArrayLike": "numpy.typing.ArrayLike",
+}
+
 # -- Options for intersphinx extension ---------------------------------------
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable", None),
 }

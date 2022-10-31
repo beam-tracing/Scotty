@@ -30,7 +30,7 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
             launch_beam_curvature_scalings
         ):
 
-            args_dict, kwargs_dict = get_parameters_for_Scotty(
+            kwargs_dict = get_parameters_for_Scotty(
                 "DBS_UCLA_DIII-D_240",
                 launch_freq_GHz=launch_freq_GHz,
                 find_B_method="torbeam",  # EFITpp, UDA_saved, UDA, torbeam
@@ -39,15 +39,15 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
                 user="Valerian_desktop",
             )
 
-            args_dict["poloidal_launch_angle_Torbeam"] = pol_launch_angle
-            args_dict["toroidal_launch_angle_Torbeam"] = tor_launch_angle
-            args_dict["mode_flag"] = -1
+            kwargs_dict["poloidal_launch_angle_Torbeam"] = pol_launch_angle
+            kwargs_dict["toroidal_launch_angle_Torbeam"] = tor_launch_angle
+            kwargs_dict["mode_flag"] = -1
 
-            args_dict["launch_beam_width"] = (
-                launch_beam_width_scaling * args_dict["launch_beam_width"]
+            kwargs_dict["launch_beam_width"] = (
+                launch_beam_width_scaling * kwargs_dict["launch_beam_width"]
             )
-            args_dict["launch_beam_curvature"] = (
-                launch_beam_curvature_scaling * args_dict["launch_beam_curvature"]
+            kwargs_dict["launch_beam_curvature"] = (
+                launch_beam_curvature_scaling * kwargs_dict["launch_beam_curvature"]
             )
 
             kwargs_dict["poloidal_flux_enter"] = 1.44
@@ -67,18 +67,18 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
             kwargs_dict["rtol"] = 1e-3
             kwargs_dict["atol"] = 1e-6
 
-            if args_dict["mode_flag"] == 1:
+            if kwargs_dict["mode_flag"] == 1:
                 mode_string = "O"
-            elif args_dict["mode_flag"] == -1:
+            elif kwargs_dict["mode_flag"] == -1:
                 mode_string = "X"
 
             kwargs_dict["output_filename_suffix"] = (
                 "_w"
-                + f"{args_dict['launch_beam_width']:.6f}"
+                + f"{kwargs_dict['launch_beam_width']:.6f}"
                 + "_curv"
-                + f"{args_dict['launch_beam_curvature']:.3f}"
+                + f"{kwargs_dict['launch_beam_curvature']:.3f}"
                 + "_f"
-                + f"{args_dict['launch_freq_GHz']:.1f}"
+                + f"{kwargs_dict['launch_freq_GHz']:.1f}"
                 + "_"
                 + mode_string
             )
@@ -89,14 +89,14 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
             # if os.path.exists(an_output):
             #     continue
             # else:
-            #     beam_me_up(**args_dict, **kwargs_dict)
+            #     beam_me_up(**kwargs_dict)
 
             if counter == 0:
                 kwargs_dict["verbose_output_flag"] = True
             else:
                 kwargs_dict["verbose_output_flag"] = False
 
-            beam_me_up(**args_dict, **kwargs_dict)
+            beam_me_up(**kwargs_dict)
 
             counter = counter + 1
             print(

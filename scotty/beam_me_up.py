@@ -206,6 +206,34 @@ def beam_me_up(
 ):
     """
     find_B_method: 1) 'efitpp' finds B from efitpp files directly 2) 'torbeam' finds B from topfile 3) UDA_saved
+
+
+    Overview
+    ========
+
+    1. Initialise density fit parameters. One of:
+        - spline with data from file
+        - Stefanikova
+        - O(3) polynomial
+        - tanh
+        - quadratic
+    2. Initialise magnetic field method. One of:
+        - TORBEAM
+        - OMFIT
+        - analytical
+        - EFIT++
+        - UDA
+        - curvy slab
+        - test/test_notime
+    3. Initialise beam launch parameters (vacuum/plasma)
+    4. Initialise event functions for IVP solver
+    5. Propagate single ray with IVP solver (?)
+    6. Handle events
+    7. Possible early exit if ``quick_run`` (?)
+    8. Propagate beam with IVP solver
+    9. Dump raw output (?)
+    10. Analysis
+    11. Dump analysis
     """
 
     # major_radius = 0.9
