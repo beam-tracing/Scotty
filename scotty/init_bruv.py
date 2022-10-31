@@ -15,7 +15,7 @@ import sys
 import math
 import numpy as np
 from scipy import constants
-import platform
+import pathlib
 from netCDF4 import Dataset
 
 from .hornpy import make_my_horn
@@ -84,8 +84,8 @@ def get_parameters_for_Scotty(
         "launch_position": None,
     }
 
-    ## User settings. Currently just loads paths
-    [ne_path, topfile_path, inbeam_path, efitpp_path, UDA_saved_path] = user_settings(
+    # User settings. Currently just loads paths
+    ne_path, topfile_path, inbeam_path, efitpp_path, UDA_saved_path = user_settings(
         diagnostic, user, shot
     )
 
@@ -153,7 +153,7 @@ def get_parameters_for_Scotty(
 
         elif find_B_method == "EFITpp":
 
-            dataset = Dataset(efitpp_path + "efitOut.nc")
+            dataset = Dataset(efitpp_path / "efitOut.nc")
             efitpp_times = dataset.variables["time"][:]
             dataset.close()
             efit_time_index = find_nearest(efitpp_times, equil_time)
@@ -163,7 +163,7 @@ def get_parameters_for_Scotty(
             kwargs_dict["magnetic_data_path"] = efitpp_path
 
         elif find_B_method == "UDA_saved" and shot <= 30471:  # MAST:
-            loadfile = np.load(UDA_saved_path + str(shot) + "_equilibrium_data.npz")
+            loadfile = np.load(UDA_saved_path / f"{shot}_equilibrium_data.npz")
             t_base_C = loadfile["t_base_C"]
             loadfile.close()
             efit_time_index = find_nearest(t_base_C, equil_time)
@@ -175,7 +175,7 @@ def get_parameters_for_Scotty(
         elif (
             find_B_method == "UDA_saved" and shot > 30471
         ) or find_B_method == "test":  # MAST:
-            loadfile = np.load(UDA_saved_path + str(shot) + "_equilibrium_data.npz")
+            loadfile = np.load(UDA_saved_path / f"{shot}_equilibrium_data.npz")
             time_EFIT = loadfile["time_EFIT"]
             loadfile.close()
             efit_time_index = find_nearest(time_EFIT, equil_time)
@@ -268,7 +268,7 @@ def get_parameters_for_Scotty(
         if (
             find_B_method == "UDA_saved" and shot > 30471
         ) or find_B_method == "test":  # MAST:
-            loadfile = np.load(UDA_saved_path + str(shot) + "_equilibrium_data.npz")
+            loadfile = np.load(UDA_saved_path / f"{shot}_equilibrium_data.npz")
             time_EFIT = loadfile["time_EFIT"]
             loadfile.close()
             efit_time_index = find_nearest(time_EFIT, equil_time)
@@ -790,11 +790,8 @@ def user_settings(diagnostic, user, shot):
     Choosing paths appropriately
     """
 
-    # Default path: all input files in the same folder as Scotty
-    if platform.system() == "Windows":
-        default_input_files_path = os.path.dirname(os.path.abspath(__file__)) + "\\"
-    elif platform.system() == "Linux":
-        default_input_files_path = os.path.dirname(os.path.abspath(__file__)) + "/"
+    # Default path: all input files in current working directory
+    default_input_files_path = pathlib.Path(".")
 
     #########################
     ## Initialising default paths
@@ -813,9 +810,9 @@ def user_settings(diagnostic, user, shot):
     elif user == "Valerian_desktop" or user == "Valerian_laptop":
 
         if user == "Valerian_desktop":
-            prefix = "D:\\Dropbox\\"
+            prefix = pathlib.Path("D:\\Dropbox\\")
         elif user == "Valerian_laptop":
-            prefix = "C:\\Dropbox\\"
+            prefix = pathlib.Path("C:\\Dropbox\\")
 
         if diagnostic == "DBS_NSTX_MAST" or diagnostic == "DBS_SWIP_MAST-U":
             if shot == 29684:
@@ -823,41 +820,35 @@ def user_settings(diagnostic, user, shot):
                 # 29684: no MSE data, but reprocessed with more constraints, only good at the edge
                 efitpp_path = (
                     prefix
-                    + "VHChen2020\\Data\\Equilibrium\\MAST\\Lucy_EFIT_runs\\"
-                    + str(shot)
-                    + "\\epk_lkogan_01\\"
+                    / f"VHChen2020/Data/Equilibrium/MAST/Lucy_EFIT_runs/{shot}/epk_lkogan_01/"
                 )
-                ne_path = prefix + "VHChen2021\\Data - Equilibrium\\MAST\\"
+                ne_path = prefix / "VHChen2021/Data - Equilibrium/MAST/"
+
             elif shot in [30073, 30074, 30075, 30076, 30077]:
                 # MAST reruns of EFIT. Done by Lucy Kogan.
                 # 30073--30077: MSE data, processed better than original runs
                 efitpp_path = (
                     prefix
-                    + "VHChen2020\\Data\\Equilibrium\\MAST\\Lucy_EFIT_runs\\"
-                    + str(shot)
-                    + "\\epi_lkogan_01\\"
+                    / f"VHChen2020/Data/Equilibrium/MAST/Lucy_EFIT_runs/{shot}/epi_lkogan_01/"
                 )
             elif shot in [29908]:
                 # MAST EFIT runs. List of available shots not updated.
                 efitpp_path = (
                     prefix
-                    + "VHChen2020\\Data\\Equilibrium\\MAST\\MSE_efitruns\\"
-                    + str(shot)
-                    + "\\Pass0\\"
+                    / f"VHChen2020/Data/Equilibrium/MAST/MSE_efitruns/{shot}/Pass0/"
                 )
             ## If it's not any of the above shots, I'll assume that there's no efit++ data
             elif shot > 30471:  # MAST-U
                 UDA_saved_path = (
-                    prefix
-                    + "VHChen2020\\Data\\Equilibrium\\MAST-U\\Equilibrium_pyuda\\"
+                    prefix / "VHChen2020/Data/Equilibrium/MAST-U/Equilibrium_pyuda/"
                 )
             else:
                 UDA_saved_path = (
-                    prefix + "VHChen2020\\Data\\Equilibrium\\MAST\\Equilibrium_pyuda\\"
+                    prefix / "VHChen2020/Data/Equilibrium/MAST/Equilibrium_pyuda/"
                 )
 
         elif diagnostic == "DBS_UCLA_DIII-D_240":
-            ne_path = prefix + "VHChen2021\Data - Equilibrium\DIII-D\\"
-            topfile_path = prefix + "VHChen2021\Data - Equilibrium\DIII-D\\"
+            ne_path = prefix / "VHChen2021/Data - Equilibrium/DIII-D/"
+            topfile_path = prefix / "VHChen2021/Data - Equilibrium/DIII-D/"
 
     return ne_path, topfile_path, inbeam_path, efitpp_path, UDA_saved_path
