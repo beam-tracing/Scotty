@@ -155,6 +155,8 @@ from scotty.fun_mix import (
 # For find_B if using efit files directly
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
 
+from scotty._version import __version__
+
 
 def beam_me_up(
     poloidal_launch_angle_Torbeam,
@@ -239,6 +241,7 @@ def beam_me_up(
     # major_radius = 0.9
 
     print("Beam trace me up, Scotty!")
+    print(f"scotty version {__version__}")
     # ------------------------------
 
     # ------------------------------

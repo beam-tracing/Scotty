@@ -1,6 +1,8 @@
 [build-system]
 requires = [
     "setuptools >= 61.0.0",
+    "setuptools_scm[toml] >= 7",
+    "wheel >= 0.29.0",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -9,7 +11,6 @@ name = "Scotty"
 description = "Beam tracing for tokamak DBS diagnostics"
 requires-python = ">3.7"
 readme = "README.md"
-version = "0.1.0"
 authors = [{name = "Valerian Hall-Chen"}]
 urls = {project = "https://github.com/valerian-chen/Scotty"}
 dependencies = [
@@ -18,6 +19,7 @@ dependencies = [
     "matplotlib",
     "netCDF4",
 ]
+dynamic = ["version"]
 
 [project.optional-dependencies]
 tests = [
@@ -30,6 +32,12 @@ docs = [
 
 [tool.setuptools]
 packages = ["scotty"]
+
+[tool.setuptools.dynamic]
+version = { attr = "setuptools_scm.get_version" }
+
+[tool.setuptools_scm]
+write_to = "scotty/_version.py"
 
 [tool.pytest.ini_options]
 testpaths = [
