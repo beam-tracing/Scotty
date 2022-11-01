@@ -4,6 +4,7 @@ from scotty.density_fit import (
     PolynomialFit,
     StefanikovaFit,
     SmoothingSplineFit,
+    density_fit,
 )
 
 import numpy as np
@@ -13,6 +14,19 @@ import pytest
 # Parameters for density fits
 CENTRAL_DENSITY = 2.0
 LCFS = 1.0
+
+
+@pytest.fixture(scope="module")
+def ne_dat(tmp_path_factory):
+    filename = tmp_path_factory.getbasetemp() / "ne.dat"
+    rho = np.linspace(0, 1, 11)
+    density = rho**2
+
+    with open(filename, "w") as f:
+        f.write(f"{len(rho)}\n")
+        np.savetxt(f, np.column_stack((rho, density)), fmt="%.7e")
+
+    return rho, density, filename
 
 
 @pytest.mark.parametrize(
@@ -44,15 +58,20 @@ def test_density_fit(fit):
     assert np.all(density[:-1] > density[1:]), "Monotonically decreasing"
 
 
-def test_spline_fit_from_file(tmp_path):
-    rho = np.linspace(0, 1, 11)
-    density = rho**2
-
-    filename = tmp_path / "ne.dat"
-    with open(filename, "w") as f:
-        f.write(f"{len(rho)}\n")
-        np.savetxt(f, np.column_stack((rho, density)), fmt="%.7e")
-
+def test_spline_fit_from_file(ne_dat):
+    rho, density, filename = ne_dat
     fit = SmoothingSplineFit.from_dat_file(filename, 1.0)
-
     assert np.allclose(density, fit(rho**2))
+
+
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
+def test_make_density_fit(ne_dat):
+    fit = density_fit("quadratic", LCFS, [CENTRAL_DENSITY])
+    assert isinstance(fit, QuadraticFit)
+
+    fit = density_fit(None, LCFS, [CENTRAL_DENSITY, LCFS])
+    assert isinstance(fit, QuadraticFit)
+
+    _, _, filename = ne_dat
+    fit = density_fit(None, LCFS, [5, 0], filename=filename)
+    assert isinstance(fit, SmoothingSplineFit)

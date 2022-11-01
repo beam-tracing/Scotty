@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional
+from warnings import warn
 
 from scotty.typing import PathLike
 
@@ -54,11 +55,27 @@ class QuadraticFit(DensityFit):
         Poloidal flux where density goes to zero (:math:`\psi_0` above)
     ne_0:
         Density at magnetic axis (:math:`n_{e0} \equiv n_e(\psi = 0)`)
+    psi_0:
+        (Deprecated) If passed, this must be the same as
+        ``poloidal_flux_enter``
     """
 
-    def __init__(self, poloidal_flux_enter: float, ne_0: float):
+    def __init__(
+        self, poloidal_flux_enter: float, ne_0: float, psi_0: Optional[float] = None
+    ):
         super().__init__(poloidal_flux_enter)
         self.ne_0 = ne_0
+
+        if psi_0 is not None:
+            warn(
+                "'psi_0' argument to `QuadraticFit` is deprecated and can be removed",
+                DeprecationWarning,
+            )
+            if psi_0 != poloidal_flux_enter:
+                raise ValueError(
+                    f"QuadraticFit: 'psi_0' ({psi_0}) doesn't agree with "
+                    f"'poloidal_flux_enter' ({poloidal_flux_enter})"
+                )
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
         return self.ne_0 - ((self.ne_0 / self.poloidal_flux_enter) * poloidal_flux**2)
@@ -79,12 +96,32 @@ class TanhFit(DensityFit):
         (Asymptotic) density at magnetic axis (:math:`n_{e0} \le n_e(\psi = 0)`)
     ne_1:
         Second fitting parameter
+    psi_0:
+        (Deprecated) If passed, this must be the same as
+        ``poloidal_flux_enter``
     """
 
-    def __init__(self, poloidal_flux_enter: float, ne_0: float, ne_1: float):
+    def __init__(
+        self,
+        poloidal_flux_enter: float,
+        ne_0: float,
+        ne_1: float,
+        psi_0: Optional[float] = None,
+    ):
         super().__init__(poloidal_flux_enter)
         self.ne_0 = ne_0
         self.ne_1 = ne_1
+
+        if psi_0 is not None:
+            warn(
+                "'psi_0' argument to `QuadraticFit` is deprecated and can be removed",
+                DeprecationWarning,
+            )
+            if psi_0 != poloidal_flux_enter:
+                raise ValueError(
+                    f"QuadraticFit: 'psi_0' ({psi_0}) doesn't agree with "
+                    f"'poloidal_flux_enter' ({poloidal_flux_enter})"
+                )
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
         return self.ne_0 * np.tanh(
@@ -246,3 +283,77 @@ class SmoothingSplineFit(DensityFit):
 
     def _fit_impl(self, poloidal_flux):
         return self.spline(poloidal_flux)
+
+
+##################################################
+
+
+DENSITY_FIT_METHODS = {
+    "smoothing-spline": SmoothingSplineFit,
+    "smoothing-spline-file": SmoothingSplineFit.from_dat_file,
+    "stefanikova": StefanikovaFit,
+    "poly3": PolynomialFit,
+    "polynomial": PolynomialFit,
+    "tanh": TanhFit,
+    "quadratic": QuadraticFit,
+}
+
+
+def density_fit(
+    method: Optional[str],
+    poloidal_flux_enter: float,
+    parameters: ArrayLike,
+    filename: Optional[PathLike] = None,
+) -> DensityFit:
+    """Create a density profile parameterisation
+
+    Parameters
+    ==========
+    method:
+        Name of density fit parameterisation
+    poloidal_flux_enter:
+        Poloidal flux label where density goes to zero
+    parameters:
+        List of parameters passed to density fit
+    filename:
+
+
+    """
+
+    if method is None:
+        warn(
+            "Creating a density fit without specifying a method is deprecated. "
+            "Guessing method from parameters",
+            DeprecationWarning,
+        )
+        if filename is not None:
+            print("ne(psi): loading from input file")
+            return SmoothingSplineFit.from_dat_file(
+                filename, poloidal_flux_enter, *parameters
+            )
+
+        FIT_LENGTH_MAPPINGS = {
+            8: ("Stefanikova", StefanikovaFit),
+            4: ("order_3_polynomial", PolynomialFit),
+            3: ("constant*tanh", TanhFit),
+            2: ("quadratic profile", QuadraticFit),
+        }
+
+        try:
+            name, fit_method = FIT_LENGTH_MAPPINGS[len(parameters)]
+            print(f"ne(psi): Using {name}")
+        except KeyError:
+            raise ValueError(
+                "Couldn't match length of 'parameters' to known fit parameterisation. "
+                "Try explicitly providing fit method"
+            )
+    else:
+        try:
+            fit_method = DENSITY_FIT_METHODS[method]
+        except KeyError:
+            raise ValueError(
+                f"Unknown density fitting method '{method}'. "
+                f"Expected one of {DENSITY_FIT_METHODS.keys()}"
+            )
+
+    return fit_method(poloidal_flux_enter, *parameters)
