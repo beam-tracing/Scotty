@@ -56,8 +56,10 @@ class QuadraticFit(DensityFit):
     ne_0:
         Density at magnetic axis (:math:`n_{e0} \equiv n_e(\psi = 0)`)
     psi_0:
-        (Deprecated) If passed, this must be the same as
-        ``poloidal_flux_enter``
+        If passed, this must be the same as ``poloidal_flux_enter``
+
+        .. deprecated:: 2.4.0
+           ``psi_0`` can be safely dropped
     """
 
     def __init__(
@@ -97,8 +99,11 @@ class TanhFit(DensityFit):
     ne_1:
         Second fitting parameter
     psi_0:
-        (Deprecated) If passed, this must be the same as
-        ``poloidal_flux_enter``
+        If passed, this must be the same as ``poloidal_flux_enter``
+
+        .. deprecated:: 2.4.0
+           ``psi_0`` can be safely dropped
+
     """
 
     def __init__(

@@ -47,8 +47,8 @@ Abbreviations
 Angles
 ~~~~~~
 
-- `theta` - angle between g and u1, small when mismatch is small
-- `theta_m` - mismatch angle, angle between u1 and K
+- ``theta`` - angle between g and u1, small when mismatch is small
+- ``theta_m`` - mismatch angle, angle between u1 and K
 
 
 Units
@@ -64,6 +64,7 @@ Units
 
 """
 
+from __future__ import annotations
 import numpy as np
 import math
 from scipy import interpolate as interpolate
@@ -204,14 +205,16 @@ def beam_me_up(
     plasmaLaunch_K=np.zeros(3),
     plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3, 3]),
     density_fit_parameters=None,
-    density_fit_method="smoothing-spline-file",
+    density_fit_method: Union[
+        str, Callable[[ArrayLike], ArrayLike]
+    ] = "smoothing-spline-file",
     ## For circular flux surfaces
     B_T_axis=None,
     B_p_a=None,
     R_axis=None,
     minor_radius_a=None,
 ):
-    """
+    r"""
     find_B_method: 1) 'efitpp' finds B from efitpp files directly 2) 'torbeam' finds B from topfile 3) UDA_saved
 
 
@@ -241,6 +244,31 @@ def beam_me_up(
     9. Dump raw output (?)
     10. Analysis
     11. Dump analysis
+
+    Parameters
+    ==========
+    density_fit_method:
+        Parameterisation of the density profile. Either a callable
+        (see `DensityFit`), or one of the following options:
+
+        - ``"smoothing-spline"``: 1D smoothing spline
+          (`SmoothingSplineFit`)
+        - ``"smoothing-spline-file"``: 1D smoothing spline constructed
+          from file (`SmoothingSplineFit.from_dat_file`)
+        - ``"stefanikova"``: combination of modified hyperbolic
+          :math:`\tan` and a Gaussian (`StefanikovaFit`)
+        - ``"poly3"`` or ``"polynomial"``: :math:`n`-th order
+          polynomial (`PolynomialFit`)
+        - ``"tanh"``: hyperbolic :math:`\tan` (`TanhFit`)
+        - ``"quadratic"``: constrained quadratic (`QuadraticFit`)
+
+        If ``density_fit_method`` is a string, then the corresponding
+        `DensityFit` object is constructed using
+        ``poloidal_flux_enter`` and ``density_fit_parameters``.
+
+        ``"smoothing-spline-file"`` looks for a file called
+        ``ne<input_filename_suffix>.dat`` in ``ne_data_path``. It also
+        uses ``interp_order`` and ``interp_smoothing``.
     """
 
     # major_radius = 0.9
