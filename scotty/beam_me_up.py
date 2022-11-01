@@ -156,6 +156,11 @@ from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
 from scotty import density_fit
 from scotty._version import __version__
 
+# Type hints
+from typing import Optional, Union, Callable
+from numpy.typing import ArrayLike
+from scotty.typing import PathLike
+
 
 def beam_me_up(
     poloidal_launch_angle_Torbeam,
@@ -199,6 +204,7 @@ def beam_me_up(
     plasmaLaunch_K=np.zeros(3),
     plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3, 3]),
     density_fit_parameters=None,
+    density_fit_method="smoothing-spline-file",
     ## For circular flux surfaces
     B_T_axis=None,
     B_p_a=None,
@@ -263,52 +269,20 @@ def beam_me_up(
     ne_data_radialcoord_array = None
 
     if density_fit_parameters is None:
-        print("ne(psi): loading from input file")
-        # Importing data from ne.dat
         ne_filename = ne_data_path / f"ne{input_filename_suffix}.dat"
-
-        find_density_1D = density_fit.SmoothingSplineFit.from_dat_file(
-            ne_filename, poloidal_flux_enter, interp_order, interp_smoothing
-        )
 
         # FIXME: Read data so it can be saved later
         ne_data = np.fromfile(ne_filename, dtype=float, sep="   ")
         ne_data_density_array = ne_data[2::2]
         ne_data_radialcoord_array = ne_data[1::2]
-    elif len(density_fit_parameters) == 8:
-        print("ne(psi): Using Stefanikova")
-        find_density_1D = density_fit.StefanikovaFit(
-            poloidal_flux_enter, *density_fit_parameters
-        )
 
-    elif len(density_fit_parameters) == 4:
-        print("ne(psi): Using order_3_polynomial")
-        find_density_1D = density_fit.PolynomialFit(
-            poloidal_flux_enter, *density_fit_parameters
-        )
-
-    elif len(density_fit_parameters) == 3:
-        print("ne(psi): using constant*tanh")
-
-        if poloidal_flux_enter != density_fit_parameters[2]:
-            raise ValueError("Invalid fit parameters for quadratic density profile")
-
-        find_density_1D = density_fit.TanhFit(
-            poloidal_flux_enter, density_fit_parameters[0], density_fit_parameters[1]
-        )
-
-    elif len(density_fit_parameters) == 2:
-        print("ne(psi): using quadratic profile")
-
-        if poloidal_flux_enter != density_fit_parameters[1]:
-            raise ValueError("Invalid fit parameters for quadratic density profile")
-
-        find_density_1D = density_fit.QuadraticFit(
-            poloidal_flux_enter, density_fit_parameters[0]
-        )
-
+        density_fit_parameters = [interp_order, interp_smoothing]
     else:
-        raise ValueError("density_fit_parameters has an invalid length")
+        ne_filename = None
+
+    find_density_1D = make_density_fit(
+        density_fit_method, density_fit_parameters, ne_filename
+    )
 
     if find_B_method == "torbeam":
         print("Using Torbeam input files for B and poloidal flux")
@@ -3389,3 +3363,20 @@ def beam_me_up(
     # -------------------
 
     return None
+
+
+def make_density_fit(
+    method: Optional[Union[str, Callable[[ArrayLike], ArrayLike]]],
+    parameters: ArrayLike,
+    filename: Optional[PathLike],
+) -> density_fit.DensityFit:
+    """Either construct a `DensityFit` instance, or return ``method``
+    if it's already suitable. Suitable methods are callables that take
+    an array of poloidal fluxes and return an array of densities.
+
+    """
+    if callable(method):
+        return method
+
+    if isinstance(method, (str, type(None))):
+        return density_fit.density_fit(method, parameters, filename)
