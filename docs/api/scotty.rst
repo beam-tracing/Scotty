@@ -23,6 +23,7 @@ Submodules
    scotty.check_ModeConversion
    scotty.compare_plot
    scotty.debugging
+   scotty.density_fit
    scotty.fun_CFD
    scotty.fun_FFD
    scotty.fun_evolution

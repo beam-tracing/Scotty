@@ -122,7 +122,6 @@ from scotty.fun_general import (
 )
 from scotty.fun_general import find_d2_poloidal_flux_dR2, find_d2_poloidal_flux_dZ2
 from scotty.fun_general import find_H_Cardano, find_D
-from scotty.fun_general import f_ped
 from scotty.fun_general import find_quick_output
 
 from scotty.fun_evolution import ray_evolution_2D_fun, beam_evolution_fun
@@ -154,7 +153,7 @@ from scotty.fun_mix import (
 
 # For find_B if using efit files directly
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
-
+from scotty import density_fit
 from scotty._version import __version__
 
 
@@ -259,157 +258,57 @@ def beam_me_up(
 
     # Experimental Profile----------
 
+    # So that saving the input data later does not complain
+    ne_data_density_array = None
+    ne_data_radialcoord_array = None
+
     if density_fit_parameters is None:
         print("ne(psi): loading from input file")
         # Importing data from ne.dat
         ne_filename = ne_data_path / f"ne{input_filename_suffix}.dat"
 
-        # electron density as a function of poloidal flux label
-        ne_data = np.fromfile(ne_filename, dtype=float, sep="   ")
-
-        #    ne_data_length = int(ne_data[0])
-        ne_data_density_array = ne_data[2::2]  # in units of 10.0**19 m-3
-        ne_data_radialcoord_array = ne_data[1::2]
-        # Loading radial coord for now, makes it easier to benchmark with Torbeam. Hence, have to convert to poloidal flux
-        ne_data_poloidal_flux_array = ne_data_radialcoord_array**2
-        # ne_data_poloidal_flux_array = ne_data[1::2] # My new IDL file outputs the flux density directly, instead of radialcoord
-
-        # interp_density_1D = interpolate.interp1d(ne_data_poloidal_flux_array, ne_data_density_array,
-        #                                          kind='cubic', axis=-1, copy=True, bounds_error=False,
-        #                                          fill_value=0, assume_sorted=False)  # density is 0 outside the LCFS, hence the fill_value. Use 'linear' instead of 'cubic' if the density data has a discontinuity in the first derivative
-        interp_density_1D = interpolate.UnivariateSpline(
-            ne_data_poloidal_flux_array,
-            ne_data_density_array,
-            w=None,
-            bbox=[None, None],
-            k=interp_order,
-            s=interp_smoothing,
-            ext=0,
-            check_finite=False,
+        find_density_1D = density_fit.SmoothingSplineFit.from_dat_file(
+            ne_filename, poloidal_flux_enter, interp_order, interp_smoothing
         )
 
-        def find_density_1D(
-            poloidal_flux,
-            interp_density_1D=interp_density_1D,
-            poloidal_flux_enter=poloidal_flux_enter,
-        ):
-            density_interp = interp_density_1D(poloidal_flux)
-            is_inside = poloidal_flux <= poloidal_flux_enter  # Boolean array
-            density = is_inside * density_interp
-            return density
-
+        # FIXME: Read data so it can be saved later
+        ne_data = np.fromfile(ne_filename, dtype=float, sep="   ")
+        ne_data_density_array = ne_data[2::2]
+        ne_data_radialcoord_array = ne_data[1::2]
     elif len(density_fit_parameters) == 8:
         print("ne(psi): Using Stefanikova")
-        ne_data_density_array = (
-            None  # So that saving the input data later does not complain
+        find_density_1D = density_fit.StefanikovaFit(
+            poloidal_flux_enter, *density_fit_parameters
         )
-        # So that saving the input data later does not complain
-        ne_data_radialcoord_array = None
 
-        def find_density_1D(
-            poloidal_flux,
-            poloidal_flux_enter=poloidal_flux_enter,
-            density_fit_parameters=density_fit_parameters,
-        ):
-            (
-                a_height,
-                a_width,
-                a_exp,
-                b_height,
-                b_SOL,
-                b_width,
-                b_slope,
-                b_pos,
-            ) = density_fit_parameters
-            fp = f_ped(poloidal_flux, b_height, 0, b_width, b_slope, b_pos)
-            density_fit = (
-                fp + (a_height - fp) * np.exp(-poloidal_flux / a_width) ** a_exp
-            )
-            is_inside = poloidal_flux <= poloidal_flux_enter  # Boolean array
-            # The Boolean array sets stuff outside poloidal_flux_enter to zero
-            density = is_inside * density_fit
-            return density
-
-    # elif len(density_fit_parameters) == 4:
-    #     print('ne(psi): Using order_1_polynomial*tanh')
-    #     ne_data_density_array=None # So that saving the input data later does not complain
-    #     ne_data_radialcoord_array=None # So that saving the input data later does not complain
-
-    #     def find_density_1D(poloidal_flux, poloidal_flux_enter=poloidal_flux_enter,density_fit_parameters=density_fit_parameters):
-    #         density_fit = (density_fit_parameters[0]*poloidal_flux + density_fit_parameters[1])*np.tanh(density_fit_parameters[2] * poloidal_flux + density_fit_parameters[3])
-    #         is_inside = poloidal_flux <= poloidal_flux_enter # Boolean array
-    #         density = is_inside * density_fit # The Boolean array sets stuff outside poloidal_flux_enter to zero
-    #         return density
     elif len(density_fit_parameters) == 4:
         print("ne(psi): Using order_3_polynomial")
-        ne_data_density_array = (
-            None  # So that saving the input data later does not complain
+        find_density_1D = density_fit.PolynomialFit(
+            poloidal_flux_enter, *density_fit_parameters
         )
-        # So that saving the input data later does not complain
-        ne_data_radialcoord_array = None
-
-        def find_density_1D(
-            poloidal_flux,
-            poloidal_flux_enter=poloidal_flux_enter,
-            density_fit_parameters=density_fit_parameters,
-        ):
-            density_fit = np.polyval(density_fit_parameters, poloidal_flux)
-            is_inside = poloidal_flux <= poloidal_flux_enter  # Boolean array
-            # The Boolean array sets stuff outside poloidal_flux_enter to zero
-            density = is_inside * density_fit
-            return density
 
     elif len(density_fit_parameters) == 3:
         print("ne(psi): using constant*tanh")
-        ne_data_density_array = (
-            None  # So that saving the input data later does not complain
-        )
-        # So that saving the input data later does not complain
-        ne_data_radialcoord_array = None
 
-        def find_density_1D(
-            poloidal_flux,
-            poloidal_flux_enter=poloidal_flux_enter,
-            density_fit_parameters=density_fit_parameters,
-        ):
-            density_fit = density_fit_parameters[0] * np.tanh(
-                density_fit_parameters[1] * (poloidal_flux - density_fit_parameters[2])
-            )
-            is_inside = poloidal_flux <= poloidal_flux_enter  # Boolean array
-            # The Boolean array sets stuff outside poloidal_flux_enter to zero
-            density = is_inside * density_fit
-            return density
+        if poloidal_flux_enter != density_fit_parameters[2]:
+            raise ValueError("Invalid fit parameters for quadratic density profile")
+
+        find_density_1D = density_fit.TanhFit(
+            poloidal_flux_enter, density_fit_parameters[0], density_fit_parameters[1]
+        )
 
     elif len(density_fit_parameters) == 2:
         print("ne(psi): using quadratic profile")
-        ne_data_density_array = (
-            None  # So that saving the input data later does not complain
-        )
-        # So that saving the input data later does not complain
-        ne_data_radialcoord_array = None
 
-        # density_fit_parameters[0]: density at magnetic axis (psi = 0)
-        # density_fit_parameters[1]: poloidal flux when density = 0
         if poloidal_flux_enter != density_fit_parameters[1]:
-            print("Invalid fit parameters for quadratic density profile")
+            raise ValueError("Invalid fit parameters for quadratic density profile")
 
-        def find_density_1D(
-            poloidal_flux,
-            poloidal_flux_enter=poloidal_flux_enter,
-            density_fit_parameters=density_fit_parameters,
-        ):
-            density_fit = density_fit_parameters[0] - (poloidal_flux) ** 2 * (
-                density_fit_parameters[0] / density_fit_parameters[1]
-            )
-            # density_fit =  density_fit_parameters[0] * (1 - (poloidal_flux)**2)
-            is_inside = poloidal_flux <= poloidal_flux_enter  # Boolean array
-            # The Boolean array sets stuff outside poloidal_flux_enter to zero
-            density = is_inside * density_fit
-            return density
+        find_density_1D = density_fit.QuadraticFit(
+            poloidal_flux_enter, density_fit_parameters[0]
+        )
 
     else:
-        print("density_fit_parameters has an invalid length")
-        sys.exit()
+        raise ValueError("density_fit_parameters has an invalid length")
 
     if find_B_method == "torbeam":
         print("Using Torbeam input files for B and poloidal flux")
