@@ -43,3 +43,6 @@ write_to = "scotty/_version.py"
 testpaths = [
     "tests",
 ]
+
+[tool.mypy]
+plugins = "numpy.typing.mypy_plugin"

@@ -19,7 +19,7 @@ import math
 import numpy as np
 from numpy.typing import ArrayLike
 import pathlib
-from typing import Callable, Dict, NamedTuple, Optional
+from typing import Callable, Dict, NamedTuple, Optional, Any
 import warnings
 
 from .hornpy import make_my_horn
@@ -38,8 +38,8 @@ def get_parameters_for_Scotty(
     launch_freq_GHz: Optional[float] = None,
     mirror_rotation: Optional[float] = None,
     mirror_tilt: Optional[float] = None,
-    find_B_method: Optional[float] = None,
-    find_ne_method: Optional[float] = None,
+    find_B_method: Optional[str] = None,
+    find_ne_method: Optional[str] = None,
     equil_time: Optional[float] = None,
     shot: Optional[int] = None,
     user: Optional[str] = None,
@@ -98,7 +98,7 @@ def get_parameters_for_Scotty(
         User profile settings
     """
     # Initialise dictionaries
-    parameters = {
+    parameters: Dict[str, Any] = {
         "poloidal_launch_angle_Torbeam": None,
         "toroidal_launch_angle_Torbeam": None,
         "launch_freq_GHz": launch_freq_GHz,
@@ -172,7 +172,7 @@ class LaunchBeamParameters(NamedTuple):
 
 
 def beam_settings(
-    diagnostic: float, launch_freq_GHz: float, method: str = "data"
+    diagnostic: str, launch_freq_GHz: float, method: str = "data"
 ) -> LaunchBeamParameters:
     """Return the launch beam width and curvature
 
@@ -664,7 +664,7 @@ def launch_beam_DBS_SWIP_MAST_U_estimate_fix_w0(launch_freq_GHz):
     return propagate_circular_beam(distance, wavenumber_K0, w0, launch_freq_GHz)
 
 
-LAUNCH_BEAM_METHODS: Dict[str, Callable[[float], DensityFitParameters]] = {
+LAUNCH_BEAM_METHODS: Dict[str, Dict[str, Callable[[float], LaunchBeamParameters]]] = {
     "DBS_NSTX_MAST": {
         "horn_and_lens": launch_beam_DBS_NSTX_MAST_horn_and_lens,
         "data": launch_beam_DBS_NSTX_MAST_data,
