@@ -82,6 +82,9 @@ class QuadraticFit(DensityFit):
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
         return self.ne_0 - ((self.ne_0 / self.poloidal_flux_enter) * poloidal_flux**2)
 
+    def __repr__(self):
+        return f"QuadraticFit({self.poloidal_flux_enter}, ne_0={self.ne_0})"
+
 
 class TanhFit(DensityFit):
     r"""Fit using :math:`\tanh`:
@@ -133,6 +136,11 @@ class TanhFit(DensityFit):
             self.ne_1 * (poloidal_flux - self.poloidal_flux_enter)
         )
 
+    def __repr__(self):
+        return (
+            f"TanhFit({self.poloidal_flux_enter}, ne_0={self.ne_0}, ne_1={self.ne_1})"
+        )
+
 
 class PolynomialFit(DensityFit):
     r"""Fit using a :math:`m`-th order polynomial:
@@ -158,6 +166,11 @@ class PolynomialFit(DensityFit):
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
         return np.polyval(self.coefficients, poloidal_flux)
+
+    def __repr__(self):
+        return (
+            f"PolynomialFit({self.poloidal_flux_enter}, {', '.join(self.coefficients)})"
+        )
 
 
 class StefanikovaFit(DensityFit):
@@ -220,6 +233,19 @@ class StefanikovaFit(DensityFit):
         return (
             fp
             + (self.a_height - fp) * np.exp(-poloidal_flux / self.a_width) ** self.a_exp
+        )
+
+    def __repr__(self):
+        return (
+            f"StefanikovaFit({self.poloidal_flux_enter}, "
+            f"a_height={self.a_height}, "
+            f"a_width={self.a_width}, "
+            f"a_exp={self.a_exp}, "
+            f"b_height={self.b_height}, "
+            f"b_SOL={self.b_SOL}, "
+            f"b_width={self.b_width}, "
+            f"b_slope={self.b_slope}, "
+            f"b_pos={self.b_pos})"
         )
 
 
