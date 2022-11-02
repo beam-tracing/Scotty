@@ -31,6 +31,7 @@ from .fun_general import (
     genray_angles_from_mirror_angles,
     freq_GHz_to_wavenumber,
 )
+from .density_fit import QuadraticFit, TanhFit, PolynomialFit, DensityFit
 
 
 def get_parameters_for_Scotty(
@@ -148,10 +149,11 @@ def get_parameters_for_Scotty(
         parameters["ne_data_path"] = ne_path
         parameters["magnetic_data_path"] = topfile_path
     elif find_B_method in ["EFITpp", "UDA_saved", "test"]:
-        density_fit = ne_settings(diagnostic, shot, equil_time, find_ne_method)
-        parameters["density_fit_parameters"] = density_fit.ne_fit_param
-        parameters["poloidal_flux_enter"] = density_fit.poloidal_flux_enter
         parameters["ne_data_path"] = UDA_saved_path
+
+        density_fit = ne_settings(diagnostic, shot, equil_time, find_ne_method)
+        parameters["density_fit_method"] = density_fit.fit
+        parameters["poloidal_flux_enter"] = density_fit.poloidal_flux_enter
 
     # MAST and MAST-U specific B-field and poloidal flux settings
     if find_B_method == "UDA":
@@ -219,22 +221,25 @@ def beam_settings(
 
 
 class DensityFitParameters(NamedTuple):
-    """Coefficients for a parameterised density"""
+    """Parameterised density"""
 
-    ne_fit_param: Optional[ArrayLike]
-    """Set of fitting parameters"""
-    ne_fit_time: Optional[float]
+    fit: Optional[DensityFit]
+    """Fit parameterisation"""
+    time_ms: Optional[float]
     """Actual shot time (in milliseconds) that parameters correspond to"""
-    poloidal_flux_enter: Optional[ArrayLike]
-    """FIXME"""
+    poloidal_flux_enter: Optional[float]
+    """Poloidal flux surface label where the density goes to zero"""
 
 
 def ne_settings(
-    diagnostic: str, shot: int, time: float, find_ne_method: str
+    diagnostic: str,
+    shot: Optional[int],
+    time: Optional[float],
+    find_ne_method: Optional[str],
 ) -> DensityFitParameters:
     """Get pre-existing density fit parameters from `DENSITY_FIT_PARAMETERS`"""
 
-    if find_ne_method is None or shot is None:
+    if find_ne_method is None or shot is None or time is None:
         return DensityFitParameters(None, None, None)
 
     try:
@@ -262,22 +267,16 @@ def ne_settings(
             f"Available methods: {shot_parameters.keys()}"
         )
 
-    ne_fit_times = np.asarray(method_parameters["ne_fit_times"])
-    ne_fit_params = np.asarray(method_parameters["ne_fit_params"])
+    ne_fits = method_parameters["fit"]
+    ne_fit_times = method_parameters["time_ms"]
 
     nearest_time_idx = find_nearest(ne_fit_times, time)
 
-    ne_fit_param = ne_fit_params[nearest_time_idx, :]
+    ne_fit = ne_fits[nearest_time_idx]
     ne_fit_time = ne_fit_times[nearest_time_idx]
     print("Nearest ne fit time:", ne_fit_time)
 
-    poloidal_fluxes_enter = method_parameters.get("poloidal_fluxes_enter", None)
-    if poloidal_fluxes_enter:
-        poloidal_flux_enter = poloidal_fluxes_enter[nearest_time_idx]
-    else:
-        poloidal_flux_enter = ne_fit_params[2]
-
-    return ne_fit_param, ne_fit_time, poloidal_flux_enter
+    return DensityFitParameters(ne_fit, ne_fit_time, ne_fit.poloidal_flux_enter)
 
 
 def user_settings(diagnostic, user, shot):
@@ -423,7 +422,8 @@ def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
 
 
 def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
-    ne_fit_param = np.array([4.0, 1.0])
+    poloidal_flux_enter = 1.0
+    ne_fit = QuadraticFit(poloidal_flux_enter, 4.0)
     return {
         "poloidal_launch_angle_Torbeam": 6.0,
         "toroidal_launch_angle_Torbeam": 0.0,
@@ -433,13 +433,13 @@ def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
         "launch_beam_curvature": 1 / -4.0,
         # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
         "launch_position": np.array([2.587, 0, -0.0157]),
-        "density_fit_parameters": ne_fit_param,
+        "density_fit_method": ne_fit,
         "find_B_method": "analytical",
         "Psi_BC_flag": True,
         "figure_flag": False,
         "vacuum_propagation_flag": True,
         "vacuumLaunch_flag": True,
-        "poloidal_flux_enter": ne_fit_param[1],
+        "poloidal_flux_enter": poloidal_flux_enter,
         "B_T_axis": 1.0,
         "B_p_a": 0.1,
         "R_axis": 1.5,
@@ -447,7 +447,7 @@ def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
     }
 
 
-DEFAULT_DIAGNOSTIC_PARAMETERS: Dict[str, Callable[[float], dict]] = {
+DEFAULT_DIAGNOSTIC_PARAMETERS: Dict[str, Callable[[Optional[float]], dict]] = {
     "DBS_NSTX_MAST": parameters_DBS_NSTX_MAST,
     "DBS_UCLA_MAST-U": parameters_DBS_UCLA_MAST_U,
     "DBS_SWIP_MAST-U": parameters_DBS_SWIP_MAST_U,
@@ -680,111 +680,93 @@ LAUNCH_BEAM_METHODS: Dict[str, Dict[str, Callable[[float], LaunchBeamParameters]
 """Functions that return launch beam parameters for the corresponding diagnostic"""
 
 
+fit_dtype = [("time_ms", np.float64), ("fit", DensityFit)]
+
 DENSITY_FIT_PARAMETERS = {
     "DBS_NSTX_MAST": {
         29684: {
-            "tanh": {
-                "ne_fit_params": [
-                    [2.1, -1.9, 1.2],  # 167ms
-                    [2.1, -1.9, 1.25],  # 179ms
-                    [2.3, -1.9, 1.2],  # 192ms
-                    [2.4, -2.0, 1.2],  # 200ms
-                    [2.5, -2.1, 1.2],  # 217ms
+            "tanh": np.array(
+                [
+                    (0.167, TanhFit(1.2, 2.1, -1.9)),
+                    (0.179, TanhFit(1.25, 2.1, -1.9)),
+                    (0.192, TanhFit(1.2, 2.3, -1.9)),
+                    (0.200, TanhFit(1.2, 2.4, -2.0)),
+                    (0.217, TanhFit(1.2, 2.5, -2.1)),
                 ],
-                "ne_fit_times": [0.167, 0.179, 0.192, 0.200, 0.217],
-            }
+                dtype=fit_dtype,
+            ),
         },
         29908: {
-            "tanh": {
-                "ne_fit_params": [
-                    [2.3, -1.9, 1.18],  # 150ms
-                    [2.55, -2.2, 1.15],  # 160ms
-                    [2.8, -2.2, 1.15],  # 170ms
-                    [3.0, -2.35, 1.2],  # 180ms
-                    [3.25, -2.4, 1.22],  # 190ms
-                    [3.7, -2.7, 1.15],  # 200ms
-                    [4.2, -2.0, 1.2],  # 210ms
-                    [4.5, -1.8, 1.24],  # 220ms
-                    [4.8, -1.8, 1.2],  # 230ms
-                    [5.2, -1.8, 1.2],  # 240ms
-                    [5.2, -2.8, 1.1],  # 250ms
-                    [5.7, -1.9, 1.15],  # 260ms
-                    [5.8, -2.2, 1.1],  # 270ms
-                    [6.5, -1.7, 1.15],  # 280ms
-                    [6.6, -1.8, 1.1],  # 290ms
+            "tanh": np.array(
+                [
+                    (0.150, TanhFit(1.18, 2.3, -1.9)),
+                    (0.160, TanhFit(1.15, 2.55, -2.2)),
+                    (0.170, TanhFit(1.15, 2.8, -2.2)),
+                    (0.180, TanhFit(1.2, 3.0, -2.35)),
+                    (0.190, TanhFit(1.22, 3.25, -2.4)),
+                    (0.200, TanhFit(1.15, 3.7, -2.7)),
+                    (0.210, TanhFit(1.2, 4.2, -2.0)),
+                    (0.220, TanhFit(1.24, 4.5, -1.8)),
+                    (0.230, TanhFit(1.2, 4.8, -1.8)),
+                    (0.240, TanhFit(1.2, 5.2, -1.8)),
+                    (0.250, TanhFit(1.1, 5.2, -2.8)),
+                    (0.260, TanhFit(1.15, 5.7, -1.9)),
+                    (0.270, TanhFit(1.1, 5.8, -2.2)),
+                    (0.280, TanhFit(1.15, 6.5, -1.7)),
+                    (0.290, TanhFit(1.1, 6.6, -1.8)),
                 ],
-                "ne_fit_times": np.linspace(0.150, 0.290, 15),
-            },
-            "poly3": {
-                "ne_fit_params": [
-                    [-3.39920666, 3.3767761, -1.55984715, 2.49116064],
-                    [-3.31670147, 2.24970438, -0.46971473, 2.47113803],
-                    [-3.44610169, 1.69591882, 0.22709583, 2.62872259],
-                    [-4.91157473, 3.12397459, 0.30956902, 2.71940548],
-                    [-6.99408536, 4.98094795, 0.36188724, 2.86325923],
-                    [-4.01026147, 0.89218099, 1.24564799, 3.24225355],
-                    [-4.21483706, 1.73180927, 0.63975703, 3.48532344],
-                    [-3.89636166, 1.00604874, 0.5745085, 3.85908854],
-                    [-4.75241047, 1.34810624, 0.7207821, 4.11300423],
-                    [-2.98806121, -1.48680106, 1.51977942, 4.54713015],
+                dtype=fit_dtype,
+            ),
+            # fmt: off
+            "poly3": np.array(
+                [
+                    (0.16, PolynomialFit(1.14908613, -3.39920666, 3.3767761, -1.55984715, 2.49116064)),
+                    (0.17, PolynomialFit(1.13336773, -3.31670147, 2.24970438, -0.46971473, 2.47113803)),
+                    (0.18, PolynomialFit(1.13850717, -3.44610169, 1.69591882, 0.22709583, 2.62872259)),
+                    (0.19, PolynomialFit(1.1274871, -4.91157473, 3.12397459, 0.30956902, 2.71940548)),
+                    (0.20, PolynomialFit(1.09851547, -6.99408536, 4.98094795, 0.36188724, 2.86325923)),
+                    (0.21, PolynomialFit(1.1302204, -4.01026147, 0.89218099, 1.24564799, 3.24225355)),
+                    (0.22, PolynomialFit(1.15828467, -4.21483706, 1.73180927, 0.63975703, 3.48532344)),
+                    (0.23, PolynomialFit(1.14394922, -3.89636166, 1.00604874, 0.5745085, 3.85908854)),
+                    (0.24, PolynomialFit(1.1153502, -4.75241047, 1.34810624, 0.7207821, 4.11300423)),
+                    (0.25, PolynomialFit(1.13408871, -2.98806121, -1.48680106, 1.51977942, 4.54713015)),
                 ],
-                "ne_fit_times": np.linspace(0.160, 0.250, 10),
-                "poloidal_fluxes_enter": [
-                    1.14908613,
-                    1.13336773,
-                    1.13850717,
-                    1.1274871,
-                    1.09851547,
-                    1.1302204,
-                    1.15828467,
-                    1.14394922,
-                    1.1153502,
-                    1.13408871,
-                ],
-            },
+                dtype=fit_dtype,
+            ),
+            # fmt: on
         },
-        29980: {
-            "tanh": {
-                "ne_fit_params": [[2.3, -2.6, 1.12]],
-                "ne_fit_times": [0.200],
-            }
-        },
+        29980: {"tanh": np.array([(0.200, TanhFit(1.12, 2.3, -2.6))], dtype=fit_dtype)},
         30073: {
-            "tanh": {
-                # Fit underestimates TS density when polflux < 0.2 (roughly, for some of the times)
-                "ne_fit_params": [
-                    [2.8, -1.4, 1.1],  # 190ms
-                    [2.9, -1.4, 1.15],  # 200ms
-                    [3.0, -1.3, 1.2],  # 210ms
-                    [3.4, -1.2, 1.2],  # 220ms
-                    [3.6, -1.2, 1.2],  # 230ms
-                    [4.0, -1.2, 1.2],  # 240ms
-                    [4.4, -1.2, 1.2],  # 250ms
+            # Fit underestimates TS density when polflux < 0.2 (roughly, for some of the times)
+            "tanh": np.array(
+                [
+                    (0.190, TanhFit(1.1, 2.8, -1.4)),
+                    (0.200, TanhFit(1.15, 2.9, -1.4)),
+                    (0.210, TanhFit(1.2, 3.0, -1.3)),
+                    (0.220, TanhFit(1.2, 3.4, -1.2)),
+                    (0.230, TanhFit(1.2, 3.6, -1.2)),
+                    (0.240, TanhFit(1.2, 4.0, -1.2)),
+                    (0.250, TanhFit(1.2, 4.4, -1.2)),
                 ],
-                "ne_fit_times": np.linspace(0.190, 0.250, 7),
-            }
+                dtype=fit_dtype,
+            ),
         },
         45091: {
-            "tanh": {
-                "ne_fit_params": [
-                    [5.5, -0.6, 1.2],  # 390ms
-                    [4.8, -0.6, 1.2],  # 400ms
-                    [3.0, -1.3, 1.2],  # 410ms
+            "tanh": np.array(
+                [
+                    (0.390, TanhFit(1.2, 5.5, -0.6)),
+                    (0.400, TanhFit(1.2, 4.8, -0.6)),
+                    (0.410, TanhFit(1.2, 3.0, -1.3)),
                 ],
-                "ne_fit_times": np.linspace(0.390, 0.410, 3),
-            }
+                dtype=fit_dtype,
+            )
         },
-        45154: {
-            "tanh": {
-                "ne_fit_params": [[2.4, -1.8, 1.12]],
-                "ne_fit_times": [0.510],
-            }
-        },
+        45154: {"tanh": np.array([(0.510, TanhFit(1.12, 2.4, -1.8))], dtype=fit_dtype)},
         45189: {
-            "tanh": {
-                "ne_fit_params": [[2.3, -1.8, 1.12], [3.5, -1.35, 1.2]],
-                "ne_fit_times": [0.200, 0.650],
-            }
+            "tanh": np.array(
+                [(0.200, TanhFit(1.12, 2.3, -1.8)), (0.650, TanhFit(1.2, 3.5, -1.35))],
+                dtype=fit_dtype,
+            )
         },
     }
 }

@@ -11,7 +11,9 @@ def test_ne_settings():
         "DBS_NSTX_MAST", 29908, 0.170, "poly3"
     )
     assert fit_time == 0.170
-    nt.assert_array_equal(fit_param, [-3.31670147, 2.24970438, -0.46971473, 2.47113803])
+    nt.assert_array_equal(
+        fit_param.coefficients, [-3.31670147, 2.24970438, -0.46971473, 2.47113803]
+    )
     assert poloidal_flux_enter == 1.13336773
 
 
