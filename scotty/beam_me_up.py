@@ -302,7 +302,7 @@ def beam_me_up(
         ne_data_density_array = ne_data[2::2]
         ne_data_radialcoord_array = ne_data[1::2]
 
-        density_fit_parameters = [interp_order, interp_smoothing]
+        density_fit_parameters = [ne_filename, interp_order, interp_smoothing]
     else:
         ne_filename = None
 
