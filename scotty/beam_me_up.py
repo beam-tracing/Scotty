@@ -309,7 +309,7 @@ def beam_me_up(
         ne_filename = None
 
     find_density_1D = make_density_fit(
-        density_fit_method, density_fit_parameters, ne_filename
+        density_fit_method, poloidal_flux_enter, density_fit_parameters, ne_filename
     )
 
     if find_B_method == "torbeam":
@@ -3395,6 +3395,7 @@ def beam_me_up(
 
 def make_density_fit(
     method: Optional[Union[str, Callable[[ArrayLike], ArrayLike]]],
+    poloidal_flux_enter: float,
     parameters: ArrayLike,
     filename: Optional[PathLike],
 ) -> density_fit.DensityFit:
@@ -3407,4 +3408,6 @@ def make_density_fit(
         return method
 
     if isinstance(method, (str, type(None))):
-        return density_fit.density_fit(method, parameters, filename)
+        return density_fit.density_fit(
+            method, poloidal_flux_enter, parameters, filename
+        )
