@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Callable, Optional
 from warnings import warn
 
 from scotty.typing import PathLike
@@ -7,6 +7,10 @@ from scotty.typing import PathLike
 import numpy as np
 from numpy.typing import ArrayLike
 from scipy.interpolate import UnivariateSpline
+
+
+DensityFitLike = Callable[[ArrayLike], ArrayLike]
+"""A callable that can parameterise density in 1D"""
 
 
 class DensityFit:
@@ -275,8 +279,8 @@ class SmoothingSplineFit(DensityFit):
     @classmethod
     def from_dat_file(
         cls,
-        filename: PathLike,
         poloidal_flux_enter: float,
+        filename: PathLike,
         order: int = 5,
         smoothing: Optional[float] = None,
     ) -> SmoothingSplineFit:
@@ -330,6 +334,31 @@ DENSITY_FIT_METHODS = {
 }
 
 
+def _guess_density_fit_method(
+    parameters: ArrayLike, filename: Optional[PathLike]
+) -> str:
+    if filename is not None:
+        print("ne(psi): loading from input file")
+        return "smoothing-spline-file"
+
+    FIT_LENGTH_MAPPINGS = {
+        8: ("Stefanikova", "stefanikova"),
+        4: ("order_3_polynomial", "polynomial"),
+        3: ("constant*tanh", "tanh"),
+        2: ("quadratic profile", "quadratic"),
+    }
+
+    try:
+        name, fit_method = FIT_LENGTH_MAPPINGS[len(parameters)]
+        print(f"ne(psi): Using {name}")
+        return fit_method
+    except KeyError:
+        raise ValueError(
+            "Couldn't match length of 'parameters' to known fit parameterisation. "
+            "Try explicitly providing fit method"
+        )
+
+
 def density_fit(
     method: Optional[str],
     poloidal_flux_enter: float,
@@ -357,34 +386,19 @@ def density_fit(
             "Guessing method from parameters",
             DeprecationWarning,
         )
-        if filename is not None:
-            print("ne(psi): loading from input file")
-            return SmoothingSplineFit.from_dat_file(
-                filename, poloidal_flux_enter, *parameters
-            )
+        method = _guess_density_fit_method(parameters, filename)
 
-        FIT_LENGTH_MAPPINGS = {
-            8: ("Stefanikova", StefanikovaFit),
-            4: ("order_3_polynomial", PolynomialFit),
-            3: ("constant*tanh", TanhFit),
-            2: ("quadratic profile", QuadraticFit),
-        }
+    if method == "smoothing-spline-file" and filename != parameters[0]:
+        raise ValueError(
+            f"For '{method}', expected filename as second parameter, but got '{parameters[0]}'"
+        )
 
-        try:
-            name, fit_method = FIT_LENGTH_MAPPINGS[len(parameters)]
-            print(f"ne(psi): Using {name}")
-        except KeyError:
-            raise ValueError(
-                "Couldn't match length of 'parameters' to known fit parameterisation. "
-                "Try explicitly providing fit method"
-            )
-    else:
-        try:
-            fit_method = DENSITY_FIT_METHODS[method]
-        except KeyError:
-            raise ValueError(
-                f"Unknown density fitting method '{method}'. "
-                f"Expected one of {DENSITY_FIT_METHODS.keys()}"
-            )
+    try:
+        fit_method = DENSITY_FIT_METHODS[method]
+    except KeyError:
+        raise ValueError(
+            f"Unknown density fitting method '{method}'. "
+            f"Expected one of {DENSITY_FIT_METHODS.keys()}"
+        )
 
     return fit_method(poloidal_flux_enter, *parameters)

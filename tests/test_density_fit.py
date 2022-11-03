@@ -60,7 +60,7 @@ def test_density_fit(fit):
 
 def test_spline_fit_from_file(ne_dat):
     rho, density, filename = ne_dat
-    fit = SmoothingSplineFit.from_dat_file(filename, 1.0)
+    fit = SmoothingSplineFit.from_dat_file(1.0, filename)
     assert np.allclose(density, fit(rho**2))
 
 
@@ -73,5 +73,5 @@ def test_make_density_fit(ne_dat):
     assert isinstance(fit, QuadraticFit)
 
     _, _, filename = ne_dat
-    fit = density_fit(None, LCFS, [5, 0], filename=filename)
+    fit = density_fit(None, LCFS, [filename, 5, 0], filename=filename)
     assert isinstance(fit, SmoothingSplineFit)
