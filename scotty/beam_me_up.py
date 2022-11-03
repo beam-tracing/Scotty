@@ -154,7 +154,7 @@ from scotty.fun_mix import (
 
 # For find_B if using efit files directly
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
-from scotty import density_fit, DensityFitLike
+from scotty.density_fit import density_fit, DensityFitLike
 from scotty._version import __version__
 
 # Type hints
@@ -3410,4 +3410,4 @@ def make_density_fit(
             f"Unexpected method type, expected callable, str or None, got '{type(method)}'"
         )
 
-    return density_fit.density_fit(method, poloidal_flux_enter, parameters, filename)
+    return density_fit(method, poloidal_flux_enter, parameters, filename)
