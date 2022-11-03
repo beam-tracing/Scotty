@@ -154,11 +154,11 @@ from scotty.fun_mix import (
 
 # For find_B if using efit files directly
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
-from scotty import density_fit
+from scotty import density_fit, DensityFitLike
 from scotty._version import __version__
 
 # Type hints
-from typing import Optional, Union, Callable
+from typing import Optional, Union
 from numpy.typing import ArrayLike
 from scotty.typing import PathLike
 
@@ -205,9 +205,7 @@ def beam_me_up(
     plasmaLaunch_K=np.zeros(3),
     plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3, 3]),
     density_fit_parameters=None,
-    density_fit_method: Union[
-        str, Callable[[ArrayLike], ArrayLike]
-    ] = "smoothing-spline-file",
+    density_fit_method: Union[str, DensityFitLike] = "smoothing-spline-file",
     ## For circular flux surfaces
     B_T_axis=None,
     B_p_a=None,
@@ -3394,11 +3392,11 @@ def beam_me_up(
 
 
 def make_density_fit(
-    method: Optional[Union[str, Callable[[ArrayLike], ArrayLike]]],
+    method: Optional[Union[str, DensityFitLike]],
     poloidal_flux_enter: float,
     parameters: ArrayLike,
     filename: Optional[PathLike],
-) -> density_fit.DensityFit:
+) -> DensityFitLike:
     """Either construct a `DensityFit` instance, or return ``method``
     if it's already suitable. Suitable methods are callables that take
     an array of poloidal fluxes and return an array of densities.
@@ -3407,7 +3405,9 @@ def make_density_fit(
     if callable(method):
         return method
 
-    if isinstance(method, (str, type(None))):
-        return density_fit.density_fit(
-            method, poloidal_flux_enter, parameters, filename
+    if not isinstance(method, (str, type(None))):
+        raise TypeError(
+            f"Unexpected method type, expected callable, str or None, got '{type(method)}'"
         )
+
+    return density_fit.density_fit(method, poloidal_flux_enter, parameters, filename)

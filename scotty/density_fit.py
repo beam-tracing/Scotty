@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Callable, Optional
 from warnings import warn
 
 from scotty.typing import PathLike
@@ -7,6 +7,10 @@ from scotty.typing import PathLike
 import numpy as np
 from numpy.typing import ArrayLike
 from scipy.interpolate import UnivariateSpline
+
+
+DensityFitLike = Callable[[ArrayLike], ArrayLike]
+"""A callable that can parameterise density in 1D"""
 
 
 class DensityFit:
