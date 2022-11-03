@@ -154,7 +154,7 @@ class PolynomialFit(DensityFit):
     Parameters
     ==========
     poloidal_flux_enter:
-        Poloidal flux where density goes to zero (:math:`\psi_0` above)
+        Poloidal flux where solver starts and/or boundary conditions are applied; density has to be zero in the current implementation (:math:`\psi_0` above)
     coefficients:
         List of polynomial coefficients, from highest degree to the
         constant term
