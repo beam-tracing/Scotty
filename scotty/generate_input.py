@@ -29,6 +29,8 @@ import pathlib
 
 import numpy as np
 
+from .typing import PathLike
+
 
 def psi_fun(x_value, z_value, major_radius, minor_radius):
     """Gives the poloidal flux on the grid"""
@@ -200,18 +202,18 @@ def n_e_fun(nedata_psi, core_ne):
 
 
 def main(
-    poloidal_launch_angle=0.0,
-    toroidal_launch_angle=0.0,
-    tau_step=0.05,
-    B_toroidal_max=1.00,
-    B_poloidal_max=0.0,
-    core_ne=4.0,
-    core_Te=0.01,
-    aspect_ratio=1.5,
-    minor_radius=0.5,
-    torbeam_directory_path=pathlib.Path("."),
-    nedata_length=101,
-    Tedata_length=101,
+    poloidal_launch_angle: float = 0.0,
+    toroidal_launch_angle: float = 0.0,
+    tau_step: float = 0.05,
+    B_toroidal_max: float = 1.00,
+    B_poloidal_max: float = 0.0,
+    core_ne: float = 4.0,
+    core_Te: float = 0.01,
+    aspect_ratio: float = 1.5,
+    minor_radius: float = 0.5,
+    torbeam_directory_path: PathLike = ".",
+    nedata_length: int = 101,
+    Tedata_length: int = 101,
 ):
     """Create TORBEAM input files
 
@@ -236,11 +238,11 @@ def main(
     minor_radius:
         In meters
     torbeam_directory_path:
-        Directory to save output files
+        Directory to save output files, defaults to working directory
     nedata_length:
-
+        Number of grid points for density
     Tedata_length:
-
+        Number of grid points for temperature
     """
 
     major_radius = aspect_ratio * minor_radius
@@ -259,6 +261,9 @@ def main(
 
     nedata_ne[-1] = 0.001
     Tedata_Te[-1] = 0.001
+
+    # Ensure this is a `pathlib.Path`
+    torbeam_directory_path = pathlib.Path(torbeam_directory_path)
 
     # Write ne and Te
     with open(torbeam_directory_path / "ne.dat", "w") as ne_data_file:
