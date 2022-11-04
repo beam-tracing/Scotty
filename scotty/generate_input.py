@@ -29,7 +29,8 @@ import pathlib
 
 import numpy as np
 
-from .typing import PathLike
+from scotty.torbeam import Torbeam
+from scotty.typing import PathLike
 
 
 def psi_fun(x_value, z_value, major_radius, minor_radius):
@@ -254,11 +255,6 @@ def main(
         Size of ``z`` grid (should be a multiple of 5)
     """
 
-    if (z_grid_length % 5) != 0:
-        raise ValueError(
-            f"'z_grid_length' should be a multiple of 5 (actual value: {z_grid_length})"
-        )
-
     major_radius = aspect_ratio * minor_radius
     launch_position_x = (major_radius + minor_radius) * 100 + 20.0
     launch_position_z = 0
@@ -299,11 +295,6 @@ def main(
     x_grid = np.linspace(x_grid_start, x_grid_end, x_grid_length)
     z_grid = np.linspace(z_grid_start, z_grid_end, z_grid_length)
 
-    B_r = np.zeros([x_grid_length, z_grid_length])
-    B_z = np.zeros([x_grid_length, z_grid_length])
-    B_t = np.zeros([x_grid_length, z_grid_length])
-    psi = np.zeros([x_grid_length, z_grid_length])
-
     x_meshgrid, z_meshgrid = np.meshgrid(x_grid, z_grid, indexing="ij")
     B_t = B_toroidal_fun(B_toroidal_max, x_grid, z_grid, major_radius)
     B_r = B_r_fun(B_poloidal_max, x_grid, z_grid, major_radius, minor_radius)
@@ -313,63 +304,15 @@ def main(
     # To enable writing in Torbeam's format
     # Reads and writes in C (and python) row col major
     # Transposes to get it to the correct major for Fortran
-    z_grid = z_grid.reshape(z_grid_length // 5, 5, order="C")
-    B_r = (np.transpose(B_r)).reshape(x_grid_length * z_grid_length // 5, 5, order="C")
-    B_z = (np.transpose(B_z)).reshape(x_grid_length * z_grid_length // 5, 5, order="C")
-    B_t = (np.transpose(B_t)).reshape(x_grid_length * z_grid_length // 5, 5, order="C")
-    psi = (np.transpose(psi)).reshape(x_grid_length * z_grid_length // 5, 5, order="C")
+    B_r = B_r.reshape(x_grid_length, z_grid_length)
+    B_z = B_z.reshape(x_grid_length, z_grid_length)
+    B_t = B_t.reshape(x_grid_length, z_grid_length)
+    psi = psi.reshape(x_grid_length, z_grid_length)
 
     # Write topfile
-    with open(torbeam_directory_path / "topfile", "w") as topfile_file:
-
-        topfile_file.write("Dummy line\n")
-        topfile_file.write(
-            str(int(x_grid_length)) + " " + str(int(z_grid_length)) + "\n"
-        )
-        topfile_file.write("Dummy line\n")
-        topfile_file.write("0 0 1\n")
-        topfile_file.write("Grid: X-coordinates\n")
-        for ii in range(0, x_grid_length):
-            topfile_file.write("{:.8e}\n".format(x_grid[ii]))
-        topfile_file.write("Grid: Z-coordinates\n")
-        for ii in range(0, z_grid_length // 5):
-            topfile_file.write(
-                "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
-                    z_grid[ii, 0],
-                    z_grid[ii, 1],
-                    z_grid[ii, 2],
-                    z_grid[ii, 3],
-                    z_grid[ii, 4],
-                )
-            )
-        topfile_file.write("Magnetic field: B_R\n")
-        for ii in range(0, x_grid_length * z_grid_length // 5):
-            topfile_file.write(
-                "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
-                    B_r[ii, 0], B_r[ii, 1], B_r[ii, 2], B_r[ii, 3], B_r[ii, 4]
-                )
-            )
-        topfile_file.write("Magnetic field: B_t\n")
-        for ii in range(0, x_grid_length * z_grid_length // 5):
-            topfile_file.write(
-                "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
-                    B_t[ii, 0], B_t[ii, 1], B_t[ii, 2], B_t[ii, 3], B_t[ii, 4]
-                )
-            )
-        topfile_file.write("Magnetic field: B_Z\n")
-        for ii in range(0, x_grid_length * z_grid_length // 5):
-            topfile_file.write(
-                "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
-                    B_z[ii, 0], B_z[ii, 1], B_z[ii, 2], B_z[ii, 3], B_z[ii, 4]
-                )
-            )
-        topfile_file.write("Poloidal flux: psi\n")
-        for ii in range(0, x_grid_length * z_grid_length // 5):
-            topfile_file.write(
-                "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
-                    psi[ii, 0], psi[ii, 1], psi[ii, 2], psi[ii, 3], psi[ii, 4]
-                )
-            )
+    Torbeam(x_grid, z_grid, B_r, B_t, B_z, psi).write(
+        torbeam_directory_path / "topfile"
+    )
 
     write_inbeam(
         minor_radius,
