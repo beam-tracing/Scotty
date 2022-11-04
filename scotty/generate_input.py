@@ -23,7 +23,7 @@ v6 - Added two different methods of selecting the launch position
 v7 - Fixed an issue where psi was transposed (shape(psi) = transpose(shape(B))) because meshgrid was using 'xy' by default, instead of ik
 """
 import numpy as np
-import os
+import pathlib
 
 
 def psi_fun(x_value, z_value, major_radius, minor_radius):
@@ -215,7 +215,7 @@ def main():
     aspect_ratio = 1.5  # major_radius/minor_radius
     minor_radius = 0.5  # in meters
 
-    torbeam_directory_path = os.path.dirname(os.path.abspath(__file__)) + "\\"
+    torbeam_directory_path = pathlib.Path(".")
     # ----------------------
 
     # Calculates other parameters
@@ -244,13 +244,13 @@ def main():
     # --
 
     # Write ne and Te
-    ne_data_file = open(torbeam_directory_path + "ne.dat", "w")
+    ne_data_file = open(torbeam_directory_path / "ne.dat", "w")
     ne_data_file.write(str(int(nedata_length)) + "\n")
     for ii in range(0, nedata_length):
         ne_data_file.write("{:.8e} {:.8e} \n".format(nedata_psi[ii], nedata_ne[ii]))
     ne_data_file.close()
 
-    Te_data_file = open(torbeam_directory_path + "Te.dat", "w")
+    Te_data_file = open(torbeam_directory_path / "Te.dat", "w")
     Te_data_file.write(str(int(Tedata_length)) + "\n")
     for ii in range(0, Tedata_length):
         Te_data_file.write("{:.8e} {:.8e} \n".format(Tedata_psi[ii], Tedata_Te[ii]))
@@ -327,7 +327,7 @@ def main():
     psi = (np.transpose(psi)).reshape(x_grid_length * z_grid_length // 5, 5, order="C")
 
     # Write topfile
-    topfile_file = open(torbeam_directory_path + "topfile", "w")
+    topfile_file = open(torbeam_directory_path / "topfile", "w")
 
     topfile_file.write("Dummy line\n")
     topfile_file.write(str(int(x_grid_length)) + " " + str(int(z_grid_length)) + "\n")
