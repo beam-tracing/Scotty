@@ -118,73 +118,71 @@ def write_inbeam(
     launch_position_x,
     launch_position_z,
     tau_step,
-    torbeam_directory_path,
+    torbeam_directory_path: pathlib.Path,
 ):
-    # Writes inbeam.dat
-    # Refer to input-output.pdf for more detail
-    # All offsets, flipping of signs, and so on should be done outside this function
-    inbeam_list = []
-    inbeam_list += [" &edata"]
-    inbeam_list += [" nabsroutine = 0"]
-    inbeam_list += [" nastra = 0"]
-    inbeam_list += [" nmaxh = 1"]
-    inbeam_list += [" noout = 0"]
-    inbeam_list += [" xzeff= 1"]
-    inbeam_list += [" ndns = 2"]  # if =1, density profile is analytic
-    inbeam_list += [" nte = 2"]  # if =1, temperature profile is analytic
-    inbeam_list += [" nmod = -1"]  # O-mode (1), X-mode (-1)
-    inbeam_list += [" ianexp = 2"]  # if =1, magnetic equilibrium is analytic
-    inbeam_list += [" nrel = 0"]
-    inbeam_list += [" ncdroutine = 2"]
-    inbeam_list += [" nrela = 0"]
-    inbeam_list += [" xf = 5.5e+10"]  # Launch freq (GHz)
-    inbeam_list += [" xpoldeg = " + str(poloidal_launch_angle)]  # poloidal launch angle
-    inbeam_list += [" xtordeg = " + str(toroidal_launch_angle)]  # toroidal launch angle
-    inbeam_list += [
-        " xxb = " + str(launch_position_x)
-    ]  # x-coordinate of the launch position
-    inbeam_list += [" xyb = 0"]  # y-coordinate of the launch position
-    inbeam_list += [
-        " xzb = " + str(launch_position_z)
-    ]  # z-coordinate of the launch position
-    inbeam_list += [" xdns = 1.02e+14"]
-    inbeam_list += [" edgdns = 1e+13"]
-    inbeam_list += [" xe1 = 2.0"]
-    inbeam_list += [" xe2 = 0.5"]
-    inbeam_list += [" xte0 = 25.0"]
-    inbeam_list += [" xteedg = 1.0"]
-    inbeam_list += [" xe1t = 2.0"]
-    inbeam_list += [" xe2t = 2.0"]
-    inbeam_list += [" xrtol = 1e-07"]  # relative tolerance of the ODE solver
-    inbeam_list += [" xatol = 1e-07"]  # absolute tolerance of the ODE solver
-    inbeam_list += [" xstep = " + str(tau_step)]  # integration step in vacuum (cm)
-    inbeam_list += [" xtbeg = 2.0"]  # obsolete
-    inbeam_list += [" xtend = 2.0"]  # obsolete
-    inbeam_list += [" xryyb = 50"]  # beam radius of curvature (cm)
-    inbeam_list += [" xrzzb = 50"]
-    inbeam_list += [" xwyyb = 5.0"]  # beam width (cm)
-    inbeam_list += [" xwzzb = 5.0"]
-    inbeam_list += [" xpw0 = 1"]  # Initial beam power (MW)
-    inbeam_list += [" xrmaj = " + str(major_radius * 100.0)]
-    inbeam_list += [" xrmin = " + str(minor_radius * 100.0)]
-    inbeam_list += [" xb0 = 2.01254"]  # central toroidal magnetic field [T]
-    inbeam_list += [" xdel0 = 0.0"]
-    inbeam_list += [" xdeled = 0.0"]
-    inbeam_list += [" xelo0 = 1.0"]
-    inbeam_list += [" xeloed = 1.5"]
-    inbeam_list += [" xq0 = 1.0"]
-    inbeam_list += [" xqedg = 4.0"]
-    inbeam_list += [" nshot = 2"]
-    inbeam_list += [" rhostop = 1.2"]
-    inbeam_list += [" ncnstrn = 0"]  # Neal Crocker's constraint
+    """
+    Writes inbeam.dat
+
+    Refer to input-output.pdf for more detail.
+    All offsets, flipping of signs, and so on should be done outside this function
+    """
+    inbeam_list = {
+        "nabsroutine": 0,
+        "nastra": 0,
+        "nmaxh": 1,
+        "noout": 0,
+        "xzeff": 1,
+        "ndns": 2,  # if =1, density profile is analytic
+        "nte": 2,  # if =1, temperature profile is analytic
+        "nmod": -1,  # O-mode (1), X-mode (-1)
+        "ianexp": 2,  # if =1, magnetic equilibrium is analytic
+        "nrel": 0,
+        "ncdroutine": 2,
+        "nrela": 0,
+        "xf": 5.5e10,  # Launch freq (GHz)
+        "xpoldeg": poloidal_launch_angle,  # poloidal launch angle
+        "xtordeg": toroidal_launch_angle,  # toroidal launch angle
+        "xxb": launch_position_x,  # x-coordinate of the launch position
+        "xyb": 0,  # y-coordinate of the launch position
+        "xzb": launch_position_z,  # z-coordinate of the launch position
+        "xdns": 1.02e14,
+        "edgdns": 1e13,
+        "xe1": 2.0,
+        "xe2": 0.5,
+        "xte0": 25.0,
+        "xteedg": 1.0,
+        "xe1t": 2.0,
+        "xe2t": 2.0,
+        "xrtol": 1e-07,  # relative tolerance of the ODE solver
+        "xatol": 1e-07,  # absolute tolerance of the ODE solver
+        "xstep": tau_step,  # integration step in vacuum (cm)
+        "xtbeg": 2.0,  # obsolete
+        "xtend": 2.0,  # obsolete
+        "xryyb": 50,  # beam radius of curvature (cm)
+        "xrzzb": 50,
+        "xwyyb": 5.0,  # beam width (cm)
+        "xwzzb": 5.0,
+        "xpw0": 1,  # Initial beam power (MW)
+        "xrmaj": major_radius * 100.0,
+        "xrmin": minor_radius * 100.0,
+        "xb0": 2.01254,  # central toroidal magnetic field [T]
+        "xdel0": 0.0,
+        "xdeled": 0.0,
+        "xelo0": 1.0,
+        "xeloed": 1.5,
+        "xq0": 1.0,
+        "xqedg": 4.0,
+        "nshot": 2,
+        "rhostop": 1.2,
+        "ncnstrn": 0,  # Neal Crocker's constraint
+    }
     # inbeam_list += [' sgnm = 1'] # If 1, poloidal flux is minimum at the magnetic axis
-    inbeam_list += [" /"]
 
-    thefile = open(torbeam_directory_path + "inbeam.dat", "w")
-    for item in inbeam_list:
-        thefile.write("%s\n" % item)
-
-    return
+    with open(torbeam_directory_path / "inbeam.dat", "w") as f:
+        f.write("&edata\n")
+        for key, value in inbeam_list.items():
+            f.write(f" {key} = {value}\n")
+        f.write("/")
 
 
 def n_e_fun(nedata_psi, core_ne):
