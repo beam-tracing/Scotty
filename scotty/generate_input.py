@@ -242,17 +242,15 @@ def main():
     # --
 
     # Write ne and Te
-    ne_data_file = open(torbeam_directory_path / "ne.dat", "w")
-    ne_data_file.write(str(int(nedata_length)) + "\n")
-    for ii in range(0, nedata_length):
-        ne_data_file.write("{:.8e} {:.8e} \n".format(nedata_psi[ii], nedata_ne[ii]))
-    ne_data_file.close()
+    with open(torbeam_directory_path / "ne.dat", "w") as ne_data_file:
+        ne_data_file.write(f"{int(nedata_length)}\n")
+        for ii in range(0, nedata_length):
+            ne_data_file.write("{:.8e} {:.8e} \n".format(nedata_psi[ii], nedata_ne[ii]))
 
-    Te_data_file = open(torbeam_directory_path / "Te.dat", "w")
-    Te_data_file.write(str(int(Tedata_length)) + "\n")
-    for ii in range(0, Tedata_length):
-        Te_data_file.write("{:.8e} {:.8e} \n".format(Tedata_psi[ii], Tedata_Te[ii]))
-    Te_data_file.close()
+    with open(torbeam_directory_path / "Te.dat", "w") as Te_data_file:
+        Te_data_file.write(f"{int(Tedata_length)}\n")
+        for ii in range(0, Tedata_length):
+            Te_data_file.write("{:.8e} {:.8e} \n".format(Tedata_psi[ii], Tedata_Te[ii]))
     # --
 
     # Generate topfile variables
@@ -325,56 +323,56 @@ def main():
     psi = (np.transpose(psi)).reshape(x_grid_length * z_grid_length // 5, 5, order="C")
 
     # Write topfile
-    topfile_file = open(torbeam_directory_path / "topfile", "w")
+    with open(torbeam_directory_path / "topfile", "w") as topfile_file:
 
-    topfile_file.write("Dummy line\n")
-    topfile_file.write(str(int(x_grid_length)) + " " + str(int(z_grid_length)) + "\n")
-    topfile_file.write("Dummy line\n")
-    topfile_file.write("0 0 1\n")
-    topfile_file.write("Grid: X-coordinates\n")
-    for ii in range(0, x_grid_length):
-        topfile_file.write("{:.8e}\n".format(x_grid[ii]))
-    topfile_file.write("Grid: Z-coordinates\n")
-    for ii in range(0, z_grid_length // 5):
+        topfile_file.write("Dummy line\n")
         topfile_file.write(
-            "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
-                z_grid[ii, 0],
-                z_grid[ii, 1],
-                z_grid[ii, 2],
-                z_grid[ii, 3],
-                z_grid[ii, 4],
-            )
+            str(int(x_grid_length)) + " " + str(int(z_grid_length)) + "\n"
         )
-    topfile_file.write("Magnetic field: B_R\n")
-    for ii in range(0, x_grid_length * z_grid_length // 5):
-        topfile_file.write(
-            "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
-                B_r[ii, 0], B_r[ii, 1], B_r[ii, 2], B_r[ii, 3], B_r[ii, 4]
+        topfile_file.write("Dummy line\n")
+        topfile_file.write("0 0 1\n")
+        topfile_file.write("Grid: X-coordinates\n")
+        for ii in range(0, x_grid_length):
+            topfile_file.write("{:.8e}\n".format(x_grid[ii]))
+        topfile_file.write("Grid: Z-coordinates\n")
+        for ii in range(0, z_grid_length // 5):
+            topfile_file.write(
+                "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
+                    z_grid[ii, 0],
+                    z_grid[ii, 1],
+                    z_grid[ii, 2],
+                    z_grid[ii, 3],
+                    z_grid[ii, 4],
+                )
             )
-        )
-    topfile_file.write("Magnetic field: B_t\n")
-    for ii in range(0, x_grid_length * z_grid_length // 5):
-        topfile_file.write(
-            "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
-                B_t[ii, 0], B_t[ii, 1], B_t[ii, 2], B_t[ii, 3], B_t[ii, 4]
+        topfile_file.write("Magnetic field: B_R\n")
+        for ii in range(0, x_grid_length * z_grid_length // 5):
+            topfile_file.write(
+                "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
+                    B_r[ii, 0], B_r[ii, 1], B_r[ii, 2], B_r[ii, 3], B_r[ii, 4]
+                )
             )
-        )
-    topfile_file.write("Magnetic field: B_Z\n")
-    for ii in range(0, x_grid_length * z_grid_length // 5):
-        topfile_file.write(
-            "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
-                B_z[ii, 0], B_z[ii, 1], B_z[ii, 2], B_z[ii, 3], B_z[ii, 4]
+        topfile_file.write("Magnetic field: B_t\n")
+        for ii in range(0, x_grid_length * z_grid_length // 5):
+            topfile_file.write(
+                "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
+                    B_t[ii, 0], B_t[ii, 1], B_t[ii, 2], B_t[ii, 3], B_t[ii, 4]
+                )
             )
-        )
-    topfile_file.write("Poloidal flux: psi\n")
-    for ii in range(0, x_grid_length * z_grid_length // 5):
-        topfile_file.write(
-            "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
-                psi[ii, 0], psi[ii, 1], psi[ii, 2], psi[ii, 3], psi[ii, 4]
+        topfile_file.write("Magnetic field: B_Z\n")
+        for ii in range(0, x_grid_length * z_grid_length // 5):
+            topfile_file.write(
+                "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
+                    B_z[ii, 0], B_z[ii, 1], B_z[ii, 2], B_z[ii, 3], B_z[ii, 4]
+                )
             )
-        )
-
-    topfile_file.close()
+        topfile_file.write("Poloidal flux: psi\n")
+        for ii in range(0, x_grid_length * z_grid_length // 5):
+            topfile_file.write(
+                "{:.8}   {:.8}   {:.8}   {:.8}   {:.8} \n".format(
+                    psi[ii, 0], psi[ii, 1], psi[ii, 2], psi[ii, 3], psi[ii, 4]
+                )
+            )
 
     write_inbeam(
         minor_radius,
