@@ -334,9 +334,7 @@ DENSITY_FIT_METHODS: Dict[str, Union[type, Callable]] = {
 }
 
 
-def _guess_density_fit_method(
-    parameters: ArrayLike, filename: Optional[PathLike]
-) -> str:
+def _guess_density_fit_method(parameters: List, filename: Optional[PathLike]) -> str:
     if filename is not None:
         print("ne(psi): loading from input file")
         return "smoothing-spline-file"
@@ -362,7 +360,7 @@ def _guess_density_fit_method(
 def density_fit(
     method: Optional[str],
     poloidal_flux_enter: float,
-    parameters: ArrayLike,
+    parameters: List,
     filename: Optional[PathLike] = None,
 ) -> DensityFit:
     """Create a density profile parameterisation
