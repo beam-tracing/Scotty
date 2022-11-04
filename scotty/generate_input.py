@@ -297,41 +297,6 @@ def main(
     print(np.shape(psi))
     print(np.shape(B_r))
 
-    ## Check start
-    # B_r_dataframe = pd.DataFrame(data=B_r, index=z_grid, columns=x_grid)
-    #
-    # plt.figure()
-    # ax = sns.heatmap(B_r_dataframe, xticklabels=13,yticklabels=13, linewidths=0)
-    # plt.xlabel('x / cm') # x-direction
-    # plt.ylabel('z / cm')
-    # ax.invert_yaxis()
-    #
-    # B_z_dataframe = pd.DataFrame(data=B_z, index=z_grid, columns=x_grid)
-    #
-    # plt.figure()
-    # ax = sns.heatmap(B_z_dataframe, xticklabels=13,yticklabels=13, linewidths=0)
-    # plt.xlabel('x / cm') # x-direction
-    # plt.ylabel('z / cm')
-    # ax.invert_yaxis()
-    #
-    # B_poloidal = (B_r**2 + B_z**2) ** (0.5)
-    # B_poloidal_dataframe = pd.DataFrame(data=B_poloidal, index=z_grid, columns=x_grid)
-    #
-    # plt.figure()
-    # ax = sns.heatmap(B_poloidal_dataframe, xticklabels=13,yticklabels=13, linewidths=0)
-    # plt.xlabel('x / cm') # x-direction
-    # plt.ylabel('z / cm')
-    # ax.invert_yaxis()
-    #
-    # B_t_dataframe = pd.DataFrame(data=B_t, index=z_grid, columns=x_grid)
-    #
-    # plt.figure()
-    # ax = sns.heatmap(B_t_dataframe, xticklabels=13,yticklabels=13, linewidths=0)
-    # plt.xlabel('x / cm') # x-direction
-    # plt.ylabel('z / cm')
-    # ax.invert_yaxis()
-    ## Check end
-
     # To enable writing in Torbeam's format
     # Reads and writes in C (and python) row col major
     # Transposes to get it to the correct major for Fortran
