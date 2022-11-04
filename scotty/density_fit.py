@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Optional
+from typing import Callable, Optional, List, Dict, Union, Sequence
 from warnings import warn
 
 from scotty.typing import PathLike
@@ -33,7 +33,8 @@ class DensityFit:
 
     def __call__(self, poloidal_flux: ArrayLike) -> ArrayLike:
         """Returns the interpolated density at ``poloidal_flux`` points."""
-        density = self._fit_impl(poloidal_flux)
+        poloidal_flux = np.asfarray(poloidal_flux)
+        density = np.asfarray(self._fit_impl(poloidal_flux))
         # Mask density inside plasma
         is_inside = poloidal_flux <= self.poloidal_flux_enter
         return is_inside * density
@@ -84,6 +85,7 @@ class QuadraticFit(DensityFit):
                 )
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
+        poloidal_flux = np.asfarray(poloidal_flux)
         return self.ne_0 - ((self.ne_0 / self.poloidal_flux_enter) * poloidal_flux**2)
 
     def __repr__(self):
@@ -136,6 +138,7 @@ class TanhFit(DensityFit):
                 )
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
+        poloidal_flux = np.asfarray(poloidal_flux)
         return self.ne_0 * np.tanh(
             self.ne_1 * (poloidal_flux - self.poloidal_flux_enter)
         )
@@ -169,6 +172,7 @@ class PolynomialFit(DensityFit):
         self.coefficients = coefficients
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
+        poloidal_flux = np.asfarray(poloidal_flux)
         return np.polyval(self.coefficients, poloidal_flux)
 
     def __repr__(self):
@@ -233,6 +237,7 @@ class StefanikovaFit(DensityFit):
         return (self.b_height - self.b_SOL) / 2 * (mth + 1) + self.b_SOL
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
+        poloidal_flux = np.asfarray(poloidal_flux)
         fp = self._f_ped(poloidal_flux)
         return (
             fp
@@ -323,7 +328,7 @@ class SmoothingSplineFit(DensityFit):
 ##################################################
 
 
-DENSITY_FIT_METHODS = {
+DENSITY_FIT_METHODS: Dict[str, Union[type, Callable]] = {
     "smoothing-spline": SmoothingSplineFit,
     "smoothing-spline-file": SmoothingSplineFit.from_dat_file,
     "stefanikova": StefanikovaFit,
@@ -335,7 +340,7 @@ DENSITY_FIT_METHODS = {
 
 
 def _guess_density_fit_method(
-    parameters: ArrayLike, filename: Optional[PathLike]
+    parameters: Sequence, filename: Optional[PathLike]
 ) -> str:
     if filename is not None:
         print("ne(psi): loading from input file")
@@ -362,7 +367,7 @@ def _guess_density_fit_method(
 def density_fit(
     method: Optional[str],
     poloidal_flux_enter: float,
-    parameters: ArrayLike,
+    parameters: Sequence,
     filename: Optional[PathLike] = None,
 ) -> DensityFit:
     """Create a density profile parameterisation

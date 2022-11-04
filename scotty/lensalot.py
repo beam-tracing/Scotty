@@ -30,8 +30,7 @@ at a distance :math:`r'`, and an angle :math:`\theta'`
 from .fun_general import freq_GHz_to_wavenumber
 
 import numpy as np
-from scipy import constants
-from typing import Optional
+from typing import Optional, Dict
 
 
 def _check_matrix_is_2x2(Psi_w_in):
@@ -171,7 +170,7 @@ def make_my_lens(
         Focal length for the DBS_UCLA_DIII-D_240 lens
     """
 
-    lenses = {
+    lenses: Dict[str, Dict[str, Lens]] = {
         "thin": {
             "MAST_V_band": Thin_Lens("MAST_V_band", 0.125),
             "MAST_Q_band": Thin_Lens("MAST_Q_band", 0.27),
@@ -215,6 +214,6 @@ def make_my_lens(
     try:
         return lens_type_dict[name]
     except KeyError:
-        return ValueError(
+        raise ValueError(
             f"Unknown {lens_type} lens '{name}', expected one of {lens_type_dict.keys()}"
         )

@@ -448,7 +448,7 @@ def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
     }
 
 
-DEFAULT_DIAGNOSTIC_PARAMETERS: Dict[str, Callable[[Optional[float]], dict]] = {
+DEFAULT_DIAGNOSTIC_PARAMETERS: Dict[str, Callable[[float], dict]] = {
     "DBS_NSTX_MAST": parameters_DBS_NSTX_MAST,
     "DBS_UCLA_MAST-U": parameters_DBS_UCLA_MAST_U,
     "DBS_SWIP_MAST-U": parameters_DBS_SWIP_MAST_U,

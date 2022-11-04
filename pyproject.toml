@@ -46,3 +46,4 @@ testpaths = [
 
 [tool.mypy]
 plugins = "numpy.typing.mypy_plugin"
+ignore_missing_imports = "True"
