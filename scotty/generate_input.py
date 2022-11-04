@@ -1,4 +1,6 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 """
 Created on Mon Jul 24 14:31:24 2017
 
@@ -22,8 +24,10 @@ v5 - B_toroidal now has correct units
 v6 - Added two different methods of selecting the launch position
 v7 - Fixed an issue where psi was transposed (shape(psi) = transpose(shape(B))) because meshgrid was using 'xy' by default, instead of ik
 """
-import numpy as np
+import argparse
 import pathlib
+
+import numpy as np
 
 
 def psi_fun(x_value, z_value, major_radius, minor_radius):
@@ -195,39 +199,55 @@ def n_e_fun(nedata_psi, core_ne):
     return nedata_ne
 
 
-def main():
-    # Specify the parameters
-    poloidal_launch_angle = 0.0  # in deg
-    toroidal_launch_angle = 0.0  # in deg
-    launch_position_z_flag = (
-        0  # (0): z=0 (1): z such that beam path has midplane as plane of symmetry
-    )
-    tau_step = 0.05  # was 0.05, making it smaller to speed up runs
+def main(
+    poloidal_launch_angle=0.0,
+    toroidal_launch_angle=0.0,
+    tau_step=0.05,
+    B_toroidal_max=1.00,
+    B_poloidal_max=0.0,
+    core_ne=4.0,
+    core_Te=0.01,
+    aspect_ratio=1.5,
+    minor_radius=0.5,
+    torbeam_directory_path=pathlib.Path("."),
+    nedata_length=101,
+    Tedata_length=101,
+):
+    """Create TORBEAM input files
 
-    B_toroidal_max = 1.00  # in Tesla (?)
-    B_poloidal_max = 0.0  # in Tesla
+    Arguments
+    ---------
+    poloidal_launch_angle:
+        In degrees
+    toroidal_launch_angle:
+        In degrees
+    tau_step:
+        Was 0.05, making it smaller to speed up runs
+    B_toroidal_max:
+        In Tesla
+    B_poloidal_max:
+        In Tesla
+    core_ne:
+        In 10^19 m-3 (IDL files, discussion w/ Jon)
+    core_Te:
 
-    core_ne = 4.0  # in 10^19 m-3 (IDL files, discussion w/ Jon)
-    core_Te = 0.01
+    aspect_ratio:
+        major_radius/minor_radius
+    minor_radius:
+        In meters
+    torbeam_directory_path:
+        Directory to save output files
+    nedata_length:
 
-    aspect_ratio = 1.5  # major_radius/minor_radius
-    minor_radius = 0.5  # in meters
+    Tedata_length:
 
-    torbeam_directory_path = pathlib.Path(".")
-    # ----------------------
+    """
 
-    # Calculates other parameters
     major_radius = aspect_ratio * minor_radius
     launch_position_x = (major_radius + minor_radius) * 100 + 20.0
-    # launch_position_z = choose_launch_position_z(major_radius, minor_radius, poloidal_launch_angle, launch_position_x, launch_position_z_flag)
     launch_position_z = 0
-    # ----------------------
 
     # Generate ne and Te
-
-    nedata_length = 101
-    Tedata_length = 101
-
     nedata_psi = np.linspace(0, 1, nedata_length)
     Tedata_psi = np.linspace(0, 1, Tedata_length)
 
@@ -237,9 +257,8 @@ def main():
     nedata_ne = n_e_fun(nedata_psi, core_ne)
     Tedata_Te = n_e_fun(Tedata_psi, core_Te)
 
-    nedata_ne[100] = 0.001
-    Tedata_Te[100] = 0.001
-    # --
+    nedata_ne[-1] = 0.001
+    Tedata_Te[-1] = 0.001
 
     # Write ne and Te
     with open(torbeam_directory_path / "ne.dat", "w") as ne_data_file:
@@ -387,4 +406,38 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Writes TORBEAM input files")
+    parser.add_argument(
+        "--poloidal_launch_angle", default=0.0, type=float, help="in degrees"
+    )
+    parser.add_argument(
+        "--toroidal_launch_angle", default=0.0, type=float, help="in degrees"
+    )
+    parser.add_argument(
+        "--tau_step",
+        default=0.05,
+        type=float,
+        help="was 0.05, making it smaller to speed up runs",
+    )
+    parser.add_argument(
+        "--B_toroidal_max", default=1.00, type=float, help="in Tesla (?)"
+    )
+    parser.add_argument("--B_poloidal_max", default=0.0, type=float, help="in Tesla")
+    parser.add_argument(
+        "--core_ne",
+        default=4.0,
+        type=float,
+        help="in 10^19 m-3 (IDL files, discussion w/ Jon)",
+    )
+    parser.add_argument("--core_Te", default=0.01)
+    parser.add_argument(
+        "--aspect_ratio", default=1.5, type=float, help="major_radius/minor_radius"
+    )
+    parser.add_argument("--minor_radius", default=0.5, type=float, help="in meters")
+    parser.add_argument("--torbeam_directory_path", default=pathlib.Path("."))
+    parser.add_argument("--nedata_length", default=101, type=int)
+    parser.add_argument("--Tedata_length", default=101, type=int)
+
+    args = parser.parse_args()
+
+    main(**vars(args))
