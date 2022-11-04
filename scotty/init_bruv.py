@@ -370,12 +370,13 @@ def parameters_DBS_NSTX_MAST(launch_freq_GHz: float) -> dict:
 
 def parameters_DBS_UCLA_MAST_U(launch_freq_GHz: float) -> dict:
     print("Warning: launch_position is an estimate")
+    # The z-position seems to vary from -9.7mm to -14.6mm, depending on launch angles
     launch_beam = beam_settings("DBS_UCLA_MAST-U", launch_freq_GHz, method="thin_lens")
 
     return {
         # q_R, q_zeta, q_Z. q_zeta = 0 at launch, by definition
         # Launch position changes ~1mm based on lens settings
-        "launch_position": np.array([2.278, 0, 0]),
+        "launch_position": np.array([2.278, 0, -0.01]),
         "launch_beam_width": launch_beam.width,
         "launch_beam_curvature": launch_beam.curvature,
         "Psi_BC_flag": True,
