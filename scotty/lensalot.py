@@ -215,6 +215,6 @@ def make_my_lens(
     try:
         return lens_type_dict[name]
     except KeyError:
-        return ValueError(
+        raise ValueError(
             f"Unknown {lens_type} lens '{name}', expected one of {lens_type_dict.keys()}"
         )
