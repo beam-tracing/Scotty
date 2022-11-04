@@ -17,13 +17,18 @@ from scipy import interpolate as interpolate
 from scipy import optimize as optimize
 from scipy import integrate as integrate
 import sys
+from typing import TextIO, List
+from numpy.typing import NDArray
 
 
-def read_floats_into_list_until(terminator, lines):
-    # Reads the lines of a file until the string (terminator) is read
-    # Currently used to read topfile
-    # Written by NE Bricknell
-    lst = []
+def read_floats_into_list_until(terminator: str, lines: TextIO) -> NDArray[np.float64]:
+    """Reads the lines of a file until the string (terminator) is read.
+
+    Currently used to read topfile.
+
+    Written by NE Bricknell
+    """
+    lst: List[float] = []
     while True:
         try:
             line = lines.readline()
@@ -34,7 +39,7 @@ def read_floats_into_list_until(terminator, lines):
         elif not line:
             break
         lst.extend(map(float, line.split()))
-    return lst
+    return np.asarray(lst)
 
 
 def find_nearest(array, value):  # returns the index
