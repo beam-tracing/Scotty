@@ -11,6 +11,8 @@ note that what he calls 'flare angle', I call 'semiflare angle'.
 
 - Table 7.1 for ratios of beam widths to aperture radii
 """
+from typing import Dict
+
 import numpy as np
 from scipy import constants
 
@@ -30,7 +32,7 @@ class Horn:
         raise NotImplementedError
 
 
-class Conical_Horn:
+class Conical_Horn(Horn):
     """
     Properties:
 
@@ -171,7 +173,7 @@ def _MAST_V_band_aperature_radius() -> float:
     return w_0 / 0.644
 
 
-KNOWN_HORNS = {
+KNOWN_HORNS: Dict[str, Horn] = {
     "MAST_V_band": Scalar_Horn("MAST_V_band", _MAST_V_band_aperature_radius()),
     "MAST_Q_band": SpeirsAsymmetricConicalHorn(
         "MAST_Q_band",

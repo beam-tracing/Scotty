@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Optional
+from typing import Callable, Optional, List, Dict, Union
 from warnings import warn
 
 from scotty.typing import PathLike
@@ -323,7 +323,7 @@ class SmoothingSplineFit(DensityFit):
 ##################################################
 
 
-DENSITY_FIT_METHODS = {
+DENSITY_FIT_METHODS: Dict[str, Union[type, Callable]] = {
     "smoothing-spline": SmoothingSplineFit,
     "smoothing-spline-file": SmoothingSplineFit.from_dat_file,
     "stefanikova": StefanikovaFit,
