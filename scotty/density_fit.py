@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Callable, Optional, List, Dict, Union
+from typing import Callable, Optional, List, Dict, Union, Sequence
 from warnings import warn
 
 from scotty.typing import PathLike
@@ -339,7 +339,9 @@ DENSITY_FIT_METHODS: Dict[str, Union[type, Callable]] = {
 }
 
 
-def _guess_density_fit_method(parameters: List, filename: Optional[PathLike]) -> str:
+def _guess_density_fit_method(
+    parameters: Sequence, filename: Optional[PathLike]
+) -> str:
     if filename is not None:
         print("ne(psi): loading from input file")
         return "smoothing-spline-file"
@@ -365,7 +367,7 @@ def _guess_density_fit_method(parameters: List, filename: Optional[PathLike]) ->
 def density_fit(
     method: Optional[str],
     poloidal_flux_enter: float,
-    parameters: List,
+    parameters: Sequence,
     filename: Optional[PathLike] = None,
 ) -> DensityFit:
     """Create a density profile parameterisation

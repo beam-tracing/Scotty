@@ -158,8 +158,7 @@ from scotty.density_fit import density_fit, DensityFitLike
 from scotty._version import __version__
 
 # Type hints
-from typing import Optional, Union
-from numpy.typing import ArrayLike
+from typing import Optional, Union, Sequence
 from scotty.typing import PathLike
 
 
@@ -1889,7 +1888,7 @@ def beam_me_up(
 
     # Calculate various properties along the ray
     poloidal_flux_output = interp_poloidal_flux(q_R_array, q_Z_array, grid=False)
-    electron_density_output = find_density_1D(poloidal_flux_output)
+    electron_density_output = np.asfarray(find_density_1D(poloidal_flux_output))
 
     # Calculates nabla_K H
     dH_dKR_output = find_dH_dKR(
@@ -3394,7 +3393,7 @@ def beam_me_up(
 def make_density_fit(
     method: Optional[Union[str, DensityFitLike]],
     poloidal_flux_enter: float,
-    parameters: ArrayLike,
+    parameters: Sequence,
     filename: Optional[PathLike],
 ) -> DensityFitLike:
     """Either construct a `DensityFit` instance, or return ``method``
