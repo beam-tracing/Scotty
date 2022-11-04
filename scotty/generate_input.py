@@ -214,6 +214,9 @@ def main(
     torbeam_directory_path: PathLike = ".",
     nedata_length: int = 101,
     Tedata_length: int = 101,
+    buffer_factor: float = 1.1,
+    x_grid_length: int = 130,
+    z_grid_length: int = 65,
 ):
     """Create TORBEAM input files
 
@@ -243,7 +246,18 @@ def main(
         Number of grid points for density
     Tedata_length:
         Number of grid points for temperature
+    buffer_factor:
+        Size of buffer in ``x`` as a factor of ``minor_radius``
+    x_grid_length:
+        Size of ``x`` grid
+    z_grid_length:
+        Size of ``z`` grid (should be a multiple of 5)
     """
+
+    if (z_grid_length % 5) != 0:
+        raise ValueError(
+            f"'z_grid_length' should be a multiple of 5 (actual value: {z_grid_length})"
+        )
 
     major_radius = aspect_ratio * minor_radius
     launch_position_x = (major_radius + minor_radius) * 100 + 20.0
@@ -275,14 +289,10 @@ def main(
         Te_data_file.write(f"{int(Tedata_length)}\n")
         for ii in range(0, Tedata_length):
             Te_data_file.write("{:.8e} {:.8e} \n".format(Tedata_psi[ii], Tedata_Te[ii]))
-    # --
 
     # Generate topfile variables
-    buffer_factor = 1.1
-    x_grid_length = 130
     x_grid_start = major_radius - buffer_factor * minor_radius  # in meters
     x_grid_end = major_radius + buffer_factor * minor_radius
-    z_grid_length = 65  # Make sure this is a multiple of 5
     z_grid_start = -buffer_factor * minor_radius
     z_grid_end = buffer_factor * minor_radius
 
@@ -299,8 +309,6 @@ def main(
     B_r = B_r_fun(B_poloidal_max, x_grid, z_grid, major_radius, minor_radius)
     B_z = B_z_fun(B_poloidal_max, x_grid, z_grid, major_radius, minor_radius)
     psi = psi_fun(x_meshgrid, z_meshgrid, major_radius, minor_radius)
-    print(np.shape(psi))
-    print(np.shape(B_r))
 
     # To enable writing in Torbeam's format
     # Reads and writes in C (and python) row col major
@@ -407,6 +415,9 @@ if __name__ == "__main__":
     parser.add_argument("--torbeam_directory_path", default=pathlib.Path("."))
     parser.add_argument("--nedata_length", default=101, type=int)
     parser.add_argument("--Tedata_length", default=101, type=int)
+    parser.add_argument("--buffer_factor", default=1.1, type=float)
+    parser.add_argument("--x_grid_length", default=130, type=int)
+    parser.add_argument("--z_grid_length", default=65, type=int)
 
     args = parser.parse_args()
 
