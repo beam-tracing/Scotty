@@ -135,7 +135,7 @@ def get_parameters_for_Scotty(
     parameters.update(default_parameters(launch_freq_GHz))
 
     # Convert mirror angles to launch angles
-    if mirror_rotation and mirror_tilt:
+    if (mirror_rotation is not None) and (mirror_tilt is not None):
         offset = np.rad2deg(math.atan2(125, 2432))
         toroidal_launch_angle, poloidal_launch_angle = genray_angles_from_mirror_angles(
             mirror_rotation, mirror_tilt, offset_for_window_norm_to_R=offset
