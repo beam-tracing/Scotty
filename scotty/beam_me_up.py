@@ -203,8 +203,8 @@ def beam_me_up(
     ## For launching within the plasma
     plasmaLaunch_K=np.zeros(3),
     plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3, 3]),
-    density_fit_parameters=None,
-    density_fit_method: Union[str, DensityFitLike] = "smoothing-spline-file",
+    density_fit_parameters: Optional[Sequence] = None,
+    density_fit_method: Optional[Union[str, DensityFitLike]] = None,
     ## For circular flux surfaces
     B_T_axis=None,
     B_p_a=None,
