@@ -203,8 +203,8 @@ def beam_me_up(
     ## For launching within the plasma
     plasmaLaunch_K=np.zeros(3),
     plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3, 3]),
-    density_fit_parameters=None,
-    density_fit_method: Union[str, DensityFitLike] = "smoothing-spline-file",
+    density_fit_parameters: Optional[Sequence] = None,
+    density_fit_method: Optional[Union[str, DensityFitLike]] = None,
     ## For circular flux surfaces
     B_T_axis=None,
     B_p_a=None,
@@ -212,8 +212,6 @@ def beam_me_up(
     minor_radius_a=None,
 ):
     r"""
-    find_B_method: 1) 'efitpp' finds B from efitpp files directly 2) 'torbeam' finds B from topfile 3) UDA_saved
-
 
     Overview
     ========
@@ -244,6 +242,18 @@ def beam_me_up(
 
     Parameters
     ==========
+    find_B_method:
+        1) 'efitpp' finds B from efitpp files directly
+        2) 'torbeam' finds B from topfile
+        3) UDA_saved
+
+    density_fit_parameters:
+        A list of parameters to be passed to the
+        ``density_fit_method`` constructor. See the docs for the
+        individual methods for the meaning of their parameters
+
+        .. note:: These parameters should *not* include
+           ``poloidal_flux_enter``
     density_fit_method:
         Parameterisation of the density profile. Either a callable
         (see `DensityFit`), or one of the following options:
@@ -265,7 +275,14 @@ def beam_me_up(
 
         ``"smoothing-spline-file"`` looks for a file called
         ``ne<input_filename_suffix>.dat`` in ``ne_data_path``. It also
-        uses ``interp_order`` and ``interp_smoothing``.
+        uses ``interp_order`` and ``interp_smoothing`` instead of
+        ``density_fit_parameters``.
+
+        .. deprecated:: 2.4.0
+           If ``None`` (the default) is passed, the method will be
+           guessed from the length of ``density_fit_parameters``. In
+           this case, ``quadratic`` and ``tanh`` parameters _should_
+           include ``poloidal_flux_enter`` as the last value.
     """
 
     # major_radius = 0.9
@@ -293,15 +310,16 @@ def beam_me_up(
     ne_data_density_array = None
     ne_data_radialcoord_array = None
 
-    if density_fit_parameters is None:
+    if density_fit_parameters is None and (
+        density_fit_method in [None, "smoothing-spline-file"]
+    ):
         ne_filename = ne_data_path / f"ne{input_filename_suffix}.dat"
+        density_fit_parameters = [ne_filename, interp_order, interp_smoothing]
 
         # FIXME: Read data so it can be saved later
         ne_data = np.fromfile(ne_filename, dtype=float, sep="   ")
         ne_data_density_array = ne_data[2::2]
         ne_data_radialcoord_array = ne_data[1::2]
-
-        density_fit_parameters = [ne_filename, interp_order, interp_smoothing]
     else:
         ne_filename = None
 
@@ -3393,7 +3411,7 @@ def beam_me_up(
 def make_density_fit(
     method: Optional[Union[str, DensityFitLike]],
     poloidal_flux_enter: float,
-    parameters: Sequence,
+    parameters: Optional[Sequence],
     filename: Optional[PathLike],
 ) -> DensityFitLike:
     """Either construct a `DensityFit` instance, or return ``method``
@@ -3407,6 +3425,11 @@ def make_density_fit(
     if not isinstance(method, (str, type(None))):
         raise TypeError(
             f"Unexpected method type, expected callable, str or None, got '{type(method)}'"
+        )
+
+    if parameters is None:
+        raise ValueError(
+            f"Passing `density_fit_method` ({method}) as string or None requires a list/array of parameters"
         )
 
     return density_fit(method, poloidal_flux_enter, parameters, filename)

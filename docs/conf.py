@@ -92,6 +92,7 @@ html_theme_options = dict(
 autodoc_typehints = "description"
 autodoc_type_aliases = {
     "ArrayLike": "numpy.typing.ArrayLike",
+    "DensityFitLike": "scotty.density_fit.DensityFitLike",
 }
 
 # -- Options for intersphinx extension ---------------------------------------
