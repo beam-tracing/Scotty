@@ -538,7 +538,7 @@ def beam_me_up(
 
         def find_B_p(q_R, q_Z, R_axis, minor_radius_a, B_p_a):
             B_p = B_p_a * (np.sqrt((q_R - R_axis) ** 2 + q_Z**2) / minor_radius_a)
-            return B_p
+            return -B_p
 
         def find_B_R(
             q_R, q_Z, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
@@ -556,7 +556,7 @@ def beam_me_up(
         ):
             B_p = find_B_p(q_R, q_Z, R_axis, minor_radius_a, B_p_a)
             B_Z = B_p * ((q_R - R_axis) / np.sqrt((q_R - R_axis) ** 2 + q_Z**2))
-            return B_Z
+            return -B_Z
 
         def interp_poloidal_flux(
             q_R, q_Z, R_axis=R_axis, minor_radius_a=minor_radius_a, grid=None
