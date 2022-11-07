@@ -310,15 +310,16 @@ def beam_me_up(
     ne_data_density_array = None
     ne_data_radialcoord_array = None
 
-    if density_fit_parameters is None:
+    if density_fit_parameters is None and (
+        density_fit_method in [None, "smoothing-spline-file"]
+    ):
         ne_filename = ne_data_path / f"ne{input_filename_suffix}.dat"
+        density_fit_parameters = [ne_filename, interp_order, interp_smoothing]
 
         # FIXME: Read data so it can be saved later
         ne_data = np.fromfile(ne_filename, dtype=float, sep="   ")
         ne_data_density_array = ne_data[2::2]
         ne_data_radialcoord_array = ne_data[1::2]
-
-        density_fit_parameters = [ne_filename, interp_order, interp_smoothing]
     else:
         ne_filename = None
 
@@ -3410,7 +3411,7 @@ def beam_me_up(
 def make_density_fit(
     method: Optional[Union[str, DensityFitLike]],
     poloidal_flux_enter: float,
-    parameters: Sequence,
+    parameters: Optional[Sequence],
     filename: Optional[PathLike],
 ) -> DensityFitLike:
     """Either construct a `DensityFit` instance, or return ``method``
@@ -3424,6 +3425,11 @@ def make_density_fit(
     if not isinstance(method, (str, type(None))):
         raise TypeError(
             f"Unexpected method type, expected callable, str or None, got '{type(method)}'"
+        )
+
+    if parameters is None:
+        raise ValueError(
+            f"Passing `density_fit_method` ({method}) as string or None requires a list/array of parameters"
         )
 
     return density_fit(method, poloidal_flux_enter, parameters, filename)
