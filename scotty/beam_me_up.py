@@ -212,8 +212,6 @@ def beam_me_up(
     minor_radius_a=None,
 ):
     r"""
-    find_B_method: 1) 'efitpp' finds B from efitpp files directly 2) 'torbeam' finds B from topfile 3) UDA_saved
-
 
     Overview
     ========
@@ -244,6 +242,11 @@ def beam_me_up(
 
     Parameters
     ==========
+    find_B_method:
+        1) 'efitpp' finds B from efitpp files directly
+        2) 'torbeam' finds B from topfile
+        3) UDA_saved
+
     density_fit_parameters:
         A list of parameters to be passed to the
         ``density_fit_method`` constructor. See the docs for the
