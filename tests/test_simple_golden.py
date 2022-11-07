@@ -1,5 +1,6 @@
 from scotty.beam_me_up import beam_me_up
 from scotty.init_bruv import get_parameters_for_Scotty
+from scotty.generate_input import write_torbeam_file
 
 import numpy as np
 from numpy.testing import assert_allclose
@@ -135,3 +136,38 @@ def test_simple_check_density_fit_file(tmp_path):
     # Slightly larger tolerance here, likely due to floating-point
     # precision of file-based input
     assert_allclose(output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED, rtol=1.5e-2)
+
+
+def test_simple_check_torbeam_field(tmp_path):
+    kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
+
+    write_torbeam_file(
+        major_radius=kwargs_dict["R_axis"],
+        minor_radius=kwargs_dict["minor_radius_a"],
+        B_toroidal_max=kwargs_dict["B_T_axis"],
+        B_poloidal_max=kwargs_dict["B_p_a"],
+        buffer_factor=1.1,
+        x_grid_length=100,
+        z_grid_length=100,
+        torbeam_directory_path=tmp_path,
+    )
+
+    kwargs_dict["B_p_a"] = 0.10
+    kwargs_dict["output_filename_suffix"] = "_Bpa0.10"
+    kwargs_dict["output_path"] = str(tmp_path) + "/"
+    kwargs_dict["figure_flag"] = False
+    kwargs_dict["len_tau"] = 10
+    kwargs_dict["find_B_method"] = "torbeam"
+    kwargs_dict["magnetic_data_path"] = tmp_path
+
+    beam_me_up(**kwargs_dict)
+
+    assert len(list(tmp_path.glob("*.npz"))) == 4
+
+    with np.load(tmp_path / "data_output_Bpa0.10.npz") as f:
+        output = dict(f)
+
+    assert_allclose(output["tau_array"], TAU_EXPECTED, rtol=1e-5)
+    assert_allclose(output["B_magnitude"], B_EXPECTED, rtol=1e-5)
+    assert_allclose(output["Psi_3D_output"][0, ...], PSI_START_EXPECTED, rtol=1e-2)
+    assert_allclose(output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED, rtol=1e-2)
