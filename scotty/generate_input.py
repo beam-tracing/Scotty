@@ -29,92 +29,9 @@ import pathlib
 
 import numpy as np
 
+from scotty.geometry import CircularCrossSection
 from scotty.torbeam import Torbeam
 from scotty.typing import PathLike
-
-
-def psi_fun(x_value, z_value, major_radius, minor_radius):
-    """Gives the poloidal flux on the grid"""
-    psi = ((x_value - major_radius) ** 2 + (z_value) ** 2) ** 0.5 / minor_radius
-    return psi
-
-
-def B_toroidal_fun(B_toroidal_max, x_array, z_array, major_radius):
-    """Gives the toroidal B field on the grid"""
-    B_toroidal = np.zeros([len(x_array), len(z_array)])
-    for x_index in range(0, len(x_array)):
-        x_value = x_array[x_index]
-        B_toroidal[x_index, :] = B_toroidal_max * major_radius / x_value
-    return B_toroidal
-
-
-def B_poloidal_fun(B_poloidal_max, x_value, z_value, major_radius, minor_radius):
-    """Gives the poloidal B field on the grid
-
-    Magnetic axis assumed to be at
-
-    - x = major_radus
-    - z = 0
-    """
-
-    if ((x_value - major_radius) ** 2 + (z_value) ** 2) ** (0.5) > minor_radius:
-        B_poloidal = B_poloidal_max
-    else:
-        B_poloidal = (
-            B_poloidal_max
-            * ((x_value - major_radius) ** 2 + (z_value) ** 2) ** 0.5
-            / minor_radius
-        )
-    return B_poloidal
-
-
-def B_r_fun(B_poloidal_max, x_array, z_array, major_radius, minor_radius):
-    """Split B_poloidal into r and z components
-
-    Magnetic axis assumed to be at
-
-    - x = major_radus
-    - z = 0
-    """
-    B_r = np.zeros([len(x_array), len(z_array)])
-
-    for x_index in range(0, len(x_array)):
-        for z_index in range(0, len(z_array)):
-            x_value = x_array[x_index]
-            z_value = z_array[z_index]
-            if x_value == major_radius and z_value == 0:
-                B_r[x_index, z_index] == 0
-            else:
-                B_poloidal = B_poloidal_fun(
-                    B_poloidal_max, x_value, z_value, major_radius, minor_radius
-                )
-                B_r[x_index, z_index] = (
-                    B_poloidal
-                    * z_value
-                    * ((x_value - major_radius) ** 2 + z_value**2) ** (-0.5)
-                )
-    return B_r
-
-
-def B_z_fun(B_poloidal_max, x_array, z_array, major_radius, minor_radius):
-    B_z = np.zeros([len(x_array), len(z_array)])
-
-    for x_index in range(0, len(x_array)):
-        for z_index in range(0, len(z_array)):
-            x_value = x_array[x_index]
-            z_value = z_array[z_index]
-            if x_value == major_radius and z_value == 0:
-                B_z[x_index, z_index] == 0
-            else:
-                B_poloidal = B_poloidal_fun(
-                    B_poloidal_max, x_value, z_value, major_radius, minor_radius
-                )
-                B_z[x_index, z_index] = (
-                    B_poloidal
-                    * (x_value - major_radius)
-                    * ((x_value - major_radius) ** 2 + z_value**2) ** (-0.5)
-                )
-    return B_z
 
 
 def write_inbeam(
@@ -202,6 +119,42 @@ def n_e_fun(nedata_psi, core_ne):
     return nedata_ne
 
 
+def write_torbeam_file(
+    major_radius: float,
+    minor_radius: float,
+    buffer_factor: float,
+    x_grid_length: int,
+    z_grid_length: int,
+    B_toroidal_max: float,
+    B_poloidal_max: float,
+    torbeam_directory_path: pathlib.Path,
+):
+    """Write a TORBEAM magnetic geometry file based on a circular
+    cross-section equilibrium"""
+
+    x_grid_start = major_radius - buffer_factor * minor_radius
+    x_grid_end = major_radius + buffer_factor * minor_radius
+    z_grid_start = -buffer_factor * minor_radius
+    z_grid_end = buffer_factor * minor_radius
+
+    x_grid = np.linspace(x_grid_start, x_grid_end, x_grid_length)
+    z_grid = np.linspace(z_grid_start, z_grid_end, z_grid_length)
+
+    x_meshgrid, z_meshgrid = np.meshgrid(x_grid, z_grid, indexing="ij")
+    field = CircularCrossSection(
+        B_toroidal_max, major_radius, minor_radius, B_poloidal_max
+    )
+    B_t = field.B_T(x_meshgrid, z_meshgrid)
+    B_r = field.B_R(x_meshgrid, z_meshgrid)
+    B_z = field.B_Z(x_meshgrid, z_meshgrid)
+    psi = field.poloidal_flux(x_meshgrid, z_meshgrid)
+
+    # Write topfile
+    Torbeam(x_grid, z_grid, B_r, B_t, B_z, psi).write(
+        torbeam_directory_path / "topfile"
+    )
+
+
 def main(
     poloidal_launch_angle: float = 0.0,
     toroidal_launch_angle: float = 0.0,
@@ -286,32 +239,15 @@ def main(
         for ii in range(0, Tedata_length):
             Te_data_file.write("{:.8e} {:.8e} \n".format(Tedata_psi[ii], Tedata_Te[ii]))
 
-    # Generate topfile variables
-    x_grid_start = major_radius - buffer_factor * minor_radius  # in meters
-    x_grid_end = major_radius + buffer_factor * minor_radius
-    z_grid_start = -buffer_factor * minor_radius
-    z_grid_end = buffer_factor * minor_radius
-
-    x_grid = np.linspace(x_grid_start, x_grid_end, x_grid_length)
-    z_grid = np.linspace(z_grid_start, z_grid_end, z_grid_length)
-
-    x_meshgrid, z_meshgrid = np.meshgrid(x_grid, z_grid, indexing="ij")
-    B_t = B_toroidal_fun(B_toroidal_max, x_grid, z_grid, major_radius)
-    B_r = B_r_fun(B_poloidal_max, x_grid, z_grid, major_radius, minor_radius)
-    B_z = B_z_fun(B_poloidal_max, x_grid, z_grid, major_radius, minor_radius)
-    psi = psi_fun(x_meshgrid, z_meshgrid, major_radius, minor_radius)
-
-    # To enable writing in Torbeam's format
-    # Reads and writes in C (and python) row col major
-    # Transposes to get it to the correct major for Fortran
-    B_r = B_r.reshape(x_grid_length, z_grid_length)
-    B_z = B_z.reshape(x_grid_length, z_grid_length)
-    B_t = B_t.reshape(x_grid_length, z_grid_length)
-    psi = psi.reshape(x_grid_length, z_grid_length)
-
-    # Write topfile
-    Torbeam(x_grid, z_grid, B_r, B_t, B_z, psi).write(
-        torbeam_directory_path / "topfile"
+    write_torbeam_file(
+        major_radius,
+        minor_radius,
+        buffer_factor,
+        x_grid_length,
+        z_grid_length,
+        B_toroidal_max,
+        B_poloidal_max,
+        torbeam_directory_path,
     )
 
     write_inbeam(
