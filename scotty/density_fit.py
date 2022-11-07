@@ -386,12 +386,13 @@ def density_fit(
     """
 
     if method is None:
+        method = _guess_density_fit_method(parameters, filename)
         warn(
             "Creating a density fit without specifying a method is deprecated. "
-            "Guessing method from parameters",
+            f"Guessing method '{method}' from parameters.\n"
+            f"\tPass `density_fit_method='{method}'` to `beam_me_up` to suppress this warning",
             DeprecationWarning,
         )
-        method = _guess_density_fit_method(parameters, filename)
 
     if method == "smoothing-spline-file" and filename != parameters[0]:
         raise ValueError(
