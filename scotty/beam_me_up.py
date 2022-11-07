@@ -244,6 +244,13 @@ def beam_me_up(
 
     Parameters
     ==========
+    density_fit_parameters:
+        A list of parameters to be passed to the
+        ``density_fit_method`` constructor. See the docs for the
+        individual methods for the meaning of their parameters
+
+        .. note:: These parameters should *not* include
+           ``poloidal_flux_enter``
     density_fit_method:
         Parameterisation of the density profile. Either a callable
         (see `DensityFit`), or one of the following options:
@@ -265,7 +272,14 @@ def beam_me_up(
 
         ``"smoothing-spline-file"`` looks for a file called
         ``ne<input_filename_suffix>.dat`` in ``ne_data_path``. It also
-        uses ``interp_order`` and ``interp_smoothing``.
+        uses ``interp_order`` and ``interp_smoothing`` instead of
+        ``density_fit_parameters``.
+
+        .. deprecated:: 2.4.0
+           If ``None`` (the default) is passed, the method will be
+           guessed from the length of ``density_fit_parameters``. In
+           this case, ``quadratic`` and ``tanh`` parameters _should_
+           include ``poloidal_flux_enter`` as the last value.
     """
 
     # major_radius = 0.9
