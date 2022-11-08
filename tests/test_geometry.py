@@ -19,7 +19,7 @@ def test_circular():
     ), "B_T, array"
 
     R = np.linspace(R_axis - minor_radius_a, R_axis + minor_radius_a, 10)
-    Z = np.linspace(-minor_radius_a/2, minor_radius_a/2, 10)
+    Z = np.linspace(-minor_radius_a / 2, minor_radius_a / 2, 10)
     R_grid, Z_grid = np.meshgrid(R, Z, indexing="ij")
     B_R = field.B_R(R_grid, Z_grid)
     B_Z = field.B_Z(R_grid, Z_grid)
