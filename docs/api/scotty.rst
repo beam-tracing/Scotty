@@ -14,7 +14,6 @@ Submodules
 
    scotty.B_derivative_test
    scotty.FindPsiBeam4
-   scotty.Generate_Input7
    scotty.OMFITsave_test
    scotty.PlotAllLocalisationLog
    scotty.PlotInput
@@ -31,6 +30,7 @@ Submodules
    scotty.fun_evolution
    scotty.fun_general
    scotty.fun_mix
+   scotty.geometry
    scotty.hornpy
    scotty.init_bruv
    scotty.lensalot
@@ -38,4 +38,5 @@ Submodules
    scotty.plot3_pretty
    scotty.plot4
    scotty.postmortem2
+   scotty.torbeam
    scotty.typing

@@ -155,6 +155,8 @@ from scotty.fun_mix import (
 # For find_B if using efit files directly
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
 from scotty.density_fit import density_fit, DensityFitLike
+from scotty.geometry import CircularCrossSection
+from scotty.torbeam import Torbeam
 from scotty._version import __version__
 
 # Checks
@@ -338,70 +340,35 @@ def beam_me_up(
         print("Using Torbeam input files for B and poloidal flux")
         # topfile
         # Others: inbeam.dat, Te.dat (not currently used in this code)
-
         topfile_filename = magnetic_data_path / f"topfile{input_filename_suffix}"
-
-        with open(topfile_filename) as f:
-            while not "X-coordinates" in f.readline():
-                pass  # Start reading only from X-coords onwards
-            data_R_coord = read_floats_into_list_until("Z-coordinates", f)
-            data_Z_coord = read_floats_into_list_until("B_R", f)
-            data_B_R_grid = read_floats_into_list_until("B_t", f)
-            data_B_T_grid = read_floats_into_list_until("B_Z", f)
-            data_B_Z_grid = read_floats_into_list_until("psi", f)
-            poloidalFlux_grid = read_floats_into_list_until("you fall asleep", f)
-        # ------------------------------
-
-        # Converts some lists to arrays so that stuff later doesn't complain
-        data_R_coord = np.array(data_R_coord)
-        data_Z_coord = np.array(data_Z_coord)
-
-        # Row-major and column-major business (Torbeam is in Fortran and Scotty is in Python)
-        data_B_R_grid = np.transpose(
-            (np.asarray(data_B_R_grid)).reshape(
-                len(data_Z_coord), len(data_R_coord), order="C"
-            )
-        )
-        data_B_T_grid = np.transpose(
-            (np.asarray(data_B_T_grid)).reshape(
-                len(data_Z_coord), len(data_R_coord), order="C"
-            )
-        )
-        data_B_Z_grid = np.transpose(
-            (np.asarray(data_B_Z_grid)).reshape(
-                len(data_Z_coord), len(data_R_coord), order="C"
-            )
-        )
-        poloidalFlux_grid = np.transpose(
-            (np.asarray(poloidalFlux_grid)).reshape(
-                len(data_Z_coord), len(data_R_coord), order="C"
-            )
-        )
-        # -------------------
+        torbeam = Torbeam.from_file(topfile_filename)
+        data_R_coord = torbeam.R_grid
+        data_Z_coord = torbeam.Z_grid
+        poloidalFlux_grid = torbeam.psi
 
         # Interpolation functions declared
         interp_B_R = interpolate.RectBivariateSpline(
-            data_R_coord,
-            data_Z_coord,
-            data_B_R_grid,
+            torbeam.R_grid,
+            torbeam.Z_grid,
+            torbeam.B_R,
             bbox=[None, None, None, None],
             kx=interp_order,
             ky=interp_order,
             s=interp_smoothing,
         )
         interp_B_T = interpolate.RectBivariateSpline(
-            data_R_coord,
-            data_Z_coord,
-            data_B_T_grid,
+            torbeam.R_grid,
+            torbeam.Z_grid,
+            torbeam.B_T,
             bbox=[None, None, None, None],
             kx=interp_order,
             ky=interp_order,
             s=interp_smoothing,
         )
         interp_B_Z = interpolate.RectBivariateSpline(
-            data_R_coord,
-            data_Z_coord,
-            data_B_Z_grid,
+            torbeam.R_grid,
+            torbeam.Z_grid,
+            torbeam.B_Z,
             bbox=[None, None, None, None],
             kx=interp_order,
             ky=interp_order,
@@ -409,31 +376,22 @@ def beam_me_up(
         )
 
         def find_B_R(q_R, q_Z):
-            B_R = interp_B_R(q_R, q_Z, grid=False)
-            return B_R
+            return interp_B_R(q_R, q_Z, grid=False)
 
         def find_B_T(q_R, q_Z):
-            B_T = interp_B_T(q_R, q_Z, grid=False)
-            return B_T
+            return interp_B_T(q_R, q_Z, grid=False)
 
         def find_B_Z(q_R, q_Z):
-            B_Z = interp_B_Z(q_R, q_Z, grid=False)
-            return B_Z
+            return interp_B_Z(q_R, q_Z, grid=False)
 
         interp_poloidal_flux = interpolate.RectBivariateSpline(
-            data_R_coord,
-            data_Z_coord,
-            poloidalFlux_grid,
+            torbeam.R_grid,
+            torbeam.Z_grid,
+            torbeam.psi,
             bbox=[None, None, None, None],
             kx=interp_order,
             ky=interp_order,
             s=interp_smoothing,
-        )
-        #    interp_poloidal_flux = interpolate.interp2d(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), kind='cubic',
-        #                                           copy=True, bounds_error=False, fill_value=None) # Flux extrapolated outside region
-
-        efit_time = (
-            None  # To prevent the data-saving routines from complaining later on
         )
 
     elif find_B_method == "omfit":
@@ -535,36 +493,13 @@ def beam_me_up(
         # B_p (hence B_R and B_Z) physical when inside the LCFS, have not
         # implemented calculation outside the LCFS
         # To do that, need to make sure B_p = B_p_a outside the LCFS
+        field = CircularCrossSection(B_T_axis, R_axis, minor_radius_a, B_p_a)
+        find_B_R = field.B_R
+        find_B_T = field.B_T
+        find_B_Z = field.B_Z
 
-        def find_B_p(q_R, q_Z, R_axis, minor_radius_a, B_p_a):
-            B_p = B_p_a * (np.sqrt((q_R - R_axis) ** 2 + q_Z**2) / minor_radius_a)
-            return B_p
-
-        def find_B_R(
-            q_R, q_Z, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
-        ):
-            B_p = find_B_p(q_R, q_Z, R_axis, minor_radius_a, B_p_a)
-            B_R = B_p * (q_Z / np.sqrt((q_R - R_axis) ** 2 + q_Z**2))
-            return B_R
-
-        def find_B_T(q_R, q_Z, R_axis=R_axis, B_T_axis=B_T_axis):
-            B_T = B_T_axis * (R_axis / q_R)
-            return B_T
-
-        def find_B_Z(
-            q_R, q_Z, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
-        ):
-            B_p = find_B_p(q_R, q_Z, R_axis, minor_radius_a, B_p_a)
-            B_Z = B_p * ((q_R - R_axis) / np.sqrt((q_R - R_axis) ** 2 + q_Z**2))
-            return B_Z
-
-        def interp_poloidal_flux(
-            q_R, q_Z, R_axis=R_axis, minor_radius_a=minor_radius_a, grid=None
-        ):
-            # keyword 'grid' doesn't do anything; it's a fix to prevent
-            # other routines from complaining
-            polflux = np.sqrt((q_R - R_axis) ** 2 + (q_Z) ** 2) / minor_radius_a
-            return polflux
+        def interp_poloidal_flux(q_R, q_Z, grid=None):
+            return field.poloidal_flux(q_R, q_Z)
 
         # Not strictly necessary, but helpful for visualisation
         data_R_coord = np.linspace(
@@ -572,7 +507,7 @@ def beam_me_up(
         )
         data_Z_coord = np.linspace(-minor_radius_a, minor_radius_a, 101)
         poloidalFlux_grid = interp_poloidal_flux(
-            *np.meshgrid(data_R_coord, data_Z_coord, sparse=False, indexing="ij")
+            *np.meshgrid(data_R_coord, data_Z_coord, indexing="ij")
         )
 
     elif (find_B_method == "EFITpp") or (find_B_method == "UDA_saved"):
@@ -1332,7 +1267,7 @@ def beam_me_up(
         q_R = ray_parameters_2D[0]
         q_Z = ray_parameters_2D[1]
 
-        poloidal_flux = interp_poloidal_flux(q_R, q_Z)
+        poloidal_flux = interp_poloidal_flux(q_R, q_Z, grid=False)
 
         poloidal_flux_difference = poloidal_flux - poloidal_flux_leave
 
@@ -1366,7 +1301,7 @@ def beam_me_up(
         q_R = ray_parameters_2D[0]
         q_Z = ray_parameters_2D[1]
 
-        poloidal_flux = interp_poloidal_flux(q_R, q_Z)
+        poloidal_flux = interp_poloidal_flux(q_R, q_Z, grid=False)
 
         poloidal_flux_difference = poloidal_flux - poloidal_flux_LCFS
 
