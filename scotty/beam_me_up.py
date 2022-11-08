@@ -155,6 +155,7 @@ from scotty.fun_mix import (
 # For find_B if using efit files directly
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
 from scotty.density_fit import density_fit, DensityFitLike
+from scotty.geometry import CircularCrossSection
 from scotty.torbeam import Torbeam
 from scotty._version import __version__
 
@@ -492,36 +493,13 @@ def beam_me_up(
         # B_p (hence B_R and B_Z) physical when inside the LCFS, have not
         # implemented calculation outside the LCFS
         # To do that, need to make sure B_p = B_p_a outside the LCFS
+        field = CircularCrossSection(B_T_axis, R_axis, minor_radius_a, B_p_a)
+        find_B_R = field.B_R
+        find_B_T = field.B_T
+        find_B_Z = field.B_Z
 
-        def find_B_p(q_R, q_Z, R_axis, minor_radius_a, B_p_a):
-            B_p = B_p_a * (np.sqrt((q_R - R_axis) ** 2 + q_Z**2) / minor_radius_a)
-            return -B_p
-
-        def find_B_R(
-            q_R, q_Z, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
-        ):
-            B_p = find_B_p(q_R, q_Z, R_axis, minor_radius_a, B_p_a)
-            B_R = B_p * (q_Z / np.sqrt((q_R - R_axis) ** 2 + q_Z**2))
-            return B_R
-
-        def find_B_T(q_R, q_Z, R_axis=R_axis, B_T_axis=B_T_axis):
-            B_T = B_T_axis * (R_axis / q_R)
-            return B_T
-
-        def find_B_Z(
-            q_R, q_Z, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
-        ):
-            B_p = find_B_p(q_R, q_Z, R_axis, minor_radius_a, B_p_a)
-            B_Z = B_p * ((q_R - R_axis) / np.sqrt((q_R - R_axis) ** 2 + q_Z**2))
-            return -B_Z
-
-        def interp_poloidal_flux(
-            q_R, q_Z, R_axis=R_axis, minor_radius_a=minor_radius_a, grid=None
-        ):
-            # keyword 'grid' doesn't do anything; it's a fix to prevent
-            # other routines from complaining
-            polflux = np.sqrt((q_R - R_axis) ** 2 + (q_Z) ** 2) / minor_radius_a
-            return polflux
+        def interp_poloidal_flux(q_R, q_Z, grid=None):
+            return field.poloidal_flux(q_R, q_Z)
 
         # Not strictly necessary, but helpful for visualisation
         data_R_coord = np.linspace(
@@ -529,7 +507,7 @@ def beam_me_up(
         )
         data_Z_coord = np.linspace(-minor_radius_a, minor_radius_a, 101)
         poloidalFlux_grid = interp_poloidal_flux(
-            *np.meshgrid(data_R_coord, data_Z_coord, sparse=False, indexing="ij")
+            *np.meshgrid(data_R_coord, data_Z_coord, indexing="ij")
         )
 
     elif (find_B_method == "EFITpp") or (find_B_method == "UDA_saved"):
