@@ -1,6 +1,6 @@
 from scotty.beam_me_up import beam_me_up
 from scotty.init_bruv import get_parameters_for_Scotty
-from scotty.generate_input import write_torbeam_file
+from scotty.torbeam import write_torbeam_file
 
 import numpy as np
 from numpy.testing import assert_allclose
