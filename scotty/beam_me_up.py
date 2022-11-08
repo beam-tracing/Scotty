@@ -300,9 +300,7 @@ def beam_me_up(
     # ------------------------------
 
     # Checking input data
-    check_input(
-        mode_flag
-    )
+    check_input(mode_flag)
 
     # Tidying up the input data
     launch_angular_frequency = 2 * math.pi * 10.0**9 * launch_freq_GHz
@@ -3299,13 +3297,11 @@ def beam_me_up(
     print("Analysis data saved")
     # -------------------
 
-
     # -------------------
     # Sanity check. Makes sure that calculated quantities are reasonable
     # -------------------
     check_output(H_output)
     # -------------------
-
 
     # -------------------
     # This saves some simple figures
