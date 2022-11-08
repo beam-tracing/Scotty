@@ -157,6 +157,10 @@ from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
 from scotty.density_fit import density_fit, DensityFitLike
 from scotty._version import __version__
 
+# Checks
+from scotty.check_input import check_input
+from scotty.check_output import check_output
+
 # Type hints
 from typing import Optional, Union, Sequence
 from scotty.typing import PathLike
@@ -294,6 +298,11 @@ def beam_me_up(
     # ------------------------------
     # Input data #
     # ------------------------------
+
+    # Checking input data
+    check_input(
+        mode_flag
+    )
 
     # Tidying up the input data
     launch_angular_frequency = 2 * math.pi * 10.0**9 * launch_freq_GHz
@@ -3289,6 +3298,14 @@ def beam_me_up(
     )
     print("Analysis data saved")
     # -------------------
+
+
+    # -------------------
+    # Sanity check. Makes sure that calculated quantities are reasonable
+    # -------------------
+    check_output(H_output)
+    # -------------------
+
 
     # -------------------
     # This saves some simple figures

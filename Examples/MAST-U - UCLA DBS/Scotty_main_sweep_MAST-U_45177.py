@@ -115,8 +115,8 @@ for ii, equil_time in enumerate(equil_times):
                     elif equil_time == 0.5:
                         kwargs_dict["poloidal_flux_enter"] = 1.06444540**2
                         
-                    kwargs_dict["delta_R"] = -0.00001
-                    kwargs_dict["delta_Z"] = -0.00001
+                    kwargs_dict["delta_R"] = -0.0001
+                    kwargs_dict["delta_Z"] = -0.0001
                     kwargs_dict["delta_K_R"] = 0.01
                     kwargs_dict["delta_K_zeta"] = 0.01
                     kwargs_dict["delta_K_Z"] = 0.01
