@@ -25,23 +25,20 @@ from scotty.typing import PathLike
 
 def check_H_output(H_output):
     tol = 1e-2
-    
+
     if max(H_output) > tol:
         """
         H_output should be zero along the entire ray
-        
+
         If not close to zero, that means numerical errors are large
         """
-        raise ValueError(
-            f"`H_output` is too large! `H_output` = '{H_output}'"
-        )    
-    
+        raise ValueError(f"`H_output` is too large! `H_output` = '{H_output}'")
+
     return None
 
-def check_input(
-    H_output
-):
+
+def check_input(H_output):
 
     check_H_output(H_output)
-    
+
     return None
