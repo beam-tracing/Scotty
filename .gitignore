@@ -226,6 +226,8 @@ cython_debug/
 *.npz
 *.nc
 *.hdf5
+*.dat
+*topfile*
 
 # Generated version file
 scotty/_version.py

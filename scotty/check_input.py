@@ -24,11 +24,9 @@ from scotty.typing import PathLike
 
 
 def check_mode_flag(mode_flag):
+    """Mode flag should be either -1 (X-mode) or 1 (O-mode)"""
 
     if mode_flag not in [-1, 1]:
-        """
-        Mode flag should be either -1 (X-mode) or 1 (O-mode)
-        """
         raise ValueError(
             f"Bad value for `mode_flag`! Expected either 1 or -1, got '{mode_flag}'"
         )
