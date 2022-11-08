@@ -38,7 +38,6 @@ def check_H_output(H_output):
 
 def check_output(H_output):
 
-
     check_H_output(H_output)
 
     return None
