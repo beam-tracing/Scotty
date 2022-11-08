@@ -21,6 +21,8 @@ Submodules
    scotty.PlotPsiBC2
    scotty.beam_me_up
    scotty.check_ModeConversion
+   scotty.check_input
+   scotty.check_output
    scotty.compare_plot
    scotty.debugging
    scotty.density_fit
