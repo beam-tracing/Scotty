@@ -30,7 +30,7 @@ Submodules
    scotty.fun_evolution
    scotty.fun_general
    scotty.fun_mix
-   scotty.generate_input
+   scotty.geometry
    scotty.hornpy
    scotty.init_bruv
    scotty.lensalot
@@ -38,4 +38,5 @@ Submodules
    scotty.plot3_pretty
    scotty.plot4
    scotty.postmortem2
+   scotty.torbeam
    scotty.typing
