@@ -1332,7 +1332,7 @@ def beam_me_up(
         q_R = ray_parameters_2D[0]
         q_Z = ray_parameters_2D[1]
 
-        poloidal_flux = interp_poloidal_flux(q_R, q_Z)
+        poloidal_flux = interp_poloidal_flux(q_R, q_Z, grid=False)
 
         poloidal_flux_difference = poloidal_flux - poloidal_flux_leave
 
@@ -1366,7 +1366,7 @@ def beam_me_up(
         q_R = ray_parameters_2D[0]
         q_Z = ray_parameters_2D[1]
 
-        poloidal_flux = interp_poloidal_flux(q_R, q_Z)
+        poloidal_flux = interp_poloidal_flux(q_R, q_Z, grid=False)
 
         poloidal_flux_difference = poloidal_flux - poloidal_flux_LCFS
 
