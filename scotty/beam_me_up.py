@@ -2997,12 +2997,10 @@ def create_magnetic_geometry(
             dataset = Dataset(magnetic_data_path / "efitOut.nc")
 
             efitpp_times = dataset.variables["time"][:]
-            #        equilibriumStatus_array = dataset.variables['equilibriumStatus'][:]
             time_idx = find_nearest(efitpp_times, equil_time)
             print("EFIT++ time", efitpp_times[time_idx])
 
             output_group = dataset.groups["output"]
-            #        input_group = dataset.groups['input']
 
             profiles2D = output_group.groups["profiles2D"]
             # unnormalised, as a function of R and Z
@@ -3011,16 +3009,6 @@ def create_magnetic_geometry(
             ][:][:]
             data_R_coord = profiles2D.variables["r"][time_idx][:]
             data_Z_coord = profiles2D.variables["z"][time_idx][:]
-
-            # radialProfiles = output_group.groups['radialProfiles']
-            # Bt_array = radialProfiles.variables['Bt'][time_idx][:]
-            # r_array_B = radialProfiles.variables['r'][time_idx][:]
-
-            # separatrixGeometry = output_group.groups['separatrixGeometry']
-            # geometricAxis = separatrixGeometry.variables['geometricAxis'][time_index] # R,Z location of the geometric axis
-
-            # globalParameters = output_group.groups['globalParameters']
-            # bvacRgeom = globalParameters.variables['bvacRgeom'][time_index] # Vacuum B field (= B_zeta, in vacuum) at the geometric axis
 
             fluxFunctionProfiles = output_group.groups["fluxFunctionProfiles"]
             poloidalFlux = fluxFunctionProfiles.variables["normalizedPoloidalFlux"][:]
@@ -3032,9 +3020,10 @@ def create_magnetic_geometry(
             dataset.close()
 
             # normalised_polflux = polflux_const_m * poloidalFlux + polflux_const_c (think y = mx + c)
-            [polflux_const_m, polflux_const_c] = np.polyfit(
+            # linear fit
+            polflux_const_m, polflux_const_c = np.polyfit(
                 unnormalizedPoloidalFlux, poloidalFlux, 1
-            )  # linear fit
+            )
             poloidalFlux_grid = (
                 unnormalised_poloidalFlux_grid * polflux_const_m + polflux_const_c
             )
@@ -3119,10 +3108,6 @@ def create_magnetic_geometry(
                 poloidalFlux_unnormalised_boundary - poloidalFlux_unnormalised_axis
             )
 
-            # plt.figure()
-            # plt.plot(poloidalFlux)
-            # print(poloidalFlux[-1])
-
         elif find_B_method == "UDA_saved" and shot is None:
             # If using this part of the code, magnetic_data_path needs to include the filename
             # Assuming only one time present in file
@@ -3142,11 +3127,6 @@ def create_magnetic_geometry(
             )
             poloidalFlux = np.linspace(0, 1.0, len(rBphi))
 
-        # interp_rBphi = interpolate.interp1d(poloidalFlux, rBphi,
-        #                                     kind='cubic', axis=-1, copy=True, bounds_error=False,
-        #                                     # fill_value=rBphi[-1],
-        #                                     fill_value='extrapolate',
-        #                                     assume_sorted=False)
         interp_rBphi = interpolate.UnivariateSpline(
             poloidalFlux,
             rBphi,
@@ -3199,12 +3179,6 @@ def create_magnetic_geometry(
 
             # Let interp do the extrapolation
             rBphi = interp_rBphi(polflux)
-
-            # Manually extrapolate
-            # rBphi = (is_inside * interp_rBphi(polflux)
-            #          + is_outside * (rBphi_gradient_for_extrapolation *
-            #                          (polflux-last_poloidal_flux) + last_rBphi)
-            #          )
 
             B_T = rBphi / q_R
 
@@ -3287,9 +3261,6 @@ def create_magnetic_geometry(
         interp_poloidal_flux = make_rect_spline(
             data_R_coord, data_Z_coord, poloidalFlux_grid
         )
-        #    interp_poloidal_flux = interpolate.interp2d(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), kind='cubic',
-        #                                           copy=True, bounds_error=False, fill_value=None) # Flux extrapolated outside region
-
     else:
         raise ValueError(f"Invalid find_B_method '{find_B_method}'")
 
