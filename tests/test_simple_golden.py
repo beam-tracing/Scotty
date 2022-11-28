@@ -1,4 +1,4 @@
-from scotty.beam_me_up import beam_me_up
+from scotty.beam_me_up import beam_me_up, create_magnetic_geometry
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.torbeam import write_torbeam_file, construct_torbeam_field
 
@@ -317,3 +317,39 @@ def test_integrated(tmp_path, generator):
     # Slightly larger tolerance here, likely due to floating-point
     # precision of file-based input
     assert_allclose(output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED, rtol=2e-2)
+
+
+@pytest.mark.parametrize(
+    "generator",
+    [
+        pytest.param(ne_dat_file, id="density-fit-file"),
+        pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(omfit_json, id="omfit-file"),
+    ],
+)
+def test_create_magnetic_geometry(tmp_path, generator):
+    kwargs_dict = generator(tmp_path)
+
+    field = create_magnetic_geometry(**kwargs_dict)
+    field_golden = create_magnetic_geometry(**simple(tmp_path))
+
+    assert_allclose(
+        field.B_R(field.data_R_coord, field.data_Z_coord),
+        field_golden.B_R(field.data_R_coord, field.data_Z_coord),
+        rtol=1e-6,
+    )
+    assert_allclose(
+        field.B_T(field.data_R_coord, field.data_Z_coord),
+        field_golden.B_T(field.data_R_coord, field.data_Z_coord),
+        rtol=1e-6,
+    )
+    assert_allclose(
+        field.B_Z(field.data_R_coord, field.data_Z_coord),
+        field_golden.B_Z(field.data_R_coord, field.data_Z_coord),
+        rtol=1e-6,
+    )
+    assert_allclose(
+        field.poloidal_flux(field.data_R_coord, field.data_Z_coord),
+        field_golden.poloidal_flux(field.data_R_coord, field.data_Z_coord),
+        rtol=1e-6,
+    )

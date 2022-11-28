@@ -2886,18 +2886,19 @@ def make_density_fit(
 
 def create_magnetic_geometry(
     find_B_method: str,
-    magnetic_data_path: pathlib.Path,
-    input_filename_suffix: str,
-    interp_order: int,
-    interp_smoothing: int,
-    B_T_axis: float,
-    R_axis: float,
-    minor_radius_a: float,
-    B_p_a: float,
-    shot: int,
-    equil_time: float,
-    delta_R: float,
-    delta_Z: float,
+    magnetic_data_path: Optional[pathlib.Path] = None,
+    input_filename_suffix: str = "",
+    interp_order: int = 5,
+    interp_smoothing: int = 0,
+    B_T_axis: Optional[float] = None,
+    R_axis: Optional[float] = None,
+    minor_radius_a: Optional[float] = None,
+    B_p_a: Optional[float] = None,
+    shot: Optional[int] = None,
+    equil_time: Optional[float] = None,
+    delta_R: Optional[float] = None,
+    delta_Z: Optional[float] = None,
+    **kwargs,
 ) -> MagneticGeometry:
     """Create an object representing the magnetic field geometry"""
 
