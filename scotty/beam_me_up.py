@@ -78,7 +78,6 @@ from netCDF4 import Dataset
 import bisect
 import time
 import json
-import ast
 import pathlib
 
 from scotty.fun_general import (
@@ -2941,42 +2940,22 @@ def create_magnetic_geometry(
         )
 
     elif find_B_method == "omfit":
-        topfile_filename = "./topfile.json"
-        f = open(topfile_filename)
-        data = f.read()
-        data = ast.literal_eval(data)
-        data_R_coord = data["R"]
-        data_Z_coord = data["Z"]
-        data_B_R_grid = data["Br"]
-        data_B_T_grid = data["Bt"]
-        data_B_Z_grid = data["Bz"]
-        poloidalFlux_grid = data["pol_flux"]
-        f.close()
-        data_R_coord = np.array(data_R_coord)
-        data_Z_coord = np.array(data_Z_coord)
+        topfile_filename = magnetic_data_path / "topfile.json"
 
-        ## Row-major and column-major business (Torbeam is in Fortran and Scotty is in Python)
-        data_B_R_grid = np.transpose(
-            (np.asarray(data_B_R_grid)).reshape(
-                len(data_Z_coord), len(data_R_coord), order="C"
-            )
-        )
-        data_B_T_grid = np.transpose(
-            (np.asarray(data_B_T_grid)).reshape(
-                len(data_Z_coord), len(data_R_coord), order="C"
-            )
-        )
-        data_B_Z_grid = np.transpose(
-            (np.asarray(data_B_Z_grid)).reshape(
-                len(data_Z_coord), len(data_R_coord), order="C"
-            )
-        )
-        poloidalFlux_grid = np.transpose(
-            (np.asarray(poloidalFlux_grid)).reshape(
-                len(data_Z_coord), len(data_R_coord), order="C"
-            )
-        )
-        # -------------------
+        with open(topfile_filename) as f:
+            data = json.load(f)
+
+        data_R_coord = np.array(data["R"])
+        data_Z_coord = np.array(data["Z"])
+
+        def unflatten(array):
+            """Convert from column-major (TORBEAM, Fortran) to row-major order (Scotty, Python)"""
+            return np.asarray(array).reshape(len(data_Z_coord), len(data_R_coord)).T
+
+        data_B_R_grid = unflatten(data["Br"])
+        data_B_T_grid = unflatten(data["Bt"])
+        data_B_Z_grid = unflatten(data["Bz"])
+        poloidalFlux_grid = unflatten(data["pol_flux"])
 
         # Interpolation functions declared
         interp_B_R = make_rect_spline(data_R_coord, data_Z_coord, data_B_R_grid)
@@ -2984,23 +2963,16 @@ def create_magnetic_geometry(
         interp_B_Z = make_rect_spline(data_R_coord, data_Z_coord, data_B_Z_grid)
 
         def find_B_R(q_R, q_Z):
-            B_R = interp_B_R(q_R, q_Z, grid=False)
-            return B_R
+            return interp_B_R(q_R, q_Z, grid=False)
 
         def find_B_T(q_R, q_Z):
-            B_T = interp_B_T(q_R, q_Z, grid=False)
-            return B_T
+            return interp_B_T(q_R, q_Z, grid=False)
 
         def find_B_Z(q_R, q_Z):
-            B_Z = interp_B_Z(q_R, q_Z, grid=False)
-            return B_Z
+            return interp_B_Z(q_R, q_Z, grid=False)
 
         interp_poloidal_flux = make_rect_spline(
             data_R_coord, data_Z_coord, poloidalFlux_grid
-        )
-
-        efit_time = (
-            None  # To prevent the data-saving routines from complaining later on
         )
 
     elif find_B_method == "analytical":
@@ -3317,10 +3289,6 @@ def create_magnetic_geometry(
         )
         #    interp_poloidal_flux = interpolate.interp2d(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), kind='cubic',
         #                                           copy=True, bounds_error=False, fill_value=None) # Flux extrapolated outside region
-
-        efit_time = (
-            None  # To prevent the data-saving routines from complaining later on
-        )
 
     else:
         print("Invalid find_B_method")
