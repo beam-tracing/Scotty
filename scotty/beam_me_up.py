@@ -3291,8 +3291,7 @@ def create_magnetic_geometry(
         #                                           copy=True, bounds_error=False, fill_value=None) # Flux extrapolated outside region
 
     else:
-        print("Invalid find_B_method")
-        sys.exit()
+        raise ValueError(f"Invalid find_B_method '{find_B_method}'")
 
     field = MagneticGeometry()
     field.B_R = find_B_R
