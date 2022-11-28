@@ -2901,6 +2901,17 @@ def create_magnetic_geometry(
 ) -> MagneticGeometry:
     """Create an object representing the magnetic field geometry"""
 
+    def make_rect_spline(R_grid, Z_grid, array):
+        return interpolate.RectBivariateSpline(
+            R_grid,
+            Z_grid,
+            array,
+            bbox=[None, None, None, None],
+            kx=interp_order,
+            ky=interp_order,
+            s=interp_smoothing,
+        )
+
     if find_B_method == "torbeam":
         print("Using Torbeam input files for B and poloidal flux")
         # topfile
@@ -2911,34 +2922,9 @@ def create_magnetic_geometry(
         data_Z_coord = torbeam.Z_grid
         poloidalFlux_grid = torbeam.psi
 
-        # Interpolation functions declared
-        interp_B_R = interpolate.RectBivariateSpline(
-            torbeam.R_grid,
-            torbeam.Z_grid,
-            torbeam.B_R,
-            bbox=[None, None, None, None],
-            kx=interp_order,
-            ky=interp_order,
-            s=interp_smoothing,
-        )
-        interp_B_T = interpolate.RectBivariateSpline(
-            torbeam.R_grid,
-            torbeam.Z_grid,
-            torbeam.B_T,
-            bbox=[None, None, None, None],
-            kx=interp_order,
-            ky=interp_order,
-            s=interp_smoothing,
-        )
-        interp_B_Z = interpolate.RectBivariateSpline(
-            torbeam.R_grid,
-            torbeam.Z_grid,
-            torbeam.B_Z,
-            bbox=[None, None, None, None],
-            kx=interp_order,
-            ky=interp_order,
-            s=interp_smoothing,
-        )
+        interp_B_R = make_rect_spline(torbeam.R_grid, torbeam.Z_grid, torbeam.B_R)
+        interp_B_T = make_rect_spline(torbeam.R_grid, torbeam.Z_grid, torbeam.B_T)
+        interp_B_Z = make_rect_spline(torbeam.R_grid, torbeam.Z_grid, torbeam.B_Z)
 
         def find_B_R(q_R, q_Z):
             return interp_B_R(q_R, q_Z, grid=False)
@@ -2949,14 +2935,8 @@ def create_magnetic_geometry(
         def find_B_Z(q_R, q_Z):
             return interp_B_Z(q_R, q_Z, grid=False)
 
-        interp_poloidal_flux = interpolate.RectBivariateSpline(
-            torbeam.R_grid,
-            torbeam.Z_grid,
-            torbeam.psi,
-            bbox=[None, None, None, None],
-            kx=interp_order,
-            ky=interp_order,
-            s=interp_smoothing,
+        interp_poloidal_flux = make_rect_spline(
+            torbeam.R_grid, torbeam.Z_grid, torbeam.psi
         )
 
     elif find_B_method == "omfit":
@@ -2998,33 +2978,9 @@ def create_magnetic_geometry(
         # -------------------
 
         # Interpolation functions declared
-        interp_B_R = interpolate.RectBivariateSpline(
-            data_R_coord,
-            data_Z_coord,
-            data_B_R_grid,
-            bbox=[None, None, None, None],
-            kx=interp_order,
-            ky=interp_order,
-            s=interp_smoothing,
-        )
-        interp_B_T = interpolate.RectBivariateSpline(
-            data_R_coord,
-            data_Z_coord,
-            data_B_T_grid,
-            bbox=[None, None, None, None],
-            kx=interp_order,
-            ky=interp_order,
-            s=interp_smoothing,
-        )
-        interp_B_Z = interpolate.RectBivariateSpline(
-            data_R_coord,
-            data_Z_coord,
-            data_B_Z_grid,
-            bbox=[None, None, None, None],
-            kx=interp_order,
-            ky=interp_order,
-            s=interp_smoothing,
-        )
+        interp_B_R = make_rect_spline(data_R_coord, data_Z_coord, data_B_R_grid)
+        interp_B_T = make_rect_spline(data_R_coord, data_Z_coord, data_B_T_grid)
+        interp_B_Z = make_rect_spline(data_R_coord, data_Z_coord, data_B_Z_grid)
 
         def find_B_R(q_R, q_Z):
             B_R = interp_B_R(q_R, q_Z, grid=False)
@@ -3038,14 +2994,8 @@ def create_magnetic_geometry(
             B_Z = interp_B_Z(q_R, q_Z, grid=False)
             return B_Z
 
-        interp_poloidal_flux = interpolate.RectBivariateSpline(
-            data_R_coord,
-            data_Z_coord,
-            poloidalFlux_grid,
-            bbox=[None, None, None, None],
-            kx=interp_order,
-            ky=interp_order,
-            s=interp_smoothing,
+        interp_poloidal_flux = make_rect_spline(
+            data_R_coord, data_Z_coord, poloidalFlux_grid
         )
 
         efit_time = (
@@ -3053,9 +3003,6 @@ def create_magnetic_geometry(
         )
 
     elif find_B_method == "analytical":
-        # B_p (hence B_R and B_Z) physical when inside the LCFS, have not
-        # implemented calculation outside the LCFS
-        # To do that, need to make sure B_p = B_p_a outside the LCFS
         field = CircularCrossSection(B_T_axis, R_axis, minor_radius_a, B_p_a)
 
         # Not strictly necessary, but helpful for visualisation
@@ -3238,14 +3185,8 @@ def create_magnetic_geometry(
             check_finite=False,
         )
 
-        interp_poloidal_flux = interpolate.RectBivariateSpline(
-            data_R_coord,
-            data_Z_coord,
-            poloidalFlux_grid,
-            bbox=[None, None, None, None],
-            kx=interp_order,
-            ky=interp_order,
-            s=interp_smoothing,
+        interp_poloidal_flux = make_rect_spline(
+            data_R_coord, data_Z_coord, poloidalFlux_grid
         )
 
         # Extrapolation assumes the last element of rBphi corresponds to poloidalflux = 1
@@ -3354,33 +3295,9 @@ def create_magnetic_geometry(
             loadfile.close()
 
         # Interpolation functions declared
-        interp_B_R = interpolate.RectBivariateSpline(
-            data_R_coord,
-            data_Z_coord,
-            data_B_R_grid,
-            bbox=[None, None, None, None],
-            kx=interp_order,
-            ky=interp_order,
-            s=interp_smoothing,
-        )
-        interp_B_T = interpolate.RectBivariateSpline(
-            data_R_coord,
-            data_Z_coord,
-            data_B_T_grid,
-            bbox=[None, None, None, None],
-            kx=interp_order,
-            ky=interp_order,
-            s=interp_smoothing,
-        )
-        interp_B_Z = interpolate.RectBivariateSpline(
-            data_R_coord,
-            data_Z_coord,
-            data_B_Z_grid,
-            bbox=[None, None, None, None],
-            kx=interp_order,
-            ky=interp_order,
-            s=interp_smoothing,
-        )
+        interp_B_R = make_rect_spline(data_R_coord, data_Z_coord, data_B_R_grid)
+        interp_B_T = make_rect_spline(data_R_coord, data_Z_coord, data_B_T_grid)
+        interp_B_Z = make_rect_spline(data_R_coord, data_Z_coord, data_B_Z_grid)
 
         def find_B_R(q_R, q_Z):
             B_R = interp_B_R(q_R, q_Z, grid=False)
@@ -3394,14 +3311,8 @@ def create_magnetic_geometry(
             B_Z = interp_B_Z(q_R, q_Z, grid=False)
             return B_Z
 
-        interp_poloidal_flux = interpolate.RectBivariateSpline(
-            data_R_coord,
-            data_Z_coord,
-            poloidalFlux_grid,
-            bbox=[None, None, None, None],
-            kx=interp_order,
-            ky=interp_order,
-            s=interp_smoothing,
+        interp_poloidal_flux = make_rect_spline(
+            data_R_coord, data_Z_coord, poloidalFlux_grid
         )
         #    interp_poloidal_flux = interpolate.interp2d(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), kind='cubic',
         #                                           copy=True, bounds_error=False, fill_value=None) # Flux extrapolated outside region
