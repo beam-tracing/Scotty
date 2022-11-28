@@ -1,7 +1,8 @@
 from scotty.beam_me_up import beam_me_up
 from scotty.init_bruv import get_parameters_for_Scotty
-from scotty.torbeam import write_torbeam_file
+from scotty.torbeam import write_torbeam_file, construct_torbeam_field
 
+import json
 import numpy as np
 from numpy.testing import assert_allclose
 import pytest
@@ -243,12 +244,47 @@ def torbeam_file(path):
     return kwargs_dict
 
 
+def omfit_json(path):
+    """Geometry using OMFIT JSON file"""
+    kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
+
+    R_grid, Z_grid, B_R, B_t, B_Z, psi = construct_torbeam_field(
+        major_radius=kwargs_dict["R_axis"],
+        minor_radius=kwargs_dict["minor_radius_a"],
+        B_toroidal_max=kwargs_dict["B_T_axis"],
+        B_poloidal_max=kwargs_dict["B_p_a"],
+        buffer_factor=1.1,
+        x_grid_length=100,
+        z_grid_length=100,
+    )
+
+    def flatten_as_F(array):
+        return array.T.flatten().tolist()
+
+    data = {
+        "R": R_grid.tolist(),
+        "Z": Z_grid.tolist(),
+        "Br": flatten_as_F(B_R),
+        "Bt": flatten_as_F(B_t),
+        "Bz": flatten_as_F(B_Z),
+        "pol_flux": flatten_as_F(psi),
+    }
+
+    with open(path / "topfile.json", "w") as f:
+        json.dump(data, f)
+
+    kwargs_dict["find_B_method"] = "omfit"
+    kwargs_dict["magnetic_data_path"] = path
+    return kwargs_dict
+
+
 @pytest.mark.parametrize(
     "generator",
     [
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(omfit_json, id="omfit-file"),
     ],
 )
 def test_integrated(tmp_path, generator):
@@ -256,7 +292,6 @@ def test_integrated(tmp_path, generator):
     flux surfaces."""
 
     kwargs_dict = generator(tmp_path)
-    kwargs_dict["B_p_a"] = 0.10
     kwargs_dict["output_filename_suffix"] = "_Bpa0.10"
     kwargs_dict["figure_flag"] = False
     kwargs_dict["len_tau"] = 10
@@ -275,7 +310,7 @@ def test_integrated(tmp_path, generator):
     K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
     assert K_magnitude.argmin() == CUTOFF_INDEX
 
-    assert_allclose(output["Psi_3D_output"][0, ...], PSI_START_EXPECTED, rtol=1e-2)
+    assert_allclose(output["Psi_3D_output"][0, ...], PSI_START_EXPECTED, rtol=1.8e-2)
     assert_allclose(
         output["Psi_3D_output"][CUTOFF_INDEX, ...], PSI_CUTOFF_EXPECTED, rtol=1e-2
     )

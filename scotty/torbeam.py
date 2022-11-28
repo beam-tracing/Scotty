@@ -207,7 +207,7 @@ def n_e_fun(nedata_psi, core_ne):
     return nedata_ne
 
 
-def write_torbeam_file(
+def construct_torbeam_field(
     major_radius: float,
     minor_radius: float,
     buffer_factor: float,
@@ -215,10 +215,8 @@ def write_torbeam_file(
     z_grid_length: int,
     B_toroidal_max: float,
     B_poloidal_max: float,
-    torbeam_directory_path: pathlib.Path,
 ):
-    """Write a TORBEAM magnetic geometry file based on a circular
-    cross-section equilibrium"""
+    """Construct the grid and magnetic field quantities for a circular cross-section equilibrium"""
 
     x_grid_start = major_radius - buffer_factor * minor_radius
     x_grid_end = major_radius + buffer_factor * minor_radius
@@ -236,8 +234,32 @@ def write_torbeam_file(
     B_r = field.B_R(x_meshgrid, z_meshgrid)
     B_z = field.B_Z(x_meshgrid, z_meshgrid)
     psi = field.poloidal_flux(x_meshgrid, z_meshgrid)
+    return x_grid, z_grid, B_r, B_t, B_z, psi
 
-    # Write topfile
+
+def write_torbeam_file(
+    major_radius: float,
+    minor_radius: float,
+    buffer_factor: float,
+    x_grid_length: int,
+    z_grid_length: int,
+    B_toroidal_max: float,
+    B_poloidal_max: float,
+    torbeam_directory_path: pathlib.Path,
+):
+    """Write a TORBEAM magnetic geometry file based on a circular
+    cross-section equilibrium"""
+
+    x_grid, z_grid, B_r, B_t, B_z, psi = construct_torbeam_field(
+        major_radius,
+        minor_radius,
+        buffer_factor,
+        x_grid_length,
+        z_grid_length,
+        B_toroidal_max,
+        B_poloidal_max,
+    )
+
     Torbeam(x_grid, z_grid, B_r, B_t, B_z, psi).write(
         torbeam_directory_path / "topfile"
     )
