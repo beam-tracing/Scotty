@@ -2960,17 +2960,16 @@ def create_magnetic_geometry(
         )
 
     elif find_B_method == "analytical":
-        field = CircularCrossSection(B_T_axis, R_axis, minor_radius_a, B_p_a)
+        if B_T_axis is None:
+            raise ValueError("Missing 'B_T_axis' argument for analytic B field")
+        if R_axis is None:
+            raise ValueError("Missing 'R_axis' argument for analytic B field")
+        if minor_radius_a is None:
+            raise ValueError("Missing 'minor_radius_a' argument for analytic B field")
+        if B_p_a is None:
+            raise ValueError("Missing 'B_p_a' argument for analytic B field")
 
-        # Not strictly necessary, but helpful for visualisation
-        field.data_R_coord = np.linspace(
-            R_axis - minor_radius_a, R_axis + minor_radius_a, 101
-        )
-        field.data_Z_coord = np.linspace(-minor_radius_a, minor_radius_a, 101)
-        field.poloidalFlux_grid = field.poloidal_flux(
-            *np.meshgrid(field.data_R_coord, field.data_Z_coord, indexing="ij")
-        )
-        return field
+        return CircularCrossSection(B_T_axis, R_axis, minor_radius_a, B_p_a)
 
     elif (find_B_method == "EFITpp") or (find_B_method == "UDA_saved"):
         if find_B_method == "EFITpp":

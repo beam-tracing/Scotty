@@ -23,12 +23,26 @@ class MagneticGeometry:
 
 class CircularCrossSection(MagneticGeometry):
     def __init__(
-        self, B_T_axis: float, R_axis: float, minor_radius_a: float, B_p_a: float
+        self,
+        B_T_axis: float,
+        R_axis: float,
+        minor_radius_a: float,
+        B_p_a: float,
+        R_points: int = 101,
+        Z_points: int = 101,
     ):
         self.B_T_axis = B_T_axis
         self.R_axis = R_axis
         self.minor_radius_a = minor_radius_a
         self.B_p_a = B_p_a
+
+        self.data_R_coord = np.linspace(
+            R_axis - minor_radius_a, R_axis + minor_radius_a, R_points
+        )
+        self.data_Z_coord = np.linspace(-minor_radius_a, minor_radius_a, Z_points)
+        self.poloidalFlux_grid = self.poloidal_flux(
+            *np.meshgrid(self.data_R_coord, self.data_Z_coord, indexing="ij")
+        )
 
     def rho(self, q_R: ArrayLike, q_Z: ArrayLike) -> ArrayLike:
         q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
