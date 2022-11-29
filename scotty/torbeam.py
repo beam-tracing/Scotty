@@ -234,7 +234,7 @@ def construct_torbeam_field(
     B_r = field.B_R(x_meshgrid, z_meshgrid)
     B_z = field.B_Z(x_meshgrid, z_meshgrid)
     psi = field.poloidal_flux(x_meshgrid, z_meshgrid)
-    return x_grid, z_grid, B_r, B_t, B_z, psi
+    return x_grid, z_grid, B_r, B_t, B_z, psi, field
 
 
 def write_torbeam_file(
@@ -250,7 +250,7 @@ def write_torbeam_file(
     """Write a TORBEAM magnetic geometry file based on a circular
     cross-section equilibrium"""
 
-    x_grid, z_grid, B_r, B_t, B_z, psi = construct_torbeam_field(
+    x_grid, z_grid, B_r, B_t, B_z, psi, _ = construct_torbeam_field(
         major_radius,
         minor_radius,
         buffer_factor,

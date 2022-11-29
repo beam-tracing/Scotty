@@ -225,6 +225,19 @@ def ne_dat_file(path):
     return kwargs_dict
 
 
+def synthetic_args():
+    kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
+    return kwargs_dict, construct_torbeam_field(
+        major_radius=kwargs_dict["R_axis"],
+        minor_radius=kwargs_dict["minor_radius_a"],
+        B_toroidal_max=kwargs_dict["B_T_axis"],
+        B_poloidal_max=kwargs_dict["B_p_a"],
+        buffer_factor=1.1,
+        x_grid_length=100,
+        z_grid_length=100,
+    )
+
+
 def torbeam_file(path):
     """Geometry using TORBEAM file"""
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
@@ -247,17 +260,7 @@ def torbeam_file(path):
 
 def omfit_json(path):
     """Geometry using OMFIT JSON file"""
-    kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
-
-    R_grid, Z_grid, B_R, B_t, B_Z, psi = construct_torbeam_field(
-        major_radius=kwargs_dict["R_axis"],
-        minor_radius=kwargs_dict["minor_radius_a"],
-        B_toroidal_max=kwargs_dict["B_T_axis"],
-        B_poloidal_max=kwargs_dict["B_p_a"],
-        buffer_factor=1.1,
-        x_grid_length=100,
-        z_grid_length=100,
-    )
+    kwargs_dict, (R_grid, Z_grid, B_R, B_t, B_Z, psi, _) = synthetic_args()
 
     def flatten_as_F(array):
         return array.T.flatten().tolist()
@@ -281,17 +284,7 @@ def omfit_json(path):
 
 def npz_file(path: pathlib.Path):
 
-    kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
-
-    R_grid, Z_grid, B_R, B_t, B_Z, psi = construct_torbeam_field(
-        major_radius=kwargs_dict["R_axis"],
-        minor_radius=kwargs_dict["minor_radius_a"],
-        B_toroidal_max=kwargs_dict["B_T_axis"],
-        B_poloidal_max=kwargs_dict["B_p_a"],
-        buffer_factor=1.1,
-        x_grid_length=100,
-        z_grid_length=100,
-    )
+    kwargs_dict, (R_grid, Z_grid, B_R, B_t, B_Z, psi, _) = synthetic_args()
 
     zeros = np.zeros_like(B_R)
     time = [100, 200, 300]
@@ -320,17 +313,7 @@ def npz_file(path: pathlib.Path):
 
 def npz_notime_file(path: pathlib.Path):
 
-    kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
-
-    R_grid, Z_grid, B_R, B_t, B_Z, psi = construct_torbeam_field(
-        major_radius=kwargs_dict["R_axis"],
-        minor_radius=kwargs_dict["minor_radius_a"],
-        B_toroidal_max=kwargs_dict["B_T_axis"],
-        B_poloidal_max=kwargs_dict["B_p_a"],
-        buffer_factor=1.1,
-        x_grid_length=100,
-        z_grid_length=100,
-    )
+    kwargs_dict, (R_grid, Z_grid, B_R, B_t, B_Z, psi, _) = synthetic_args()
 
     np.savez(
         path / "12345_equilibrium_data",
