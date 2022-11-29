@@ -51,7 +51,7 @@ class CircularCrossSection(MagneticGeometry):
 
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> ArrayLike:
         q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
-        return self.rho(q_R, q_Z) / self.minor_radius_a
+        return (self.rho(q_R, q_Z) / self.minor_radius_a) ** 2
 
 
 class CurvySlab(MagneticGeometry):
