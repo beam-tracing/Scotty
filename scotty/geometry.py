@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from typing import Callable, Optional
+
 import numpy as np
 import numpy.typing as npt
-from scipy.interpolate import RectBivariateSpline
+from scipy.interpolate import RectBivariateSpline, UnivariateSpline
 
+from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
 from scotty.typing import ArrayLike
 
 
@@ -106,6 +109,21 @@ class CurvySlab(MagneticGeometry):
         return np.zeros_like(q_R)
 
 
+def _make_rect_spline(
+    R_grid, Z_grid, array, interp_order: int, interp_smoothing: int
+) -> Callable[[ArrayLike, ArrayLike], ArrayLike]:
+    spline = RectBivariateSpline(
+        R_grid,
+        Z_grid,
+        array,
+        bbox=[None, None, None, None],
+        kx=interp_order,
+        ky=interp_order,
+        s=interp_smoothing,
+    )
+    return lambda R, Z: spline(R, Z, grid=False)
+
+
 class InterpolatedField(MagneticGeometry):
     """Interpolated numerical equilibrium using bivariate splines
 
@@ -140,37 +158,92 @@ class InterpolatedField(MagneticGeometry):
         interp_order: int = 5,
         interp_smoothing: int = 0,
     ):
-        self._interp_order = interp_order
-        self._interp_smoothing = interp_smoothing
-
-        self._interp_B_R = self._make_rect_spline(R_grid, Z_grid, B_R)
-        self._interp_B_T = self._make_rect_spline(R_grid, Z_grid, B_T)
-        self._interp_B_Z = self._make_rect_spline(R_grid, Z_grid, B_Z)
-        self._interp_poloidal_flux = self._make_rect_spline(R_grid, Z_grid, psi)
+        self._interp_B_R = _make_rect_spline(
+            R_grid, Z_grid, B_R, interp_order, interp_smoothing
+        )
+        self._interp_B_T = _make_rect_spline(
+            R_grid, Z_grid, B_T, interp_order, interp_smoothing
+        )
+        self._interp_B_Z = _make_rect_spline(
+            R_grid, Z_grid, B_Z, interp_order, interp_smoothing
+        )
+        self._interp_poloidal_flux = _make_rect_spline(
+            R_grid, Z_grid, psi, interp_order, interp_smoothing
+        )
 
         self.data_R_coord = R_grid
         self.data_Z_coord = Z_grid
         self.poloidalFlux_grid = psi
 
-    def _make_rect_spline(self, R_grid, Z_grid, array):
-        return RectBivariateSpline(
-            R_grid,
-            Z_grid,
-            array,
-            bbox=[None, None, None, None],
-            kx=self._interp_order,
-            ky=self._interp_order,
-            s=self._interp_smoothing,
-        )
-
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> ArrayLike:
-        return self._interp_B_R(q_R, q_Z, grid=False)
+        return self._interp_B_R(q_R, q_Z)
 
     def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> ArrayLike:
-        return self._interp_B_T(q_R, q_Z, grid=False)
+        return self._interp_B_T(q_R, q_Z)
 
     def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> ArrayLike:
-        return self._interp_B_Z(q_R, q_Z, grid=False)
+        return self._interp_B_Z(q_R, q_Z)
 
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> ArrayLike:
-        return self._interp_poloidal_flux(q_R, q_Z, grid=False)
+        return self._interp_poloidal_flux(q_R, q_Z)
+
+
+class EFITField(MagneticGeometry):
+    def __init__(
+        self,
+        R_grid: npt.ArrayLike,
+        Z_grid: npt.ArrayLike,
+        rBphi: npt.NDArray[np.float64],
+        psi_norm_2D: npt.ArrayLike,
+        psi_unnorm_axis: float,
+        psi_unnorm_boundary: float,
+        psi_norm_1D: Optional[npt.ArrayLike] = None,
+        delta_R: float = 0.0001,
+        delta_Z: float = 0.0001,
+        interp_order: int = 5,
+        interp_smoothing: int = 0,
+    ):
+        self.data_R_coord = R_grid
+        self.data_Z_coord = Z_grid
+        self.poloidalFlux_grid = psi_norm_2D
+
+        self.delta_R = delta_R
+        self.delta_Z = delta_Z
+
+        self._interp_poloidal_flux = _make_rect_spline(
+            R_grid, Z_grid, psi_norm_2D, interp_order, interp_smoothing
+        )
+
+        self.poloidal_flux_gradient = psi_unnorm_boundary - psi_unnorm_axis
+        if psi_norm_1D is None:
+            psi_norm_1D = np.linspace(0, 1.0, len(rBphi))
+
+        self._interp_rBphi = UnivariateSpline(
+            psi_norm_1D,
+            rBphi,
+            w=None,
+            bbox=[None, None],
+            k=interp_order,
+            s=interp_smoothing,
+            ext=0,
+            check_finite=False,
+        )
+
+    def B_R(self, q_R, q_Z):
+        dpolflux_dZ = find_dpolflux_dZ(
+            q_R, q_Z, self.delta_Z, self._interp_poloidal_flux
+        )
+        return -dpolflux_dZ * self.poloidal_flux_gradient / q_R
+
+    def B_T(self, q_R, q_Z):
+        polflux = self._interp_poloidal_flux(q_R, q_Z)
+        return self._interp_rBphi(polflux) / q_R
+
+    def B_Z(self, q_R, q_Z):
+        dpolflux_dR = find_dpolflux_dR(
+            q_R, q_Z, self.delta_R, self._interp_poloidal_flux
+        )
+        return dpolflux_dR * self.poloidal_flux_gradient / q_R
+
+    def poloidal_flux(self, q_R, q_Z):
+        return self._interp_poloidal_flux(q_R, q_Z)

@@ -3106,7 +3106,9 @@ def create_magnetic_geometry(
             interp_poloidal_flux=interp_poloidal_flux,
             polflux_const_m=polflux_const_m,
         ):
-            dpolflux_dZ = find_dpolflux_dZ(q_R, q_Z, delta_Z, interp_poloidal_flux)
+            dpolflux_dZ = find_dpolflux_dZ(
+                q_R, q_Z, delta_Z, lambda r, z: interp_poloidal_flux(r, z, grid=False)
+            )
             B_R = -dpolflux_dZ / (polflux_const_m * q_R)
             return B_R
 

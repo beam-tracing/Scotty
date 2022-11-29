@@ -74,13 +74,13 @@ def test_interpolated():
     Z_vertical = np.linspace(0.1, minor_radius_a, 10)
 
     npt.assert_allclose(
-        field.B_R(0.0, Z_vertical), circular_field.B_R(0.0, Z_vertical), rtol=1e-5
+        field.B_R(R_axis, Z_vertical), circular_field.B_R(R_axis, Z_vertical), rtol=1e-2
     )
     npt.assert_allclose(
-        field.B_T(R_midplane, 0.0), circular_field.B_T(R_midplane, 0.0), rtol=1e-5
+        field.B_T(R_midplane, 0.0), circular_field.B_T(R_midplane, 0.0), rtol=1e-2
     )
     npt.assert_allclose(
-        field.B_Z(R_midplane, 0.0), circular_field.B_Z(R_midplane, 0.0), rtol=1e-5
+        field.B_Z(R_midplane, 0.0), circular_field.B_Z(R_midplane, 0.0), rtol=1e-2
     )
     npt.assert_allclose(
         field.poloidal_flux(R_midplane, 0.0),
