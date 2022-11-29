@@ -167,12 +167,6 @@ from typing import Optional, Union, Sequence
 from scotty.typing import PathLike
 
 
-class MagneticGeometry:
-    """Temporary shim"""
-
-    pass
-
-
 def beam_me_up(
     poloidal_launch_angle_Torbeam,
     toroidal_launch_angle_Torbeam,
