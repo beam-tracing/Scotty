@@ -22,6 +22,23 @@ class MagneticGeometry:
 
 
 class CircularCrossSection(MagneticGeometry):
+    """Simple circular cross-section magnetic geometry
+
+    Parameters
+    ----------
+    B_T_axis:
+        Toroidal magnetic field at the magnetic axis (Tesla)
+    R_axis:
+        Major radius of the magnetic axis (metres)
+    minor_radius_a:
+        Minor radius of the last closed flux surface (metres)
+    B_p_a:
+        Poloidal magnetic field at ``minor_radius_a`` (Tesla)
+    R_points:
+    Z_points:
+        Number of points for sample ``(R, Z)`` grid
+    """
+
     def __init__(
         self,
         B_T_axis: float,
@@ -90,18 +107,27 @@ class CurvySlab(MagneticGeometry):
 
 
 class InterpolatedField(MagneticGeometry):
-    """Interpolated numerical equilibrium using bivariate splines"""
+    """Interpolated numerical equilibrium using bivariate splines
 
-    def _make_rect_spline(self, R_grid, Z_grid, array):
-        return RectBivariateSpline(
-            R_grid,
-            Z_grid,
-            array,
-            bbox=[None, None, None, None],
-            kx=self._interp_order,
-            ky=self._interp_order,
-            s=self._interp_smoothing,
-        )
+    Parameters
+    ----------
+    R_grid:
+        1D array of points in ``R`` (metres)
+    Z_grid:
+        1D array of points in ``Z`` (metres)
+    B_R:
+        2D ``(R, Z)`` grid of radial magnetic field values (Tesla)
+    B_T:
+        2D ``(R, Z)`` grid of toroidal magnetic field values (Tesla)
+    B_Z:
+        2D ``(R, Z)`` grid of vertical magnetic field values (Tesla)
+    psi:
+        2D ``(R, Z)`` grid of poloidal flux values (Weber/radian)
+    interp_order:
+        Order of interpolating splines
+    interp_smoothing:
+        Smoothing factor for interpolating splines
+    """
 
     def __init__(
         self,
@@ -125,6 +151,17 @@ class InterpolatedField(MagneticGeometry):
         self.data_R_coord = R_grid
         self.data_Z_coord = Z_grid
         self.poloidalFlux_grid = psi
+
+    def _make_rect_spline(self, R_grid, Z_grid, array):
+        return RectBivariateSpline(
+            R_grid,
+            Z_grid,
+            array,
+            bbox=[None, None, None, None],
+            kx=self._interp_order,
+            ky=self._interp_order,
+            s=self._interp_smoothing,
+        )
 
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> ArrayLike:
         return self._interp_B_R(q_R, q_Z, grid=False)
