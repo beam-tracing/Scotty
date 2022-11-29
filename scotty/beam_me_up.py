@@ -3155,56 +3155,42 @@ def create_magnetic_geometry(
 
     elif find_B_method == "test" or find_B_method == "test_notime":
         # TODO: tidy up
+        if magnetic_data_path is None:
+            raise ValueError(missing_magnetic_data_path)
 
         if find_B_method == "test":
             # Works nicely with the new MAST-U UDA output
-            loadfile = np.load(magnetic_data_path / f"{shot}_equilibrium_data.npz")
-            data_R_coord = loadfile["R_EFIT"]
-            data_Z_coord = loadfile["Z_EFIT"]
-            poloidalFlux_grid_all_times = loadfile["poloidalFlux_grid"]
-            Bphi_grid_all_times = loadfile["Bphi_grid"]
-            Br_grid_all_times = loadfile["Br_grid"]
-            Bz_grid_all_times = loadfile["Bz_grid"]
-            time_EFIT = loadfile["time_EFIT"]
-            loadfile.close()
+            filename = magnetic_data_path / f"{shot}_equilibrium_data.npz"
+            with np.load(filename) as loadfile:
+                time_EFIT = loadfile["time_EFIT"]
+                t_idx = find_nearest(time_EFIT, equil_time)
+                print("EFIT time", time_EFIT[t_idx])
 
-            t_idx = find_nearest(time_EFIT, equil_time)
-            print("EFIT time", time_EFIT[t_idx])
-
-            poloidalFlux_grid = poloidalFlux_grid_all_times[t_idx, :, :]
-            data_B_R_grid = Br_grid_all_times[t_idx, :, :]
-            data_B_T_grid = Bphi_grid_all_times[t_idx, :, :]
-            data_B_Z_grid = Bz_grid_all_times[t_idx, :, :]
+                data_R_coord = loadfile["R_EFIT"]
+                data_Z_coord = loadfile["Z_EFIT"]
+                poloidalFlux_grid = loadfile["poloidalFlux_grid"][t_idx, :, :]
+                data_B_T_grid = loadfile["Bphi_grid"][t_idx, :, :]
+                data_B_R_grid = loadfile["Br_grid"][t_idx, :, :]
+                data_B_Z_grid = loadfile["Bz_grid"][t_idx, :, :]
 
         if find_B_method == "test_notime":
-            loadfile = np.load(magnetic_data_path)
-            data_R_coord = loadfile["R_EFIT"]
-            data_Z_coord = loadfile["Z_EFIT"]
-            poloidalFlux_grid = loadfile["poloidalFlux_grid"]
-            data_B_T_grid = loadfile["Bphi_grid"]
-            data_B_R_grid = loadfile["Br_grid"]
-            data_B_Z_grid = loadfile["Bz_grid"]
-            loadfile.close()
+            with np.load(magnetic_data_path) as loadfile:
+                data_R_coord = loadfile["R_EFIT"]
+                data_Z_coord = loadfile["Z_EFIT"]
+                poloidalFlux_grid = loadfile["poloidalFlux_grid"]
+                data_B_T_grid = loadfile["Bphi_grid"]
+                data_B_R_grid = loadfile["Br_grid"]
+                data_B_Z_grid = loadfile["Bz_grid"]
 
-        # Interpolation functions declared
-        interp_B_R = make_rect_spline(data_R_coord, data_Z_coord, data_B_R_grid)
-        interp_B_T = make_rect_spline(data_R_coord, data_Z_coord, data_B_T_grid)
-        interp_B_Z = make_rect_spline(data_R_coord, data_Z_coord, data_B_Z_grid)
-
-        def find_B_R(q_R, q_Z):
-            B_R = interp_B_R(q_R, q_Z, grid=False)
-            return B_R
-
-        def find_B_T(q_R, q_Z):
-            B_T = interp_B_T(q_R, q_Z, grid=False)
-            return B_T
-
-        def find_B_Z(q_R, q_Z):
-            B_Z = interp_B_Z(q_R, q_Z, grid=False)
-            return B_Z
-
-        interp_poloidal_flux = make_rect_spline(
-            data_R_coord, data_Z_coord, poloidalFlux_grid
+        return InterpolatedField(
+            data_R_coord,
+            data_Z_coord,
+            data_B_R_grid,
+            data_B_T_grid,
+            data_B_Z_grid,
+            poloidalFlux_grid,
+            interp_order,
+            interp_smoothing,
         )
     else:
         raise ValueError(f"Invalid find_B_method '{find_B_method}'")

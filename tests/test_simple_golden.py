@@ -5,6 +5,7 @@ from scotty.torbeam import write_torbeam_file, construct_torbeam_field
 import json
 import numpy as np
 from numpy.testing import assert_allclose
+import pathlib
 import pytest
 
 
@@ -278,12 +279,80 @@ def omfit_json(path):
     return kwargs_dict
 
 
+def npz_file(path: pathlib.Path):
+
+    kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
+
+    R_grid, Z_grid, B_R, B_t, B_Z, psi = construct_torbeam_field(
+        major_radius=kwargs_dict["R_axis"],
+        minor_radius=kwargs_dict["minor_radius_a"],
+        B_toroidal_max=kwargs_dict["B_T_axis"],
+        B_poloidal_max=kwargs_dict["B_p_a"],
+        buffer_factor=1.1,
+        x_grid_length=100,
+        z_grid_length=100,
+    )
+
+    zeros = np.zeros_like(B_R)
+    time = [100, 200, 300]
+
+    def add_timeslices(array):
+        return np.stack((zeros, array, zeros))
+
+    shot = 12345
+    np.savez(
+        path / f"{shot}_equilibrium_data",
+        R_EFIT=R_grid,
+        Z_EFIT=Z_grid,
+        poloidalFlux_grid=add_timeslices(psi),
+        Bphi_grid=add_timeslices(B_t),
+        Br_grid=add_timeslices(B_R),
+        Bz_grid=add_timeslices(B_Z),
+        time_EFIT=time,
+    )
+    kwargs_dict["find_B_method"] = "test"
+    kwargs_dict["magnetic_data_path"] = path
+    kwargs_dict["shot"] = shot
+    kwargs_dict["equil_time"] = time[1]
+
+    return kwargs_dict
+
+
+def npz_notime_file(path: pathlib.Path):
+
+    kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
+
+    R_grid, Z_grid, B_R, B_t, B_Z, psi = construct_torbeam_field(
+        major_radius=kwargs_dict["R_axis"],
+        minor_radius=kwargs_dict["minor_radius_a"],
+        B_toroidal_max=kwargs_dict["B_T_axis"],
+        B_poloidal_max=kwargs_dict["B_p_a"],
+        buffer_factor=1.1,
+        x_grid_length=100,
+        z_grid_length=100,
+    )
+
+    np.savez(
+        path / "12345_equilibrium_data",
+        R_EFIT=R_grid,
+        Z_EFIT=Z_grid,
+        poloidalFlux_grid=psi,
+        Bphi_grid=B_t,
+        Br_grid=B_R,
+        Bz_grid=B_Z,
+    )
+    kwargs_dict["find_B_method"] = "test_notime"
+    kwargs_dict["magnetic_data_path"] = path / "12345_equilibrium_data.npz"
+    return kwargs_dict
+
+
 @pytest.mark.parametrize(
     "generator",
     [
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
     ],
 )
 def test_integrated(tmp_path, generator):
@@ -296,9 +365,11 @@ def test_integrated(tmp_path, generator):
     kwargs_dict["len_tau"] = 10
     kwargs_dict["output_path"] = tmp_path
 
+    number_of_existing_npz_files = len(list(tmp_path.glob("*.npz")))
+
     beam_me_up(**kwargs_dict)
 
-    assert len(list(tmp_path.glob("*.npz"))) == 4
+    assert len(list(tmp_path.glob("*.npz"))) == 4 + number_of_existing_npz_files
 
     with np.load(tmp_path / "data_output_Bpa0.10.npz") as f:
         output = dict(f)
@@ -324,6 +395,8 @@ def test_integrated(tmp_path, generator):
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
         pytest.param(omfit_json, id="omfit-file"),
+        pytest.param(npz_file, id="test-file"),
+        pytest.param(npz_notime_file, id="test_notime-file"),
     ],
 )
 def test_create_magnetic_geometry(tmp_path, generator):
