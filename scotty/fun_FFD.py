@@ -1404,9 +1404,9 @@ def find_d2H_dKZ_dZ(
 
 def find_dpolflux_dR(q_R, q_Z, delta_R, interp_poloidal_flux):
 
-    polflux_0 = interp_poloidal_flux(q_R, q_Z, grid=False)
-    polflux_1 = interp_poloidal_flux(q_R + delta_R, q_Z, grid=False)
-    polflux_2 = interp_poloidal_flux(q_R + 2 * delta_R, q_Z, grid=False)
+    polflux_0 = interp_poloidal_flux(q_R, q_Z)
+    polflux_1 = interp_poloidal_flux(q_R + delta_R, q_Z)
+    polflux_2 = interp_poloidal_flux(q_R + 2 * delta_R, q_Z)
     dpolflux_dR = ((-3 / 2) * polflux_0 + (2) * polflux_1 + (-1 / 2) * polflux_2) / (
         delta_R
     )
@@ -1416,9 +1416,9 @@ def find_dpolflux_dR(q_R, q_Z, delta_R, interp_poloidal_flux):
 
 def find_dpolflux_dZ(q_R, q_Z, delta_Z, interp_poloidal_flux):
 
-    polflux_0 = interp_poloidal_flux(q_R, q_Z, grid=False)
-    polflux_1 = interp_poloidal_flux(q_R, q_Z + delta_Z, grid=False)
-    polflux_2 = interp_poloidal_flux(q_R, q_Z + 2 * delta_Z, grid=False)
+    polflux_0 = interp_poloidal_flux(q_R, q_Z)
+    polflux_1 = interp_poloidal_flux(q_R, q_Z + delta_Z)
+    polflux_2 = interp_poloidal_flux(q_R, q_Z + 2 * delta_Z)
     dpolflux_dZ = ((-3 / 2) * polflux_0 + (2) * polflux_1 + (-1 / 2) * polflux_2) / (
         delta_Z
     )

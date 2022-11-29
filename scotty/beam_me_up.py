@@ -168,6 +168,12 @@ from typing import Optional, Union, Sequence
 from scotty.typing import PathLike
 
 
+class MagneticGeometry:
+    """Temporary shim"""
+
+    pass
+
+
 def beam_me_up(
     poloidal_launch_angle_Torbeam,
     toroidal_launch_angle_Torbeam,
@@ -856,6 +862,15 @@ def beam_me_up(
         print("Invalid find_B_method")
         sys.exit()
 
+    if find_B_method != "analytical":
+        field = MagneticGeometry()
+        field.B_R = find_B_R
+        field.B_T = find_B_T
+        field.B_Z = find_B_Z
+        field.poloidal_flux = lambda q_R, q_Z: interp_poloidal_flux(
+            q_R, q_Z, grid=False
+        )
+
     # -------------------
     # Launch parameters
     # -------------------
@@ -967,8 +982,8 @@ def beam_me_up(
                 launch_position[2], search_Z_end, numberOfCoarseSearchPoints
             )
             poloidal_flux_coarse_search_array = np.zeros(numberOfCoarseSearchPoints)
-            poloidal_flux_coarse_search_array = interp_poloidal_flux(
-                R_coarse_search_array, Z_coarse_search_array, grid=False
+            poloidal_flux_coarse_search_array = field.poloidal_flux(
+                R_coarse_search_array, Z_coarse_search_array
             )
             meets_flux_condition_array = (
                 poloidal_flux_coarse_search_array < 0.9 * poloidal_flux_enter
@@ -988,8 +1003,8 @@ def beam_me_up(
                 numberOfFineSearchPoints,
             )
             poloidal_fine_search_array = np.zeros(numberOfFineSearchPoints)
-            poloidal_fine_search_array = interp_poloidal_flux(
-                R_fine_search_array, Z_fine_search_array, grid=False
+            poloidal_fine_search_array = field.poloidal_flux(
+                R_fine_search_array, Z_fine_search_array
             )
             entry_index = find_nearest(poloidal_fine_search_array, poloidal_flux_enter)
             if poloidal_fine_search_array[entry_index] > poloidal_flux_enter:
@@ -1083,11 +1098,11 @@ def beam_me_up(
                     launch_angular_frequency,
                     mode_flag,
                     delta_K_R,
-                    interp_poloidal_flux,
+                    field.poloidal_flux,
                     find_density_1D,
-                    find_B_R,
-                    find_B_T,
-                    find_B_Z,
+                    field.B_R,
+                    field.B_T,
+                    field.B_Z,
                 )
                 dH_dKzeta_initial = find_dH_dKzeta(
                     initial_position[0],
@@ -1098,11 +1113,11 @@ def beam_me_up(
                     launch_angular_frequency,
                     mode_flag,
                     delta_K_zeta,
-                    interp_poloidal_flux,
+                    field.poloidal_flux,
                     find_density_1D,
-                    find_B_R,
-                    find_B_T,
-                    find_B_Z,
+                    field.B_R,
+                    field.B_T,
+                    field.B_Z,
                 )
                 dH_dKZ_initial = find_dH_dKZ(
                     initial_position[0],
@@ -1113,11 +1128,11 @@ def beam_me_up(
                     launch_angular_frequency,
                     mode_flag,
                     delta_K_Z,
-                    interp_poloidal_flux,
+                    field.poloidal_flux,
                     find_density_1D,
-                    find_B_R,
-                    find_B_T,
-                    find_B_Z,
+                    field.B_R,
+                    field.B_T,
+                    field.B_Z,
                 )
                 dH_dR_initial = find_dH_dR(
                     initial_position[0],
@@ -1128,11 +1143,11 @@ def beam_me_up(
                     launch_angular_frequency,
                     mode_flag,
                     delta_R,
-                    interp_poloidal_flux,
+                    field.poloidal_flux,
                     find_density_1D,
-                    find_B_R,
-                    find_B_T,
-                    find_B_Z,
+                    field.B_R,
+                    field.B_T,
+                    field.B_Z,
                 )
                 dH_dZ_initial = find_dH_dZ(
                     initial_position[0],
@@ -1143,23 +1158,23 @@ def beam_me_up(
                     launch_angular_frequency,
                     mode_flag,
                     delta_Z,
-                    interp_poloidal_flux,
+                    field.poloidal_flux,
                     find_density_1D,
-                    find_B_R,
-                    find_B_T,
-                    find_B_Z,
+                    field.B_R,
+                    field.B_T,
+                    field.B_Z,
                 )
                 d_poloidal_flux_d_R_boundary = find_d_poloidal_flux_dR(
                     initial_position[0],
                     initial_position[2],
                     delta_R,
-                    interp_poloidal_flux,
+                    field.poloidal_flux,
                 )
                 d_poloidal_flux_d_Z_boundary = find_d_poloidal_flux_dZ(
                     initial_position[0],
                     initial_position[2],
                     delta_R,
-                    interp_poloidal_flux,
+                    field.poloidal_flux,
                 )
 
                 Psi_3D_lab_initial = find_Psi_3D_plasma(
@@ -1267,7 +1282,7 @@ def beam_me_up(
         q_R = ray_parameters_2D[0]
         q_Z = ray_parameters_2D[1]
 
-        poloidal_flux = interp_poloidal_flux(q_R, q_Z, grid=False)
+        poloidal_flux = field.poloidal_flux(q_R, q_Z)
 
         poloidal_flux_difference = poloidal_flux - poloidal_flux_leave
 
@@ -1301,7 +1316,7 @@ def beam_me_up(
         q_R = ray_parameters_2D[0]
         q_Z = ray_parameters_2D[1]
 
-        poloidal_flux = interp_poloidal_flux(q_R, q_Z, grid=False)
+        poloidal_flux = field.poloidal_flux(q_R, q_Z)
 
         poloidal_flux_difference = poloidal_flux - poloidal_flux_LCFS
 
@@ -1377,9 +1392,9 @@ def beam_me_up(
         q_R = ray_parameters_2D[0]
         q_Z = ray_parameters_2D[1]
 
-        B_R = find_B_R(q_R, q_Z)
-        B_T = find_B_T(q_R, q_Z)
-        B_Z = find_B_Z(q_R, q_Z)
+        B_R = field.B_R(q_R, q_Z)
+        B_T = field.B_T(q_R, q_Z)
+        B_Z = field.B_Z(q_R, q_Z)
 
         B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
         gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
@@ -1478,9 +1493,9 @@ def beam_me_up(
     # Propagate the beam
     # Calls scipy's initial value problem solver
 
-    tau_max = (
-        10**5
-    )  # If the ray hasn't left the plasma by the time this tau is reached, the solver gives up
+    # If the ray hasn't left the plasma by the time this tau is reached, the solver gives up
+    tau_max = 10**5
+    # Stuff the solver needs to evolve beam_parameters
     solver_arguments = (
         K_zeta_initial,
         launch_angular_frequency,
@@ -1490,11 +1505,11 @@ def beam_me_up(
         delta_K_R,
         delta_K_zeta,
         delta_K_Z,
-        interp_poloidal_flux,
+        field.poloidal_flux,
         find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )  # Stuff the solver needs to evolve beam_parameters
 
     """
@@ -1644,9 +1659,9 @@ def beam_me_up(
         K_R_cutoff = ray_parameters_turning_pt[K_min_idx][2]
         K_Z_cutoff = ray_parameters_turning_pt[K_min_idx][3]
 
-        B_R_cutoff = find_B_R(q_R_cutoff, q_Z_cutoff)
-        B_T_cutoff = find_B_T(q_R_cutoff, q_Z_cutoff)
-        B_Z_cutoff = find_B_Z(q_R_cutoff, q_Z_cutoff)
+        B_R_cutoff = field.B_R(q_R_cutoff, q_Z_cutoff)
+        B_T_cutoff = field.B_T(q_R_cutoff, q_Z_cutoff)
+        B_Z_cutoff = field.B_Z(q_R_cutoff, q_Z_cutoff)
 
         K_cutoff = np.array([K_R_cutoff, K_zeta_initial / q_R_cutoff, K_Z_cutoff])
         B_cutoff = np.array([B_R_cutoff, B_T_cutoff, B_Z_cutoff])
@@ -1659,7 +1674,7 @@ def beam_me_up(
             abs(sin_theta_m_cutoff)
         )
 
-        poloidal_flux_cutoff = interp_poloidal_flux(q_R_cutoff, q_Z_cutoff)
+        poloidal_flux_cutoff = field.poloidal_flux(q_R_cutoff, q_Z_cutoff)
 
         return (
             q_R_cutoff,
@@ -1847,7 +1862,7 @@ def beam_me_up(
     # -------------------
 
     # Calculate various properties along the ray
-    poloidal_flux_output = interp_poloidal_flux(q_R_array, q_Z_array, grid=False)
+    poloidal_flux_output = field.poloidal_flux(q_R_array, q_Z_array)
     electron_density_output = np.asfarray(find_density_1D(poloidal_flux_output))
 
     # Calculates nabla_K H
@@ -1860,11 +1875,11 @@ def beam_me_up(
         launch_angular_frequency,
         mode_flag,
         delta_K_R,
-        interp_poloidal_flux,
+        field.poloidal_flux,
         find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )
     dH_dKzeta_output = find_dH_dKzeta(
         q_R_array,
@@ -1875,11 +1890,11 @@ def beam_me_up(
         launch_angular_frequency,
         mode_flag,
         delta_K_zeta,
-        interp_poloidal_flux,
+        field.poloidal_flux,
         find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )
     dH_dKZ_output = find_dH_dKZ(
         q_R_array,
@@ -1890,11 +1905,11 @@ def beam_me_up(
         launch_angular_frequency,
         mode_flag,
         delta_K_Z,
-        interp_poloidal_flux,
+        field.poloidal_flux,
         find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )
 
     # Calculates g_hat
@@ -1908,9 +1923,9 @@ def beam_me_up(
 
     # Calculates b_hat and grad_b_hat
     b_hat_output = np.zeros([numberOfDataPoints, 3])
-    B_R_output = find_B_R(q_R_array, q_Z_array)
-    B_T_output = find_B_T(q_R_array, q_Z_array)
-    B_Z_output = find_B_Z(q_R_array, q_Z_array)
+    B_R_output = field.B_R(q_R_array, q_Z_array)
+    B_T_output = field.B_T(q_R_array, q_Z_array)
+    B_Z_output = field.B_Z(q_R_array, q_Z_array)
     B_magnitude = np.sqrt(B_R_output**2 + B_T_output**2 + B_Z_output**2)
     b_hat_output[:, 0] = B_R_output / B_magnitude
     b_hat_output[:, 1] = B_T_output / B_magnitude
@@ -1918,10 +1933,10 @@ def beam_me_up(
 
     grad_bhat_output = np.zeros([numberOfDataPoints, 3, 3])
     dbhat_dR = find_dbhat_dR(
-        q_R_array, q_Z_array, delta_R, find_B_R, find_B_T, find_B_Z
+        q_R_array, q_Z_array, delta_R, field.B_R, field.B_T, field.B_Z
     )
     dbhat_dZ = find_dbhat_dZ(
-        q_R_array, q_Z_array, delta_Z, find_B_R, find_B_T, find_B_Z
+        q_R_array, q_Z_array, delta_Z, field.B_R, field.B_T, field.B_Z
     )
     # Transpose dbhat_dR so that it has the right shape
     grad_bhat_output[:, 0, :] = dbhat_dR.T
@@ -1965,11 +1980,11 @@ def beam_me_up(
         K_Z_array,
         launch_angular_frequency,
         mode_flag,
-        interp_poloidal_flux,
+        field.poloidal_flux,
         find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )
     H_other = find_H(
         q_R_array,
@@ -1979,11 +1994,11 @@ def beam_me_up(
         K_Z_array,
         launch_angular_frequency,
         -mode_flag,
-        interp_poloidal_flux,
+        field.poloidal_flux,
         find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )
 
     # nabla H along the ray
@@ -1996,11 +2011,11 @@ def beam_me_up(
         launch_angular_frequency,
         mode_flag,
         delta_R,
-        interp_poloidal_flux,
+        field.poloidal_flux,
         find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )
     dH_dZ_output = find_dH_dZ(
         q_R_array,
@@ -2011,19 +2026,19 @@ def beam_me_up(
         launch_angular_frequency,
         mode_flag,
         delta_Z,
-        interp_poloidal_flux,
+        field.poloidal_flux,
         find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )
 
     # Gradients of poloidal flux along the ray
     dpolflux_dR_debugging = find_dpolflux_dR(
-        q_R_array, q_Z_array, delta_R, interp_poloidal_flux
+        q_R_array, q_Z_array, delta_R, field.poloidal_flux
     )
     dpolflux_dZ_debugging = find_dpolflux_dZ(
-        q_R_array, q_Z_array, delta_Z, interp_poloidal_flux
+        q_R_array, q_Z_array, delta_Z, field.poloidal_flux
     )
     # d2polflux_dR2_FFD_debugging =
     # d2polflux_dZ2_FFD_debugging =
@@ -2393,9 +2408,8 @@ def beam_me_up(
 
     # This part is used to make some nice plots when post-processing
     R_midplane_points = np.linspace(data_R_coord[0], data_R_coord[-1], 1000)
-    poloidal_flux_on_midplane = interp_poloidal_flux(
-        R_midplane_points, 0, grid=False
-    )  # poloidal flux at R and z=0
+    # poloidal flux at R and z=0
+    poloidal_flux_on_midplane = field.poloidal_flux(R_midplane_points, 0)
 
     # Calculates localisation (start)
     # Ray piece of localisation as a function of distance along ray
@@ -2927,11 +2941,11 @@ def beam_me_up(
         mode_flag,
         delta_R,
         delta_Z,
-        interp_poloidal_flux,
+        field.poloidal_flux,
         find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )
 
     gradK_grad_H = find_gradK_grad_H_vectorised(
@@ -2947,11 +2961,11 @@ def beam_me_up(
         delta_K_Z,
         delta_R,
         delta_Z,
-        interp_poloidal_flux,
+        field.poloidal_flux,
         find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )
     grad_gradK_H = np.swapaxes(gradK_grad_H, 2, 1)
 
@@ -2966,11 +2980,11 @@ def beam_me_up(
         delta_K_R,
         delta_K_zeta,
         delta_K_Z,
-        interp_poloidal_flux,
+        field.poloidal_flux,
         find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )
 
     # gradK_gradK_H[:,0,1] = - gradK_gradK_H[:,0,1]
