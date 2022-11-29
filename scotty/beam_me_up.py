@@ -154,7 +154,7 @@ from scotty.fun_mix import (
 # For find_B if using efit files directly
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
 from scotty.density_fit import density_fit, DensityFitLike
-from scotty.geometry import CircularCrossSection
+from scotty.geometry import MagneticGeometry, CircularCrossSection, InterpolatedField
 from scotty.torbeam import Torbeam
 from scotty._version import __version__
 
@@ -2750,9 +2750,9 @@ def beam_me_up(
 
         contour_levels = np.linspace(0, 1.0, 11)
         CS = plt.contour(
-            data_R_coord,
-            data_Z_coord,
-            np.transpose(poloidalFlux_grid),
+            field.data_R_coord,
+            field.data_Z_coord,
+            np.transpose(field.poloidalFlux_grid),
             contour_levels,
             vmin=0,
             vmax=1,
@@ -2766,8 +2766,8 @@ def beam_me_up(
         )  # Central (reference) ray
         # cutoff_contour = plt.contour(x_grid, z_grid, normalised_plasma_freq_grid,
         #                             levels=1,vmin=1,vmax=1,linewidths=5,colors='grey')
-        plt.xlim(data_R_coord[0], data_R_coord[-1])
-        plt.ylim(data_Z_coord[0], data_Z_coord[-1])
+        plt.xlim(field.data_R_coord[0], field.data_R_coord[-1])
+        plt.ylim(field.data_Z_coord[0], field.data_Z_coord[-1])
 
         plt.savefig(output_path / f"Ray1_{output_figurename_suffix}")
         plt.close()
@@ -2906,34 +2906,36 @@ def create_magnetic_geometry(
             s=interp_smoothing,
         )
 
+    missing_magnetic_data_path = (
+        f"Missing 'magnetic_data_path' for find_B_method='{find_B_method}'"
+    )
+
     if find_B_method == "torbeam":
         print("Using Torbeam input files for B and poloidal flux")
+        if magnetic_data_path is None:
+            raise ValueError(missing_magnetic_data_path)
+
         # topfile
         # Others: inbeam.dat, Te.dat (not currently used in this code)
         topfile_filename = magnetic_data_path / f"topfile{input_filename_suffix}"
         torbeam = Torbeam.from_file(topfile_filename)
-        data_R_coord = torbeam.R_grid
-        data_Z_coord = torbeam.Z_grid
-        poloidalFlux_grid = torbeam.psi
 
-        interp_B_R = make_rect_spline(torbeam.R_grid, torbeam.Z_grid, torbeam.B_R)
-        interp_B_T = make_rect_spline(torbeam.R_grid, torbeam.Z_grid, torbeam.B_T)
-        interp_B_Z = make_rect_spline(torbeam.R_grid, torbeam.Z_grid, torbeam.B_Z)
-
-        def find_B_R(q_R, q_Z):
-            return interp_B_R(q_R, q_Z, grid=False)
-
-        def find_B_T(q_R, q_Z):
-            return interp_B_T(q_R, q_Z, grid=False)
-
-        def find_B_Z(q_R, q_Z):
-            return interp_B_Z(q_R, q_Z, grid=False)
-
-        interp_poloidal_flux = make_rect_spline(
-            torbeam.R_grid, torbeam.Z_grid, torbeam.psi
+        return InterpolatedField(
+            torbeam.R_grid,
+            torbeam.Z_grid,
+            torbeam.B_R,
+            torbeam.B_T,
+            torbeam.B_Z,
+            torbeam.psi,
+            interp_order,
+            interp_smoothing,
         )
 
     elif find_B_method == "omfit":
+        print("Using OMFIT JSON Torbeam file for B and poloidal flux")
+        if magnetic_data_path is None:
+            raise ValueError(missing_magnetic_data_path)
+
         topfile_filename = magnetic_data_path / "topfile.json"
 
         with open(topfile_filename) as f:
@@ -2946,27 +2948,15 @@ def create_magnetic_geometry(
             """Convert from column-major (TORBEAM, Fortran) to row-major order (Scotty, Python)"""
             return np.asarray(array).reshape(len(data_Z_coord), len(data_R_coord)).T
 
-        data_B_R_grid = unflatten(data["Br"])
-        data_B_T_grid = unflatten(data["Bt"])
-        data_B_Z_grid = unflatten(data["Bz"])
-        poloidalFlux_grid = unflatten(data["pol_flux"])
-
-        # Interpolation functions declared
-        interp_B_R = make_rect_spline(data_R_coord, data_Z_coord, data_B_R_grid)
-        interp_B_T = make_rect_spline(data_R_coord, data_Z_coord, data_B_T_grid)
-        interp_B_Z = make_rect_spline(data_R_coord, data_Z_coord, data_B_Z_grid)
-
-        def find_B_R(q_R, q_Z):
-            return interp_B_R(q_R, q_Z, grid=False)
-
-        def find_B_T(q_R, q_Z):
-            return interp_B_T(q_R, q_Z, grid=False)
-
-        def find_B_Z(q_R, q_Z):
-            return interp_B_Z(q_R, q_Z, grid=False)
-
-        interp_poloidal_flux = make_rect_spline(
-            data_R_coord, data_Z_coord, poloidalFlux_grid
+        return InterpolatedField(
+            data_R_coord,
+            data_Z_coord,
+            unflatten(data["Br"]),
+            unflatten(data["Bt"]),
+            unflatten(data["Bz"]),
+            unflatten(data["pol_flux"]),
+            interp_order,
+            interp_smoothing,
         )
 
     elif find_B_method == "analytical":

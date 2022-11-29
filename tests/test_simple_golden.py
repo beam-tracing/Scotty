@@ -284,7 +284,6 @@ def omfit_json(path):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
-        pytest.param(omfit_json, id="omfit-file"),
     ],
 )
 def test_integrated(tmp_path, generator):
@@ -333,23 +332,16 @@ def test_create_magnetic_geometry(tmp_path, generator):
     field = create_magnetic_geometry(**kwargs_dict)
     field_golden = create_magnetic_geometry(**simple(tmp_path))
 
-    assert_allclose(
-        field.B_R(field.data_R_coord, field.data_Z_coord),
-        field_golden.B_R(field.data_R_coord, field.data_Z_coord),
-        rtol=1e-6,
+    R = np.linspace(
+        kwargs_dict["R_axis"] + 0.1,
+        kwargs_dict["R_axis"] + kwargs_dict["minor_radius_a"],
+        10,
     )
+    Z = np.linspace(0.1, kwargs_dict["minor_radius_a"], 10)
+
+    assert_allclose(field.B_R(0.0, Z), field_golden.B_R(0.0, Z), rtol=1e-5)
+    assert_allclose(field.B_T(R, 0.0), field_golden.B_T(R, 0.0), rtol=1e-5)
+    assert_allclose(field.B_Z(R, 0.0), field_golden.B_Z(R, 0.0), rtol=1e-5)
     assert_allclose(
-        field.B_T(field.data_R_coord, field.data_Z_coord),
-        field_golden.B_T(field.data_R_coord, field.data_Z_coord),
-        rtol=1e-6,
-    )
-    assert_allclose(
-        field.B_Z(field.data_R_coord, field.data_Z_coord),
-        field_golden.B_Z(field.data_R_coord, field.data_Z_coord),
-        rtol=1e-6,
-    )
-    assert_allclose(
-        field.poloidal_flux(field.data_R_coord, field.data_Z_coord),
-        field_golden.poloidal_flux(field.data_R_coord, field.data_Z_coord),
-        rtol=1e-6,
+        field.poloidal_flux(R, 0.0), field_golden.poloidal_flux(R, 0.0), rtol=1e-5
     )

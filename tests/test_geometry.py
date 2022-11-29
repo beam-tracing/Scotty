@@ -43,3 +43,47 @@ def test_circular():
     assert total_sign[0, -1] == 1, "Top right"
     assert total_sign[-1, 0] == 1, "Bottom left"
     assert total_sign[-1, -1] == -1, "Bottom right"
+
+
+def test_interpolated():
+    B_T_axis = 1.0
+    R_axis = 2.0
+    minor_radius_a = 1.0
+    B_p_a = 0.5
+    circular_field = geometry.CircularCrossSection(
+        B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
+    )
+
+    R = np.linspace(R_axis - minor_radius_a, R_axis + minor_radius_a)
+    Z = np.linspace(-minor_radius_a, minor_radius_a)
+    R_grid, Z_grid = np.meshgrid(R, Z, indexing="ij")
+    B_R = circular_field.B_R(R_grid, Z_grid)
+    B_T = circular_field.B_T(R_grid, Z_grid)
+    B_Z = circular_field.B_Z(R_grid, Z_grid)
+    psi = circular_field.poloidal_flux(R_grid, Z_grid)
+
+    field = geometry.InterpolatedField(R, Z, B_R, B_T, B_Z, psi)
+
+    assert np.isclose(field.B_T(R_axis, 0.0), B_T_axis), "B_T on axis, scalar"
+    npt.assert_allclose(
+        field.B_T([R_axis, R_axis], [-1, 1]), [B_T_axis, B_T_axis], rtol=5e-6
+    ), "B_T, array"
+
+    # Not quite from the axis, as interpolation particularly bad there
+    R_midplane = np.linspace(R_axis + 0.1, R_axis + minor_radius_a, 10)
+    Z_vertical = np.linspace(0.1, minor_radius_a, 10)
+
+    npt.assert_allclose(
+        field.B_R(0.0, Z_vertical), circular_field.B_R(0.0, Z_vertical), rtol=1e-5
+    )
+    npt.assert_allclose(
+        field.B_T(R_midplane, 0.0), circular_field.B_T(R_midplane, 0.0), rtol=1e-5
+    )
+    npt.assert_allclose(
+        field.B_Z(R_midplane, 0.0), circular_field.B_Z(R_midplane, 0.0), rtol=1e-5
+    )
+    npt.assert_allclose(
+        field.poloidal_flux(R_midplane, 0.0),
+        circular_field.poloidal_flux(R_midplane, 0.0),
+        rtol=1e-3,
+    )
