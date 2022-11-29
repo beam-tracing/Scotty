@@ -116,7 +116,12 @@ from scotty.fun_CFD import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta  # \nabla_K 
 # For find_B if using efit files directly
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
 from scotty.density_fit import density_fit, DensityFitLike
-from scotty.geometry import MagneticGeometry, CircularCrossSection, InterpolatedField
+from scotty.geometry import (
+    MagneticGeometry,
+    CircularCrossSection,
+    InterpolatedField,
+    CurvySlab,
+)
 from scotty.torbeam import Torbeam
 from scotty._version import __version__
 
@@ -3142,16 +3147,11 @@ def create_magnetic_geometry(
 
     elif find_B_method == "curvy_slab":
         print("Analytical curvy slab geometry")
-
-        def find_B_R(q_R, q_Z):
-            return np.zeros_like(q_R)
-
-        def find_B_T(q_R, q_Z, B_T_axis=B_T_axis, R_axis=R_axis):
-            B_T = B_T_axis * R_axis / q_R
-            return B_T
-
-        def find_B_Z(q_R, q_Z):
-            return np.zeros_like(q_R)
+        if B_T_axis is None:
+            raise ValueError("Missing 'B_T_axis' argument for curvy slab B field")
+        if R_axis is None:
+            raise ValueError("Missing 'R_axis' argument for curvy slab B field")
+        return CurvySlab(B_T_axis, R_axis)
 
     elif find_B_method == "test" or find_B_method == "test_notime":
         # TODO: tidy up
