@@ -18,13 +18,24 @@ def test_circular():
         field.B_T([R_axis, R_axis], [-1, 1]), [B_T_axis, B_T_axis]
     ), "B_T, array"
 
-    R = np.linspace(R_axis - minor_radius_a, R_axis + minor_radius_a, 10)
-    Z = np.linspace(-minor_radius_a / 2, minor_radius_a / 2, 10)
+    # Include buffer for gradient near edge
+    width = minor_radius_a + 0.05
+    # Different grid sizes to capture transpose errors
+    R = np.linspace(R_axis - width, R_axis + width, 99)
+    Z = np.linspace(-width, width, 101)
     R_grid, Z_grid = np.meshgrid(R, Z, indexing="ij")
     B_R = field.B_R(R_grid, Z_grid)
     B_Z = field.B_Z(R_grid, Z_grid)
-    calculated_B_poloidal = -np.sqrt(B_R**2 + B_Z**2)
-    npt.assert_allclose(calculated_B_poloidal, field.B_p(R_grid, Z_grid))
+
+    psi = field.poloidal_flux(R_grid, Z_grid)
+    grad_psi = np.gradient(psi, R, Z)
+    calculated_B_R = grad_psi[1] * B_p_a / R_grid
+    calculated_B_Z = -grad_psi[0] * B_p_a / R_grid
+
+    mask = (psi > 0.1) & (psi <= 1)
+
+    npt.assert_allclose(B_R[mask], calculated_B_R[mask], 2e-3, 2e-3)
+    npt.assert_allclose(B_Z[mask], calculated_B_Z[mask], 2e-3, 2e-3)
 
     # Check that poloidal field rotates in the correct direction
     total_sign = np.sign(B_R) * np.sign(B_Z)

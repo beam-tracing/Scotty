@@ -33,13 +33,9 @@ class CircularCrossSection(MagneticGeometry):
         q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
         return np.sqrt((q_R - self.R_axis) ** 2 + q_Z**2)
 
-    def B_p(self, q_R: ArrayLike, q_Z: ArrayLike) -> ArrayLike:
-        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
-        return -self.B_p_a * (self.rho(q_R, q_Z) / self.minor_radius_a)
-
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> ArrayLike:
         q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
-        return self.B_p(q_R, q_Z) * (q_Z / self.rho(q_R, q_Z))
+        return self.B_p_a * q_Z / (q_R * self.minor_radius_a * self.rho(q_R, q_Z))
 
     def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> ArrayLike:
         q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
@@ -47,11 +43,15 @@ class CircularCrossSection(MagneticGeometry):
 
     def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> ArrayLike:
         q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
-        return -self.B_p(q_R, q_Z) * (q_R - self.R_axis) / self.rho(q_R, q_Z)
+        return (
+            -self.B_p_a
+            * (q_R - self.R_axis)
+            / (q_R * self.minor_radius_a * self.rho(q_R, q_Z))
+        )
 
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> ArrayLike:
         q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
-        return (self.rho(q_R, q_Z) / self.minor_radius_a) ** 2
+        return self.rho(q_R, q_Z) / self.minor_radius_a
 
 
 class CurvySlab(MagneticGeometry):
