@@ -308,7 +308,7 @@ def user_settings(diagnostic, user, shot):
         elif user == "Valerian_laptop":
             prefix = pathlib.Path("C:\\Dropbox\\")
 
-        if diagnostic in ["DBS_NSTX_MAST", "DBS_SWIP_MAST-U"]:
+        if diagnostic in ["DBS_NSTX_MAST", "DBS_SWIP_MAST-U","DBS_UCLA_MAST-U"]:
             if shot in [29684]:
                 # MAST reruns of EFIT. Done by Lucy Kogan.
                 # 29684: no MSE data, but reprocessed with more constraints,
@@ -336,7 +336,7 @@ def user_settings(diagnostic, user, shot):
                 # MAST EFIT runs. List of available shots not updated.
                 efitpp_path = (
                     prefix
-                    / f"VHChen2022/Data - Equilibrium/MSE_efitruns/{shot}/"
+                    / f"VHChen2022/Data - Equilibrium/MSE_efitruns/{shot}/efit_sgibson_02/"
                 )                
             # If it's not any of the above shots, I'll assume that there's no efit++ data
             elif shot > 30471:  # MAST-U
