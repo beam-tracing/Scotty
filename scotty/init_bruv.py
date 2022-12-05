@@ -308,7 +308,7 @@ def user_settings(diagnostic, user, shot):
         elif user == "Valerian_laptop":
             prefix = pathlib.Path("C:\\Dropbox\\")
 
-        if diagnostic in ["DBS_NSTX_MAST", "DBS_SWIP_MAST-U","DBS_UCLA_MAST-U"]:
+        if diagnostic in ["DBS_NSTX_MAST", "DBS_SWIP_MAST-U", "DBS_UCLA_MAST-U"]:
             if shot in [29684]:
                 # MAST reruns of EFIT. Done by Lucy Kogan.
                 # 29684: no MSE data, but reprocessed with more constraints,
