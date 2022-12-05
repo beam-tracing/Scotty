@@ -20,11 +20,7 @@ kwargs_dict = dict(
         ("launch_beam_width", 0.06323503329291348),
         ("launch_beam_curvature", -0.5535179506038995),
         ("launch_position", np.array([4.5, 0.0, -0.6])),
-    ]
-)
-
-kwargs_dict = dict(
-    [
+        ##
         ("delta_R", -0.00001),
         ("delta_Z", 0.00001),
         (
@@ -39,22 +35,21 @@ kwargs_dict = dict(
             "density_fit_parameters",
             np.array(
                 [
-                    10.84222049,
-                    0.17888095,
-                    1.29493525,
-                    5.81062798,
-                    0.0,
-                    0.02727005,
-                    0.1152848,
-                    0.94942186,
+                    1.08424828e+01, 
+                    7.78049990e-01,  
+                    5.62555233e+00, 
+                    5.80966239e+00,
+                    -0.1,  
+                    2.73776308e-02,  
+                    1.15399313e-01,  
+                    9.49642550e-01
                 ]
             ),
         ),
-        ("poloidal_flux_enter", 1.3),
-        # ('magnetic_data_path','D:\\Dropbox\\VHChen2021\\Collaborator - Daniel Carralero\\Processed data\\JT60SA_highden.npz'),
+        ("poloidal_flux_enter", 1.05891249),
         (
             "magnetic_data_path",
-            "C:\\Users\\chenv\\Dropbox\\VHChen2021\\Collaborator - Daniel Carralero\\Processed data\\JT60SA_highden.npz",
+            "D:\\Dropbox\\VHChen2021\\Collaborators\\Daniel Carralero\\Processed data\\JT60SA_highden.npz",
         ),
     ]
 )

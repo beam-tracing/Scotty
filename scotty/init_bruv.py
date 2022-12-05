@@ -332,6 +332,12 @@ def user_settings(diagnostic, user, shot):
                     prefix
                     / f"VHChen2020/Data/Equilibrium/MAST/MSE_efitruns/{shot}/Pass0/"
                 )
+            elif shot in [45177]:
+                # MAST EFIT runs. List of available shots not updated.
+                efitpp_path = (
+                    prefix
+                    / f"VHChen2022/Data - Equilibrium/MSE_efitruns/{shot}/"
+                )                
             # If it's not any of the above shots, I'll assume that there's no efit++ data
             elif shot > 30471:  # MAST-U
                 UDA_saved_path = (

@@ -31,14 +31,16 @@ import os
 from scotty.init_bruv import get_parameters_for_Scotty
 
 
-equil_times = np.array([0.2,0.5])
+# equil_times = np.array([0.2,0.5])
+equil_times = np.array([0.5])
+
 # poloidal_launch_angles_Torbeam = np.array([10, 7.5, 5.0, 2.5, -2.5, -5.0, -7.5, -10])
 poloidal_launch_angles_Torbeam = np.array([-2.5, -5.0, -7.5, -10])
 # toroidal_launch_angles_Torbeam = np.array([3.0])
 toroidal_launch_angles_Torbeam = np.linspace(-10, 10, 51)
 # launch_freqs_GHz = np.array([30.0])
-# launch_freqs_GHz = np.array([32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50])
-launch_freqs_GHz = np.linspace(30,75,19)
+launch_freqs_GHz = np.array([32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50])
+# launch_freqs_GHz = np.linspace(30,75,19) 
 
 total_simulations = (
     len(equil_times)
@@ -58,9 +60,11 @@ for ii, equil_time in enumerate(equil_times):
                     
                     kwargs_dict = get_parameters_for_Scotty(
                         "DBS_UCLA_MAST-U",
+                        shot = 45177,
                         launch_freq_GHz=launch_freq_GHz,
-                        find_B_method="test",  # EFITpp, UDA_saved, UDA, torbeam
-                        user="Valerian_laptop",
+                        # find_B_method="test",  # EFITpp, UDA_saved, UDA, torbeam
+                        find_B_method="EFITpp",  # EFITpp, UDA_saved, UDA, torbeam                        
+                        user="Valerian_desktop",
                     )
     
                     kwargs_dict["mode_flag"] = mode_flag
@@ -98,7 +102,7 @@ for ii, equil_time in enumerate(equil_times):
                     kwargs_dict["figure_flag"] = False
                     kwargs_dict[
                         "output_path"
-                    ] = "D:\\Dropbox\\VHChen2022\\Data - Scotty\\Run 2\\"
+                    ] = "D:\\Dropbox\\VHChen2022\\Data - Scotty\\Run 3\\"
                     kwargs_dict["density_fit_parameters"] = None
                     kwargs_dict[
                         "ne_data_path"
