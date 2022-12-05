@@ -3094,9 +3094,9 @@ def launch_beam(
             dH_dKZ_initial,
             dH_dR_initial,
             dH_dZ_initial,
-            d_poloidal_flux_d_R_boundary.item(),
-            d_poloidal_flux_d_Z_boundary.item(),
-        )  # . item() to convert variable from type ndarray to float, such that the array elements all have the same type
+            d_poloidal_flux_d_R_boundary,
+            d_poloidal_flux_d_Z_boundary,
+        )
     else:  # Do not use BCs
         Psi_3D_lab_initial = Psi_3D_lab_entry
 
