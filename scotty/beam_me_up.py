@@ -121,6 +121,7 @@ from scotty.geometry import (
     CircularCrossSection,
     InterpolatedField,
     CurvySlab,
+    EFITField,
 )
 from scotty.torbeam import Torbeam
 from scotty._version import __version__
@@ -2862,17 +2863,6 @@ def create_magnetic_geometry(
 ) -> MagneticGeometry:
     """Create an object representing the magnetic field geometry"""
 
-    def make_rect_spline(R_grid, Z_grid, array):
-        return interpolate.RectBivariateSpline(
-            R_grid,
-            Z_grid,
-            array,
-            bbox=[None, None, None, None],
-            kx=interp_order,
-            ky=interp_order,
-            s=interp_smoothing,
-        )
-
     missing_magnetic_data_path = (
         f"Missing 'magnetic_data_path' for find_B_method='{find_B_method}'"
     )
@@ -2939,35 +2929,42 @@ def create_magnetic_geometry(
         return CircularCrossSection(B_T_axis, R_axis, minor_radius_a, B_p_a)
 
     elif (find_B_method == "EFITpp") or (find_B_method == "UDA_saved"):
+        if magnetic_data_path is None:
+            raise ValueError(missing_magnetic_data_path)
+        if delta_R is None:
+            raise ValueError(f"Missing 'delta_R' for find_B_method='{find_B_method}'")
+        if delta_Z is None:
+            raise ValueError(f"Missing 'delta_Z' for find_B_method='{find_B_method}'")
+
         if find_B_method == "EFITpp":
             print(
                 "Using MSE-constrained EFIT++ output files directly for B and poloidal flux"
             )
 
-            dataset = Dataset(magnetic_data_path / "efitOut.nc")
+            with Dataset(magnetic_data_path / "efitOut.nc") as dataset:
+                efitpp_times = dataset.variables["time"][:]
+                time_idx = find_nearest(efitpp_times, equil_time)
+                print("EFIT++ time", efitpp_times[time_idx])
 
-            efitpp_times = dataset.variables["time"][:]
-            time_idx = find_nearest(efitpp_times, equil_time)
-            print("EFIT++ time", efitpp_times[time_idx])
+                output_group = dataset.groups["output"]
 
-            output_group = dataset.groups["output"]
+                profiles2D = output_group.groups["profiles2D"]
+                # unnormalised, as a function of R and Z
+                unnormalised_poloidalFlux_grid = profiles2D.variables["poloidalFlux"][
+                    time_idx
+                ][:][:]
+                data_R_coord = profiles2D.variables["r"][time_idx][:]
+                data_Z_coord = profiles2D.variables["z"][time_idx][:]
 
-            profiles2D = output_group.groups["profiles2D"]
-            # unnormalised, as a function of R and Z
-            unnormalised_poloidalFlux_grid = profiles2D.variables["poloidalFlux"][
-                time_idx
-            ][:][:]
-            data_R_coord = profiles2D.variables["r"][time_idx][:]
-            data_Z_coord = profiles2D.variables["z"][time_idx][:]
-
-            fluxFunctionProfiles = output_group.groups["fluxFunctionProfiles"]
-            poloidalFlux = fluxFunctionProfiles.variables["normalizedPoloidalFlux"][:]
-            # poloidalFlux as a function of normalised poloidal flux
-            unnormalizedPoloidalFlux = fluxFunctionProfiles.variables["poloidalFlux"][
-                time_idx
-            ][:]
-            rBphi = fluxFunctionProfiles.variables["rBphi"][time_idx][:]
-            dataset.close()
+                fluxFunctionProfiles = output_group.groups["fluxFunctionProfiles"]
+                poloidalFlux = fluxFunctionProfiles.variables["normalizedPoloidalFlux"][
+                    :
+                ]
+                # poloidalFlux as a function of normalised poloidal flux
+                unnormalizedPoloidalFlux = fluxFunctionProfiles.variables[
+                    "poloidalFlux"
+                ][time_idx][:]
+                rBphi = fluxFunctionProfiles.variables["rBphi"][time_idx][:]
 
             # normalised_polflux = polflux_const_m * poloidalFlux + polflux_const_c (think y = mx + c)
             # linear fit
@@ -2977,6 +2974,19 @@ def create_magnetic_geometry(
             poloidalFlux_grid = (
                 unnormalised_poloidalFlux_grid * polflux_const_m + polflux_const_c
             )
+            return EFITField(
+                R_grid=data_R_coord,
+                Z_grid=data_Z_coord,
+                rBphi=rBphi,
+                psi_norm_2D=poloidalFlux_grid,
+                psi_norm_1D=poloidalFlux,
+                psi_unnorm_axis=0.0,
+                psi_unnorm_boundary=polflux_const_m,
+                delta_R=delta_R,
+                delta_Z=delta_Z,
+                interp_order=interp_order,
+                interp_smoothing=interp_smoothing,
+            )
 
         elif (
             find_B_method == "UDA_saved" and shot is not None and shot <= 30471
@@ -2984,21 +2994,23 @@ def create_magnetic_geometry(
             print(shot)
             # 30471 is the last shot on MAST
             # data saved differently for MAST-U shots
-            loadfile = np.load(magnetic_data_path / f"{shot}_equilibrium_data.npz")
-            rBphi_all_times = loadfile["rBphi"]  # On time base C
-            t_base_B = loadfile["t_base_B"]
-            t_base_C = loadfile["t_base_C"]
-            data_R_coord = loadfile["R_EFIT"]
-            data_Z_coord = loadfile["Z_EFIT"]
-            # Time base C
-            polflux_axis_all_times = loadfile["poloidal_flux_unnormalised_axis"]
-            # Time base C
-            polflux_boundary_all_times = loadfile["poloidal_flux_unnormalised_boundary"]
-            # On time base B
-            unnormalised_poloidalFlux_grid_all_times = loadfile[
-                "poloidal_flux_unnormalised"
-            ]
-            loadfile.close()
+            filename = magnetic_data_path / f"{shot}_equilibrium_data.npz"
+            with np.load(filename) as loadfile:
+                rBphi_all_times = loadfile["rBphi"]  # On time base C
+                t_base_B = loadfile["t_base_B"]
+                t_base_C = loadfile["t_base_C"]
+                data_R_coord = loadfile["R_EFIT"]
+                data_Z_coord = loadfile["Z_EFIT"]
+                # Time base C
+                polflux_axis_all_times = loadfile["poloidal_flux_unnormalised_axis"]
+                # Time base C
+                polflux_boundary_all_times = loadfile[
+                    "poloidal_flux_unnormalised_boundary"
+                ]
+                # On time base B
+                unnormalised_poloidalFlux_grid_all_times = loadfile[
+                    "poloidal_flux_unnormalised"
+                ]
 
             t_base_B_idx = find_nearest(t_base_B, equil_time)
             # Get the same time slice
@@ -3020,132 +3032,63 @@ def create_magnetic_geometry(
                 polflux_boundary - polflux_axis
             )
 
+            return EFITField(
+                R_grid=data_R_coord,
+                Z_grid=data_Z_coord,
+                rBphi=rBphi,
+                psi_norm_2D=poloidalFlux_grid,
+                psi_norm_1D=poloidalFlux,
+                psi_unnorm_axis=polflux_axis,
+                psi_unnorm_boundary=polflux_boundary,
+                delta_R=delta_R,
+                delta_Z=delta_Z,
+                interp_order=interp_order,
+                interp_smoothing=interp_smoothing,
+            )
+
         elif (
             find_B_method == "UDA_saved" and shot is not None and shot > 30471
         ):  # MAST-U
             # 30471 is the last shot on MAST
             # data saved differently for MAST-U shots
-            loadfile = np.load(magnetic_data_path / f"{shot}_equilibrium_data.npz")
-            rBphi_all_times = loadfile["rBphi"]  # On time base C
-            time_EFIT = loadfile["time_EFIT"]
-            data_R_coord = loadfile["R_EFIT"]
-            data_Z_coord = loadfile["Z_EFIT"]
-            poloidalFlux_grid_all_times = loadfile["poloidalFlux_grid"]
-            poloidalFlux_all_times = loadfile["poloidalFlux"]
-            poloidalFlux_unnormalised_axis_all_times = loadfile[
-                "poloidalFlux_unnormalised_axis"
-            ]
-            poloidalFlux_unnormalised_boundary_all_times = loadfile[
-                "poloidalFlux_unnormalised_boundary"
-            ]
-            loadfile.close()
+            filename = magnetic_data_path / f"{shot}_equilibrium_data.npz"
+            with np.load(filename) as loadfile:
+                time_EFIT = loadfile["time_EFIT"]
+                t_idx = find_nearest(time_EFIT, equil_time)
+                print("EFIT time", time_EFIT[t_idx])
 
-            t_idx = find_nearest(time_EFIT, equil_time)
-            print("EFIT time", time_EFIT[t_idx])
-
-            rBphi = rBphi_all_times[t_idx, :]
-            poloidalFlux_grid = poloidalFlux_grid_all_times[t_idx, :, :]
-            poloidalFlux = poloidalFlux_all_times[t_idx, :]
-
-            poloidalFlux_unnormalised_axis = poloidalFlux_unnormalised_axis_all_times[
-                t_idx,
-            ]
-            poloidalFlux_unnormalised_boundary = (
-                poloidalFlux_unnormalised_boundary_all_times[t_idx]
-            )
-
-            polflux_const_m = (1.0 - 0.0) / (
-                poloidalFlux_unnormalised_boundary - poloidalFlux_unnormalised_axis
-            )
+                return EFITField(
+                    R_grid=loadfile["R_EFIT"],
+                    Z_grid=loadfile["Z_EFIT"],
+                    rBphi=loadfile["rBphi"][t_idx, :],
+                    psi_norm_2D=loadfile["poloidalFlux_grid"][t_idx, :, :],
+                    psi_norm_1D=loadfile["poloidalFlux"][t_idx, :],
+                    psi_unnorm_axis=loadfile["poloidalFlux_unnormalised_axis"][t_idx],
+                    psi_unnorm_boundary=loadfile["poloidalFlux_unnormalised_boundary"][
+                        t_idx
+                    ],
+                    delta_R=delta_R,
+                    delta_Z=delta_Z,
+                    interp_order=interp_order,
+                    interp_smoothing=interp_smoothing,
+                )
 
         elif find_B_method == "UDA_saved" and shot is None:
             # If using this part of the code, magnetic_data_path needs to include the filename
             # Assuming only one time present in file
-            loadfile = np.load(magnetic_data_path)
-            rBphi = loadfile["rBphi"]
-            data_R_coord = loadfile["R_EFIT"]
-            data_Z_coord = loadfile["Z_EFIT"]
-            poloidalFlux_grid = loadfile["poloidalFlux_grid"]
-            poloidalFlux_unnormalised_axis = loadfile["poloidalFlux_unnormalised_axis"]
-            poloidalFlux_unnormalised_boundary = loadfile[
-                "poloidalFlux_unnormalised_boundary"
-            ]
-            loadfile.close()
-
-            polflux_const_m = (1.0 - 0.0) / (
-                poloidalFlux_unnormalised_boundary - poloidalFlux_unnormalised_axis
-            )
-            poloidalFlux = np.linspace(0, 1.0, len(rBphi))
-
-        interp_rBphi = interpolate.UnivariateSpline(
-            poloidalFlux,
-            rBphi,
-            w=None,
-            bbox=[None, None],
-            k=interp_order,
-            s=interp_smoothing,
-            ext=0,
-            check_finite=False,
-        )
-
-        interp_poloidal_flux = make_rect_spline(
-            data_R_coord, data_Z_coord, poloidalFlux_grid
-        )
-
-        # Extrapolation assumes the last element of rBphi corresponds to poloidalflux = 1
-        rBphi_gradient_for_extrapolation = (rBphi[-1] - rBphi[-2]) / (
-            poloidalFlux[-1] - poloidalFlux[-2]
-        )
-        last_poloidal_flux = poloidalFlux[-1]
-        last_rBphi = rBphi[-1]
-
-        def find_B_R(
-            q_R,
-            q_Z,
-            delta_Z=delta_Z,
-            interp_poloidal_flux=interp_poloidal_flux,
-            polflux_const_m=polflux_const_m,
-        ):
-            dpolflux_dZ = find_dpolflux_dZ(
-                q_R, q_Z, delta_Z, lambda r, z: interp_poloidal_flux(r, z, grid=False)
-            )
-            B_R = -dpolflux_dZ / (polflux_const_m * q_R)
-            return B_R
-
-        def find_B_T(
-            q_R,
-            q_Z,
-            last_poloidal_flux=last_poloidal_flux,
-            last_rBphi=last_rBphi,
-            rBphi_gradient_for_extrapolation=rBphi_gradient_for_extrapolation,
-            interp_poloidal_flux=interp_poloidal_flux,
-            interp_rBphi=interp_rBphi,
-        ):
-            # B_T from EFIT
-
-            polflux = interp_poloidal_flux(q_R, q_Z, grid=False)
-
-            # Boolean array. True if it's inside the range where the data is available
-            is_inside = polflux <= last_poloidal_flux
-            is_outside = ~is_inside
-
-            # Let interp do the extrapolation
-            rBphi = interp_rBphi(polflux)
-
-            B_T = rBphi / q_R
-
-            return B_T
-
-        def find_B_Z(
-            q_R,
-            q_Z,
-            delta_R=delta_R,
-            interp_poloidal_flux=interp_poloidal_flux,
-            polflux_const_m=polflux_const_m,
-        ):
-            dpolflux_dR = find_dpolflux_dR(q_R, q_Z, delta_R, interp_poloidal_flux)
-            B_Z = dpolflux_dR / (polflux_const_m * q_R)
-            return B_Z
+            with np.load(magnetic_data_path) as loadfile:
+                return EFITField(
+                    R_grid=loadfile["R_EFIT"],
+                    Z_grid=loadfile["Z_EFIT"],
+                    rBphi=loadfile["rBphi"],
+                    psi_norm_2D=loadfile["poloidalFlux_grid"],
+                    psi_unnorm_axis=loadfile["poloidalFlux_unnormalised_axis"],
+                    psi_unnorm_boundary=loadfile["poloidalFlux_unnormalised_boundary"],
+                    delta_R=delta_R,
+                    delta_Z=delta_Z,
+                    interp_order=interp_order,
+                    interp_smoothing=interp_smoothing,
+                )
 
     elif find_B_method == "curvy_slab":
         print("Analytical curvy slab geometry")
@@ -3194,15 +3137,5 @@ def create_magnetic_geometry(
             interp_order,
             interp_smoothing,
         )
-    else:
-        raise ValueError(f"Invalid find_B_method '{find_B_method}'")
 
-    field = MagneticGeometry()
-    field.B_R = find_B_R
-    field.B_T = find_B_T
-    field.B_Z = find_B_Z
-    field.poloidal_flux = lambda q_R, q_Z: interp_poloidal_flux(q_R, q_Z, grid=False)
-    field.data_R_coord = data_R_coord
-    field.data_Z_coord = data_Z_coord
-    field.poloidalFlux_grid = poloidalFlux_grid
-    return field
+    raise ValueError(f"Invalid find_B_method '{find_B_method}'")
