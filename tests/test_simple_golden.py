@@ -1,14 +1,25 @@
-from scotty.beam_me_up import beam_me_up, create_magnetic_geometry
+from scotty.beam_me_up import (
+    beam_me_up,
+    create_magnetic_geometry,
+    launch_beam,
+    make_density_fit,
+)
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.torbeam import Torbeam
 from scotty.geometry import CircularCrossSectionField
+from scotty.fun_general import (
+    freq_GHz_to_angular_frequency,
+    angular_frequency_to_wavenumber,
+)
 
 import json
 import numpy as np
-from numpy.testing import assert_allclose
+from numpy.testing import assert_allclose, assert_array_equal
 import pathlib
 import pytest
 
+# Print more of arrays in failed tests
+np.set_printoptions(linewidth=120, threshold=100)
 
 CUTOFF_INDEX = 5
 
@@ -363,7 +374,7 @@ def UDA_saved(path: pathlib.Path):
     kwargs_dict["find_B_method"] = "UDA_saved"
     kwargs_dict["magnetic_data_path"] = path / "12345_equilibrium_data.npz"
     kwargs_dict["shot"] = None
-    kwargs_dict["delta_R"] = 0.0001
+    kwargs_dict["delta_R"] = -0.0001
     kwargs_dict["delta_Z"] = 0.0001
     return kwargs_dict
 
@@ -400,7 +411,7 @@ def UDA_saved_MAST_U(path: pathlib.Path):
     kwargs_dict["find_B_method"] = "UDA_saved"
     kwargs_dict["magnetic_data_path"] = path
     kwargs_dict["shot"] = shot
-    kwargs_dict["delta_R"] = 0.0001
+    kwargs_dict["delta_R"] = -0.0001
     kwargs_dict["delta_Z"] = 0.0001
     kwargs_dict["equil_time"] = time[1]
     return kwargs_dict
@@ -524,3 +535,160 @@ def test_EFIT_geometry(tmp_path):
     assert total_sign[0, -1] == 1, "Top right"
     assert total_sign[-1, 0] == 1, "Bottom left"
     assert total_sign[-1, -1] == -1, "Bottom right"
+
+
+def test_launch_in_plasma():
+    K_initial, launch_position, _, Psi_w, _, _, _, _ = launch_beam(
+        toroidal_launch_angle_Torbeam=None,
+        poloidal_launch_angle_Torbeam=None,
+        mode_flag=None,
+        launch_beam_width=None,
+        launch_beam_curvature=None,
+        launch_position=[1, 2, 3],
+        wavenumber_K0=1,
+        field=None,
+        find_density_1D=None,
+        launch_angular_frequency=None,
+        vacuumLaunch_flag=False,
+    )
+
+    assert_array_equal(K_initial, np.zeros(3))
+    assert_array_equal(launch_position, [1, 2, 3])
+    assert_array_equal(Psi_w, np.zeros((3, 3)) + 0j)
+
+
+@pytest.mark.parametrize(
+    "generator",
+    [
+        pytest.param(simple, id="simple"),
+        pytest.param(ne_dat_file, id="density-fit-file"),
+        pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(omfit_json, id="omfit-file"),
+        pytest.param(npz_file, id="test-file"),
+        pytest.param(npz_notime_file, id="test_notime-file"),
+        pytest.param(UDA_saved, id="UDA-saved-file"),
+        pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file"),
+    ],
+)
+def test_launch_golden_answer(tmp_path, generator):
+    args = generator(tmp_path)
+    field = create_magnetic_geometry(**args)
+    ne_data_path = args.get("ne_data_path", None)
+    if ne_data_path:
+        ne_filename = ne_data_path / "ne.dat"
+        parameters = [ne_filename, 5, 0]
+    else:
+        parameters = None
+        ne_filename = None
+
+    density_fit = make_density_fit(
+        args["density_fit_method"],
+        args["poloidal_flux_enter"],
+        parameters,
+        ne_filename,
+    )
+
+    launch_angular_frequency = freq_GHz_to_angular_frequency(args["launch_freq_GHz"])
+    wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
+
+    (
+        K_initial,
+        initial_position,
+        launch_K,
+        Psi_3D_lab_initial,
+        Psi_3D_lab_launch,
+        Psi_3D_lab_entry,
+        Psi_3D_lab_entry_cartersian,
+        distance_from_launch_to_entry,
+    ) = launch_beam(
+        field=field,
+        find_density_1D=density_fit,
+        toroidal_launch_angle_Torbeam=args["toroidal_launch_angle_Torbeam"],
+        poloidal_launch_angle_Torbeam=args["poloidal_launch_angle_Torbeam"],
+        mode_flag=args["mode_flag"],
+        launch_beam_width=args["launch_beam_width"],
+        launch_beam_curvature=args["launch_beam_curvature"],
+        launch_position=args["launch_position"],
+        wavenumber_K0=wavenumber_K0,
+        vacuumLaunch_flag=args["vacuumLaunch_flag"],
+        vacuum_propagation_flag=args["vacuum_propagation_flag"],
+        Psi_BC_flag=args["Psi_BC_flag"],
+        poloidal_flux_enter=args["poloidal_flux_enter"],
+        launch_angular_frequency=launch_angular_frequency,
+    )
+
+    expected_K_initial = np.array([-1146.4000699962507, -0.0, -120.4915026654739])
+    expected_initial_position = np.array([1.99382564, -0.0, -0.07804514])
+    expected_launch_K = np.array([-1146.40007, -0.0, -120.49150267])
+    expected_Psi_3D_lab_initial = np.array(
+        [
+            [
+                -2.473578e03 + 1.195578e01j,
+                -1.399168e-02 - 1.433479e-02j,
+                3.405239e02 - 1.137526e02j,
+            ],
+            [
+                -1.399168e-02 - 1.433479e-02j,
+                4.245892e03 + 4.350010e03j,
+                2.211272e-03 + 2.265497e-03j,
+            ],
+            [
+                3.405239e02 - 1.137526e02j,
+                2.211272e-03 + 2.265497e-03j,
+                4.257764e02 + 1.082292e03j,
+            ],
+        ]
+    )
+    expected_Psi_3D_lab_launch = np.array(
+        [
+            [-3.1486979 + 13.65774954j, 0.0 + 0.0j, 29.9578594 - 129.94480676j],
+            [0.0 + 0.0j, 1037.08121046 + 8365.71125j, 0.0 + 0.0j],
+            [29.9578594 - 129.94480676j, 0.0 + 0.0j, -285.02999262 + 1236.34225046j],
+        ]
+    )
+    expected_Psi_3D_lab_entry = np.array(
+        [
+            [5.38751589 + 11.95597601j, 0.0 + 0.0j, -51.25878964 - 113.75351313j],
+            [0.0 + 0.0j, 4245.89207422 + 4350.0100231j, 0.0 + 0.0j],
+            [-51.25878964 - 113.75351313j, 0.0 + 0.0j, 487.69480611 + 1082.29238188j],
+        ]
+    )
+    expected_Psi_3D_lab_entry_cartersian = np.array(
+        [
+            [5.38751589 + 11.95597601j, 0.0 + 0.0j, -51.25878964 - 113.75351313j],
+            [0.0 + 0.0j, 493.082322 + 1094.24835789j, 0.0 + 0.0j],
+            [-51.25878964 - 113.75351313j, 0.0 + 0.0j, 487.69480611 + 1082.29238188j],
+        ]
+    )
+    expected_distance_from_launch_to_entry = 0.5964417281350541
+    expected_Psi_3D = np.array(
+        [
+            [-3.1486979 + 13.65774954j, 0.0 + 0.0j, 29.9578594 - 129.94480676j],
+            [0.0 + 0.0j, 1037.08121046 + 8365.71125j, 0.0 + 0.0j],
+            [29.9578594 - 129.94480676j, 0.0 + 0.0j, -285.02999262 + 1236.34225046j],
+        ]
+    )
+
+    tol = 1e-3
+    assert_allclose(Psi_3D_lab_launch, expected_Psi_3D, tol, tol)
+    assert_allclose(K_initial, expected_K_initial, tol, tol)
+    assert_allclose(initial_position, expected_initial_position, tol, tol)
+    assert_allclose(launch_K, expected_launch_K, tol, tol)
+    assert_allclose(Psi_3D_lab_launch, expected_Psi_3D_lab_launch, tol, tol)
+    assert_allclose(Psi_3D_lab_entry, expected_Psi_3D_lab_entry, tol, tol)
+    assert_allclose(
+        Psi_3D_lab_entry_cartersian, expected_Psi_3D_lab_entry_cartersian, tol, tol
+    )
+    assert_allclose(
+        distance_from_launch_to_entry,
+        expected_distance_from_launch_to_entry,
+        tol,
+        tol,
+    )
+    assert_allclose(launch_K, expected_launch_K, tol, tol)
+    assert_allclose(Psi_3D_lab_launch, expected_Psi_3D_lab_launch, tol, tol)
+    assert_allclose(Psi_3D_lab_entry, expected_Psi_3D_lab_entry, tol, tol)
+    assert_allclose(
+        Psi_3D_lab_entry_cartersian, expected_Psi_3D_lab_entry_cartersian, tol, tol
+    )
+    assert_allclose(Psi_3D_lab_initial, expected_Psi_3D_lab_initial, atol=0.1)

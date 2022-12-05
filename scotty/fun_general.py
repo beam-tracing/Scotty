@@ -197,10 +197,19 @@ def find_area_points(xs, ys, fraction_wanted):
 # ----------------------------------
 
 # Functions (Coordinate transformations)
+def freq_GHz_to_angular_frequency(freq_GHz: float) -> float:
+    """Convert frequency in GHz to angular frequency"""
+    return 2 * np.pi * 1e9 * freq_GHz
+
+
+def angular_frequency_to_wavenumber(angular_frequency: float) -> float:
+    """Convert angular frequency to wavenumber"""
+    return angular_frequency / constants.c
+
+
 def freq_GHz_to_wavenumber(freq_GHz: float) -> float:
     """Converts frequency in GHz to wavenumber"""
-    angular_frequency = 2 * np.pi * 1e9 * freq_GHz
-    return angular_frequency / constants.c
+    return angular_frequency_to_wavenumber(freq_GHz_to_angular_frequency(freq_GHz))
 
 
 def find_vec_lab_Cartesian(vec_lab, q_zeta):
