@@ -19,6 +19,10 @@ or from a local clone:
 pip install .
 ```
 
+Documentation
+-------
+(https://scotty.readthedocs.io/)
+
 Background
 -------
 Description of the Scotty [[1]](#1), derivation of beam tracing given in Appendix A.
