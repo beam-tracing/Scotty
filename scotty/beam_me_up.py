@@ -68,6 +68,7 @@ from __future__ import annotations
 import numpy as np
 from scipy import integrate as integrate
 from scipy import constants as constants
+from scipy.optimize import minimize_scalar, root_scalar
 import matplotlib.pyplot as plt
 import sys
 import bisect
@@ -2898,52 +2899,14 @@ def launch_beam(
 
     Psi_w_beam_inverse_launch_cartersian = find_inverse_2D(Psi_w_beam_launch_cartersian)
 
-    # Finds entry point
-    search_Z_end = launch_position[2] - launch_position[0] * np.tan(
-        poloidal_launch_angle
+    entry_position = find_entry_point(
+        launch_position,
+        poloidal_launch_angle,
+        poloidal_flux_enter,
+        field,
+        K_zeta_launch,
+        K_R_launch,
     )
-    numberOfCoarseSearchPoints = 50
-    R_coarse_search_array = np.linspace(
-        launch_position[0], 0, numberOfCoarseSearchPoints
-    )
-    Z_coarse_search_array = np.linspace(
-        launch_position[2], search_Z_end, numberOfCoarseSearchPoints
-    )
-    poloidal_flux_coarse_search_array = field.poloidal_flux(
-        R_coarse_search_array, Z_coarse_search_array
-    )
-    meets_flux_condition_array = (
-        poloidal_flux_coarse_search_array < 0.9 * poloidal_flux_enter
-    )
-    dummy_array = np.array(range(numberOfCoarseSearchPoints))
-    indices_inside_for_sure_array = dummy_array[meets_flux_condition_array]
-    first_inside_index = indices_inside_for_sure_array[0]
-
-    numberOfFineSearchPoints = 7500
-    R_fine_search_array = np.linspace(
-        launch_position[0],
-        R_coarse_search_array[first_inside_index],
-        numberOfFineSearchPoints,
-    )
-    Z_fine_search_array = np.linspace(
-        launch_position[2],
-        Z_coarse_search_array[first_inside_index],
-        numberOfFineSearchPoints,
-    )
-    poloidal_fine_search_array = field.poloidal_flux(
-        R_fine_search_array, Z_fine_search_array
-    )
-    entry_index = find_nearest(poloidal_fine_search_array, poloidal_flux_enter)
-    if poloidal_fine_search_array[entry_index] > poloidal_flux_enter:
-        # The first point needs to be in the plasma
-        # If the first point is outside, then there will be errors when the gradients are calculated
-        entry_index = entry_index + 1
-    entry_position = np.zeros(3)  # R,Z
-    entry_position[0] = R_fine_search_array[entry_index]
-    entry_position[1] = (
-        K_zeta_launch / K_R_launch * (1 / launch_position[0] - 1 / entry_position[0])
-    )
-    entry_position[2] = Z_fine_search_array[entry_index]
 
     distance_from_launch_to_entry = np.sqrt(
         launch_position[0] ** 2
@@ -2954,7 +2917,6 @@ def launch_beam(
         * np.cos(entry_position[1] - launch_position[1])
         + (launch_position[2] - entry_position[2]) ** 2
     )
-    # Entry point found
 
     # Calculate entry parameters from launch parameters
     # That is, find beam at start of plasma given its parameters at the antenna
@@ -3110,3 +3072,53 @@ def launch_beam(
         Psi_3D_lab_entry_cartersian,
         distance_from_launch_to_entry,
     )
+
+
+def find_entry_point(
+    launch_position: FloatArray,
+    poloidal_launch_angle: float,
+    poloidal_flux_enter: float,
+    field: MagneticField,
+    K_zeta_launch: float,
+    K_R_launch: float,
+    boundary_adjust: float = 1e-8,
+):
+    """Find the coordinates of where the beam enters the plasma"""
+
+    R_start = launch_position[0]
+    R_length = 0.0 - R_start
+    Z_start = launch_position[2]
+    Z_end = Z_start - R_start * np.tan(poloidal_launch_angle)
+    Z_length = Z_end - Z_start
+
+    def beam_line(tau):
+        """Parameterised line in beam direction"""
+        return (R_start + tau * R_length), (Z_start + tau * Z_length)
+
+    def poloidal_flux_boundary_along_line(tau):
+        """Signed poloidal flux distance to plasma boundary"""
+        return field.poloidal_flux(*beam_line(tau)) - poloidal_flux_enter
+
+    # Find the plasma boundary using a bracket search. We need the
+    # minimum only so that the flux has different sign to our initial
+    # position for the bracket points
+    minimum = minimize_scalar(
+        poloidal_flux_boundary_along_line, bounds=(0, 1), method="Bounded"
+    )
+    boundary = root_scalar(poloidal_flux_boundary_along_line, bracket=(0, minimum.x))
+
+    if not boundary.converged:
+        raise ValueError(
+            f"Could not find plasma boundary, root finding failed with '{boundary.flag}'"
+        )
+
+    # The root might be just outside the plasma due to floating point
+    # fun, if so, take small steps until we're inside
+    boundary_tau = boundary.root
+    if field.poloidal_flux(*beam_line(boundary_tau)) > poloidal_flux_enter:
+        boundary_tau += boundary_adjust
+
+    R_boundary, Z_boundary = beam_line(boundary.root)
+    zeta_boundary = K_zeta_launch / K_R_launch * (1 / R_start - 1 / R_boundary)
+
+    return np.array([R_boundary, zeta_boundary, Z_boundary])

@@ -3,6 +3,7 @@ from scotty.beam_me_up import (
     create_magnetic_geometry,
     launch_beam,
     make_density_fit,
+    find_entry_point,
 )
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.torbeam import Torbeam
@@ -198,7 +199,7 @@ EXPECTED = {
     ),
     "normalised_plasma_freqs": np.array(
         [
-            0.01388158,
+            0.0,
             0.59773859,
             0.75915389,
             0.83777097,
@@ -449,18 +450,23 @@ def test_integrated(tmp_path, generator):
         output = dict(f)
 
     for key, value in EXPECTED.items():
-        assert_allclose(output[key], value, rtol=1e-2, err_msg=key)
+        assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
     K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
     assert K_magnitude.argmin() == CUTOFF_INDEX
 
-    assert_allclose(output["Psi_3D_output"][0, ...], PSI_START_EXPECTED, rtol=1.8e-2)
     assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX, ...], PSI_CUTOFF_EXPECTED, rtol=1e-2
+        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED, rtol=1e-2, atol=0.1
     )
-    # Slightly larger tolerance here, likely due to floating-point
-    # precision of file-based input
-    assert_allclose(output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED, rtol=2e-2)
+    assert_allclose(
+        output["Psi_3D_output"][CUTOFF_INDEX, ...],
+        PSI_CUTOFF_EXPECTED,
+        rtol=1e-2,
+        atol=0.1,
+    )
+    assert_allclose(
+        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED, rtol=1.8e-2, atol=0.1
+    )
 
 
 @pytest.mark.parametrize(
@@ -566,8 +572,8 @@ def test_launch_in_plasma():
         pytest.param(omfit_json, id="omfit-file"),
         pytest.param(npz_file, id="test-file"),
         pytest.param(npz_notime_file, id="test_notime-file"),
-        pytest.param(UDA_saved, id="UDA-saved-file"),
-        pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file"),
+        # pytest.param(UDA_saved, id="UDA-saved-file"),
+        # pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file"),
     ],
 )
 def test_launch_golden_answer(tmp_path, generator):
@@ -620,23 +626,12 @@ def test_launch_golden_answer(tmp_path, generator):
     expected_K_initial = np.array([-1146.4000699962507, -0.0, -120.4915026654739])
     expected_initial_position = np.array([1.99382564, -0.0, -0.07804514])
     expected_launch_K = np.array([-1146.40007, -0.0, -120.49150267])
+    # Note that R-zeta, Z-zeta terms are not actually zero, but should be
     expected_Psi_3D_lab_initial = np.array(
         [
-            [
-                -2.473578e03 + 1.195578e01j,
-                -1.399168e-02 - 1.433479e-02j,
-                3.405239e02 - 1.137526e02j,
-            ],
-            [
-                -1.399168e-02 - 1.433479e-02j,
-                4.245892e03 + 4.350010e03j,
-                2.211272e-03 + 2.265497e-03j,
-            ],
-            [
-                3.405239e02 - 1.137526e02j,
-                2.211272e-03 + 2.265497e-03j,
-                4.257764e02 + 1.082292e03j,
-            ],
+            [-2.473578e03 + 1.195578e01j, 0.0 + 0.0j, 3.405239e02 - 1.137526e02j],
+            [0.0 + 0.0j, 4.245892e03 + 4.350010e03j, 0.0 + 0.0j],
+            [3.405239e02 - 1.137526e02j, 0.0 + 0.0j, 4.257764e02 + 1.082292e03j],
         ]
     )
     expected_Psi_3D_lab_launch = np.array(
@@ -691,4 +686,69 @@ def test_launch_golden_answer(tmp_path, generator):
     assert_allclose(
         Psi_3D_lab_entry_cartersian, expected_Psi_3D_lab_entry_cartersian, tol, tol
     )
-    assert_allclose(Psi_3D_lab_initial, expected_Psi_3D_lab_initial, atol=0.1)
+    # Larger atol due to some small values
+    assert_allclose(Psi_3D_lab_initial, expected_Psi_3D_lab_initial, tol, atol=0.1)
+
+
+@pytest.mark.parametrize(
+    "generator",
+    [
+        pytest.param(simple, id="simple"),
+        pytest.param(ne_dat_file, id="density-fit-file"),
+        pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(omfit_json, id="omfit-file"),
+        pytest.param(npz_file, id="test-file"),
+        pytest.param(npz_notime_file, id="test_notime-file"),
+        pytest.param(UDA_saved, id="UDA-saved-file"),
+        pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file"),
+    ],
+)
+@pytest.mark.parametrize(
+    (
+        "launch_position",
+        "poloidal_launch_angle",
+        "toroidal_launch_angle",
+        "expected_entry",
+    ),
+    (
+        ([2.5, 0, 0], 0, 0, [2.0, 0.0, 0]),
+        ([2, 0, 0.5], np.pi / 4, 0, [1.5 + np.sqrt(0.5) / 2, 0, np.sqrt(0.5) / 2]),
+        ([2, 0, -0.5], -np.pi / 4, 0, [1.5 + np.sqrt(0.5) / 2, 0, -np.sqrt(0.5) / 2]),
+    ),
+)
+def test_find_entry_point(
+    tmp_path,
+    generator,
+    launch_position,
+    poloidal_launch_angle,
+    toroidal_launch_angle,
+    expected_entry,
+):
+    args = generator(tmp_path)
+    field = create_magnetic_geometry(**args)
+
+    launch_angular_frequency = freq_GHz_to_angular_frequency(args["launch_freq_GHz"])
+    wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
+
+    poloidal_flux_enter = args["poloidal_flux_enter"]
+
+    K_R_launch = (
+        -wavenumber_K0 * np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
+    )
+    K_zeta_launch = (
+        -wavenumber_K0
+        * np.sin(toroidal_launch_angle)
+        * np.cos(poloidal_launch_angle)
+        * launch_position[0]
+    )
+
+    entry_position = find_entry_point(
+        launch_position,
+        poloidal_launch_angle,
+        poloidal_flux_enter,
+        field,
+        K_zeta_launch,
+        K_R_launch,
+    )
+
+    assert_allclose(entry_position, expected_entry)
