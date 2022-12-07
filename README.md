@@ -21,7 +21,7 @@ pip install .
 
 Documentation
 -------
-(https://scotty.readthedocs.io/)
+https://scotty.readthedocs.io/
 
 Background
 -------
