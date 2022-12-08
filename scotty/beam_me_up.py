@@ -67,12 +67,10 @@ Units
 from __future__ import annotations
 import numpy as np
 import math
-from scipy import interpolate as interpolate
 from scipy import integrate as integrate
 from scipy import constants as constants
 import matplotlib.pyplot as plt
 import sys
-from netCDF4 import Dataset
 import bisect
 import time
 import json
