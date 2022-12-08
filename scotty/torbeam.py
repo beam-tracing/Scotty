@@ -32,7 +32,7 @@ import numpy as np
 import freegs._fileutils as fortran
 
 from scotty.fun_general import read_floats_into_list_until
-from scotty.geometry import CircularCrossSectionField
+from scotty.geometry import ConstantCurrentDensityField
 from scotty.typing import PathLike
 
 
@@ -207,36 +207,6 @@ def n_e_fun(nedata_psi, core_ne):
     return nedata_ne
 
 
-def construct_torbeam_field(
-    major_radius: float,
-    minor_radius: float,
-    buffer_factor: float,
-    x_grid_length: int,
-    z_grid_length: int,
-    B_toroidal_max: float,
-    B_poloidal_max: float,
-):
-    """Construct the grid and magnetic field quantities for a circular cross-section equilibrium"""
-
-    x_grid_start = major_radius - buffer_factor * minor_radius
-    x_grid_end = major_radius + buffer_factor * minor_radius
-    z_grid_start = -buffer_factor * minor_radius
-    z_grid_end = buffer_factor * minor_radius
-
-    x_grid = np.linspace(x_grid_start, x_grid_end, x_grid_length)
-    z_grid = np.linspace(z_grid_start, z_grid_end, z_grid_length)
-
-    x_meshgrid, z_meshgrid = np.meshgrid(x_grid, z_grid, indexing="ij")
-    field = CircularCrossSectionField(
-        B_toroidal_max, major_radius, minor_radius, B_poloidal_max
-    )
-    B_t = field.B_T(x_meshgrid, z_meshgrid)
-    B_r = field.B_R(x_meshgrid, z_meshgrid)
-    B_z = field.B_Z(x_meshgrid, z_meshgrid)
-    psi = field.poloidal_flux(x_meshgrid, z_meshgrid)
-    return x_grid, z_grid, B_r, B_t, B_z, psi, field
-
-
 def write_torbeam_file(
     major_radius: float,
     minor_radius: float,
@@ -247,20 +217,27 @@ def write_torbeam_file(
     B_poloidal_max: float,
     torbeam_directory_path: pathlib.Path,
 ):
-    """Write a TORBEAM magnetic geometry file based on a circular
-    cross-section equilibrium"""
+    """Write a TORBEAM magnetic geometry file based on a constant
+    current density equilibrium"""
 
-    x_grid, z_grid, B_r, B_t, B_z, psi, _ = construct_torbeam_field(
+    field = ConstantCurrentDensityField(
+        B_toroidal_max,
         major_radius,
         minor_radius,
-        buffer_factor,
+        B_poloidal_max,
         x_grid_length,
         z_grid_length,
-        B_toroidal_max,
-        B_poloidal_max,
+        buffer_factor,
     )
+    x_meshgrid, z_meshgrid = np.meshgrid(
+        field.data_R_coord, field.data_Z_coord, indexing="ij"
+    )
+    B_t = field.B_T(x_meshgrid, z_meshgrid)
+    B_r = field.B_R(x_meshgrid, z_meshgrid)
+    B_z = field.B_Z(x_meshgrid, z_meshgrid)
+    psi = field.poloidal_flux(x_meshgrid, z_meshgrid)
 
-    Torbeam(x_grid, z_grid, B_r, B_t, B_z, psi).write(
+    Torbeam(field.data_R_coord, field.data_Z_coord, B_r, B_t, B_z, psi).write(
         torbeam_directory_path / "topfile"
     )
 

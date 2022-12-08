@@ -40,6 +40,8 @@ class CircularCrossSectionField(MagneticField):
     R_points:
     Z_points:
         Number of points for sample ``(R, Z)`` grid
+    grid_buffer_factor:
+        Multiplicative factor to increase size of sample grid by
     """
 
     def __init__(
@@ -50,16 +52,18 @@ class CircularCrossSectionField(MagneticField):
         B_p_a: float,
         R_points: int = 101,
         Z_points: int = 101,
+        grid_buffer_factor: float = 1.0,
     ):
         self.B_T_axis = B_T_axis
         self.R_axis = R_axis
         self.minor_radius_a = minor_radius_a
         self.B_p_a = B_p_a
 
+        grid_width = grid_buffer_factor * minor_radius_a
         self.data_R_coord = np.linspace(
-            R_axis - minor_radius_a, R_axis + minor_radius_a, R_points
+            R_axis - grid_width, R_axis + grid_width, R_points
         )
-        self.data_Z_coord = np.linspace(-minor_radius_a, minor_radius_a, Z_points)
+        self.data_Z_coord = np.linspace(-grid_width, grid_width, Z_points)
         self.poloidalFlux_grid = self.poloidal_flux(
             *np.meshgrid(self.data_R_coord, self.data_Z_coord, indexing="ij")
         )
@@ -83,6 +87,75 @@ class CircularCrossSectionField(MagneticField):
             * (q_R - self.R_axis)
             / (q_R * self.minor_radius_a * self.rho(q_R, q_Z))
         )
+
+    def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        return self.rho(q_R, q_Z) / self.minor_radius_a
+
+
+class ConstantCurrentDensityField(MagneticField):
+    """Circular cross-section magnetic geometry with constant current density
+
+    TODO
+    ----
+    Poloidal flux needs to be made consistent with  B_{R,Z}
+
+    Parameters
+    ----------
+    B_T_axis:
+        Toroidal magnetic field at the magnetic axis (Tesla)
+    R_axis:
+        Major radius of the magnetic axis (metres)
+    minor_radius_a:
+        Minor radius of the last closed flux surface (metres)
+    B_p_a:
+        Poloidal magnetic field at ``minor_radius_a`` (Tesla)
+    R_points:
+    Z_points:
+        Number of points for sample ``(R, Z)`` grid
+    grid_buffer_factor:
+        Multiplicative factor to increase size of sample grid by
+    """
+
+    def __init__(
+        self,
+        B_T_axis: float,
+        R_axis: float,
+        minor_radius_a: float,
+        B_p_a: float,
+        R_points: int = 101,
+        Z_points: int = 101,
+        grid_buffer_factor: float = 1,
+    ):
+        self.B_T_axis = B_T_axis
+        self.R_axis = R_axis
+        self.minor_radius_a = minor_radius_a
+        self.B_p_a = B_p_a
+
+        grid_width = grid_buffer_factor * minor_radius_a
+        self.data_R_coord = np.linspace(
+            R_axis - grid_width, R_axis + grid_width, R_points
+        )
+        self.data_Z_coord = np.linspace(-grid_width, grid_width, Z_points)
+        self.poloidalFlux_grid = self.poloidal_flux(
+            *np.meshgrid(self.data_R_coord, self.data_Z_coord, indexing="ij")
+        )
+
+    def rho(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        return np.sqrt((q_R - self.R_axis) ** 2 + q_Z**2)
+
+    def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        return self.B_p_a * q_Z / self.rho(q_R, q_Z)
+
+    def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        return self.B_T_axis * (self.R_axis / q_R)
+
+    def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        return -self.B_p_a * (q_R - self.R_axis) / self.rho(q_R, q_Z)
 
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)

@@ -119,6 +119,7 @@ from scotty.density_fit import density_fit, DensityFitLike
 from scotty.geometry import (
     MagneticField,
     CircularCrossSectionField,
+    ConstantCurrentDensityField,
     InterpolatedField,
     CurvySlabField,
     EFITField,
@@ -2869,6 +2870,27 @@ def create_magnetic_geometry(
     # Analytical geometries
 
     if find_B_method == "analytical":
+        print("Analytical constant current density geometry")
+        if B_T_axis is None:
+            raise ValueError(missing_arg("B_T_axis"))
+        if R_axis is None:
+            raise ValueError(missing_arg("R_axis"))
+        if minor_radius_a is None:
+            raise ValueError(missing_arg("minor_radius_a"))
+        if B_p_a is None:
+            raise ValueError(missing_arg("B_p_a"))
+
+        return ConstantCurrentDensityField(B_T_axis, R_axis, minor_radius_a, B_p_a)
+
+    if find_B_method == "curvy_slab":
+        print("Analytical curvy slab geometry")
+        if B_T_axis is None:
+            raise ValueError(missing_arg("B_T_axis"))
+        if R_axis is None:
+            raise ValueError(missing_arg("R_axis"))
+        return CurvySlabField(B_T_axis, R_axis)
+
+    if find_B_method == "unit-tests":
         print("Analytical circular cross-section geometry")
         if B_T_axis is None:
             raise ValueError(missing_arg("B_T_axis"))
@@ -2880,14 +2902,6 @@ def create_magnetic_geometry(
             raise ValueError(missing_arg("B_p_a"))
 
         return CircularCrossSectionField(B_T_axis, R_axis, minor_radius_a, B_p_a)
-
-    if find_B_method == "curvy_slab":
-        print("Analytical curvy slab geometry")
-        if B_T_axis is None:
-            raise ValueError(missing_arg("B_T_axis"))
-        if R_axis is None:
-            raise ValueError(missing_arg("R_axis"))
-        return CurvySlabField(B_T_axis, R_axis)
 
     ########################################
     # Interpolated numerical geometries from file

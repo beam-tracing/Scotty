@@ -1,6 +1,7 @@
 from scotty.beam_me_up import beam_me_up, create_magnetic_geometry
 from scotty.init_bruv import get_parameters_for_Scotty
-from scotty.torbeam import write_torbeam_file, construct_torbeam_field
+from scotty.torbeam import Torbeam
+from scotty.geometry import CircularCrossSectionField
 
 import json
 import numpy as np
@@ -203,7 +204,9 @@ EXPECTED = {
 
 def simple(path):
     """Built-in synthetic diagnostic"""
-    return get_parameters_for_Scotty("DBS_synthetic")
+    kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
+    kwargs_dict["find_B_method"] = "unit-tests"
+    return kwargs_dict
 
 
 def ne_dat_file(path):
@@ -219,6 +222,7 @@ def ne_dat_file(path):
         f.write(f"{len(rho)}\n")
         np.savetxt(f, np.column_stack((rho, density)), fmt="%.7e")
 
+    kwargs_dict["find_B_method"] = "unit-tests"
     kwargs_dict["density_fit_parameters"] = None
     kwargs_dict["density_fit_method"] = "smoothing-spline-file"
     kwargs_dict["ne_data_path"] = path
@@ -227,30 +231,38 @@ def ne_dat_file(path):
 
 def synthetic_args():
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
-    return kwargs_dict, construct_torbeam_field(
-        major_radius=kwargs_dict["R_axis"],
-        minor_radius=kwargs_dict["minor_radius_a"],
-        B_toroidal_max=kwargs_dict["B_T_axis"],
-        B_poloidal_max=kwargs_dict["B_p_a"],
-        buffer_factor=1.1,
-        x_grid_length=100,
-        z_grid_length=100,
+    field = CircularCrossSectionField(
+        R_axis=kwargs_dict["R_axis"],
+        minor_radius_a=kwargs_dict["minor_radius_a"],
+        B_T_axis=kwargs_dict["B_T_axis"],
+        B_p_a=kwargs_dict["B_p_a"],
+        R_points=100,
+        Z_points=100,
+        grid_buffer_factor=1.1,
     )
+    x_meshgrid, z_meshgrid = np.meshgrid(
+        field.data_R_coord, field.data_Z_coord, indexing="ij"
+    )
+    B_t = field.B_T(x_meshgrid, z_meshgrid)
+    B_r = field.B_R(x_meshgrid, z_meshgrid)
+    B_z = field.B_Z(x_meshgrid, z_meshgrid)
+    psi = field.poloidal_flux(x_meshgrid, z_meshgrid)
+    return kwargs_dict, B_r, B_t, B_z, psi, field
 
 
 def torbeam_file(path):
     """Geometry using TORBEAM file"""
-    kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
+    kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
+    x_meshgrid, z_meshgrid = np.meshgrid(
+        field.data_R_coord, field.data_Z_coord, indexing="ij"
+    )
+    B_t = field.B_T(x_meshgrid, z_meshgrid)
+    B_r = field.B_R(x_meshgrid, z_meshgrid)
+    B_z = field.B_Z(x_meshgrid, z_meshgrid)
+    psi = field.poloidal_flux(x_meshgrid, z_meshgrid)
 
-    write_torbeam_file(
-        major_radius=kwargs_dict["R_axis"],
-        minor_radius=kwargs_dict["minor_radius_a"],
-        B_toroidal_max=kwargs_dict["B_T_axis"],
-        B_poloidal_max=kwargs_dict["B_p_a"],
-        buffer_factor=1.1,
-        x_grid_length=100,
-        z_grid_length=100,
-        torbeam_directory_path=path,
+    Torbeam(field.data_R_coord, field.data_Z_coord, B_r, B_t, B_z, psi).write(
+        path / "topfile"
     )
 
     kwargs_dict["find_B_method"] = "torbeam"
@@ -260,14 +272,14 @@ def torbeam_file(path):
 
 def omfit_json(path):
     """Geometry using OMFIT JSON file"""
-    kwargs_dict, (R_grid, Z_grid, B_R, B_t, B_Z, psi, _) = synthetic_args()
+    kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
 
     def flatten_as_F(array):
         return array.T.flatten().tolist()
 
     data = {
-        "R": R_grid.tolist(),
-        "Z": Z_grid.tolist(),
+        "R": field.data_R_coord.tolist(),
+        "Z": field.data_Z_coord.tolist(),
         "Br": flatten_as_F(B_R),
         "Bt": flatten_as_F(B_t),
         "Bz": flatten_as_F(B_Z),
@@ -291,15 +303,15 @@ def add_timeslices(array):
 def npz_file(path: pathlib.Path):
     """find_B_method = "test" """
 
-    kwargs_dict, (R_grid, Z_grid, B_R, B_t, B_Z, psi, _) = synthetic_args()
+    kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
 
     time = [100, 200, 300]
 
     shot = 12345
     np.savez(
         path / f"{shot}_equilibrium_data",
-        R_EFIT=R_grid,
-        Z_EFIT=Z_grid,
+        R_EFIT=field.data_R_coord,
+        Z_EFIT=field.data_Z_coord,
         poloidalFlux_grid=add_timeslices(psi),
         Bphi_grid=add_timeslices(B_t),
         Br_grid=add_timeslices(B_R),
@@ -316,12 +328,12 @@ def npz_file(path: pathlib.Path):
 
 def npz_notime_file(path: pathlib.Path):
     """find_B_method = "test_notime" """
-    kwargs_dict, (R_grid, Z_grid, B_R, B_t, B_Z, psi, _) = synthetic_args()
+    kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
 
     np.savez(
         path / "12345_equilibrium_data",
-        R_EFIT=R_grid,
-        Z_EFIT=Z_grid,
+        R_EFIT=field.data_R_coord,
+        Z_EFIT=field.data_Z_coord,
         poloidalFlux_grid=psi,
         Bphi_grid=B_t,
         Br_grid=B_R,
@@ -334,7 +346,7 @@ def npz_notime_file(path: pathlib.Path):
 
 def UDA_saved(path: pathlib.Path):
     """find_B_method = "UDA_saved" with shot = None"""
-    kwargs_dict, (R_grid, Z_grid, B_R, B_t, B_Z, psi, field) = synthetic_args()
+    kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
 
     R_axis = kwargs_dict["R_axis"]
     minor_radius = kwargs_dict["minor_radius_a"]
@@ -348,8 +360,8 @@ def UDA_saved(path: pathlib.Path):
     np.savez(
         path / "12345_equilibrium_data",
         rBphi=rBphi,
-        R_EFIT=R_grid,
-        Z_EFIT=Z_grid,
+        R_EFIT=field.data_R_coord,
+        Z_EFIT=field.data_Z_coord,
         poloidalFlux_grid=psi,
         poloidalFlux_unnormalised_axis=-psi_axis,
         poloidalFlux_unnormalised_boundary=-psi_boundary,
@@ -364,7 +376,7 @@ def UDA_saved(path: pathlib.Path):
 
 def UDA_saved_MAST_U(path: pathlib.Path):
     """find_B_method = "UDA_saved" with shot = None"""
-    kwargs_dict, (R_grid, Z_grid, B_R, B_t, B_Z, psi, field) = synthetic_args()
+    kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
 
     shot = 55555
 
@@ -383,8 +395,8 @@ def UDA_saved_MAST_U(path: pathlib.Path):
     np.savez(
         path / f"{shot}_equilibrium_data",
         rBphi=add_timeslices(rBphi),
-        R_EFIT=R_grid,
-        Z_EFIT=Z_grid,
+        R_EFIT=field.data_R_coord,
+        Z_EFIT=field.data_Z_coord,
         poloidalFlux_grid=add_timeslices(psi),
         poloidalFlux=add_timeslices(psi_norm_1D),
         poloidalFlux_unnormalised_axis=add_timeslices(-psi_axis),
