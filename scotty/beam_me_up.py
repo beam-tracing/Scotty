@@ -146,7 +146,7 @@ def beam_me_up(
     launch_position,
     ## keyword arguments begin
     vacuumLaunch_flag=True,
-    find_B_method="torbeam",
+    find_B_method: Union[str, MagneticField] = "torbeam",
     shot=None,
     equil_time=None,
     vacuum_propagation_flag=False,
@@ -217,9 +217,19 @@ def beam_me_up(
     Parameters
     ==========
     find_B_method:
-        1) 'efitpp' finds B from efitpp files directly
-        2) 'torbeam' finds B from topfile
-        3) UDA_saved
+        - ``"efitpp"`` uses magnetic field data from efitpp files
+          directly
+        - ``"torbeam"`` uses magnetic field data from TORBEAM input
+          files
+        - ``"omfit"`` is similar to ``"torbeam"`` but reads the data
+          from JSON files
+        - ``"UDA_saved"`` reads EFIT data from numpy's ``.npz`` files
+        - ``"analytical"`` uses a constant current density circular
+          equilibrium
+
+        Or pass a `MagneticField` instance directly.
+
+        .. todo:: document which options different methods take
 
     density_fit_parameters:
         A list of parameters to be passed to the
@@ -2847,7 +2857,7 @@ def make_density_fit(
 
 
 def create_magnetic_geometry(
-    find_B_method: str,
+    find_B_method: Union[str, MagneticField],
     magnetic_data_path: Optional[pathlib.Path] = None,
     input_filename_suffix: str = "",
     interp_order: int = 5,
@@ -2863,6 +2873,9 @@ def create_magnetic_geometry(
     **kwargs,
 ) -> MagneticField:
     """Create an object representing the magnetic field geometry"""
+
+    if isinstance(find_B_method, MagneticField):
+        return find_B_method
 
     def missing_arg(argument: str) -> str:
         return f"Missing '{argument}' for find_B_method='{find_B_method}'"
