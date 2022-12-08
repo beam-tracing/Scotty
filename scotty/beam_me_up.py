@@ -793,10 +793,10 @@ def beam_me_up(
         find_B_R,
         find_B_T,
         find_B_Z,
-        data_R_coord_min=field.data_R_coord.min(),
-        data_R_coord_max=field.data_R_coord.max(),
-        data_Z_coord_min=field.data_Z_coord.min(),
-        data_Z_coord_max=field.data_Z_coord.max(),
+        data_R_coord_min=field.R_coord.min(),
+        data_R_coord_max=field.R_coord.max(),
+        data_Z_coord_min=field.Z_coord.min(),
+        data_Z_coord_max=field.Z_coord.max(),
     ):
 
         q_R = ray_parameters_2D[0]
@@ -1268,8 +1268,8 @@ def beam_me_up(
         np.savez(
             output_path / f"data_input{output_filename_suffix}",
             poloidalFlux_grid=field.poloidalFlux_grid,
-            data_R_coord=field.data_R_coord,
-            data_Z_coord=field.data_Z_coord,
+            data_R_coord=field.R_coord,
+            data_Z_coord=field.Z_coord,
             poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
             toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
             launch_freq_GHz=launch_freq_GHz,
@@ -1856,7 +1856,7 @@ def beam_me_up(
     #    print(cutoff_index)
 
     # This part is used to make some nice plots when post-processing
-    R_midplane_points = np.linspace(field.data_R_coord[0], field.data_R_coord[-1], 1000)
+    R_midplane_points = np.linspace(field.R_coord[0], field.R_coord[-1], 1000)
     # poloidal flux at R and z=0
     poloidal_flux_on_midplane = field.poloidal_flux(R_midplane_points, 0)
 
@@ -2719,8 +2719,8 @@ def beam_me_up(
 
         contour_levels = np.linspace(0, 1.0, 11)
         CS = plt.contour(
-            field.data_R_coord,
-            field.data_Z_coord,
+            field.R_coord,
+            field.Z_coord,
             np.transpose(field.poloidalFlux_grid),
             contour_levels,
             vmin=0,
@@ -2735,8 +2735,8 @@ def beam_me_up(
         )  # Central (reference) ray
         # cutoff_contour = plt.contour(x_grid, z_grid, normalised_plasma_freq_grid,
         #                             levels=1,vmin=1,vmax=1,linewidths=5,colors='grey')
-        plt.xlim(field.data_R_coord[0], field.data_R_coord[-1])
-        plt.ylim(field.data_Z_coord[0], field.data_Z_coord[-1])
+        plt.xlim(field.R_coord[0], field.R_coord[-1])
+        plt.ylim(field.Z_coord[0], field.Z_coord[-1])
 
         plt.savefig(output_path / f"Ray1_{output_figurename_suffix}")
         plt.close()

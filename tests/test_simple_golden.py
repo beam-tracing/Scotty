@@ -240,9 +240,7 @@ def synthetic_args():
         Z_points=100,
         grid_buffer_factor=1.1,
     )
-    x_meshgrid, z_meshgrid = np.meshgrid(
-        field.data_R_coord, field.data_Z_coord, indexing="ij"
-    )
+    x_meshgrid, z_meshgrid = np.meshgrid(field.R_coord, field.Z_coord, indexing="ij")
     B_t = field.B_T(x_meshgrid, z_meshgrid)
     B_r = field.B_R(x_meshgrid, z_meshgrid)
     B_z = field.B_Z(x_meshgrid, z_meshgrid)
@@ -253,17 +251,13 @@ def synthetic_args():
 def torbeam_file(path):
     """Geometry using TORBEAM file"""
     kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
-    x_meshgrid, z_meshgrid = np.meshgrid(
-        field.data_R_coord, field.data_Z_coord, indexing="ij"
-    )
+    x_meshgrid, z_meshgrid = np.meshgrid(field.R_coord, field.Z_coord, indexing="ij")
     B_t = field.B_T(x_meshgrid, z_meshgrid)
     B_r = field.B_R(x_meshgrid, z_meshgrid)
     B_z = field.B_Z(x_meshgrid, z_meshgrid)
     psi = field.poloidal_flux(x_meshgrid, z_meshgrid)
 
-    Torbeam(field.data_R_coord, field.data_Z_coord, B_r, B_t, B_z, psi).write(
-        path / "topfile"
-    )
+    Torbeam(field.R_coord, field.Z_coord, B_r, B_t, B_z, psi).write(path / "topfile")
 
     kwargs_dict["find_B_method"] = "torbeam"
     kwargs_dict["magnetic_data_path"] = path
@@ -278,8 +272,8 @@ def omfit_json(path):
         return array.T.flatten().tolist()
 
     data = {
-        "R": field.data_R_coord.tolist(),
-        "Z": field.data_Z_coord.tolist(),
+        "R": field.R_coord.tolist(),
+        "Z": field.Z_coord.tolist(),
         "Br": flatten_as_F(B_R),
         "Bt": flatten_as_F(B_t),
         "Bz": flatten_as_F(B_Z),
@@ -310,8 +304,8 @@ def npz_file(path: pathlib.Path):
     shot = 12345
     np.savez(
         path / f"{shot}_equilibrium_data",
-        R_EFIT=field.data_R_coord,
-        Z_EFIT=field.data_Z_coord,
+        R_EFIT=field.R_coord,
+        Z_EFIT=field.Z_coord,
         poloidalFlux_grid=add_timeslices(psi),
         Bphi_grid=add_timeslices(B_t),
         Br_grid=add_timeslices(B_R),
@@ -332,8 +326,8 @@ def npz_notime_file(path: pathlib.Path):
 
     np.savez(
         path / "12345_equilibrium_data",
-        R_EFIT=field.data_R_coord,
-        Z_EFIT=field.data_Z_coord,
+        R_EFIT=field.R_coord,
+        Z_EFIT=field.Z_coord,
         poloidalFlux_grid=psi,
         Bphi_grid=B_t,
         Br_grid=B_R,
@@ -360,8 +354,8 @@ def UDA_saved(path: pathlib.Path):
     np.savez(
         path / "12345_equilibrium_data",
         rBphi=rBphi,
-        R_EFIT=field.data_R_coord,
-        Z_EFIT=field.data_Z_coord,
+        R_EFIT=field.R_coord,
+        Z_EFIT=field.Z_coord,
         poloidalFlux_grid=psi,
         poloidalFlux_unnormalised_axis=-psi_axis,
         poloidalFlux_unnormalised_boundary=-psi_boundary,
@@ -395,8 +389,8 @@ def UDA_saved_MAST_U(path: pathlib.Path):
     np.savez(
         path / f"{shot}_equilibrium_data",
         rBphi=add_timeslices(rBphi),
-        R_EFIT=field.data_R_coord,
-        Z_EFIT=field.data_Z_coord,
+        R_EFIT=field.R_coord,
+        Z_EFIT=field.Z_coord,
         poloidalFlux_grid=add_timeslices(psi),
         poloidalFlux=add_timeslices(psi_norm_1D),
         poloidalFlux_unnormalised_axis=add_timeslices(-psi_axis),

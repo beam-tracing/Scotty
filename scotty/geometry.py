@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC
 from typing import Callable, Optional
 
 import numpy as np
@@ -10,7 +11,20 @@ from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
 from scotty.typing import ArrayLike, FloatArray
 
 
-class MagneticField:
+class MagneticField(ABC):
+    """Abstract base class for magnetic field geometries
+
+    Attributes
+    ----------
+    R_coord:
+    Z_coord:
+        Arrays with the (original) sample locations for the poloidal
+        flux and magnetic field components
+    """
+
+    R_coord: FloatArray
+    Z_coord: FloatArray
+
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         raise NotImplementedError
 
@@ -60,12 +74,10 @@ class CircularCrossSectionField(MagneticField):
         self.B_p_a = B_p_a
 
         grid_width = grid_buffer_factor * minor_radius_a
-        self.data_R_coord = np.linspace(
-            R_axis - grid_width, R_axis + grid_width, R_points
-        )
-        self.data_Z_coord = np.linspace(-grid_width, grid_width, Z_points)
+        self.R_coord = np.linspace(R_axis - grid_width, R_axis + grid_width, R_points)
+        self.Z_coord = np.linspace(-grid_width, grid_width, Z_points)
         self.poloidalFlux_grid = self.poloidal_flux(
-            *np.meshgrid(self.data_R_coord, self.data_Z_coord, indexing="ij")
+            *np.meshgrid(self.R_coord, self.Z_coord, indexing="ij")
         )
 
     def rho(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
@@ -133,12 +145,10 @@ class ConstantCurrentDensityField(MagneticField):
         self.B_p_a = B_p_a
 
         grid_width = grid_buffer_factor * minor_radius_a
-        self.data_R_coord = np.linspace(
-            R_axis - grid_width, R_axis + grid_width, R_points
-        )
-        self.data_Z_coord = np.linspace(-grid_width, grid_width, Z_points)
+        self.R_coord = np.linspace(R_axis - grid_width, R_axis + grid_width, R_points)
+        self.Z_coord = np.linspace(-grid_width, grid_width, Z_points)
         self.poloidalFlux_grid = self.poloidal_flux(
-            *np.meshgrid(self.data_R_coord, self.data_Z_coord, indexing="ij")
+            *np.meshgrid(self.R_coord, self.Z_coord, indexing="ij")
         )
 
     def rho(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
@@ -244,8 +254,8 @@ class InterpolatedField(MagneticField):
             R_grid, Z_grid, psi, interp_order, interp_smoothing
         )
 
-        self.data_R_coord = R_grid
-        self.data_Z_coord = Z_grid
+        self.R_coord = R_grid
+        self.Z_coord = Z_grid
         self.poloidalFlux_grid = psi
 
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
@@ -276,8 +286,8 @@ class EFITField(MagneticField):
         interp_order: int = 5,
         interp_smoothing: int = 0,
     ):
-        self.data_R_coord = R_grid
-        self.data_Z_coord = Z_grid
+        self.R_coord = R_grid
+        self.Z_coord = Z_grid
         self.poloidalFlux_grid = psi_norm_2D
 
         self.delta_R = delta_R
