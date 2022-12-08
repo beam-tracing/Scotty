@@ -2961,81 +2961,26 @@ def launch_beam(
     K_Z_initial = K_Z_entry
     initial_position = entry_position
     if Psi_BC_flag:  # Use BCs
-        dH_dKR_initial = find_dH_dKR(
-            initial_position[0],
-            initial_position[2],
-            K_R_initial,
-            K_zeta_initial,
-            K_Z_initial,
-            launch_angular_frequency,
-            mode_flag,
-            delta_K_R,
-            field.poloidal_flux,
-            find_density_1D,
-            field.B_R,
-            field.B_T,
-            field.B_Z,
-        )
-        dH_dKzeta_initial = find_dH_dKzeta(
-            initial_position[0],
-            initial_position[2],
-            K_R_initial,
-            K_zeta_initial,
-            K_Z_initial,
-            launch_angular_frequency,
-            mode_flag,
-            delta_K_zeta,
-            field.poloidal_flux,
-            find_density_1D,
-            field.B_R,
-            field.B_T,
-            field.B_Z,
-        )
-        dH_dKZ_initial = find_dH_dKZ(
-            initial_position[0],
-            initial_position[2],
-            K_R_initial,
-            K_zeta_initial,
-            K_Z_initial,
-            launch_angular_frequency,
-            mode_flag,
-            delta_K_Z,
-            field.poloidal_flux,
-            find_density_1D,
-            field.B_R,
-            field.B_T,
-            field.B_Z,
-        )
-        dH_dR_initial = find_dH_dR(
-            initial_position[0],
-            initial_position[2],
-            K_R_initial,
-            K_zeta_initial,
-            K_Z_initial,
-            launch_angular_frequency,
-            mode_flag,
-            delta_R,
-            field.poloidal_flux,
-            find_density_1D,
-            field.B_R,
-            field.B_T,
-            field.B_Z,
-        )
-        dH_dZ_initial = find_dH_dZ(
-            initial_position[0],
-            initial_position[2],
-            K_R_initial,
-            K_zeta_initial,
-            K_Z_initial,
-            launch_angular_frequency,
-            mode_flag,
-            delta_Z,
-            field.poloidal_flux,
-            find_density_1D,
-            field.B_R,
-            field.B_T,
-            field.B_Z,
-        )
+        find_H_args = {
+            "q_R": initial_position[0],
+            "q_Z": initial_position[2],
+            "K_R": K_R_initial,
+            "K_zeta": K_zeta_initial,
+            "K_Z": K_Z_initial,
+            "launch_angular_frequency": launch_angular_frequency,
+            "mode_flag": mode_flag,
+            "interp_poloidal_flux": field.poloidal_flux,
+            "find_density_1D": find_density_1D,
+            "find_B_R": field.B_R,
+            "find_B_T": field.B_T,
+            "find_B_Z": field.B_Z,
+        }
+
+        dH_dKR_initial = find_dH_dKR(delta_K_R=delta_K_R, **find_H_args)
+        dH_dKzeta_initial = find_dH_dKzeta(delta_K_zeta=delta_K_zeta, **find_H_args)
+        dH_dKZ_initial = find_dH_dKZ(delta_K_Z=delta_K_Z, **find_H_args)
+        dH_dR_initial = find_dH_dR(delta_R=delta_R, **find_H_args)
+        dH_dZ_initial = find_dH_dZ(delta_Z=delta_Z, **find_H_args)
         d_poloidal_flux_d_R_boundary = find_d_poloidal_flux_dR(
             initial_position[0],
             initial_position[2],
