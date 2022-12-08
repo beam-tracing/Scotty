@@ -9,7 +9,7 @@ def test_circular():
     R_axis = 2.0
     minor_radius_a = 1.0
     B_p_a = 0.5
-    field = geometry.CircularCrossSection(
+    field = geometry.CircularCrossSectionField(
         B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
     )
 
@@ -50,7 +50,7 @@ def test_interpolated():
     R_axis = 2.0
     minor_radius_a = 1.0
     B_p_a = 0.5
-    circular_field = geometry.CircularCrossSection(
+    circular_field = geometry.CircularCrossSectionField(
         B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
     )
 

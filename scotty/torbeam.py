@@ -32,7 +32,7 @@ import numpy as np
 import freegs._fileutils as fortran
 
 from scotty.fun_general import read_floats_into_list_until
-from scotty.geometry import CircularCrossSection
+from scotty.geometry import CircularCrossSectionField
 from scotty.typing import PathLike
 
 
@@ -227,7 +227,7 @@ def construct_torbeam_field(
     z_grid = np.linspace(z_grid_start, z_grid_end, z_grid_length)
 
     x_meshgrid, z_meshgrid = np.meshgrid(x_grid, z_grid, indexing="ij")
-    field = CircularCrossSection(
+    field = CircularCrossSectionField(
         B_toroidal_max, major_radius, minor_radius, B_poloidal_max
     )
     B_t = field.B_T(x_meshgrid, z_meshgrid)

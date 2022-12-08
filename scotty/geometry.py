@@ -10,7 +10,7 @@ from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
 from scotty.typing import ArrayLike, FloatArray
 
 
-class MagneticGeometry:
+class MagneticField:
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         raise NotImplementedError
 
@@ -24,7 +24,7 @@ class MagneticGeometry:
         raise NotImplementedError
 
 
-class CircularCrossSection(MagneticGeometry):
+class CircularCrossSectionField(MagneticField):
     """Simple circular cross-section magnetic geometry
 
     Parameters
@@ -89,7 +89,7 @@ class CircularCrossSection(MagneticGeometry):
         return self.rho(q_R, q_Z) / self.minor_radius_a
 
 
-class CurvySlab(MagneticGeometry):
+class CurvySlabField(MagneticField):
     """Analytical curvy slab geometry"""
 
     def __init__(self, B_T_axis: float, R_axis: float):
@@ -124,7 +124,7 @@ def _make_rect_spline(
     return lambda R, Z: spline(R, Z, grid=False)
 
 
-class InterpolatedField(MagneticGeometry):
+class InterpolatedField(MagneticField):
     """Interpolated numerical equilibrium using bivariate splines
 
     Parameters
@@ -188,7 +188,7 @@ class InterpolatedField(MagneticGeometry):
         return self._interp_poloidal_flux(q_R, q_Z)
 
 
-class EFITField(MagneticGeometry):
+class EFITField(MagneticField):
     def __init__(
         self,
         R_grid: npt.ArrayLike,

@@ -117,10 +117,10 @@ from scotty.fun_CFD import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta  # \nabla_K 
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
 from scotty.density_fit import density_fit, DensityFitLike
 from scotty.geometry import (
-    MagneticGeometry,
-    CircularCrossSection,
+    MagneticField,
+    CircularCrossSectionField,
     InterpolatedField,
-    CurvySlab,
+    CurvySlabField,
     EFITField,
 )
 from scotty.torbeam import Torbeam
@@ -2860,7 +2860,7 @@ def create_magnetic_geometry(
     delta_R: Optional[float] = None,
     delta_Z: Optional[float] = None,
     **kwargs,
-) -> MagneticGeometry:
+) -> MagneticField:
     """Create an object representing the magnetic field geometry"""
 
     def missing_arg(argument: str) -> str:
@@ -2879,7 +2879,7 @@ def create_magnetic_geometry(
         if B_p_a is None:
             raise ValueError(missing_arg("B_p_a"))
 
-        return CircularCrossSection(B_T_axis, R_axis, minor_radius_a, B_p_a)
+        return CircularCrossSectionField(B_T_axis, R_axis, minor_radius_a, B_p_a)
 
     if find_B_method == "curvy_slab":
         print("Analytical curvy slab geometry")
@@ -2887,7 +2887,7 @@ def create_magnetic_geometry(
             raise ValueError(missing_arg("B_T_axis"))
         if R_axis is None:
             raise ValueError(missing_arg("R_axis"))
-        return CurvySlab(B_T_axis, R_axis)
+        return CurvySlabField(B_T_axis, R_axis)
 
     ########################################
     # Interpolated numerical geometries from file
