@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from abc import ABC
+import pathlib
 from typing import Callable, Optional
 
+from netCDF4 import Dataset
 import numpy as np
 import numpy.typing as npt
 from scipy.interpolate import RectBivariateSpline, UnivariateSpline
 
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
+from scotty.fun_general import find_nearest
 from scotty.typing import ArrayLike, FloatArray
 
 
@@ -232,12 +235,12 @@ class InterpolatedField(MagneticField):
 
     def __init__(
         self,
-        R_grid: npt.ArrayLike,
-        Z_grid: npt.ArrayLike,
-        B_R: npt.ArrayLike,
-        B_T: npt.ArrayLike,
-        B_Z: npt.ArrayLike,
-        psi: npt.ArrayLike,
+        R_grid: FloatArray,
+        Z_grid: FloatArray,
+        B_R: FloatArray,
+        B_T: FloatArray,
+        B_Z: FloatArray,
+        psi: FloatArray,
         interp_order: int = 5,
         interp_smoothing: int = 0,
     ):
@@ -274,13 +277,13 @@ class InterpolatedField(MagneticField):
 class EFITField(MagneticField):
     def __init__(
         self,
-        R_grid: npt.ArrayLike,
-        Z_grid: npt.ArrayLike,
-        rBphi: npt.NDArray[np.float64],
-        psi_norm_2D: npt.ArrayLike,
+        R_grid: FloatArray,
+        Z_grid: FloatArray,
+        rBphi: FloatArray,
+        psi_norm_2D: FloatArray,
         psi_unnorm_axis: float,
         psi_unnorm_boundary: float,
-        psi_norm_1D: Optional[npt.ArrayLike] = None,
+        psi_norm_1D: Optional[FloatArray] = None,
         delta_R: float = 0.0001,
         delta_Z: float = 0.0001,
         interp_order: int = 5,
@@ -330,3 +333,132 @@ class EFITField(MagneticField):
 
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         return self._interp_poloidal_flux(q_R, q_Z)
+
+    @classmethod
+    def from_EFITpp(
+        cls,
+        filename: pathlib.Path,
+        equil_time: float,
+        delta_R: float,
+        delta_Z: float,
+        interp_order: int,
+        interp_smoothing: int,
+    ):
+        with Dataset(filename) as dataset:
+            efitpp_times = dataset.variables["time"][:]
+            time_idx = find_nearest(efitpp_times, equil_time)
+            print("EFIT++ time", efitpp_times[time_idx])
+
+            output_group = dataset.groups["output"]
+            profiles2D = output_group.groups["profiles2D"]
+            # unnormalised, as a function of R and Z
+            unnorm_psi_2D = profiles2D.variables["poloidalFlux"][time_idx][:][:]
+            data_R_coord = profiles2D.variables["r"][time_idx][:]
+            data_Z_coord = profiles2D.variables["z"][time_idx][:]
+
+            fluxFunctionProfiles = output_group.groups["fluxFunctionProfiles"]
+            norm_psi_1D = fluxFunctionProfiles.variables["normalizedPoloidalFlux"][:]
+            # poloidalFlux as a function of normalised poloidal flux
+            unorm_psi_1D = fluxFunctionProfiles.variables["poloidalFlux"][time_idx][:]
+            rBphi = fluxFunctionProfiles.variables["rBphi"][time_idx][:]
+
+        # linear fit
+        polflux_const_m, polflux_const_c = np.polyfit(unorm_psi_1D, norm_psi_1D, 1)
+        norm_psi_2D = unnorm_psi_2D * polflux_const_m + polflux_const_c
+
+        return EFITField(
+            R_grid=data_R_coord,
+            Z_grid=data_Z_coord,
+            rBphi=rBphi,
+            psi_norm_2D=norm_psi_2D,
+            psi_norm_1D=norm_psi_1D,
+            psi_unnorm_axis=0.0,
+            psi_unnorm_boundary=polflux_const_m,
+            delta_R=delta_R,
+            delta_Z=delta_Z,
+            interp_order=interp_order,
+            interp_smoothing=interp_smoothing,
+        )
+
+    @classmethod
+    def from_MAST_saved(
+        cls,
+        filename: pathlib.Path,
+        equil_time: float,
+        delta_R: float,
+        delta_Z: float,
+        interp_order: int,
+        interp_smoothing: int,
+    ):
+        with np.load(filename) as loadfile:
+            # On time base C
+            rBphi_all_times = loadfile["rBphi"]
+            t_base_B = loadfile["t_base_B"]
+            t_base_C = loadfile["t_base_C"]
+            data_R_coord = loadfile["R_EFIT"]
+            data_Z_coord = loadfile["Z_EFIT"]
+            # Time base C
+            polflux_axis_all_times = loadfile["poloidal_flux_unnormalised_axis"]
+            # Time base C
+            psi_boundary_all_times = loadfile["poloidal_flux_unnormalised_boundary"]
+            # On time base B
+            unnorm_psi_all_times = loadfile["poloidal_flux_unnormalised"]
+
+        t_base_B_idx = find_nearest(t_base_B, equil_time)
+        # Get the same time slice
+        t_base_C_idx = find_nearest(t_base_C, t_base_B[t_base_B_idx])
+        print("EFIT time", t_base_B[t_base_B_idx])
+
+        rBphi = rBphi_all_times[t_base_C_idx, :]
+        psi_axis = polflux_axis_all_times[t_base_C_idx]
+        psi_boundary = psi_boundary_all_times[t_base_C_idx]
+        unnorm_psi_2D = unnorm_psi_all_times[t_base_B_idx, :, :].T
+
+        # Taken from an old file of Sam Gibson's. Should probably check with Lucy or Sam.
+        poloidalFlux = np.linspace(0, 1.0, len(rBphi))
+        poloidalFlux_grid = (unnorm_psi_2D - psi_axis) / (psi_boundary - psi_axis)
+
+        return cls(
+            R_grid=data_R_coord,
+            Z_grid=data_Z_coord,
+            rBphi=rBphi,
+            psi_norm_2D=poloidalFlux_grid,
+            psi_norm_1D=poloidalFlux,
+            psi_unnorm_axis=psi_axis,
+            psi_unnorm_boundary=psi_boundary,
+            delta_R=delta_R,
+            delta_Z=delta_Z,
+            interp_order=interp_order,
+            interp_smoothing=interp_smoothing,
+        )
+
+    @classmethod
+    def from_MAST_U_saved(
+        cls,
+        filename: pathlib.Path,
+        equil_time: float,
+        delta_R: float,
+        delta_Z: float,
+        interp_order: int,
+        interp_smoothing: int,
+    ):
+        with np.load(filename) as loadfile:
+            time_EFIT = loadfile["time_EFIT"]
+            t_idx = find_nearest(time_EFIT, equil_time)
+            print("EFIT time", time_EFIT[t_idx])
+
+            return EFITField(
+                R_grid=loadfile["R_EFIT"],
+                Z_grid=loadfile["Z_EFIT"],
+                rBphi=loadfile["rBphi"][t_idx, :],
+                psi_norm_2D=loadfile["poloidalFlux_grid"][t_idx, :, :],
+                psi_norm_1D=loadfile["poloidalFlux"][t_idx, :],
+                psi_unnorm_axis=loadfile["poloidalFlux_unnormalised_axis"][t_idx],
+                psi_unnorm_boundary=loadfile["poloidalFlux_unnormalised_boundary"][
+                    t_idx
+                ],
+                delta_R=delta_R,
+                delta_Z=delta_Z,
+                interp_order=interp_order,
+                interp_smoothing=interp_smoothing,
+            )

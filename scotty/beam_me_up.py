@@ -2988,140 +2988,12 @@ def create_magnetic_geometry(
     # Interpolated numerical geometries from EFIT data
 
     if delta_R is None:
-        raise ValueError(f"Missing 'delta_R' for find_B_method='{find_B_method}'")
+        raise ValueError(missing_arg("delta_R"))
     if delta_Z is None:
-        raise ValueError(f"Missing 'delta_Z' for find_B_method='{find_B_method}'")
-
-    if find_B_method == "EFITpp":
-        print(
-            "Using MSE-constrained EFIT++ output files directly for B and poloidal flux"
-        )
-
-        with Dataset(magnetic_data_path / "efitOut.nc") as dataset:
-            efitpp_times = dataset.variables["time"][:]
-            time_idx = find_nearest(efitpp_times, equil_time)
-            print("EFIT++ time", efitpp_times[time_idx])
-
-            output_group = dataset.groups["output"]
-
-            profiles2D = output_group.groups["profiles2D"]
-            # unnormalised, as a function of R and Z
-            unnormalised_poloidalFlux_grid = profiles2D.variables["poloidalFlux"][
-                time_idx
-            ][:][:]
-            data_R_coord = profiles2D.variables["r"][time_idx][:]
-            data_Z_coord = profiles2D.variables["z"][time_idx][:]
-
-            fluxFunctionProfiles = output_group.groups["fluxFunctionProfiles"]
-            poloidalFlux = fluxFunctionProfiles.variables["normalizedPoloidalFlux"][:]
-            # poloidalFlux as a function of normalised poloidal flux
-            unnormalizedPoloidalFlux = fluxFunctionProfiles.variables["poloidalFlux"][
-                time_idx
-            ][:]
-            rBphi = fluxFunctionProfiles.variables["rBphi"][time_idx][:]
-
-        # normalised_polflux = polflux_const_m * poloidalFlux + polflux_const_c (think y = mx + c)
-        # linear fit
-        polflux_const_m, polflux_const_c = np.polyfit(
-            unnormalizedPoloidalFlux, poloidalFlux, 1
-        )
-        poloidalFlux_grid = (
-            unnormalised_poloidalFlux_grid * polflux_const_m + polflux_const_c
-        )
-        return EFITField(
-            R_grid=data_R_coord,
-            Z_grid=data_Z_coord,
-            rBphi=rBphi,
-            psi_norm_2D=poloidalFlux_grid,
-            psi_norm_1D=poloidalFlux,
-            psi_unnorm_axis=0.0,
-            psi_unnorm_boundary=polflux_const_m,
-            delta_R=delta_R,
-            delta_Z=delta_Z,
-            interp_order=interp_order,
-            interp_smoothing=interp_smoothing,
-        )
-
-    if find_B_method == "UDA_saved" and shot is not None and shot <= 30471:  # MAST
-        print(shot)
-        # 30471 is the last shot on MAST
-        # data saved differently for MAST-U shots
-        filename = magnetic_data_path / f"{shot}_equilibrium_data.npz"
-        with np.load(filename) as loadfile:
-            rBphi_all_times = loadfile["rBphi"]  # On time base C
-            t_base_B = loadfile["t_base_B"]
-            t_base_C = loadfile["t_base_C"]
-            data_R_coord = loadfile["R_EFIT"]
-            data_Z_coord = loadfile["Z_EFIT"]
-            # Time base C
-            polflux_axis_all_times = loadfile["poloidal_flux_unnormalised_axis"]
-            # Time base C
-            polflux_boundary_all_times = loadfile["poloidal_flux_unnormalised_boundary"]
-            # On time base B
-            unnormalised_poloidalFlux_grid_all_times = loadfile[
-                "poloidal_flux_unnormalised"
-            ]
-
-        t_base_B_idx = find_nearest(t_base_B, equil_time)
-        # Get the same time slice
-        t_base_C_idx = find_nearest(t_base_C, t_base_B[t_base_B_idx])
-        print("EFIT time", t_base_B[t_base_B_idx])
-
-        rBphi = rBphi_all_times[t_base_C_idx, :]
-        polflux_axis = polflux_axis_all_times[t_base_C_idx]
-        polflux_boundary = polflux_boundary_all_times[t_base_C_idx]
-        unnormalised_poloidalFlux_grid = unnormalised_poloidalFlux_grid_all_times[
-            t_base_B_idx, :, :
-        ].T
-
-        # Taken from an old file of Sam Gibson's. Should probably check with Lucy or Sam.
-        poloidalFlux = np.linspace(0, 1.0, len(rBphi))
-        polflux_const_m = (1.0 - 0.0) / (polflux_boundary - polflux_axis)
-
-        poloidalFlux_grid = (unnormalised_poloidalFlux_grid - polflux_axis) / (
-            polflux_boundary - polflux_axis
-        )
-
-        return EFITField(
-            R_grid=data_R_coord,
-            Z_grid=data_Z_coord,
-            rBphi=rBphi,
-            psi_norm_2D=poloidalFlux_grid,
-            psi_norm_1D=poloidalFlux,
-            psi_unnorm_axis=polflux_axis,
-            psi_unnorm_boundary=polflux_boundary,
-            delta_R=delta_R,
-            delta_Z=delta_Z,
-            interp_order=interp_order,
-            interp_smoothing=interp_smoothing,
-        )
-
-    if find_B_method == "UDA_saved" and shot is not None and shot > 30471:  # MAST-U
-        # 30471 is the last shot on MAST
-        # data saved differently for MAST-U shots
-        filename = magnetic_data_path / f"{shot}_equilibrium_data.npz"
-        with np.load(filename) as loadfile:
-            time_EFIT = loadfile["time_EFIT"]
-            t_idx = find_nearest(time_EFIT, equil_time)
-            print("EFIT time", time_EFIT[t_idx])
-
-            return EFITField(
-                R_grid=loadfile["R_EFIT"],
-                Z_grid=loadfile["Z_EFIT"],
-                rBphi=loadfile["rBphi"][t_idx, :],
-                psi_norm_2D=loadfile["poloidalFlux_grid"][t_idx, :, :],
-                psi_norm_1D=loadfile["poloidalFlux"][t_idx, :],
-                psi_unnorm_axis=loadfile["poloidalFlux_unnormalised_axis"][t_idx],
-                psi_unnorm_boundary=loadfile["poloidalFlux_unnormalised_boundary"][
-                    t_idx
-                ],
-                delta_R=delta_R,
-                delta_Z=delta_Z,
-                interp_order=interp_order,
-                interp_smoothing=interp_smoothing,
-            )
+        raise ValueError(missing_arg("delta_Z"))
 
     if find_B_method == "UDA_saved" and shot is None:
+        print("Using MAST(-U) saved UDA data")
         # If using this part of the code, magnetic_data_path needs to include the filename
         # Assuming only one time present in file
         with np.load(magnetic_data_path) as loadfile:
@@ -3137,5 +3009,51 @@ def create_magnetic_geometry(
                 interp_order=interp_order,
                 interp_smoothing=interp_smoothing,
             )
+
+    # Data files with multiple time-slices
+
+    if equil_time is None:
+        raise ValueError(missing_arg("equil_time"))
+
+    if find_B_method == "EFITpp":
+        print(
+            "Using MSE-constrained EFIT++ output files directly for B and poloidal flux"
+        )
+        return EFITField.from_EFITpp(
+            magnetic_data_path / "efitOut.nc",
+            equil_time,
+            delta_R,
+            delta_Z,
+            interp_order,
+            interp_smoothing,
+        )
+
+    if find_B_method == "UDA_saved" and shot is not None and shot <= 30471:  # MAST
+        print(f"Using MAST shot {shot} from saved UDA data")
+        # 30471 is the last shot on MAST
+        # data saved differently for MAST-U shots
+        filename = magnetic_data_path / f"{shot}_equilibrium_data.npz"
+        return EFITField.from_MAST_saved(
+            filename,
+            equil_time,
+            delta_R,
+            delta_Z,
+            interp_order,
+            interp_smoothing,
+        )
+
+    if find_B_method == "UDA_saved" and shot is not None and shot > 30471:  # MAST-U
+        print(f"Using MAST-U shot {shot} from saved UDA data")
+        # 30471 is the last shot on MAST
+        # data saved differently for MAST-U shots
+        filename = magnetic_data_path / f"{shot}_equilibrium_data.npz"
+        return EFITField.from_MAST_U_saved(
+            filename,
+            equil_time,
+            delta_R,
+            delta_Z,
+            interp_order,
+            interp_smoothing,
+        )
 
     raise ValueError(f"Invalid find_B_method '{find_B_method}'")
