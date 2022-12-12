@@ -208,7 +208,7 @@ def _make_rect_spline(
         ky=interp_order,
         s=interp_smoothing,
     )
-    return lambda R, Z: spline(R, Z, grid=False)
+    return lambda q_R, q_Z: spline(q_R, q_Z, grid=False)
 
 
 class InterpolatedField(MagneticField):
