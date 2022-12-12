@@ -337,7 +337,7 @@ def user_settings(diagnostic, user, shot):
                 efitpp_path = (
                     prefix
                     / f"VHChen2022/Data - Equilibrium/MSE_efitruns/{shot}/efit_sgibson_02/"
-                )                
+                )
             # If it's not any of the above shots, I'll assume that there's no efit++ data
             elif shot > 30471:  # MAST-U
                 UDA_saved_path = (
