@@ -3,7 +3,7 @@
 
 @author: VH Hall-Chen
 Valerian Hongjie Hall-Chen
-valerian@hall-chen.com
+valerian_hall-chen@ihpc.a-star.edu.sg
 
 Initialisation.
 
