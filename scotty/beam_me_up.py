@@ -68,7 +68,7 @@ from __future__ import annotations
 import numpy as np
 from scipy import integrate as integrate
 from scipy import constants as constants
-from scipy.optimize import minimize_scalar, root_scalar
+from scipy.optimize import root_scalar, direct
 import matplotlib.pyplot as plt
 import sys
 import bisect
@@ -2902,10 +2902,9 @@ def launch_beam(
     entry_position = find_entry_point(
         launch_position,
         poloidal_launch_angle,
+        toroidal_launch_angle,
         poloidal_flux_enter,
         field,
-        K_zeta_launch,
-        K_R_launch,
     )
 
     distance_from_launch_to_entry = np.sqrt(
@@ -3022,48 +3021,109 @@ def launch_beam(
 def find_entry_point(
     launch_position: FloatArray,
     poloidal_launch_angle: float,
+    toroidal_launch_angle: float,
     poloidal_flux_enter: float,
     field: MagneticField,
-    K_zeta_launch: float,
-    K_R_launch: float,
     boundary_adjust: float = 1e-8,
-):
-    """Find the coordinates of where the beam enters the plasma"""
+) -> FloatArray:
+    """Find the coordinates where the beam enters the plasma.
 
-    R_start = launch_position[0]
-    R_length = 0.0 - R_start
-    Z_start = launch_position[2]
-    Z_end = Z_start - R_start * np.tan(poloidal_launch_angle)
-    Z_length = Z_end - Z_start
+    Arguments
+    ---------
+    launch_position:
+        Cartesian coordinates of the antenna (or cylindrical with
+        zeta=0)
+    poloidal_launch_angle:
+        Poloidal angle of the antenna (radians), clockwise from the
+        horizontal axis
+    toroidal_launch_angle:
+        Toroidal angle of the antenna (radians), anti-clockwise from
+        the negative X-axis
+    field:
+        Object describing the magnetic field geometry
+    boundary_adjust:
+        Step size used to ensure entry point is _just_ inside plasma
+
+    Returns
+    -------
+    Array with cylindrical coordinates of entry point
+    """
+
+    # We know that the plasma is contained entirely within ``field``'s
+    # (R, Z) grid, so the maximum distance the beam could possibly
+    # travel before hitting the plasma is when it's aimed at the
+    # top/bottom corner of the grid on the far side of the torus. This
+    # an overestimate, but it's only used to parameterize the beam
+    X_start, Y_start, Z_start = launch_position
+    X_length = abs(X_start) + field.R_coord.max()
+    Z_length = abs(Z_start) + field.Z_coord.max()
+    max_length = np.hypot(X_length, Z_length)
+
+    # TORBEAM antenna angles are anti-clockwise from negative X-axis,
+    # so we need to rotate the toroidal angle by pi. This will take
+    # care of the direction of the beam. The poloidal angle is also
+    # reversed from its usual sense, so we can just flip it
+    toroidal_launch_angle = toroidal_launch_angle + np.pi
+    poloidal_launch_angle = -poloidal_launch_angle
+
+    # We parameterise beam in a line normal to the antenna up to
+    # max_length, and we can be sure the beam will either hit the
+    # plasma or miss it entirely.
+    X_step = max_length * np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
+    Y_step = max_length * np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
+    Z_step = max_length * np.sin(poloidal_launch_angle)
+    step_array = np.array((X_step, Y_step, Z_step))
 
     def beam_line(tau):
         """Parameterised line in beam direction"""
-        return (R_start + tau * R_length), (Z_start + tau * Z_length)
+        return launch_position + tau * step_array
+
+    def cartesian_to_cylindrical(X, Y, Z):
+        """Cartesian to cylindrical coordinates"""
+        return np.sqrt(X**2 + Y**2), np.arctan2(Y, X), Z
 
     def poloidal_flux_boundary_along_line(tau):
         """Signed poloidal flux distance to plasma boundary"""
-        return field.poloidal_flux(*beam_line(tau)) - poloidal_flux_enter
+        R, _, Z = cartesian_to_cylindrical(*beam_line(tau))
+        return field.poloidal_flux(R, Z) - poloidal_flux_enter
 
     # Find the plasma boundary using a bracket search. We need the
-    # minimum only so that the flux has different sign to our initial
-    # position for the bracket points
-    minimum = minimize_scalar(
-        poloidal_flux_boundary_along_line, bounds=(0, 1), method="Bounded"
+    # minimum so that the flux has different sign to our initial
+    # position for the bracket points. There could be one or two
+    # minima (corresponding to the two halves of the torus), we only
+    # care about the closest, so use the first result as a bound for
+    # the second. If there isn't a second, this will just find the
+    # first again
+    first_min = direct(
+        poloidal_flux_boundary_along_line, bounds=((0, 1),), len_tol=1e-3
     )
-    boundary = root_scalar(poloidal_flux_boundary_along_line, bracket=(0, minimum.x))
+    minimum = direct(
+        poloidal_flux_boundary_along_line, bounds=((0, first_min.x),), len_tol=1e-3
+    )
+    # If the closest minimum is positive, then the beam never actually
+    # enters the plasma, and we should abort
+    if minimum.fun > 0:
+        R_miss, zeta_miss, Z_miss = cartesian_to_cylindrical(*beam_line(minimum.x))
+        miss_coords = f"(R={R_miss}, zeta={zeta_miss}, Z={Z_miss})"
+        raise RuntimeError(
+            f"Beam does not hit plasma. Closest point is at {miss_coords}, "
+            f"distance in poloidal flux to boundary={minimum.fun}"
+        )
 
+    # `minimum.x` is some point along the beam that's definitely
+    # inside the plasma. So any root between the start of the beam and
+    # this point is the closest entry point
+    boundary = root_scalar(poloidal_flux_boundary_along_line, bracket=(0, minimum.x))
     if not boundary.converged:
-        raise ValueError(
+        raise RuntimeError(
             f"Could not find plasma boundary, root finding failed with '{boundary.flag}'"
         )
 
     # The root might be just outside the plasma due to floating point
-    # fun, if so, take small steps until we're inside
+    # errors, if so, take small steps until we're definitely inside
     boundary_tau = boundary.root
-    if field.poloidal_flux(*beam_line(boundary_tau)) > poloidal_flux_enter:
+    R_boundary, _, Z_boundary = cartesian_to_cylindrical(*beam_line(boundary_tau))
+    if field.poloidal_flux(R_boundary, Z_boundary) > poloidal_flux_enter:
         boundary_tau += boundary_adjust
 
-    R_boundary, Z_boundary = beam_line(boundary.root)
-    zeta_boundary = K_zeta_launch / K_R_launch * (1 / R_start - 1 / R_boundary)
-
-    return np.array([R_boundary, zeta_boundary, Z_boundary])
+    return np.array(cartesian_to_cylindrical(*beam_line(boundary.root)))

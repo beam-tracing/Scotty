@@ -690,17 +690,32 @@ def test_launch_golden_answer(tmp_path, generator):
     assert_allclose(Psi_3D_lab_initial, expected_Psi_3D_lab_initial, tol, atol=0.1)
 
 
+def launch_parameters(start_point, end_point_poloidal_coords):
+    kwargs_dict = simple(None)
+    rho_end, theta_end, zeta_end = end_point_poloidal_coords
+    R_axis = kwargs_dict["R_axis"]
+    minor_radius = kwargs_dict["minor_radius_a"]
+
+    R_end = R_axis + rho_end * minor_radius * np.cos(theta_end)
+    Z_end = rho_end * minor_radius * np.sin(theta_end)
+    X_end = R_end * np.cos(zeta_end)
+    Y_end = R_end * np.sin(zeta_end)
+
+    X_start, Y_start, Z_start = start_point
+    phi_t = np.arctan2(Y_end - Y_start, X_end - X_start) - np.pi
+    poloidal_length = np.sqrt((Y_end - Y_start) ** 2 + (X_end - X_start) ** 2)
+    phi_p = np.arctan2(Z_end - Z_start, poloidal_length)
+    expected_entry_cartesian = (R_end, zeta_end, Z_end)
+    return start_point, -phi_p, phi_t, expected_entry_cartesian
+
+
 @pytest.mark.parametrize(
     "generator",
     [
         pytest.param(simple, id="simple"),
-        pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
-        pytest.param(omfit_json, id="omfit-file"),
         pytest.param(npz_file, id="test-file"),
-        pytest.param(npz_notime_file, id="test_notime-file"),
         pytest.param(UDA_saved, id="UDA-saved-file"),
-        pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file"),
     ],
 )
 @pytest.mark.parametrize(
@@ -711,9 +726,28 @@ def test_launch_golden_answer(tmp_path, generator):
         "expected_entry",
     ),
     (
-        ([2.5, 0, 0], 0, 0, [2.0, 0.0, 0]),
-        ([2, 0, 0.5], np.pi / 4, 0, [1.5 + np.sqrt(0.5) / 2, 0, np.sqrt(0.5) / 2]),
-        ([2, 0, -0.5], -np.pi / 4, 0, [1.5 + np.sqrt(0.5) / 2, 0, -np.sqrt(0.5) / 2]),
+        pytest.param([2.5, 0, 0], 0, 0, [2.0, 0.0, 0], id="outboard-midplane"),
+        pytest.param([0.5, 0, 0], 0, np.pi, [1.0, 0, 0], id="inboard-midplane"),
+        pytest.param([1.5, 0, 1], np.pi / 2, 0, [1.5, 0, 0.5], id="top"),
+        pytest.param([1.5, 0, -1], -np.pi / 2, 0, [1.5, 0, -0.5], id="bottom"),
+        pytest.param(
+            [2, 0, 0.5],
+            np.pi / 4,
+            0,
+            [1.5 + np.sqrt(0.5) / 2, 0, np.sqrt(0.5) / 2],
+            id="top-right",
+        ),
+        pytest.param(
+            [2, 0, -0.5],
+            -np.pi / 4,
+            0,
+            [1.5 + np.sqrt(0.5) / 2, 0, -np.sqrt(0.5) / 2],
+            id="bottom-right",
+        ),
+        pytest.param(
+            *launch_parameters((2.5, 0.0, -0.1), (1, np.pi / 4, np.pi / 8)),
+            id="steep-angle",
+        ),
     ),
 )
 def test_find_entry_point(
@@ -726,29 +760,14 @@ def test_find_entry_point(
 ):
     args = generator(tmp_path)
     field = create_magnetic_geometry(**args)
-
-    launch_angular_frequency = freq_GHz_to_angular_frequency(args["launch_freq_GHz"])
-    wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
-
     poloidal_flux_enter = args["poloidal_flux_enter"]
-
-    K_R_launch = (
-        -wavenumber_K0 * np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
-    )
-    K_zeta_launch = (
-        -wavenumber_K0
-        * np.sin(toroidal_launch_angle)
-        * np.cos(poloidal_launch_angle)
-        * launch_position[0]
-    )
 
     entry_position = find_entry_point(
         launch_position,
         poloidal_launch_angle,
+        toroidal_launch_angle,
         poloidal_flux_enter,
         field,
-        K_zeta_launch,
-        K_R_launch,
     )
 
-    assert_allclose(entry_position, expected_entry)
+    assert_allclose(entry_position, expected_entry, 1e-7, 1e-7)
