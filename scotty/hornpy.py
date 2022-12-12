@@ -2,7 +2,7 @@
 """
 Created on Sat Apr 17 09:43:34 2021
 
-@author: VH Hall-Chen (valerian@hall-chen.com)
+@author: VH Hall-Chen (valerian_hall-chen@ihpc.a-star.edu.sg)
 
 This module calculates the Gaussian beam properties based on the horn and lens.
 

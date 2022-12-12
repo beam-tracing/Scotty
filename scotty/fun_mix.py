@@ -6,7 +6,7 @@ Functions for finding derivatives of H using forward finite difference.
 
 @author: chenv
 Valerian Hongjie Hall-Chen
-valerian@hall-chen.com
+valerian_hall-chen@ihpc.a-star.edu.sg
 
 Run in Python 3,  does not work in Python 2
 """

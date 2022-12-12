@@ -4,8 +4,7 @@ Created on Fri Jun  8 10:44:34 2018
 
 @author: VH Hall-Chen
 Valerian Hongjie Hall-Chen
-valerian.chen@gmail.com
-valerian.hall-chen.com
+valerian_hall-chen@ihpc.a-star.edu.sg
 
 Run in Python 3, does not work in Python 2
 

@@ -32,9 +32,15 @@ def check_H_output(H_output):
     tol = 1e-2
 
     if max(H_output) > tol:
-        warnings.warn((f"`H_output` is too large! `max H_output` = '{max(H_output)}' but 'tol' = '{tol}'"))
+        warnings.warn(
+            (
+                f"WARNING: `H_output` is too large! `max H_output` = '{max(H_output)}' but 'tol' = '{tol}'"
+            )
+        )
     elif max(H_output) > 1.0:
-        raise ValueError(f"`H_output` is unphysically large! `max H_output` = '{max(H_output)}'")
+        raise ValueError(
+            f"`H_output` is unphysically large! `max H_output` = '{max(H_output)}'"
+        )
 
     return None
 
