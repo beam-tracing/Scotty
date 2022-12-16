@@ -15,6 +15,7 @@ Run in Python 3,  does not work in Python 2
 import numpy as np
 
 from scotty.hamiltonian import Hamiltonian, laplacians
+from scotty.typing import FloatArray
 
 
 # Functions (solver)
@@ -64,6 +65,65 @@ def ray_evolution_2D_fun(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonia
     return d_ray_parameters_2D_d_tau
 
 
+def pack_beam_parameters(q_R, q_zeta, q_Z, K_R, K_Z, Psi):
+    # This used to be complex, with a length of 11, but the solver
+    # throws a warning saying that something is casted to real It
+    # seems to be fine, bu
+    beam_parameters = np.zeros(17)
+
+    beam_parameters[0] = q_R
+    beam_parameters[1] = q_zeta
+    beam_parameters[2] = q_Z
+
+    beam_parameters[3] = K_R
+    beam_parameters[4] = K_Z
+
+    beam_parameters[5] = np.real(Psi[0, 0])
+    beam_parameters[6] = np.real(Psi[1, 1])
+    beam_parameters[7] = np.real(Psi[2, 2])
+    beam_parameters[8] = np.real(Psi[0, 1])
+    beam_parameters[9] = np.real(Psi[0, 2])
+    beam_parameters[10] = np.real(Psi[1, 2])
+
+    beam_parameters[11] = np.imag(Psi[0, 0])
+    beam_parameters[12] = np.imag(Psi[1, 1])
+    beam_parameters[13] = np.imag(Psi[2, 2])
+    beam_parameters[14] = np.imag(Psi[0, 1])
+    beam_parameters[15] = np.imag(Psi[0, 2])
+    beam_parameters[16] = np.imag(Psi[1, 2])
+    return beam_parameters
+
+
+def unpack_beam_parameters(beam_parameters: FloatArray):
+    q_R = beam_parameters[0, ...]
+    q_zeta = beam_parameters[1, ...]
+    q_Z = beam_parameters[2, ...]
+    K_R = beam_parameters[3, ...]
+    K_Z = beam_parameters[4, ...]
+
+    n_points = beam_parameters.shape[1] if beam_parameters.ndim == 2 else 1
+
+    Psi_3D = np.zeros([n_points, 3, 3], dtype="complex128")
+    # Psi_RR
+    Psi_3D[:, 0, 0] = beam_parameters[5, ...] + 1j * beam_parameters[11, ...]
+    # Psi_zetazeta
+    Psi_3D[:, 1, 1] = beam_parameters[6, ...] + 1j * beam_parameters[12, ...]
+    # Psi_ZZ
+    Psi_3D[:, 2, 2] = beam_parameters[7, ...] + 1j * beam_parameters[13, ...]
+    # Psi_Rzeta
+    Psi_3D[:, 0, 1] = beam_parameters[8, ...] + 1j * beam_parameters[14, ...]
+    # Psi_RZ
+    Psi_3D[:, 0, 2] = beam_parameters[9, ...] + 1j * beam_parameters[15, ...]
+    # Psi_zetaZ
+    Psi_3D[:, 1, 2] = beam_parameters[10, ...] + 1j * beam_parameters[16, ...]
+    # Psi_3D is symmetric
+    Psi_3D[:, 1, 0] = Psi_3D[:, 0, 1]
+    Psi_3D[:, 2, 0] = Psi_3D[:, 0, 2]
+    Psi_3D[:, 2, 1] = Psi_3D[:, 1, 2]
+
+    return q_R, q_zeta, q_Z, K_R, K_Z, np.squeeze(Psi_3D)
+
+
 def beam_evolution_fun(tau, beam_parameters, K_zeta, hamiltonian: Hamiltonian):
     """
     Parameters
@@ -79,23 +139,7 @@ def beam_evolution_fun(tau, beam_parameters, K_zeta, hamiltonian: Hamiltonian):
         d (beam_parameters) / d tau
     """
 
-    # Clean input up. Not necessary, but aids readability
-    q_R = beam_parameters[0]
-    # q_zeta = beam_parameters[1]
-    q_Z = beam_parameters[2]
-    K_R = beam_parameters[3]
-    K_Z = beam_parameters[4]
-
-    Psi_3D = np.zeros([3, 3], dtype="complex128")
-    Psi_3D[0, 0] = beam_parameters[5] + 1j * beam_parameters[11]  # Psi_RR
-    Psi_3D[1, 1] = beam_parameters[6] + 1j * beam_parameters[12]  # Psi_zetazeta
-    Psi_3D[2, 2] = beam_parameters[7] + 1j * beam_parameters[13]  # Psi_ZZ
-    Psi_3D[0, 1] = beam_parameters[8] + 1j * beam_parameters[14]  # Psi_Rzeta
-    Psi_3D[0, 2] = beam_parameters[9] + 1j * beam_parameters[15]  # Psi_RZ
-    Psi_3D[1, 2] = beam_parameters[10] + 1j * beam_parameters[16]  # Psi_zetaZ
-    Psi_3D[1, 0] = Psi_3D[0, 1]  # Psi_3D is symmetric
-    Psi_3D[2, 0] = Psi_3D[0, 2]
-    Psi_3D[2, 1] = Psi_3D[1, 2]
+    q_R, q_zeta, q_Z, K_R, K_Z, Psi_3D = unpack_beam_parameters(beam_parameters)
 
     # Find derivatives of H
     dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z, order=2)
@@ -116,27 +160,4 @@ def beam_evolution_fun(tau, beam_parameters, K_zeta, hamiltonian: Hamiltonian):
         - np.matmul(np.matmul(Psi_3D, gradK_gradK_H), Psi_3D)
     )
 
-    d_beam_parameters_d_tau = np.zeros_like(beam_parameters)
-
-    d_beam_parameters_d_tau[0] = dH_dKR  # d (q_R) / d tau
-    d_beam_parameters_d_tau[1] = dH_dKzeta  # d (q_zeta) / d tau
-
-    d_beam_parameters_d_tau[2] = dH_dKZ  # d (q_Z) / d tau
-    d_beam_parameters_d_tau[3] = -dH_dR  # d (K_R) / d tau
-    d_beam_parameters_d_tau[4] = -dH_dZ  # d (K_Z) / d tau
-
-    d_beam_parameters_d_tau[5] = np.real(d_Psi_d_tau[0, 0])  # d (Psi_RR) / d tau
-    d_beam_parameters_d_tau[6] = np.real(d_Psi_d_tau[1, 1])  # d (Psi_zetazeta) / d tau
-    d_beam_parameters_d_tau[7] = np.real(d_Psi_d_tau[2, 2])  # d (Psi_ZZ) / d tau
-    d_beam_parameters_d_tau[8] = np.real(d_Psi_d_tau[0, 1])  # d (Psi_Rzeta) / d tau
-    d_beam_parameters_d_tau[9] = np.real(d_Psi_d_tau[0, 2])  # d (Psi_RZ) / d tau
-    d_beam_parameters_d_tau[10] = np.real(d_Psi_d_tau[1, 2])  # d (Psi_zetaZ) / d tau
-
-    d_beam_parameters_d_tau[11] = np.imag(d_Psi_d_tau[0, 0])  # d (Psi_RR) / d tau
-    d_beam_parameters_d_tau[12] = np.imag(d_Psi_d_tau[1, 1])  # d (Psi_zetazeta) / d tau
-    d_beam_parameters_d_tau[13] = np.imag(d_Psi_d_tau[2, 2])  # d (Psi_ZZ) / d tau
-    d_beam_parameters_d_tau[14] = np.imag(d_Psi_d_tau[0, 1])  # d (Psi_Rzeta) / d tau
-    d_beam_parameters_d_tau[15] = np.imag(d_Psi_d_tau[0, 2])  # d (Psi_RZ) / d tau
-    d_beam_parameters_d_tau[16] = np.imag(d_Psi_d_tau[1, 2])  # d (Psi_zetaZ) / d tau
-
-    return d_beam_parameters_d_tau
+    return pack_beam_parameters(dH_dKR, dH_dKzeta, dH_dKZ, -dH_dR, -dH_dZ, d_Psi_d_tau)

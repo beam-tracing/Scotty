@@ -90,7 +90,12 @@ from scotty.fun_general import find_normalised_plasma_freq, find_normalised_gyro
 from scotty.fun_general import find_epsilon_para, find_epsilon_perp, find_epsilon_g
 from scotty.fun_general import find_dbhat_dR, find_dbhat_dZ
 from scotty.fun_general import find_H_Cardano, find_D
-from scotty.fun_evolution import ray_evolution_2D_fun, beam_evolution_fun
+from scotty.fun_evolution import (
+    ray_evolution_2D_fun,
+    beam_evolution_fun,
+    pack_beam_parameters,
+    unpack_beam_parameters,
+)
 
 # For find_B if using efit files directly
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
@@ -414,31 +419,14 @@ def beam_me_up(
     # -------------------
 
     # Initial conditions for the solver
-    beam_parameters_initial = np.zeros(17)
-    # This used to be complex, with a length of 11, but the solver throws a warning saying that something is casted to real
-    # It seems to be fine, bu
-
-    beam_parameters_initial[0] = initial_position[0]  # q_R
-    # q_zeta (This should be = 0)
-    beam_parameters_initial[1] = initial_position[1]
-    beam_parameters_initial[2] = initial_position[2]  # q_Z
-
-    beam_parameters_initial[3] = K_R_initial
-    beam_parameters_initial[4] = K_Z_initial
-
-    beam_parameters_initial[5] = np.real(Psi_3D_lab_initial[0, 0])  # Psi_RR
-    beam_parameters_initial[6] = np.real(Psi_3D_lab_initial[1, 1])  # Psi_zetazeta
-    beam_parameters_initial[7] = np.real(Psi_3D_lab_initial[2, 2])  # Psi_ZZ
-    beam_parameters_initial[8] = np.real(Psi_3D_lab_initial[0, 1])  # Psi_Rzeta
-    beam_parameters_initial[9] = np.real(Psi_3D_lab_initial[0, 2])  # Psi_RZ
-    beam_parameters_initial[10] = np.real(Psi_3D_lab_initial[1, 2])  # Psi_zetaZ
-
-    beam_parameters_initial[11] = np.imag(Psi_3D_lab_initial[0, 0])  # Psi_RR
-    beam_parameters_initial[12] = np.imag(Psi_3D_lab_initial[1, 1])  # Psi_zetazeta
-    beam_parameters_initial[13] = np.imag(Psi_3D_lab_initial[2, 2])  # Psi_ZZ
-    beam_parameters_initial[14] = np.imag(Psi_3D_lab_initial[0, 1])  # Psi_Rzeta
-    beam_parameters_initial[15] = np.imag(Psi_3D_lab_initial[0, 2])  # Psi_RZ
-    beam_parameters_initial[16] = np.imag(Psi_3D_lab_initial[1, 2])  # Psi_zetaZ
+    beam_parameters_initial = pack_beam_parameters(
+        initial_position[0],
+        initial_position[1],
+        initial_position[2],
+        K_R_initial,
+        K_Z_initial,
+        Psi_3D_lab_initial,
+    )
 
     ray_parameters_initial = np.real(beam_parameters_initial[0:5])
     ray_parameters_2D_initial = np.delete(ray_parameters_initial, 1)  # Remove q_zeta
@@ -845,35 +833,14 @@ def beam_me_up(
 
     numberOfDataPoints = len(tau_array)
 
-    q_R_array = np.real(beam_parameters[0, :])
-    q_zeta_array = np.real(beam_parameters[1, :])
-    q_Z_array = np.real(beam_parameters[2, :])
-
-    K_R_array = np.real(beam_parameters[3, :])
-    K_Z_array = np.real(beam_parameters[4, :])
-
-    Psi_3D_output = np.zeros([numberOfDataPoints, 3, 3], dtype="complex128")
-    Psi_3D_output[:, 0, 0] = (
-        beam_parameters[5, :] + 1j * beam_parameters[11, :]
-    )  # d (Psi_RR) / d tau
-    Psi_3D_output[:, 1, 1] = (
-        beam_parameters[6, :] + 1j * beam_parameters[12, :]
-    )  # d (Psi_zetazeta) / d tau
-    Psi_3D_output[:, 2, 2] = (
-        beam_parameters[7, :] + 1j * beam_parameters[13, :]
-    )  # d (Psi_ZZ) / d tau
-    Psi_3D_output[:, 0, 1] = (
-        beam_parameters[8, :] + 1j * beam_parameters[14, :]
-    )  # d (Psi_Rzeta) / d tau
-    Psi_3D_output[:, 0, 2] = (
-        beam_parameters[9, :] + 1j * beam_parameters[15, :]
-    )  # d (Psi_RZ) / d tau
-    Psi_3D_output[:, 1, 2] = (
-        beam_parameters[10, :] + 1j * beam_parameters[16, :]
-    )  # d (Psi_zetaZ) / d tau
-    Psi_3D_output[:, 1, 0] = Psi_3D_output[:, 0, 1]
-    Psi_3D_output[:, 2, 0] = Psi_3D_output[:, 0, 2]
-    Psi_3D_output[:, 2, 1] = Psi_3D_output[:, 1, 2]
+    (
+        q_R_array,
+        q_zeta_array,
+        q_Z_array,
+        K_R_array,
+        K_Z_array,
+        Psi_3D_output,
+    ) = unpack_beam_parameters(beam_parameters)
 
     print("Main loop complete")
     # -------------------
