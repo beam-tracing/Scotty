@@ -140,22 +140,3 @@ def beam_evolution_fun(tau, beam_parameters, K_zeta, hamiltonian: Hamiltonian):
     d_beam_parameters_d_tau[16] = np.imag(d_Psi_d_tau[1, 2])  # d (Psi_zetaZ) / d tau
 
     return d_beam_parameters_d_tau
-
-
-# ----------------------------------
-
-
-# def find_second_derivatives(K_magnitude,
-#                             K_magnitude_p_dKZ_1, K_magnitude_m_dKZ_1,
-#                             sin_theta_m_sq,
-#                             electron_density,
-#                             B_Total,
-#                             launch_angular_frequency, mode_flag,
-#                             delta_R, delta_Z, delta_K_R, delta_K_zeta, delta_K_Z):
-
-#     H_0 = find_H_numba(K_magnitude, electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency, mode_flag)
-
-#     H_p_dZ = find_H_numba(K_magnitude, electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency, mode_flag)
-
-
-#     return grad_grad_H, grad_gradK_H, gradK_gradK_H
