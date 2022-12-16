@@ -832,7 +832,12 @@ def beam_me_up(
     )
 
     solver_end_time = time.time()
-    print("Time taken (beam solver)", solver_end_time - solver_start_time, "s")
+    solver_time = solver_end_time - solver_start_time
+    print(f"Time taken (beam solver) {solver_time}s")
+    print(f"Number of beam evolution evaluations: {solver_beam_output.nfev}")
+    print(
+        f"Time per beam evolution evaluation: {solver_time / solver_beam_output.nfev}"
+    )
 
     beam_parameters = solver_beam_output.y
     tau_array = solver_beam_output.t
