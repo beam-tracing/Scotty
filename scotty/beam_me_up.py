@@ -762,7 +762,7 @@ def beam_me_up(
         - suffix _fine for variables in this section
         - I guess I could've used 'dense_output' for the section above and got the information from there, and one day I'll go and see which method works better/faster
         """
-        max_tau_idx = np.argmax(tau_ray[tau_ray <= tau_leave])
+        max_tau_idx = int(np.argmax(tau_ray[tau_ray <= tau_leave]))
 
         K_magnitude_ray = (
             (np.real(ray_parameters_2D[2, :max_tau_idx])) ** 2
