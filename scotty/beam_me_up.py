@@ -389,21 +389,17 @@ def beam_me_up(
         ) = launch_beam(
             toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
             poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
-            mode_flag=mode_flag,
             launch_beam_width=launch_beam_width,
             launch_beam_curvature=launch_beam_curvature,
             launch_position=launch_position,
             launch_angular_frequency=launch_angular_frequency,
             field=field,
-            find_density_1D=find_density_1D,
+            hamiltonian=hamiltonian,
             vacuum_propagation_flag=vacuum_propagation_flag,
             Psi_BC_flag=Psi_BC_flag,
             poloidal_flux_enter=poloidal_flux_enter,
             delta_R=delta_R,
             delta_Z=delta_Z,
-            delta_K_R=delta_K_R,
-            delta_K_zeta=delta_K_zeta,
-            delta_K_Z=delta_K_Z,
         )
     else:
         print("Beam launched from inside the plasma")
