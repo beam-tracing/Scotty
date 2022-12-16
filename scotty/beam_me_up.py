@@ -80,7 +80,6 @@ from scotty.fun_general import (
     contract_special,
     make_unit_vector_from_cross_product,
     find_x0,
-    find_H,
     find_waist,
     freq_GHz_to_angular_frequency,
     angular_frequency_to_wavenumber,
@@ -97,9 +96,6 @@ from scotty.fun_evolution import (
     find_gradK_grad_H_vectorised,
     find_gradK_gradK_H_vectorised,
 )
-
-from scotty.fun_FFD import find_dH_dR, find_dH_dZ  # \nabla H
-from scotty.fun_CFD import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta  # \nabla_K H
 
 # For find_B if using efit files directly
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
@@ -936,53 +932,17 @@ def beam_me_up(
     poloidal_flux_output = field.poloidal_flux(q_R_array, q_Z_array)
     electron_density_output = np.asfarray(find_density_1D(poloidal_flux_output))
 
-    # Calculates nabla_K H
-    dH_dKR_output = find_dH_dKR(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_R,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
-    dH_dKzeta_output = find_dH_dKzeta(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_zeta,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
-    dH_dKZ_output = find_dH_dKZ(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_Z,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
+    dH = hamiltonian.derivatives(
+        q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, order=1
     )
 
+    dH_dR_output = dH["dH_dR"]
+    dH_dZ_output = dH["dH_dZ"]
+    dH_dKR_output = dH["dH_dKR"]
+    dH_dKzeta_output = dH["dH_dKzeta"]
+    dH_dKZ_output = dH["dH_dKZ"]
+
+    # Calculates nabla_K H
     # Calculates g_hat
     g_hat_output = np.zeros([numberOfDataPoints, 3])
     g_magnitude_output = (
@@ -1043,66 +1003,19 @@ def beam_me_up(
     # But good for checking whether things are working properly
     # -------------------
     #
-    H_output = find_H(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
-    H_other = find_H(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
+    H_output = hamiltonian(q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array)
+    # Create and immediately evaluate a Hamiltonian with the opposite mode
+    H_other = Hamiltonian(
+        field,
         launch_angular_frequency,
         -mode_flag,
-        field.poloidal_flux,
         find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
-
-    # nabla H along the ray
-    dH_dR_output = find_dH_dR(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
         delta_R,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
-    dH_dZ_output = find_dH_dZ(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
         delta_Z,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
+        delta_K_R,
+        delta_K_zeta,
+        delta_K_Z,
+    )(q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array)
 
     # Gradients of poloidal flux along the ray
     dpolflux_dR_debugging = find_dpolflux_dR(
