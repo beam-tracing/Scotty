@@ -179,12 +179,12 @@ class Hamiltonian:
             "dH_dR": apply_stencil(("q_R",), FFD1_stencil),
             "dH_dZ": apply_stencil(("q_Z",), FFD1_stencil),
             "dH_dKR": apply_stencil(("K_R",), CFD1_stencil),
+            "dH_dKzeta": apply_stencil(("K_zeta",), CFD1_stencil),
             "dH_dKZ": apply_stencil(("K_Z",), CFD1_stencil),
         }
 
         if order == 2:
             second_derivatives = {
-                "dH_dKzeta": apply_stencil(("K_zeta",), CFD1_stencil),
                 "d2H_dR2": apply_stencil(("q_R",), FFD2_stencil, order=2),
                 "d2H_dZ2": apply_stencil(("q_Z",), FFD2_stencil, order=2),
                 "d2H_dKR2": apply_stencil(("K_R",), CFD2_stencil, order=2),

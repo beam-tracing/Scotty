@@ -35,6 +35,7 @@ from scotty.fun_mix import (
 )  # \nabla_K \nabla H
 
 from scotty.fun_general import find_H_numba
+from scotty.hamiltonian import Hamiltonian
 
 
 # Functions (gradients of H, vectorised)
@@ -389,23 +390,7 @@ def find_gradK_gradK_H_vectorised(
 # Functions (solver)
 # Defines the ray evolution function
 # Not necessary for what I want to do, but it does make life easier
-def ray_evolution_2D_fun(
-    tau,
-    ray_parameters_2D,
-    K_zeta,
-    launch_angular_frequency,
-    mode_flag,
-    delta_R,
-    delta_Z,
-    delta_K_R,
-    delta_K_zeta,
-    delta_K_Z,
-    interp_poloidal_flux,
-    find_density_1D,
-    find_B_R,
-    find_B_T,
-    find_B_Z,
-):
+def ray_evolution_2D_fun(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
     """
     Parameters
     ----------
@@ -413,6 +398,8 @@ def ray_evolution_2D_fun(
         Parameter along the ray.
     ray_parameters_2D : complex128
         q_R, q_Z, K_R, K_Z
+    hamiltonian:
+        Hamiltonian object
 
     Returns
     -------
@@ -424,83 +411,25 @@ def ray_evolution_2D_fun(
 
     """
 
-    ## Clean input up. Not necessary, but aids readability
+    # Clean input up. Not necessary, but aids readability
     q_R = ray_parameters_2D[0]
     q_Z = ray_parameters_2D[1]
     K_R = ray_parameters_2D[2]
     K_Z = ray_parameters_2D[3]
 
-    ## Find derivatives of H
-    # \nabla H
-    dH_dR = find_dH_dR(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    dH_dZ = find_dH_dZ(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-
-    # \nabla_K H
-    dH_dKR = find_dH_dKR(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_R,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    dH_dKZ = find_dH_dKZ(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
+    # Find derivatives of H
+    dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z, order=1)
 
     d_ray_parameters_2D_d_tau = np.zeros_like(ray_parameters_2D)
 
-    d_ray_parameters_2D_d_tau[0] = dH_dKR  # d (q_R) / d tau
-    d_ray_parameters_2D_d_tau[1] = dH_dKZ  # d (q_Z) / d tau
-    d_ray_parameters_2D_d_tau[2] = -dH_dR  # d (K_R) / d tau
-    d_ray_parameters_2D_d_tau[3] = -dH_dZ  # d (K_Z) / d tau
+    # d (q_R) / d tau
+    d_ray_parameters_2D_d_tau[0] = dH["dH_dKR"]
+    # d (q_Z) / d tau
+    d_ray_parameters_2D_d_tau[1] = dH["dH_dKZ"]
+    # d (K_R) / d tau
+    d_ray_parameters_2D_d_tau[2] = -dH["dH_dR"]
+    # d (K_Z) / d tau
+    d_ray_parameters_2D_d_tau[3] = -dH["dH_dZ"]
 
     return d_ray_parameters_2D_d_tau
 
@@ -509,23 +438,7 @@ def ray_evolution_2D_fun(
 
 
 # Defines the beam evolution function
-def beam_evolution_fun(
-    tau,
-    beam_parameters,
-    K_zeta,
-    launch_angular_frequency,
-    mode_flag,
-    delta_R,
-    delta_Z,
-    delta_K_R,
-    delta_K_zeta,
-    delta_K_Z,
-    interp_poloidal_flux,
-    find_density_1D,
-    find_B_R,
-    find_B_T,
-    find_B_Z,
-):
+def beam_evolution_fun(tau, beam_parameters, K_zeta, hamiltonian: Hamiltonian):
     """
     Parameters
     ----------
@@ -540,9 +453,9 @@ def beam_evolution_fun(
         d (beam_parameters) / d tau
     """
 
-    ## Clean input up. Not necessary, but aids readability
+    # Clean input up. Not necessary, but aids readability
     q_R = beam_parameters[0]
-    q_zeta = beam_parameters[1]
+    # q_zeta = beam_parameters[1]
     q_Z = beam_parameters[2]
     K_R = beam_parameters[3]
     K_Z = beam_parameters[4]
@@ -558,357 +471,59 @@ def beam_evolution_fun(
     Psi_3D[2, 0] = Psi_3D[0, 2]
     Psi_3D[2, 1] = Psi_3D[1, 2]
 
-    ## Find derivatives of H
-    # \nabla H
-    dH_dR = find_dH_dR(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    dH_dZ = find_dH_dZ(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
+    # Find derivatives of H
+    dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z, order=2)
 
-    # \nabla_K H
-    dH_dKR = find_dH_dKR(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_R,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    dH_dKzeta = find_dH_dKzeta(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_zeta,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    dH_dKZ = find_dH_dKZ(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
+    dH_dR = dH["dH_dR"]
+    dH_dZ = dH["dH_dZ"]
+    dH_dKR = dH["dH_dKR"]
+    dH_dKzeta = dH["dH_dKzeta"]
+    dH_dKZ = dH["dH_dKZ"]
+    d2H_dR2 = dH["d2H_dR2"]
+    d2H_dZ2 = dH["d2H_dZ2"]
+    d2H_dKR2 = dH["d2H_dKR2"]
+    d2H_dKzeta2 = dH["d2H_dKzeta2"]
+    d2H_dKZ2 = dH["d2H_dKZ2"]
+    d2H_dR_dZ = dH["d2H_dR_dZ"]
+    d2H_dKR_dR = dH["d2H_dR_dKR"]
+    d2H_dKzeta_dR = dH["d2H_dR_dKzeta"]
+    d2H_dKZ_dR = dH["d2H_dR_dKZ"]
+    d2H_dKR_dZ = dH["d2H_dZ_dKR"]
+    d2H_dKzeta_dZ = dH["d2H_dZ_dKzeta"]
+    d2H_dKZ_dZ = dH["d2H_dZ_dKZ"]
+    d2H_dKR_dKZ = dH["d2H_dKR_dKZ"]
+    d2H_dKR_dKzeta = dH["d2H_dKR_dKzeta"]
+    d2H_dKzeta_dKZ = dH["d2H_dKzeta_dKZ"]
 
     # \nabla \nabla H
-    d2H_dR2 = find_d2H_dR2(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    d2H_dR_dZ = find_d2H_dR_dZ(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    d2H_dZ2 = find_d2H_dZ2(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    grad_grad_H = np.squeeze(
-        np.array(
-            [
-                [d2H_dR2.item(), 0.0, d2H_dR_dZ.item()],
-                [0.0, 0.0, 0.0],
-                [
-                    d2H_dR_dZ.item(),
-                    0.0,
-                    d2H_dZ2.item(),
-                ],  # . item() to convert variable from type ndarray to float, such that the array elements all have the same type
-            ]
-        )
+    # . item() to convert variable from type ndarray to float, such
+    # that the array elements all have the same type
+    grad_grad_H = np.array(
+        [
+            [d2H_dR2, 0.0, d2H_dR_dZ],
+            [0.0, 0.0, 0.0],
+            [d2H_dR_dZ, 0.0, d2H_dZ2],
+        ]
     )
 
     # \nabla_K \nabla H
-    d2H_dKR_dR = find_d2H_dKR_dR(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_R,
-        delta_R,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+    gradK_grad_H = np.array(
+        [
+            [d2H_dKR_dR, 0.0, d2H_dKR_dZ],
+            [d2H_dKzeta_dR, 0.0, d2H_dKzeta_dZ],
+            [d2H_dKZ_dR, 0.0, d2H_dKZ_dZ],
+        ]
     )
-    d2H_dKZ_dZ = find_d2H_dKZ_dZ(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_Z,
-        delta_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    d2H_dKR_dZ = find_d2H_dKR_dZ(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_R,
-        delta_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    d2H_dKzeta_dZ = find_d2H_dKzeta_dZ(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_zeta,
-        delta_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    d2H_dKzeta_dR = find_d2H_dKzeta_dR(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_zeta,
-        delta_R,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    d2H_dKZ_dR = find_d2H_dKZ_dR(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_Z,
-        delta_R,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    gradK_grad_H = np.squeeze(
-        np.array(
-            [
-                [d2H_dKR_dR.item(), 0.0, d2H_dKR_dZ.item()],
-                [d2H_dKzeta_dR.item(), 0.0, d2H_dKzeta_dZ.item()],
-                [d2H_dKZ_dR.item(), 0.0, d2H_dKZ_dZ.item()],
-            ]
-        )
-    )
+
     grad_gradK_H = np.transpose(gradK_grad_H)
 
     # \nabla_K \nabla_K H
-    d2H_dKR2 = find_d2H_dKR2(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_R,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    d2H_dKzeta2 = find_d2H_dKzeta2(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_zeta,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    d2H_dKZ2 = find_d2H_dKZ2(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    d2H_dKR_dKzeta = find_d2H_dKR_dKzeta(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_R,
-        delta_K_zeta,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    d2H_dKR_dKZ = find_d2H_dKR_dKZ(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_R,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    d2H_dKzeta_dKZ = find_d2H_dKzeta_dKZ(
-        q_R,
-        q_Z,
-        K_R,
-        K_zeta,
-        K_Z,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_zeta,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    )
-    gradK_gradK_H = np.squeeze(
-        np.array(
-            [
-                [d2H_dKR2.item(), d2H_dKR_dKzeta.item(), d2H_dKR_dKZ.item()],
-                [d2H_dKR_dKzeta.item(), d2H_dKzeta2.item(), d2H_dKzeta_dKZ.item()],
-                [d2H_dKR_dKZ.item(), d2H_dKzeta_dKZ.item(), d2H_dKZ2.item()],
-            ]
-        )
+    gradK_gradK_H = np.array(
+        [
+            [d2H_dKR2, d2H_dKR_dKzeta, d2H_dKR_dKZ],
+            [d2H_dKR_dKzeta, d2H_dKzeta2, d2H_dKzeta_dKZ],
+            [d2H_dKR_dKZ, d2H_dKzeta_dKZ, d2H_dKZ2],
+        ]
     )
 
     d_Psi_d_tau = (

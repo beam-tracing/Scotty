@@ -112,6 +112,7 @@ from scotty.geometry import (
     CurvySlabField,
     EFITField,
 )
+from scotty.hamiltonian import Hamiltonian
 from scotty.launch import launch_beam
 from scotty.torbeam import Torbeam
 from scotty._version import __version__
@@ -359,6 +360,18 @@ def beam_me_up(
         delta_Z,
     )
 
+    hamiltonian = Hamiltonian(
+        field,
+        launch_angular_frequency,
+        mode_flag,
+        find_density_1D,
+        delta_R,
+        delta_Z,
+        delta_K_R,
+        delta_K_zeta,
+        delta_K_Z,
+    )
+
     # -------------------
     # Launch parameters
     # -------------------
@@ -450,18 +463,7 @@ def beam_me_up(
         tau,
         ray_parameters_2D,
         K_zeta,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        hamiltonian: Hamiltonian,
         poloidal_flux_leave=poloidal_flux_enter,
     ):  # Leave at the same poloidal flux of entry
         q_R = ray_parameters_2D[0]
@@ -483,18 +485,7 @@ def beam_me_up(
         tau,
         ray_parameters_2D,
         K_zeta,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        hamiltonian: Hamiltonian,
         poloidal_flux_LCFS=1.0,
     ):
         q_R = ray_parameters_2D[0]
@@ -516,18 +507,7 @@ def beam_me_up(
         tau,
         ray_parameters_2D,
         K_zeta,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        hamiltonian: Hamiltonian,
         data_R_coord_min=field.R_coord.min(),
         data_R_coord_max=field.R_coord.max(),
         data_Z_coord_min=field.Z_coord.min(),
@@ -551,23 +531,7 @@ def beam_me_up(
     # negative value, when function result goes from positive to negative
     event_leave_simulation.direction = -1.0
 
-    def event_cross_resonance(
-        tau,
-        ray_parameters_2D,
-        K_zeta,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    ):
+    def event_cross_resonance(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
         # Currently only works when crossing resonance.
         # To implement crossing of higher harmonics as well
         delta_gyro_freq = 0.01
@@ -590,23 +554,7 @@ def beam_me_up(
     # Stop the solver when the beam is in a region of resonance
     event_cross_resonance.terminal = True
 
-    def event_reach_cutoff(
-        tau,
-        ray_parameters_2D,
-        K_zeta,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    ):
+    def event_reach_cutoff(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
         # To find tau of the cut-off, that is the location where the
         # wavenumber K is minimised
         # This function finds the turning points
@@ -618,53 +566,11 @@ def beam_me_up(
         K_Z = ray_parameters_2D[3]
         K_magnitude = np.sqrt(K_R**2 + K_Z**2 + K_zeta**2 / q_R**2)
 
-        dH_dKR = find_dH_dKR(
-            q_R,
-            q_Z,
-            K_R,
-            K_zeta,
-            K_Z,
-            launch_angular_frequency,
-            mode_flag,
-            delta_K_R,
-            interp_poloidal_flux,
-            find_density_1D,
-            find_B_R,
-            find_B_T,
-            find_B_Z,
-        )
-        dH_dR = find_dH_dR(
-            q_R,
-            q_Z,
-            K_R,
-            K_zeta,
-            K_Z,
-            launch_angular_frequency,
-            mode_flag,
-            delta_R,
-            interp_poloidal_flux,
-            find_density_1D,
-            find_B_R,
-            find_B_T,
-            find_B_Z,
-        )
-        dH_dZ = find_dH_dZ(
-            q_R,
-            q_Z,
-            K_R,
-            K_zeta,
-            K_Z,
-            launch_angular_frequency,
-            mode_flag,
-            delta_Z,
-            interp_poloidal_flux,
-            find_density_1D,
-            find_B_R,
-            find_B_T,
-            find_B_Z,
-        )
+        dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z, order=1)
 
-        d_K_d_tau = -(1 / K_magnitude) * (dH_dR * K_R + dH_dZ * K_Z + dH_dKR * q_R)
+        d_K_d_tau = -(1 / K_magnitude) * (
+            dH["dH_dR"] * K_R + dH["dH_dZ"] * K_Z + dH["dH_dKR"] * q_R
+        )
         return d_K_d_tau
 
     event_reach_cutoff.direction = 1.0
@@ -679,21 +585,7 @@ def beam_me_up(
     # If the ray hasn't left the plasma by the time this tau is reached, the solver gives up
     tau_max = 10**5
     # Stuff the solver needs to evolve beam_parameters
-    solver_arguments = (
-        K_zeta_initial,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )  # Stuff the solver needs to evolve beam_parameters
+    solver_arguments = (K_zeta_initial, hamiltonian)
 
     """
     Propagate a ray. Quickly finds tau at which the ray leaves the plasma, as well as estimates location of cut-off
