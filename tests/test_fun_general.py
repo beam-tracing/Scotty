@@ -4,6 +4,7 @@ from scotty.fun_general import (
     read_floats_into_list_until,
     find_Psi_3D_lab,
     find_Psi_3D_lab_Cartesian,
+    make_array_3x3,
 )
 
 import io
@@ -125,3 +126,11 @@ def test_Psi_cylindrical():
         ]
     )
     npt.assert_allclose(Psi_lab_cylindrical, expected + 0j)
+
+
+def test_make_array_3x3():
+    A = np.array([[1, 2], [3, 4]])
+    B = make_array_3x3(A)
+
+    expected = np.array([[1, 2, 0], [3, 4, 0], [0, 0, 0]])
+    npt.assert_array_equal(B, expected)

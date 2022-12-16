@@ -1482,6 +1482,23 @@ def genray_angles_from_mirror_angles(
 
 # ----------------------------------
 
+def make_array_3x3(array):
+    r"""Convert a 2x2 array into a 3x3 by appending zeros on the outside:
 
-# Functions ()
-# ----------------------------------
+    .. math::
+
+        \begin{pmatrix}
+            a & b \\
+            c & d \\
+        \end{pmatrix}
+        \Rightarrow
+        \begin{pmatrix}
+            a & b & 0 \\
+            c & d & 0 \\
+            0 & 0 & 0 \\
+        \end{pmatrix}
+    """
+    if array.shape != (2, 2):
+        raise ValueError(f"Expected array shape to be (2, 2), got {array.shape}")
+
+    return np.append(np.append(array, [[0, 0]], axis=0), [[0], [0], [0]], axis=1)

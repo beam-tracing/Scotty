@@ -1,9 +1,7 @@
 from scotty.beam_me_up import (
     beam_me_up,
     create_magnetic_geometry,
-    launch_beam,
     make_density_fit,
-    find_entry_point,
 )
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.torbeam import Torbeam
@@ -12,6 +10,7 @@ from scotty.fun_general import (
     freq_GHz_to_angular_frequency,
     angular_frequency_to_wavenumber,
 )
+from scotty.launch import find_entry_point, launch_beam
 
 import json
 import numpy as np
