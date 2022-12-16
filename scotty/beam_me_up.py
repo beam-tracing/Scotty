@@ -68,7 +68,6 @@ from __future__ import annotations
 import numpy as np
 from scipy import integrate as integrate
 from scipy import constants as constants
-from scipy.optimize import root_scalar, direct
 import matplotlib.pyplot as plt
 import sys
 import bisect
@@ -86,22 +85,10 @@ from scotty.fun_general import (
     freq_GHz_to_angular_frequency,
     angular_frequency_to_wavenumber,
 )
-from scotty.fun_general import (
-    find_inverse_2D,
-    find_Psi_3D_lab,
-    find_q_lab_Cartesian,
-    find_K_lab_Cartesian,
-    find_K_lab,
-    find_Psi_3D_lab_Cartesian,
-)
+from scotty.fun_general import find_q_lab_Cartesian, find_Psi_3D_lab_Cartesian
 from scotty.fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq
 from scotty.fun_general import find_epsilon_para, find_epsilon_perp, find_epsilon_g
 from scotty.fun_general import find_dbhat_dR, find_dbhat_dZ
-from scotty.fun_general import (
-    find_d_poloidal_flux_dR,
-    find_d_poloidal_flux_dZ,
-    find_Psi_3D_plasma,
-)
 from scotty.fun_general import find_H_Cardano, find_D
 from scotty.fun_evolution import ray_evolution_2D_fun, beam_evolution_fun
 from scotty.fun_evolution import (
