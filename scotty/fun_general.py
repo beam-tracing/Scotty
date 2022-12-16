@@ -1482,6 +1482,7 @@ def genray_angles_from_mirror_angles(
 
 # ----------------------------------
 
+
 def make_array_3x3(array):
     r"""Convert a 2x2 array into a 3x3 by appending zeros on the outside:
 
