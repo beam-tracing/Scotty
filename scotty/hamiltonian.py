@@ -6,7 +6,7 @@ from scotty.fun_general import (
     find_normalised_plasma_freq,
     contract_special,
 )
-from scotty.typing import ArrayLike
+from scotty.typing import ArrayLike, FloatArray
 
 
 from dataclasses import dataclass, asdict
@@ -203,3 +203,68 @@ class Hamiltonian:
             }
             derivatives.update(second_derivatives)
         return derivatives
+
+
+def laplacians(dH: dict):
+    r"""Compute the Laplacians of the Hamiltonian:
+
+    .. math::
+        \grad \grad H
+        \grad_K \grad H
+        \grad_K \grad_K H
+
+    given a ``dict`` containing the second derivatives of the Hamiltonian
+    """
+
+    d2H_dR2 = dH["d2H_dR2"]
+    d2H_dZ2 = dH["d2H_dZ2"]
+    d2H_dKR2 = dH["d2H_dKR2"]
+    d2H_dKzeta2 = dH["d2H_dKzeta2"]
+    d2H_dKZ2 = dH["d2H_dKZ2"]
+    d2H_dR_dZ = dH["d2H_dR_dZ"]
+    d2H_dKR_dR = dH["d2H_dR_dKR"]
+    d2H_dKzeta_dR = dH["d2H_dR_dKzeta"]
+    d2H_dKZ_dR = dH["d2H_dR_dKZ"]
+    d2H_dKR_dZ = dH["d2H_dZ_dKR"]
+    d2H_dKzeta_dZ = dH["d2H_dZ_dKzeta"]
+    d2H_dKZ_dZ = dH["d2H_dZ_dKZ"]
+    d2H_dKR_dKZ = dH["d2H_dKR_dKZ"]
+    d2H_dKR_dKzeta = dH["d2H_dKR_dKzeta"]
+    d2H_dKzeta_dKZ = dH["d2H_dKzeta_dKZ"]
+
+    zeros = np.zeros_like(d2H_dR2)
+
+    def reshape(array: FloatArray):
+        """Such that shape is [points,3,3] instead of [3,3,points]"""
+        if array.ndim == 2:
+            return array
+        return np.moveaxis(np.squeeze(array), 2, 0)
+
+    grad_grad_H = reshape(
+        np.array(
+            [
+                [d2H_dR2, zeros, d2H_dR_dZ],
+                [zeros, zeros, zeros],
+                [d2H_dR_dZ, zeros, d2H_dZ2],
+            ]
+        )
+    )
+    gradK_grad_H = reshape(
+        np.array(
+            [
+                [d2H_dKR_dR, zeros, d2H_dKR_dZ],
+                [d2H_dKzeta_dR, zeros, d2H_dKzeta_dZ],
+                [d2H_dKZ_dR, zeros, d2H_dKZ_dZ],
+            ]
+        )
+    )
+    gradK_gradK_H = reshape(
+        np.array(
+            [
+                [d2H_dKR2, d2H_dKR_dKzeta, d2H_dKR_dKZ],
+                [d2H_dKR_dKzeta, d2H_dKzeta2, d2H_dKzeta_dKZ],
+                [d2H_dKR_dKZ, d2H_dKzeta_dKZ, d2H_dKZ2],
+            ]
+        )
+    )
+    return grad_grad_H, gradK_grad_H, gradK_gradK_H

@@ -91,11 +91,6 @@ from scotty.fun_general import find_epsilon_para, find_epsilon_perp, find_epsilo
 from scotty.fun_general import find_dbhat_dR, find_dbhat_dZ
 from scotty.fun_general import find_H_Cardano, find_D
 from scotty.fun_evolution import ray_evolution_2D_fun, beam_evolution_fun
-from scotty.fun_evolution import (
-    find_grad_grad_H_vectorised,
-    find_gradK_grad_H_vectorised,
-    find_gradK_gradK_H_vectorised,
-)
 
 # For find_B if using efit files directly
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
@@ -108,7 +103,7 @@ from scotty.geometry import (
     CurvySlabField,
     EFITField,
 )
-from scotty.hamiltonian import Hamiltonian
+from scotty.hamiltonian import Hamiltonian, laplacians
 from scotty.launch import launch_beam
 from scotty.torbeam import Torbeam
 from scotty._version import __version__
@@ -933,7 +928,7 @@ def beam_me_up(
     electron_density_output = np.asfarray(find_density_1D(poloidal_flux_output))
 
     dH = hamiltonian.derivatives(
-        q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, order=1
+        q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, order=2
     )
 
     dH_dR_output = dH["dH_dR"]
@@ -1932,61 +1927,7 @@ def beam_me_up(
     # print('ST first 2 terms / ST full: ', abs((G_term2[theta_m_min_idx]+G_term1[theta_m_min_idx])/G_full[theta_m_min_idx]) )
 
     # Calculates nabla nabla H, nabla_K nabla H, nabla_K nabla_K H
-    grad_grad_H = find_grad_grad_H_vectorised(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
-
-    gradK_grad_H = find_gradK_grad_H_vectorised(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        delta_R,
-        delta_Z,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
-    grad_gradK_H = np.swapaxes(gradK_grad_H, 2, 1)
-
-    gradK_gradK_H = find_gradK_gradK_H_vectorised(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
+    grad_grad_H, gradK_grad_H, gradK_gradK_H = laplacians(dH)
 
     # gradK_gradK_H[:,0,1] = - gradK_gradK_H[:,0,1]
 

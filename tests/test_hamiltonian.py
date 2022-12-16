@@ -1,9 +1,10 @@
-from scotty.hamiltonian import Hamiltonian
+from scotty.hamiltonian import Hamiltonian, laplacians
 from scotty.fun_general import freq_GHz_to_angular_frequency
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.beam_me_up import create_magnetic_geometry
 
 import numpy as np
+from numpy.testing import assert_allclose
 
 import pytest
 
@@ -90,6 +91,35 @@ def test_hamiltonian_derivatives():
     assert np.isclose(d2H_dKR_dKZ, k_K_R * k_K_Z)
     assert np.isclose(d2H_dKR_dKzeta, k_K_R * k_K_zeta)
     assert np.isclose(d2H_dKzeta_dKZ, k_K_zeta * k_K_Z)
+
+
+def test_hamiltonian_laplacians():
+    H = FakeHamiltonian(1e-3, 1e-3, 1e-4, 1e-4, 1e-4)
+    dH = H.derivatives(1.2, 2.3, 3.4, 4.5, 5.6, order=2)
+    H0 = H(1.2, 2.3, 3.4, 4.5, 5.6)
+
+    grad_grad_H, gradK_grad_H, gradK_gradK_H = laplacians(dH)
+
+    grad_grad_H_expected = np.array(
+        [[k_q_R**2, 0, k_q_R * k_q_Z], [0, 0, 0], [k_q_R * k_q_Z, 0, k_q_Z**2]]
+    )
+    gradK_grad_H_expected = np.array(
+        [
+            [k_K_R * k_q_R, 0, k_K_R * k_q_Z],
+            [k_K_zeta * k_q_R, 0, k_K_zeta * k_q_Z],
+            [k_K_Z * k_q_R, 0, k_K_Z * k_q_Z],
+        ]
+    )
+    gradK_gradK_H_expected = np.array(
+        [
+            [k_K_R**2, k_K_R * k_K_zeta, k_K_R * k_K_Z],
+            [k_K_zeta * k_K_R, k_K_zeta**2, k_K_zeta * k_K_Z],
+            [k_K_Z * k_K_R, k_K_Z * k_K_zeta, k_K_Z**2],
+        ]
+    )
+    assert_allclose(grad_grad_H / H0, grad_grad_H_expected, rtol=1e-5, atol=1e-4)
+    assert_allclose(gradK_grad_H / H0, gradK_grad_H_expected, rtol=1e-5, atol=1e-4)
+    assert_allclose(gradK_gradK_H / H0, gradK_gradK_H_expected, rtol=1e-5, atol=1e-4)
 
 
 @pytest.mark.parametrize(
