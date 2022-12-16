@@ -247,8 +247,8 @@ def synthetic_args():
         minor_radius_a=kwargs_dict["minor_radius_a"],
         B_T_axis=kwargs_dict["B_T_axis"],
         B_p_a=kwargs_dict["B_p_a"],
-        R_points=100,
-        Z_points=100,
+        R_points=256,
+        Z_points=256,
         grid_buffer_factor=1.1,
     )
     x_meshgrid, z_meshgrid = np.meshgrid(field.R_coord, field.Z_coord, indexing="ij")
@@ -769,4 +769,4 @@ def test_find_entry_point(
         field,
     )
 
-    assert_allclose(entry_position, expected_entry, 1e-7, 1e-7)
+    assert_allclose(entry_position, expected_entry, 1e-6, 1e-6)
