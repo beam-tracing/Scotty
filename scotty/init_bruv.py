@@ -302,7 +302,6 @@ def user_settings(diagnostic, user, shot):
         efitpp_path = None
 
     elif user in ["Valerian_desktop", "Valerian_laptop"]:
-
         if user == "Valerian_desktop":
             prefix = pathlib.Path("D:\\Dropbox\\")
         elif user == "Valerian_laptop":

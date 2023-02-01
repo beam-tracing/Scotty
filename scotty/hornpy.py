@@ -92,7 +92,6 @@ class SpeirsAsymmetricConicalHorn(Conical_Horn):
     """Uses David Speirs' CST simulation data"""
 
     def output_beam(self, freq_GHz):
-
         # Beam waist widths don't change very much, it seems
         # From horn simulation's electric field (35 GHz)
         # in meters
