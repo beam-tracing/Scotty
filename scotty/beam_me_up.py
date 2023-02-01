@@ -2226,6 +2226,7 @@ def beam_me_up(
     # Converting x_hat, y_hat, and Psi_3D to Cartesians so we can contract them with each other
     y_hat_Cartesian = np.zeros([numberOfDataPoints, 3])
     x_hat_Cartesian = np.zeros([numberOfDataPoints, 3])
+    g_hat_Cartesian = np.zeros([numberOfDataPoints,3])
     y_hat_Cartesian[:, 0] = y_hat_output[:, 0] * np.cos(q_zeta_array) - y_hat_output[
         :, 1
     ] * np.sin(q_zeta_array)
@@ -2240,6 +2241,9 @@ def beam_me_up(
         :, 1
     ] * np.cos(q_zeta_array)
     x_hat_Cartesian[:, 2] = x_hat_output[:, 2]
+    g_hat_Cartesian[:,0] = g_hat_output[:,0]*np.cos(q_zeta_array ) - g_hat_output[:,1]*np.sin(q_zeta_array )
+    g_hat_Cartesian[:,1] = g_hat_output[:,0]*np.sin(q_zeta_array ) + g_hat_output[:,1]*np.cos(q_zeta_array )
+    g_hat_Cartesian[:,2] = g_hat_output[:,2]
 
     Psi_3D_Cartesian = find_Psi_3D_lab_Cartesian(
         Psi_3D_output, q_R_array, q_zeta_array, K_R_array, K_zeta_initial
@@ -2253,6 +2257,9 @@ def beam_me_up(
     Psi_yy_output = contract_special(
         y_hat_Cartesian, contract_special(Psi_3D_Cartesian, y_hat_Cartesian)
     )
+    Psi_xg_output = contract_special(x_hat_Cartesian,contract_special(Psi_3D_Cartesian,g_hat_Cartesian))
+    Psi_yg_output = contract_special(y_hat_Cartesian,contract_special(Psi_3D_Cartesian,g_hat_Cartesian))
+    Psi_gg_output = contract_special(g_hat_Cartesian,contract_special(Psi_3D_Cartesian,g_hat_Cartesian))    
 
     Psi_xx_entry = np.dot(
         x_hat_Cartesian[0, :],
@@ -3137,12 +3144,16 @@ def beam_me_up(
         Psi_xx_output=Psi_xx_output,
         Psi_xy_output=Psi_xy_output,
         Psi_yy_output=Psi_yy_output,
+        Psi_xg_output=Psi_xg_output,
+        Psi_yg_output=Psi_yg_output,
+        Psi_gg_output=Psi_gg_output,
         Psi_xx_entry=Psi_xx_entry,
         Psi_xy_entry=Psi_xy_entry,
         Psi_yy_entry=Psi_yy_entry,
         Psi_3D_Cartesian=Psi_3D_Cartesian,
         x_hat_Cartesian=x_hat_Cartesian,
         y_hat_Cartesian=y_hat_Cartesian,
+        g_hat_Cartesian=g_hat_Cartesian,        
         M_xx_output=M_xx_output,
         M_xy_output=M_xy_output,
         M_yy_output=M_yy_output,

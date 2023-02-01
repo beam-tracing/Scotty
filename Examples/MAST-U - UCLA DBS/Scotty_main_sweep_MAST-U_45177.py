@@ -132,7 +132,7 @@ for ii, equil_time in enumerate(equil_times):
                     if ii == 0 and jj == 0 and kk == 0 and kk == ll:
                         kwargs_dict["verbose_output_flag"] = True
                     else:
-                        kwargs_dict["verbose_output_flag"] = False
+                        kwargs_dict["verbose_output_flag"] = False    
     
                     data_output = (
                         kwargs_dict["output_path"]
