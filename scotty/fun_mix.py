@@ -33,7 +33,6 @@ def find_d2H_dKR_dR(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dR_plus = find_dH_dR(
         q_R,
         q_Z,
@@ -85,7 +84,6 @@ def find_d2H_dKR_dZ(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dZ_plus = find_dH_dZ(
         q_R,
         q_Z,
@@ -137,7 +135,6 @@ def find_d2H_dKzeta_dR(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dR_plus = find_dH_dR(
         q_R,
         q_Z,
@@ -189,7 +186,6 @@ def find_d2H_dKzeta_dZ(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dZ_plus = find_dH_dZ(
         q_R,
         q_Z,
@@ -241,7 +237,6 @@ def find_d2H_dKZ_dR(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dR_plus = find_dH_dR(
         q_R,
         q_Z,
@@ -293,7 +288,6 @@ def find_d2H_dKZ_dZ(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dZ_plus = find_dH_dZ(
         q_R,
         q_Z,

@@ -35,7 +35,6 @@ def check_mode_flag(mode_flag):
 
 
 def check_input(mode_flag):
-
     check_mode_flag(mode_flag)
 
     return None

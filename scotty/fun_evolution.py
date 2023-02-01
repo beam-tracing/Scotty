@@ -36,6 +36,7 @@ from scotty.fun_mix import (
 
 from scotty.fun_general import find_H_numba
 
+
 # Functions (gradients of H, vectorised)
 def find_grad_grad_H_vectorised(
     q_R,

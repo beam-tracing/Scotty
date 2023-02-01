@@ -31,7 +31,6 @@ def find_dH_dR(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus = find_H(
         q_R + delta_R,
         q_Z,
@@ -79,7 +78,6 @@ def find_dH_dZ(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus = find_H(
         q_R,
         q_Z + delta_Z,
@@ -128,7 +126,6 @@ def find_dH_dKR(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus = find_H(
         q_R,
         q_Z,
@@ -177,7 +174,6 @@ def find_dH_dKzeta(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus = find_H(
         q_R,
         q_Z,
@@ -226,7 +222,6 @@ def find_dH_dKZ(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus = find_H(
         q_R,
         q_Z,
@@ -275,7 +270,6 @@ def find_d2H_dR2(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus = find_H(
         q_R + delta_R,
         q_Z,
@@ -338,7 +332,6 @@ def find_d2H_dZ2(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus = find_H(
         q_R,
         q_Z + delta_Z,
@@ -402,7 +395,6 @@ def find_d2H_dR_dZ(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus_R_plus_Z = find_H(
         q_R + delta_R,
         q_Z + delta_Z,
@@ -481,7 +473,6 @@ def find_d2H_dKR2(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus = find_H(
         q_R,
         q_Z,
@@ -545,7 +536,6 @@ def find_d2H_dKR_dKzeta(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus_K_R_plus_K_zeta = find_H(
         q_R,
         q_Z,
@@ -628,7 +618,6 @@ def find_d2H_dKR_dKZ(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus_K_R_plus_K_z = find_H(
         q_R,
         q_Z,
@@ -710,7 +699,6 @@ def find_d2H_dKzeta2(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus = find_H(
         q_R,
         q_Z,
@@ -774,7 +762,6 @@ def find_d2H_dKzeta_dKZ(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus_K_zeta_plus_K_z = find_H(
         q_R,
         q_Z,
@@ -856,7 +843,6 @@ def find_d2H_dKZ2(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus = find_H(
         q_R,
         q_Z,
@@ -920,7 +906,6 @@ def find_d2H_dKR_dR(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus_K_R_plus_R = find_H(
         q_R + delta_R,
         q_Z,
@@ -1003,7 +988,6 @@ def find_d2H_dKR_dZ(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus_K_R_plus_Z = find_H(
         q_R,
         q_Z + delta_Z,
@@ -1086,7 +1070,6 @@ def find_d2H_dKzeta_dR(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus_K_zeta_plus_R = find_H(
         q_R + delta_R,
         q_Z,
@@ -1169,7 +1152,6 @@ def find_d2H_dKzeta_dZ(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus_K_zeta_plus_Z = find_H(
         q_R,
         q_Z + delta_Z,
@@ -1252,7 +1234,6 @@ def find_d2H_dKZ_dR(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus_K_Z_plus_R = find_H(
         q_R + delta_R,
         q_Z,
@@ -1335,7 +1316,6 @@ def find_d2H_dKZ_dZ(
     find_B_T,
     find_B_Z,
 ):
-
     H_plus_K_Z_plus_Z = find_H(
         q_R,
         q_Z + delta_Z,
@@ -1403,7 +1383,6 @@ def find_d2H_dKZ_dZ(
 
 
 def find_dpolflux_dR(q_R, q_Z, delta_R, interp_poloidal_flux):
-
     polflux_plus = interp_poloidal_flux(q_R + delta_R, q_Z, grid=False)
     polflux_minus = interp_poloidal_flux(q_R - delta_R, q_Z, grid=False)
     dpolflux_dR = (polflux_plus - polflux_minus) / (2 * delta_R)
@@ -1412,7 +1391,6 @@ def find_dpolflux_dR(q_R, q_Z, delta_R, interp_poloidal_flux):
 
 
 def find_dpolflux_dZ(q_R, q_Z, delta_Z, interp_poloidal_flux):
-
     polflux_plus = interp_poloidal_flux(q_R, q_Z + delta_Z, grid=False)
     polflux_minus = interp_poloidal_flux(q_R, q_Z - delta_Z, grid=False)
     dpolflux_dZ = (polflux_plus - polflux_minus) / (2 * delta_Z)

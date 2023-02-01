@@ -26,7 +26,6 @@ from scotty.fun_general import (
 
 
 def plot():
-
     efit_time = 220  # in ms
     launch_freq_GHz = 67.5
     mirror_rotation_angle = -3.0
