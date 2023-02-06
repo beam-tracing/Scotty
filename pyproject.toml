@@ -18,7 +18,7 @@ dependencies = [
     "scipy",
     "matplotlib",
     "netCDF4",
-    "freegs",
+    "freeqdsk==0.1.0",
 ]
 dynamic = ["version"]
 
