@@ -20,7 +20,6 @@ from scipy import constants
 
 
 def plot(suffix="_Torbeam_benchmark"):
-
     loadfile = np.load("data_output" + suffix + ".npz")
     tau_array = loadfile["tau_array"]
     q_R_array = loadfile["q_R_array"]

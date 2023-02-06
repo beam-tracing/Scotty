@@ -17,7 +17,6 @@ from scotty.fun_general import (
 
 
 def plot(suffix1="01", suffix2="02"):
-
     loadfile = np.load("data_output" + suffix1 + ".npz")
     q_R_array1 = loadfile["q_R_array"]
     q_zeta_array1 = loadfile["q_zeta_array"]

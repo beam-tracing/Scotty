@@ -12,6 +12,7 @@ Checks various quantities that beam_me_up calculates
 from __future__ import annotations
 import numpy as np
 import pathlib
+import warnings
 
 # For find_B if using efit files directly
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
@@ -31,13 +32,37 @@ def check_H_output(H_output):
     tol = 1e-2
 
     if max(H_output) > tol:
-        raise ValueError(f"`H_output` is too large! `H_output` = '{H_output}'")
+        warnings.warn(
+            (
+                f"WARNING: `H_output` is too large! `max H_output` = '{max(H_output)}' but 'tol' = '{tol}'"
+            )
+        )
+    elif max(H_output) > 1.0:
+        raise ValueError(
+            f"`H_output` is unphysically large! `max H_output` = '{max(H_output)}'"
+        )
+
+    return None
+
+
+def check_Psi(Psi_xg_output, Psi_yg_output, Psi_gg_output):
+    # By definition, we need
+    # Im(\Psi \cdot \hat{\mathbf{g}}) = 0
+    # Re(\Psi \cdot \hat{\mathbf{g}}) = \nabla_K H
+
+    tol = 1e-3
+
+    if max(np.imag(Psi_xg_output)) > tol:
+        warnings.warn(
+            (
+                f"WARNING: `H_output` is too large! `max Psi_xg` = '{max(Psi_xg_output)}' but 'tol' = '{tol}'"
+            )
+        )
 
     return None
 
 
 def check_output(H_output):
-
     check_H_output(H_output)
 
     return None

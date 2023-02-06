@@ -17,7 +17,6 @@ from scotty.fun_general import (
 
 
 def plot():
-
     loadfile = np.load("data_input0.npz")
     launch_position = loadfile["launch_position"]
     launch_K = loadfile["launch_K"]

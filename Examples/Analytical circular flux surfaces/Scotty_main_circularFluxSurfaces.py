@@ -4,7 +4,7 @@ Created on Fri Jun  8 10:44:34 2018
 
 @author: VH Hall-Chen
 Valerian Hongjie Hall-Chen
-valerian@hall-chen.com
+valerian_hall-chen@ihpc.a-star.edu.sg
 
 
 """
@@ -22,6 +22,7 @@ kwargs_dict = {
     "launch_beam_curvature": -0.25,
     "launch_position": np.array([2.587, 0.0, -0.0157]),
     "density_fit_parameters": np.array([4.0, 1.0]),
+    "density_fit_method": "quadratic",
     "find_B_method": "analytical",
     "Psi_BC_flag": True,
     "figure_flag": False,

@@ -16,7 +16,8 @@ from scotty.init_bruv import get_parameters_for_Scotty
 pol_launch_angles = np.array([-11.4])
 tor_launch_angles = np.linspace(-4.0, 9.0, 131)
 # launch_freqs_GHz = np.array([55.0,57.5,60.0,62.5,65.0,67.5,70.0,72.5,75.0])
-launch_freqs_GHz = np.array([52.5, 77.5])
+# launch_freqs_GHz = np.array([52.5, 77.5])
+launch_freqs_GHz = np.array([52.5,55.0,57.5,60.0,62.5,65.0,67.5,70.0,72.5,75.0,77.5])
 
 
 equil_time = 1900.0
@@ -33,7 +34,7 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
             kwargs_dict = get_parameters_for_Scotty(
                 "DBS_UCLA_DIII-D_240",
                 launch_freq_GHz=launch_freq_GHz,
-                find_B_method="torbeam",  # EFITpp, UDA_saved, UDA, torbeam
+                find_B_method="omfit",  # EFITpp, UDA_saved, UDA, torbeam
                 equil_time=equil_time,
                 shot=188839,
                 user="Valerian_desktop",
@@ -45,10 +46,10 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
 
             kwargs_dict["poloidal_flux_enter"] = 1.44
             kwargs_dict["input_filename_suffix"] = "_188839_1900ms"
-            # kwargs_dict['output_path'] = os.path.dirname(os.path.abspath(__file__)) + '\\Output\\'
+            kwargs_dict['ne_data_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Equilibrium\\DIII-D\\'
             kwargs_dict[
                 "output_path"
-            ] = "D:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 28\\"
+            ] = "D:\\Dropbox\\VHChen2022\\Data - Scotty\\Run 9\\"
 
             kwargs_dict["delta_R"] = -0.00001
             kwargs_dict["delta_Z"] = -0.00001

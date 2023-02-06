@@ -29,7 +29,7 @@ import argparse
 import pathlib
 
 import numpy as np
-import freegs._fileutils as fortran
+import freeqdsk._fileutils as fortran
 
 from scotty.fun_general import read_floats_into_list_until
 from scotty.geometry import ConstantCurrentDensityField
