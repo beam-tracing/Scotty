@@ -32,7 +32,7 @@ import numpy as np
 import freeqdsk._fileutils as fortran
 
 from scotty.fun_general import read_floats_into_list_until
-from scotty.geometry import CircularCrossSection
+from scotty.geometry import ConstantCurrentDensityField
 from scotty.typing import PathLike
 
 
@@ -217,28 +217,25 @@ def write_torbeam_file(
     B_poloidal_max: float,
     torbeam_directory_path: pathlib.Path,
 ):
-    """Write a TORBEAM magnetic geometry file based on a circular
-    cross-section equilibrium"""
+    """Write a TORBEAM magnetic geometry file based on a constant
+    current density equilibrium"""
 
-    x_grid_start = major_radius - buffer_factor * minor_radius
-    x_grid_end = major_radius + buffer_factor * minor_radius
-    z_grid_start = -buffer_factor * minor_radius
-    z_grid_end = buffer_factor * minor_radius
-
-    x_grid = np.linspace(x_grid_start, x_grid_end, x_grid_length)
-    z_grid = np.linspace(z_grid_start, z_grid_end, z_grid_length)
-
-    x_meshgrid, z_meshgrid = np.meshgrid(x_grid, z_grid, indexing="ij")
-    field = CircularCrossSection(
-        B_toroidal_max, major_radius, minor_radius, B_poloidal_max
+    field = ConstantCurrentDensityField(
+        B_toroidal_max,
+        major_radius,
+        minor_radius,
+        B_poloidal_max,
+        x_grid_length,
+        z_grid_length,
+        buffer_factor,
     )
+    x_meshgrid, z_meshgrid = np.meshgrid(field.R_coord, field.Z_coord, indexing="ij")
     B_t = field.B_T(x_meshgrid, z_meshgrid)
     B_r = field.B_R(x_meshgrid, z_meshgrid)
     B_z = field.B_Z(x_meshgrid, z_meshgrid)
     psi = field.poloidal_flux(x_meshgrid, z_meshgrid)
 
-    # Write topfile
-    Torbeam(x_grid, z_grid, B_r, B_t, B_z, psi).write(
+    Torbeam(field.R_coord, field.Z_coord, B_r, B_t, B_z, psi).write(
         torbeam_directory_path / "topfile"
     )
 

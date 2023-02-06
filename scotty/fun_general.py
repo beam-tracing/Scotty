@@ -507,7 +507,7 @@ def find_H(
     K_magnitude = np.sqrt(K_R**2 + (K_zeta / q_R) ** 2 + K_Z**2)
     wavenumber_K0 = launch_angular_frequency / constants.c
 
-    poloidal_flux = interp_poloidal_flux(q_R, q_Z, grid=False)
+    poloidal_flux = interp_poloidal_flux(q_R, q_Z)
     electron_density = find_density_1D(poloidal_flux)
     B_R = np.squeeze(find_B_R(q_R, q_Z))
     B_T = np.squeeze(find_B_T(q_R, q_Z))

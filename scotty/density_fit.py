@@ -2,10 +2,9 @@ from __future__ import annotations
 from typing import Callable, Optional, List, Dict, Union, Sequence
 from warnings import warn
 
-from scotty.typing import PathLike
+from scotty.typing import PathLike, ArrayLike
 
 import numpy as np
-from numpy.typing import ArrayLike
 from scipy.interpolate import UnivariateSpline
 
 

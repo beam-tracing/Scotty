@@ -1383,16 +1383,18 @@ def find_d2H_dKZ_dZ(
 
 
 def find_dpolflux_dR(q_R, q_Z, delta_R, interp_poloidal_flux):
-    polflux_plus = interp_poloidal_flux(q_R + delta_R, q_Z, grid=False)
-    polflux_minus = interp_poloidal_flux(q_R - delta_R, q_Z, grid=False)
+    polflux_plus = interp_poloidal_flux(q_R + delta_R, q_Z)
+    polflux_minus = interp_poloidal_flux(q_R - delta_R, q_Z)
+
     dpolflux_dR = (polflux_plus - polflux_minus) / (2 * delta_R)
 
     return dpolflux_dR
 
 
 def find_dpolflux_dZ(q_R, q_Z, delta_Z, interp_poloidal_flux):
-    polflux_plus = interp_poloidal_flux(q_R, q_Z + delta_Z, grid=False)
-    polflux_minus = interp_poloidal_flux(q_R, q_Z - delta_Z, grid=False)
+    polflux_plus = interp_poloidal_flux(q_R, q_Z + delta_Z)
+    polflux_minus = interp_poloidal_flux(q_R, q_Z - delta_Z)
+
     dpolflux_dZ = (polflux_plus - polflux_minus) / (2 * delta_Z)
 
     return dpolflux_dZ
