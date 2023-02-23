@@ -7,7 +7,7 @@ I've separated this from scotty.fun_general to prevent circular importing
 
 @author: chenv
 Valerian Hongjie Hall-Chen
-valerian@hall-chen.com
+valerian_hall-chen@ihpc.a-star.edu.sg
 
 Run in Python 3,  does not work in Python 2
 """
@@ -35,6 +35,7 @@ from scotty.fun_mix import (
 )  # \nabla_K \nabla H
 
 from scotty.fun_general import find_H_numba
+
 
 # Functions (gradients of H, vectorised)
 def find_grad_grad_H_vectorised(

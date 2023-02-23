@@ -4,7 +4,7 @@ lens-a-lot
 
 Created on Sat Apr 17 16:23:01 2021
 
-@author: VH Hall-Chen (valerian@hall-chen.com)
+@author: VH Hall-Chen (valerian_hall-chen@ihpc.a-star.edu.sg)
 
 Transfer matrix (2x2):
 

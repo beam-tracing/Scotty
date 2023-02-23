@@ -6,7 +6,7 @@ Functions for Scotty (excluding functions for finding derivatives of H).
 
 @author: chenv
 Valerian Hongjie Hall-Chen
-valerian@hall-chen.com
+valerian_hall-chen@ihpc.a-star.edu.sg
 
 Run in Python 3,  does not work in Python 2
 """
@@ -195,6 +195,7 @@ def find_area_points(xs, ys, fraction_wanted):
 
 
 # ----------------------------------
+
 
 # Functions (Coordinate transformations)
 def freq_GHz_to_angular_frequency(freq_GHz: float) -> float:
@@ -389,9 +390,9 @@ def find_Psi_3D_lab_Cartesian(Psi_3D_lab, q_R, q_zeta, K_R, K_zeta):
 
 # ----------------------------------
 
+
 # Functions (beam tracing 1)
 def find_normalised_plasma_freq(electron_density, launch_angular_frequency):
-
     #    if electron_density < 0:
     #        print(electron_density)
     #        electron_density=0
@@ -406,7 +407,6 @@ def find_normalised_plasma_freq(electron_density, launch_angular_frequency):
 
 
 def find_normalised_gyro_freq(B_Total, launch_angular_frequency):
-
     normalised_gyro_freq = (
         constants.e * B_Total / (constants.m_e * launch_angular_frequency)
     )
@@ -456,7 +456,6 @@ def find_epsilon_g(electron_density, B_Total, launch_angular_frequency):
 def find_Booker_alpha(
     electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency
 ):
-
     epsilon_para = find_epsilon_para(electron_density, launch_angular_frequency)
     epsilon_perp = find_epsilon_perp(
         electron_density, B_Total, launch_angular_frequency
@@ -469,7 +468,6 @@ def find_Booker_alpha(
 def find_Booker_beta(
     electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency
 ):
-
     epsilon_perp = find_epsilon_perp(
         electron_density, B_Total, launch_angular_frequency
     )
@@ -483,7 +481,6 @@ def find_Booker_beta(
 
 
 def find_Booker_gamma(electron_density, B_Total, launch_angular_frequency):
-
     epsilon_perp = find_epsilon_perp(
         electron_density, B_Total, launch_angular_frequency
     )
@@ -613,7 +610,6 @@ def find_H_numba(
 # Functions (interface)
 # For going from vacuum to plasma (Will one day implement going from plasma to vacuum)
 def find_d_poloidal_flux_dR(q_R, q_Z, delta_R, interp_poloidal_flux):
-
     poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
     poloidal_flux_1 = interp_poloidal_flux(q_R + delta_R, q_Z)
     poloidal_flux_2 = interp_poloidal_flux(q_R + 2 * delta_R, q_Z)
@@ -625,7 +621,6 @@ def find_d_poloidal_flux_dR(q_R, q_Z, delta_R, interp_poloidal_flux):
 
 
 def find_d_poloidal_flux_dZ(q_R, q_Z, delta_Z, interp_poloidal_flux):
-
     poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
     poloidal_flux_1 = interp_poloidal_flux(q_R, q_Z + delta_Z)
     poloidal_flux_2 = interp_poloidal_flux(q_R, q_Z + 2 * delta_Z)
@@ -954,6 +949,7 @@ def find_ST_terms(
 
 # ----------------------------------
 
+
 # Functions (for runs with only ray tracing and no beam tracing)
 ## Not used yet, still being written
 def find_quick_output(ray_parameters_2D, K_zeta_initial, find_B_R, find_B_T, find_B_Z):
@@ -974,6 +970,7 @@ def find_quick_output(ray_parameters_2D, K_zeta_initial, find_B_R, find_B_T, fin
 
 
 # ----------------------------------
+
 
 # Functions (circular Gaussian beam in vacuum)
 def find_Rayleigh_length(
@@ -1003,6 +1000,7 @@ def find_distance_from_waist(
 # def propagate_circular_beam(distance,wavenumber,w0):
 #     """
 #     w0 : Width of beam waist
+
 
 #     Note that the curvature in this function returns has units of inverse length.
 #     """
@@ -1169,7 +1167,6 @@ def find_d2B_dR2_CFD(q_R, q_Z, delta_R, find_B_R, find_B_T, find_B_Z):
 
 
 def find_d2B_dZ2_CFD(q_R, q_Z, delta_Z, find_B_R, find_B_T, find_B_Z):
-
     B_R_0 = np.squeeze(find_B_R(q_R, q_Z))
     B_T_0 = np.squeeze(find_B_T(q_R, q_Z))
     B_Z_0 = np.squeeze(find_B_Z(q_R, q_Z))
@@ -1299,7 +1296,6 @@ def find_d2B_dR2_FFD(q_R, q_Z, delta_R, find_B_R, find_B_T, find_B_Z):
 
 
 def find_d2B_dZ2_FFD(q_R, q_Z, delta_Z, find_B_R, find_B_T, find_B_Z):
-
     B_R_0 = np.squeeze(find_B_R(q_R, q_Z))
     B_T_0 = np.squeeze(find_B_T(q_R, q_Z))
     B_Z_0 = np.squeeze(find_B_Z(q_R, q_Z))
@@ -1331,7 +1327,6 @@ def find_d2B_dZ2_FFD(q_R, q_Z, delta_Z, find_B_R, find_B_T, find_B_Z):
 
 
 def find_d2B_dR_dZ_FFD(q_R, q_Z, delta_R, delta_Z, find_B_R, find_B_T, find_B_Z):
-
     dB_dZ_0 = find_dB_dZ_FFD(q_R, q_Z, delta_Z, find_B_R, find_B_T, find_B_Z)
     dB_dZ_1 = find_dB_dZ_FFD(q_R + delta_R, q_Z, delta_Z, find_B_R, find_B_T, find_B_Z)
     dB_dZ_2 = find_dB_dZ_FFD(
@@ -1343,7 +1338,6 @@ def find_d2B_dR_dZ_FFD(q_R, q_Z, delta_R, delta_Z, find_B_R, find_B_T, find_B_Z)
 
 
 def find_d2_poloidal_flux_dR2(q_R, q_Z, delta_R, interp_poloidal_flux):
-
     poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
     poloidal_flux_1 = interp_poloidal_flux(q_R + delta_R, q_Z)
     poloidal_flux_2 = interp_poloidal_flux(q_R + 2 * delta_R, q_Z)
@@ -1359,7 +1353,6 @@ def find_d2_poloidal_flux_dR2(q_R, q_Z, delta_R, interp_poloidal_flux):
 
 
 def find_d2_poloidal_flux_dZ2(q_R, q_Z, delta_Z, interp_poloidal_flux):
-
     poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
     poloidal_flux_1 = interp_poloidal_flux(q_R, q_Z + delta_Z)
     poloidal_flux_2 = interp_poloidal_flux(q_R, q_Z + 2 * delta_Z)

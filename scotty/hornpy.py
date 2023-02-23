@@ -2,7 +2,7 @@
 """
 Created on Sat Apr 17 09:43:34 2021
 
-@author: VH Hall-Chen (valerian@hall-chen.com)
+@author: VH Hall-Chen (valerian_hall-chen@ihpc.a-star.edu.sg)
 
 This module calculates the Gaussian beam properties based on the horn and lens.
 
@@ -92,7 +92,6 @@ class SpeirsAsymmetricConicalHorn(Conical_Horn):
     """Uses David Speirs' CST simulation data"""
 
     def output_beam(self, freq_GHz):
-
         # Beam waist widths don't change very much, it seems
         # From horn simulation's electric field (35 GHz)
         # in meters

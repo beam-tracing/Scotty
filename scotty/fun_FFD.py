@@ -6,7 +6,7 @@ Functions for finding derivatives of H using forward finite difference.
 
 @author: chenv
 Valerian Hongjie Hall-Chen
-valerian@hall-chen.com
+valerian_hall-chen@ihpc.a-star.edu.sg
 
 Run in Python 3,  does not work in Python 2
 """
@@ -31,7 +31,6 @@ def find_dH_dR(
     find_B_T,
     find_B_Z,
 ):
-
     H_0 = find_H(
         q_R,
         q_Z,
@@ -94,7 +93,6 @@ def find_dH_dZ(
     find_B_T,
     find_B_Z,
 ):
-
     H_0 = find_H(
         q_R,
         q_Z,
@@ -157,7 +155,6 @@ def find_dH_dKR(
     find_B_T,
     find_B_Z,
 ):
-
     H_0 = find_H(
         q_R,
         q_Z,
@@ -220,7 +217,6 @@ def find_dH_dKzeta(
     find_B_T,
     find_B_Z,
 ):
-
     H_0 = find_H(
         q_R,
         q_Z,
@@ -283,7 +279,6 @@ def find_dH_dKZ(
     find_B_T,
     find_B_Z,
 ):
-
     H_0 = find_H(
         q_R,
         q_Z,
@@ -346,7 +341,6 @@ def find_d2H_dR2(
     find_B_T,
     find_B_Z,
 ):
-
     H_0 = find_H(
         q_R,
         q_Z,
@@ -427,7 +421,6 @@ def find_d2H_dZ2(
     find_B_T,
     find_B_Z,
 ):
-
     H_0 = find_H(
         q_R,
         q_Z,
@@ -505,7 +498,6 @@ def find_d2H_dR_dZ(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dZ_0 = find_dH_dZ(
         q_R,
         q_Z,
@@ -571,7 +563,6 @@ def find_d2H_dKR2(
     find_B_T,
     find_B_Z,
 ):
-
     H_0 = find_H(
         q_R,
         q_Z,
@@ -649,7 +640,6 @@ def find_d2H_dKR_dKzeta(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dKzeta_0 = find_dH_dKzeta(
         q_R,
         q_Z,
@@ -718,7 +708,6 @@ def find_d2H_dKR_dKZ(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dKZ_0 = find_dH_dKZ(
         q_R,
         q_Z,
@@ -786,7 +775,6 @@ def find_d2H_dKzeta2(
     find_B_T,
     find_B_Z,
 ):
-
     H_0 = find_H(
         q_R,
         q_Z,
@@ -866,7 +854,6 @@ def find_d2H_dKzeta_dKZ(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dKZ_0 = find_dH_dKZ(
         q_R,
         q_Z,
@@ -934,7 +921,6 @@ def find_d2H_dKZ2(
     find_B_T,
     find_B_Z,
 ):
-
     H_0 = find_H(
         q_R,
         q_Z,
@@ -1012,7 +998,6 @@ def find_d2H_dKR_dR(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dR_0 = find_dH_dR(
         q_R,
         q_Z,
@@ -1079,7 +1064,6 @@ def find_d2H_dKR_dZ(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dZ_0 = find_dH_dZ(
         q_R,
         q_Z,
@@ -1146,7 +1130,6 @@ def find_d2H_dKzeta_dR(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dR_0 = find_dH_dR(
         q_R,
         q_Z,
@@ -1215,7 +1198,6 @@ def find_d2H_dKzeta_dZ(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dZ_0 = find_dH_dZ(
         q_R,
         q_Z,
@@ -1284,7 +1266,6 @@ def find_d2H_dKZ_dR(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dR_0 = find_dH_dR(
         q_R,
         q_Z,
@@ -1351,7 +1332,6 @@ def find_d2H_dKZ_dZ(
     find_B_T,
     find_B_Z,
 ):
-
     dH_dZ_0 = find_dH_dZ(
         q_R,
         q_Z,
@@ -1403,10 +1383,10 @@ def find_d2H_dKZ_dZ(
 
 
 def find_dpolflux_dR(q_R, q_Z, delta_R, interp_poloidal_flux):
-
     polflux_0 = interp_poloidal_flux(q_R, q_Z)
     polflux_1 = interp_poloidal_flux(q_R + delta_R, q_Z)
     polflux_2 = interp_poloidal_flux(q_R + 2 * delta_R, q_Z)
+
     dpolflux_dR = ((-3 / 2) * polflux_0 + (2) * polflux_1 + (-1 / 2) * polflux_2) / (
         delta_R
     )
@@ -1415,10 +1395,10 @@ def find_dpolflux_dR(q_R, q_Z, delta_R, interp_poloidal_flux):
 
 
 def find_dpolflux_dZ(q_R, q_Z, delta_Z, interp_poloidal_flux):
-
     polflux_0 = interp_poloidal_flux(q_R, q_Z)
     polflux_1 = interp_poloidal_flux(q_R, q_Z + delta_Z)
     polflux_2 = interp_poloidal_flux(q_R, q_Z + 2 * delta_Z)
+
     dpolflux_dZ = ((-3 / 2) * polflux_0 + (2) * polflux_1 + (-1 / 2) * polflux_2) / (
         delta_Z
     )
