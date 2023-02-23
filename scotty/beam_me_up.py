@@ -125,27 +125,27 @@ from scotty.typing import PathLike, FloatArray
 
 
 def beam_me_up(
-    poloidal_launch_angle_Torbeam,
-    toroidal_launch_angle_Torbeam,
-    launch_freq_GHz,
-    mode_flag,
-    launch_beam_width,
-    launch_beam_curvature,
-    launch_position,
+    poloidal_launch_angle_Torbeam: float,
+    toroidal_launch_angle_Torbeam: float,
+    launch_freq_GHz: float,
+    mode_flag: int,
+    launch_beam_width: float,
+    launch_beam_curvature: float,
+    launch_position: FloatArray,
     ## keyword arguments begin
-    vacuumLaunch_flag=True,
+    vacuumLaunch_flag: bool = True,
     find_B_method: Union[str, MagneticField] = "torbeam",
     shot=None,
     equil_time=None,
-    vacuum_propagation_flag=False,
-    Psi_BC_flag=False,
-    poloidal_flux_enter=None,
+    vacuum_propagation_flag: bool = False,
+    Psi_BC_flag: bool = False,
+    poloidal_flux_enter: Optional[float] = None,
     ## Finite-difference and solver parameters
-    delta_R=-0.0001,  # in the same units as data_R_coord
-    delta_Z=0.0001,  # in the same units as data_Z_coord
-    delta_K_R=0.1,  # in the same units as K_R
-    delta_K_zeta=0.1,  # in the same units as K_zeta
-    delta_K_Z=0.1,  # in the same units as K_z
+    delta_R: float = -0.0001,  # in the same units as data_R_coord
+    delta_Z: float = 0.0001,  # in the same units as data_Z_coord
+    delta_K_R: float = 0.1,  # in the same units as K_R
+    delta_K_zeta: float = 0.1,  # in the same units as K_zeta
+    delta_K_Z: float = 0.1,  # in the same units as K_z
     interp_order=5,  # For the 2D interpolation functions
     len_tau=102,  # Number of tau_points to output
     rtol=1e-3,  # for solve_ivp of the beam solver
@@ -204,6 +204,46 @@ def beam_me_up(
 
     Parameters
     ==========
+    toroidal_launch_angle_Torbeam: float
+        Toroidal angle of antenna in TORBEAM convention
+    poloidal_launch_angle_Torbeam: float
+        Poloidal angle of antenna in TORBEAM convention
+    mode_flag: int
+        Either ``+/-1``, used to determine which mode branch to use
+    launch_beam_width: float
+        Width of the beam at launch
+    launch_beam_curvature: float
+        Curvatuve of the beam at launch
+    launch_position: FloatArray
+        Position of the antenna in cylindrical coordinates
+    vacuumLaunch_flag: bool
+        If ``True``, launch beam from vacuum, otherwise beam launch
+        position is inside the plasma already
+    vacuum_propagation_flag: bool
+        If ``True``, run solver from the launch position, and don't
+        use analytical vacuum propagation
+    Psi_BC_flag: bool
+        If ``True``, use matching boundary conditions at plasma entry
+        position, otherwise do no special treatment at plasma boundary
+    poloidal_flux_enter: Optional
+        Normalised poloidal flux label of plasma boundary. Required if
+        ``vacuum_propagation_flag`` is ``True``
+    plasmaLaunch_Psi_3D_lab_Cartesian: FloatArray
+        :math:`\Psi` of beam in lab Cartesian coordinates. Required if
+        ``vacuumLaunch_flag`` is ``False``
+    plasmaLaunch_K: FloatArray
+        Wavevector of beam at launch. Required if
+        ``vacuumLaunch_flag`` is ``False``
+    delta_R: float
+        Finite difference spacing to use for ``R``
+    delta_Z: float
+        Finite difference spacing to use for ``Z``
+    delta_K_R: float
+        Finite difference spacing to use for ``K_R``
+    delta_K_zeta: float
+        Finite difference spacing to use for ``K_zeta``
+    delta_K_Z: float
+        Finite difference spacing to use for ``K_Z``
     find_B_method:
         - ``"efitpp"`` uses magnetic field data from efitpp files
           directly

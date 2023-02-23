@@ -44,20 +44,74 @@ def launch_beam(
     delta_K_zeta: float = 1e-1,
     delta_K_Z: float = 1e-1,
 ):
-    """
+    r"""
+    Propagate the beam from its initial position at the antenna to
+    *just* inside the plasma.
+
+    Parameters
+    ----------
+    toroidal_launch_angle_Torbeam: float
+        Toroidal angle of antenna in TORBEAM convention
+    poloidal_launch_angle_Torbeam: float
+        Poloidal angle of antenna in TORBEAM convention
+    mode_flag: int
+        Either ``+/-1``, used to determine which mode branch to use
+    launch_beam_width: float
+        Width of the beam at launch
+    launch_beam_curvature: float
+        Curvatuve of the beam at launch
+    launch_position: FloatArray
+        Position of the antenna in cylindrical coordinates
+    wavenumber_K0: float
+        Wavenumber of the launched beam
+    field: MagneticField
+        Object describing the magnetic field of the plasma
+    find_density_1D: DensityFitLike
+        Function or ``Callable`` parameterising the density
+    launch_angular_frequency: float
+        Angular frequency of the beam at launch
+    vacuumLaunch_flag: bool
+        If ``True``, launch beam from vacuum, otherwise beam launch
+        position is inside the plasma already
+    vacuum_propagation_flag: bool
+        If ``True``, run solver from the launch position, and don't
+        use analytical vacuum propagation
+    Psi_BC_flag: bool
+        If ``True``, use matching boundary conditions at plasma entry
+        position, otherwise do no special treatment at plasma boundary
+    poloidal_flux_enter: Optional
+        Normalised poloidal flux label of plasma boundary. Required if
+        ``vacuum_propagation_flag`` is ``True``
+    plasmaLaunch_Psi_3D_lab_Cartesian: FloatArray
+        :math:`\Psi` of beam in lab Cartesian coordinates. Required if
+        ``vacuumLaunch_flag`` is ``False``
+    plasmaLaunch_K: FloatArray
+        Wavevector of beam at launch. Required if
+        ``vacuumLaunch_flag`` is ``False``
+    delta_R: float
+        Finite difference spacing to use for ``R``
+    delta_Z: float
+        Finite difference spacing to use for ``Z``
+    delta_K_R: float
+        Finite difference spacing to use for ``K_R``
+    delta_K_zeta: float
+        Finite difference spacing to use for ``K_zeta``
+    delta_K_Z: float
+        Finite difference spacing to use for ``K_Z``
 
     Returns
     -------
-    K_R_initial:
-    K_zeta_initial:
-    K_Z_initial:
-    initial_position:
-    launch_K:
-    Psi_3D_lab_initial:
-    Psi_3D_lab_launch:
-    Psi_3D_lab_entry:
-    Psi_3D_lab_entry_cartersian:
-    distance_from_launch_to_entry:
+    K_initial: FloatArray
+        Wavevector at plasma entry point
+    initial_position: FloatArray
+        Coordinates of entry point
+    launch_K: FloatArray
+        Wavevector at launch point
+    Psi_3D_lab_initial: FloatArray
+    Psi_3D_lab_launch: FloatArray
+    Psi_3D_lab_entry: FloatArray
+    Psi_3D_lab_entry_cartersian: FloatArray
+    distance_from_launch_to_entry: float
 
     """
 
@@ -139,7 +193,6 @@ def launch_beam(
     )
 
     if not vacuum_propagation_flag:
-        # Run solver from the launch position, no analytical vacuum propagation
         return (
             [K_R_launch, K_zeta_launch, K_Z_launch],
             launch_position,
