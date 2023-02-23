@@ -27,6 +27,7 @@ class MagneticField(ABC):
 
     R_coord: FloatArray
     Z_coord: FloatArray
+    poloidalFlux_grid: FloatArray
 
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         raise NotImplementedError
