@@ -10,6 +10,7 @@ from scotty.fun_general import (
     find_K_lab,
     find_d_poloidal_flux_dR,
     find_d_poloidal_flux_dZ,
+    angular_frequency_to_wavenumber,
 )
 from scotty.typing import FloatArray
 from scotty.density_fit import DensityFitLike
@@ -28,16 +29,12 @@ def launch_beam(
     launch_beam_width: float,
     launch_beam_curvature: float,
     launch_position: FloatArray,
-    wavenumber_K0: float,
+    launch_angular_frequency: float,
     field: MagneticField,
     find_density_1D: DensityFitLike,
-    launch_angular_frequency: float,
-    vacuumLaunch_flag: bool = True,
     vacuum_propagation_flag: bool = True,
     Psi_BC_flag: bool = True,
     poloidal_flux_enter: Optional[float] = None,
-    plasmaLaunch_Psi_3D_lab_Cartesian: FloatArray = np.zeros((3, 3)),
-    plasmaLaunch_K: FloatArray = np.zeros(3),
     delta_R: float = -1e-4,
     delta_Z: float = 1e-4,
     delta_K_R: float = 1e-1,
@@ -62,14 +59,12 @@ def launch_beam(
         Curvatuve of the beam at launch
     launch_position: FloatArray
         Position of the antenna in cylindrical coordinates
-    wavenumber_K0: float
-        Wavenumber of the launched beam
+    launch_angular_frequency: float
+        Angular frequency of the beam at launch
     field: MagneticField
         Object describing the magnetic field of the plasma
     find_density_1D: DensityFitLike
         Function or ``Callable`` parameterising the density
-    launch_angular_frequency: float
-        Angular frequency of the beam at launch
     vacuumLaunch_flag: bool
         If ``True``, launch beam from vacuum, otherwise beam launch
         position is inside the plasma already
@@ -82,12 +77,6 @@ def launch_beam(
     poloidal_flux_enter: Optional
         Normalised poloidal flux label of plasma boundary. Required if
         ``vacuum_propagation_flag`` is ``True``
-    plasmaLaunch_Psi_3D_lab_Cartesian: FloatArray
-        :math:`\Psi` of beam in lab Cartesian coordinates. Required if
-        ``vacuumLaunch_flag`` is ``False``
-    plasmaLaunch_K: FloatArray
-        Wavevector of beam at launch. Required if
-        ``vacuumLaunch_flag`` is ``False``
     delta_R: float
         Finite difference spacing to use for ``R``
     delta_Z: float
@@ -115,31 +104,10 @@ def launch_beam(
 
     """
 
-    if not vacuumLaunch_flag:
-        print("Beam launched from inside the plasma")
-        Psi_3D_lab_initial = find_Psi_3D_lab(
-            plasmaLaunch_Psi_3D_lab_Cartesian,
-            launch_position[0],
-            launch_position[1],
-            plasmaLaunch_K[0],
-            plasmaLaunch_K[1],
-        )
-
-        return (
-            plasmaLaunch_K,
-            launch_position,
-            None,
-            Psi_3D_lab_initial,
-            None,
-            None,
-            None,
-            None,
-        )
-
-    print("Beam launched from outside the plasma")
-
     toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam)
     poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_Torbeam)
+
+    wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
 
     K_R_launch = (
         -wavenumber_K0 * np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)

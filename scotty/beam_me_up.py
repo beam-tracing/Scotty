@@ -84,6 +84,7 @@ from scotty.fun_general import (
     find_waist,
     freq_GHz_to_angular_frequency,
     angular_frequency_to_wavenumber,
+    find_Psi_3D_lab,
 )
 from scotty.fun_general import find_q_lab_Cartesian, find_Psi_3D_lab_Cartesian
 from scotty.fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq
@@ -361,38 +362,53 @@ def beam_me_up(
     # -------------------
     # Launch parameters
     # -------------------
-    (
-        K_initial,
-        initial_position,
-        launch_K,
-        Psi_3D_lab_initial,
-        Psi_3D_lab_launch,
-        Psi_3D_lab_entry,
-        Psi_3D_lab_entry_cartersian,
-        distance_from_launch_to_entry,
-    ) = launch_beam(
-        toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
-        poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
-        mode_flag=mode_flag,
-        launch_beam_width=launch_beam_width,
-        launch_beam_curvature=launch_beam_curvature,
-        launch_position=launch_position,
-        wavenumber_K0=wavenumber_K0,
-        field=field,
-        find_density_1D=find_density_1D,
-        vacuumLaunch_flag=vacuumLaunch_flag,
-        vacuum_propagation_flag=vacuum_propagation_flag,
-        Psi_BC_flag=Psi_BC_flag,
-        poloidal_flux_enter=poloidal_flux_enter,
-        plasmaLaunch_Psi_3D_lab_Cartesian=plasmaLaunch_Psi_3D_lab_Cartesian,
-        plasmaLaunch_K=plasmaLaunch_K,
-        launch_angular_frequency=launch_angular_frequency,
-        delta_R=delta_R,
-        delta_Z=delta_Z,
-        delta_K_R=delta_K_R,
-        delta_K_zeta=delta_K_zeta,
-        delta_K_Z=delta_K_Z,
-    )
+    if vacuumLaunch_flag:
+        print("Beam launched from outside the plasma")
+        (
+            K_initial,
+            initial_position,
+            launch_K,
+            Psi_3D_lab_initial,
+            Psi_3D_lab_launch,
+            Psi_3D_lab_entry,
+            Psi_3D_lab_entry_cartersian,
+            distance_from_launch_to_entry,
+        ) = launch_beam(
+            toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
+            poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
+            mode_flag=mode_flag,
+            launch_beam_width=launch_beam_width,
+            launch_beam_curvature=launch_beam_curvature,
+            launch_position=launch_position,
+            launch_angular_frequency=launch_angular_frequency,
+            field=field,
+            find_density_1D=find_density_1D,
+            vacuum_propagation_flag=vacuum_propagation_flag,
+            Psi_BC_flag=Psi_BC_flag,
+            poloidal_flux_enter=poloidal_flux_enter,
+            delta_R=delta_R,
+            delta_Z=delta_Z,
+            delta_K_R=delta_K_R,
+            delta_K_zeta=delta_K_zeta,
+            delta_K_Z=delta_K_Z,
+        )
+    else:
+        print("Beam launched from inside the plasma")
+        Psi_3D_lab_initial = find_Psi_3D_lab(
+            plasmaLaunch_Psi_3D_lab_Cartesian,
+            launch_position[0],
+            launch_position[1],
+            plasmaLaunch_K[0],
+            plasmaLaunch_K[1],
+        )
+        K_initial = plasmaLaunch_K
+        initial_position = launch_position
+        launch_K = None
+        Psi_3D_lab_launch = None
+        Psi_3D_lab_entry = None
+        Psi_3D_lab_entry_cartersian = None
+        distance_from_launch_to_entry = None
+
     K_R_initial, K_zeta_initial, K_Z_initial = K_initial
 
     # -------------------

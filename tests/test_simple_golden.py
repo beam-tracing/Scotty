@@ -542,26 +542,6 @@ def test_EFIT_geometry(tmp_path):
     assert total_sign[-1, -1] == -1, "Bottom right"
 
 
-def test_launch_in_plasma():
-    K_initial, launch_position, _, Psi_w, _, _, _, _ = launch_beam(
-        toroidal_launch_angle_Torbeam=None,
-        poloidal_launch_angle_Torbeam=None,
-        mode_flag=None,
-        launch_beam_width=None,
-        launch_beam_curvature=None,
-        launch_position=[1, 2, 3],
-        wavenumber_K0=1,
-        field=None,
-        find_density_1D=None,
-        launch_angular_frequency=None,
-        vacuumLaunch_flag=False,
-    )
-
-    assert_array_equal(K_initial, np.zeros(3))
-    assert_array_equal(launch_position, [1, 2, 3])
-    assert_array_equal(Psi_w, np.zeros((3, 3)) + 0j)
-
-
 @pytest.mark.parametrize(
     "generator",
     [
@@ -594,7 +574,6 @@ def test_launch_golden_answer(tmp_path, generator):
     )
 
     launch_angular_frequency = freq_GHz_to_angular_frequency(args["launch_freq_GHz"])
-    wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
 
     (
         K_initial,
@@ -614,8 +593,6 @@ def test_launch_golden_answer(tmp_path, generator):
         launch_beam_width=args["launch_beam_width"],
         launch_beam_curvature=args["launch_beam_curvature"],
         launch_position=args["launch_position"],
-        wavenumber_K0=wavenumber_K0,
-        vacuumLaunch_flag=args["vacuumLaunch_flag"],
         vacuum_propagation_flag=args["vacuum_propagation_flag"],
         Psi_BC_flag=args["Psi_BC_flag"],
         poloidal_flux_enter=args["poloidal_flux_enter"],
