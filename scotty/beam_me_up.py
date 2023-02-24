@@ -118,7 +118,7 @@ from scotty.check_input import check_input
 from scotty.check_output import check_output
 
 # Type hints
-from typing import Optional, Union, Sequence, Protocol, Any
+from typing import Optional, Union, Sequence, Protocol, Any, Dict
 from scotty.typing import PathLike, FloatArray
 
 
@@ -529,13 +529,19 @@ def beam_me_up(
     print("Starting the solvers")
     solver_start_time = time.time()
 
-    solver_ray_events = (
-        event_leave_plasma,
-        event_leave_LCFS,
-        event_leave_simulation,
-        event_cross_resonance,
-        event_reach_K_min
-    )
+    # `solve_ivp` only takes a list of event handlers, which means we
+    # need to match indices with the returned events. To make that a
+    # bit easier, we make a dict here and pass `solve_ivp` the
+    # values. We can then pass the keys to our event handler along
+    # with the returned events, and use these names instead of list
+    # indices
+    solver_ray_events = {
+        "leave_plasma": event_leave_plasma,
+        "leave_LCFS": event_leave_LCFS,
+        "leave_simulation": event_leave_simulation,
+        "cross_resonance": event_cross_resonance,
+        "reach_K_min": event_reach_K_min,
+    }
 
     solver_ray_output = integrate.solve_ivp(
         ray_evolution_2D_fun,
@@ -544,7 +550,7 @@ def beam_me_up(
         method="RK45",
         t_eval=None,
         dense_output=False,
-        events=solver_ray_events,
+        events=solver_ray_events.values(),
         vectorized=False,
         args=solver_arguments,
         rtol=rtol,
@@ -587,66 +593,13 @@ def beam_me_up(
 
     tau_events = solver_ray_output.t_events
     ray_parameters_2D_events = solver_ray_output.y_events
-    ray_parameters_LCFS = ray_parameters_2D_events[1]
 
-    if (len(tau_events[0]) != 0) and (len(tau_events[1]) == 0):
-        """
-        If event_leave_plasma occurs and event_leave_LCFS does not
-        """
-        tau_leave = np.squeeze(tau_events[0])
-
-    elif len(tau_events[3]) != 0:
-        """
-        If the beam reaches a resonance
-        """
-        tau_cross_resonance = np.squeeze(tau_events[3])
-        tau_leave = tau_cross_resonance
-
-    elif (len(tau_events[0]) == 0) and (len(tau_events[1]) != 0):
-        """
-        - If event_leave_plasma doesn't occur, but event_leave_LCFS does.
-        """
-        tau_leave_LCFS = tau_events[1]
-        tau_leave = tau_leave_LCFS[0]
-    elif (len(tau_events[0]) != 0) and (len(tau_events[1]) != 0):
-        """
-        If both event_leave_plasma and event_leave_LCFS occur
-        """
-        K_R_LCFS = ray_parameters_LCFS[0][2]
-
-        if K_R_LCFS < 0:
-            """
-            Beam has gone through the plasma, terminate at LCFS
-            """
-            tau_leave_LCFS = tau_events[1]
-            tau_leave = tau_leave_LCFS[0]
-        else:
-            """
-            Beam deflection sufficiently large, terminate at entry poloidal flux
-            """
-            tau_leave = np.squeeze(tau_events[0])
-
-    else:
-        """
-        If one ends up here, things aren't going well. I can think of two possible reasons
-        - The launch conditions are really weird (hasn't happened yet, in my experience)
-        - The max_step setting of the solver is too large, such that the ray
-          leaves the LCFS and enters a region where poloidal_flux < 1 in a
-          single step. The solver thus doesn't log the event when it really should
-        """
-
-        # plt.figure()
-        # plt.plot(ray_parameters_2D[0,:],ray_parameters_2D[1,:],'o')
-        # contour_levels = np.linspace(0,1,11)
-        # CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
-        # plt.clabel(CS, inline=True, fontsize=10,inline_spacing=-5,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
-        # print(tau_events)
-
-        print("Warning: Ray has left the simulation region without leaving the LCFS.")
-        # print('We should not be here. I am prematurely terminating this simulation.')
-        # sys.exit()
-        tau_leave = np.squeeze(tau_events[2])
-        ##
+    # tau_events is a list with the same order as the values of
+    # solver_ray_events, so we can use the names from that dict
+    # instead of raw indices
+    tau_leave = handle_events(
+        dict(zip(solver_ray_events.keys(), tau_events)), ray_parameters_2D_events[1]
+    )
 
     if quick_run:
         ray_parameters_2D_events = solver_ray_output.y_events
@@ -2485,6 +2438,7 @@ def create_magnetic_geometry(
 
 class _Event(Protocol):
     """Protocol describing a `scipy.integrate.solve_ivp` event callback"""
+
     terminal: bool = False
     direction: float = 0.0
 
@@ -2497,6 +2451,7 @@ def _event(terminal: bool, direction: float):
     keepying mypy happy
 
     """
+
     def decorator_event(func: Any) -> _Event:
         # Stop the solver when the beam leaves the plasma
         func.terminal = terminal
@@ -2505,3 +2460,61 @@ def _event(terminal: bool, direction: float):
         return func
 
     return decorator_event
+
+
+def handle_events(
+    tau_events: Dict[str, FloatArray], ray_parameters_2D_events: FloatArray
+) -> FloatArray:
+    """Handle events detected by `scipy.integrate.solve_ivp`
+
+    Parameters
+    ----------
+    tau_events : Dict[str, FloatArray]
+        A mapping between event names and the solver ``t_events``
+    K_R_LCFS : float
+        The radial wavevector in the case where the beam has crossed
+        the LCFS
+
+    Returns
+    -------
+    FloatArray
+        The value of ``tau`` when the detected event first occurred
+
+    """
+
+    def detected(event):
+        """True if ``event`` was detected"""
+        return len(tau_events[event]) != 0
+
+    # Event names here must match those in the `solver_ray_events`
+    # dict defined outside this function
+    if detected("leave_plasma") and not detected("leave_LCFS"):
+        return np.squeeze(tau_events["leave_plasma"])
+
+    if detected("cross_resonance"):
+        return np.squeeze(tau_events["cross_resonance"])
+
+    if not detected("leave_plasma") and detected("leave_LCFS"):
+        return tau_events["leave_LCFS"][0]
+
+    if detected("leave_plasma") and detected("leave_LCFS"):
+        # If both event_leave_plasma and event_leave_LCFS occur
+        K_R_LCFS = ray_parameters_2D_events[0][2]
+        if K_R_LCFS < 0:
+            # Beam has gone through the plasma, terminate at LCFS
+            return tau_events["leave_LCFS"][0]
+
+        # Beam deflection sufficiently large, terminate at entry poloidal flux
+        return np.squeeze(tau_events["leave_plasma"])
+
+    # If one ends up here, things aren't going well. I can think of
+    # two possible reasons:
+    # - The launch conditions are really weird (hasn't happened yet,
+    #   in my experience)
+    # - The max_step setting of the solver is too large, such that the
+    #   ray leaves the LCFS and enters a region where `poloidal_flux <
+    #   1` in a single step. The solver thus doesn't log the event
+    #   when it really should
+
+    print("Warning: Ray has left the simulation region without leaving the LCFS.")
+    return np.squeeze(tau_events["leave_simulation"])
