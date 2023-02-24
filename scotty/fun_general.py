@@ -493,6 +493,7 @@ def find_Booker_gamma(electron_density, B_Total, launch_angular_frequency):
 
 # ----------------------------------
 
+
 def find_H_numba(
     K_magnitude,
     electron_density,

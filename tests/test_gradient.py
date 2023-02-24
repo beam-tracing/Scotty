@@ -9,7 +9,6 @@ def myfun(x, y):
 
 
 def test_gradient():
-
     grad_x = cfd_gradient(myfun, x=0, y=3, directions="x", dx=1e-4)
     assert np.isclose(grad_x, 9)
 
