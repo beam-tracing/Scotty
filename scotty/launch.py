@@ -32,7 +32,7 @@ def launch_beam(
     vacuumLaunch_flag: bool = True,
     vacuum_propagation_flag: bool = True,
     Psi_BC_flag: bool = True,
-    poloidal_flux_enter: Optional[float] = None,
+    poloidal_flux_enter: float = 1.0,
     delta_R: float = -1e-4,
     delta_Z: float = 1e-4,
 ):
@@ -65,9 +65,8 @@ def launch_beam(
     Psi_BC_flag: bool
         If ``True``, use matching boundary conditions at plasma entry
         position, otherwise do no special treatment at plasma boundary
-    poloidal_flux_enter: Optional
-        Normalised poloidal flux label of plasma boundary. Required if
-        ``vacuum_propagation_flag`` is ``True``
+    poloidal_flux_enter: float
+        Normalised poloidal flux label of plasma boundary
     delta_R: float
         Finite difference spacing to use for ``R``
     delta_Z: float
@@ -155,11 +154,6 @@ def launch_beam(
             None,
             np.full_like(Psi_3D_lab_launch, fill_value=np.nan),
             None,
-        )
-
-    if poloidal_flux_enter is None:
-        raise ValueError(
-            "Missing required 'poloidal_flux_enter' for vacuum-launched beam"
         )
 
     Psi_w_beam_inverse_launch_cartersian = find_inverse_2D(Psi_w_beam_launch_cartersian)

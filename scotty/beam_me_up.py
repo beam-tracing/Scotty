@@ -138,7 +138,7 @@ def beam_me_up(
     equil_time=None,
     vacuum_propagation_flag: bool = False,
     Psi_BC_flag: bool = False,
-    poloidal_flux_enter: Optional[float] = None,
+    poloidal_flux_enter: float = 1.0,
     ## Finite-difference and solver parameters
     delta_R: float = -0.0001,  # in the same units as data_R_coord
     delta_Z: float = 0.0001,  # in the same units as data_Z_coord
@@ -223,9 +223,8 @@ def beam_me_up(
     Psi_BC_flag: bool
         If ``True``, use matching boundary conditions at plasma entry
         position, otherwise do no special treatment at plasma boundary
-    poloidal_flux_enter: Optional
-        Normalised poloidal flux label of plasma boundary. Required if
-        ``vacuum_propagation_flag`` is ``True``
+    poloidal_flux_enter: float
+        Normalised poloidal flux label of plasma boundary
     plasmaLaunch_Psi_3D_lab_Cartesian: FloatArray
         :math:`\Psi` of beam in lab Cartesian coordinates. Required if
         ``vacuumLaunch_flag`` is ``False``
