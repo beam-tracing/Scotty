@@ -118,7 +118,7 @@ from scotty.check_input import check_input
 from scotty.check_output import check_output
 
 # Type hints
-from typing import Optional, Union, Sequence
+from typing import Optional, Union, Sequence, Protocol, Any
 from scotty.typing import PathLike, FloatArray
 
 
@@ -434,6 +434,7 @@ def beam_me_up(
 
     # Define events for the solver
     # Notice how the beam parameters are allocated: this function only works correctly for the 2D case
+    @_event(terminal=True, direction=1.0)
     def event_leave_plasma(
         tau,
         ray_parameters_2D,
@@ -451,11 +452,8 @@ def beam_me_up(
         # goes from negative to positive when leaving the plasma
         return poloidal_flux_difference
 
-    # Stop the solver when the beam leaves the plasma
-    event_leave_plasma.terminal = True
-    # positive value, when function result goes from negative to positive
-    event_leave_plasma.direction = 1.0
 
+    @_event(terminal=False, direction=1.0)
     def event_leave_LCFS(
         tau,
         ray_parameters_2D,
@@ -473,11 +471,8 @@ def beam_me_up(
         # goes from negative to positive when leaving the LCFS
         return poloidal_flux_difference
 
-    # Do not stop the solver when the beam leaves the plasma
-    event_leave_LCFS.terminal = False
-    # positive value, when function result goes from negative to positive
-    event_leave_LCFS.direction = 1.0
 
+    @_event(terminal=True, direction=-1.0)
     def event_leave_simulation(
         tau,
         ray_parameters_2D,
@@ -501,11 +496,7 @@ def beam_me_up(
         # goes from positive (True) to negative(False) when leaving the simulation region
         return is_inside
 
-    # Stop the solver when the beam leaves the simulation region. Entering the simulation region is fine
-    event_leave_simulation.terminal = True
-    # negative value, when function result goes from positive to negative
-    event_leave_simulation.direction = -1.0
-
+    @_event(terminal=True, direction=0.0)
     def event_cross_resonance(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
         # Currently only works when crossing resonance.
         # To implement crossing of higher harmonics as well
@@ -525,10 +516,7 @@ def beam_me_up(
         # above to below or below to above the resonance.
         return (gyro_freq - 1.0 - delta_gyro_freq) * (gyro_freq - 1.0 + delta_gyro_freq)
 
-    event_cross_resonance.direction = 0.0
-    # Stop the solver when the beam is in a region of resonance
-    event_cross_resonance.terminal = True
-
+    @_event(terminal=False, direction=1.0)
     def event_reach_cutoff(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
         # To find tau of the cut-off, that is the location where the
         # wavenumber K is minimised
@@ -547,10 +535,6 @@ def beam_me_up(
             dH["dH_dR"] * K_R + dH["dH_dZ"] * K_Z + dH["dH_dKR"] * q_R
         )
         return d_K_d_tau
-
-    event_reach_cutoff.direction = 1.0
-    # positive value, when function result goes from negative to positive
-    event_reach_cutoff.terminal = False
 
     # -------------------
 
@@ -2520,3 +2504,27 @@ def create_magnetic_geometry(
         )
 
     raise ValueError(f"Invalid find_B_method '{find_B_method}'")
+
+
+class _Event(Protocol):
+    """Protocol describing a `scipy.integrate.solve_ivp` event callback"""
+    terminal: bool = False
+    direction: float = 0.0
+
+    def __call__(self, *args):
+        pass
+
+
+def _event(terminal: bool, direction: float):
+    """Decorator to add the attributes required for `scipy.integrate.solve_ivp` while
+    keepying mypy happy
+
+    """
+    def decorator_event(func: Any) -> _Event:
+        # Stop the solver when the beam leaves the plasma
+        func.terminal = terminal
+        # positive value, when function result goes from negative to positive
+        func.direction = direction
+        return func
+
+    return decorator_event
