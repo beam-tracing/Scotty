@@ -436,55 +436,35 @@ def beam_me_up(
     # Notice how the beam parameters are allocated: this function only works correctly for the 2D case
     @_event(terminal=True, direction=1.0)
     def event_leave_plasma(
-        tau,
-        ray_parameters_2D,
-        K_zeta,
-        hamiltonian: Hamiltonian,
-        poloidal_flux_leave=poloidal_flux_enter,
-    ):  # Leave at the same poloidal flux of entry
-        q_R = ray_parameters_2D[0]
-        q_Z = ray_parameters_2D[1]
-
+        tau, ray_parameters_2D, K_zeta: float, hamiltonian: Hamiltonian
+    ):
+        q_R, q_Z, _, _ = ray_parameters_2D
         poloidal_flux = field.poloidal_flux(q_R, q_Z)
 
-        poloidal_flux_difference = poloidal_flux - poloidal_flux_leave
-
+        # Leave at the same poloidal flux of entry
         # goes from negative to positive when leaving the plasma
-        return poloidal_flux_difference
-
+        return poloidal_flux - poloidal_flux_enter
 
     @_event(terminal=False, direction=1.0)
     def event_leave_LCFS(
-        tau,
-        ray_parameters_2D,
-        K_zeta,
-        hamiltonian: Hamiltonian,
-        poloidal_flux_LCFS=1.0,
+        tau, ray_parameters_2D, K_zeta: float, hamiltonian: Hamiltonian
     ):
-        q_R = ray_parameters_2D[0]
-        q_Z = ray_parameters_2D[1]
-
+        q_R, q_Z, _, _ = ray_parameters_2D
         poloidal_flux = field.poloidal_flux(q_R, q_Z)
-
-        poloidal_flux_difference = poloidal_flux - poloidal_flux_LCFS
-
+        poloidal_flux_LCFS = 1.0
         # goes from negative to positive when leaving the LCFS
-        return poloidal_flux_difference
+        return poloidal_flux - poloidal_flux_LCFS
 
+    data_R_coord_min = field.R_coord.min()
+    data_R_coord_max = field.R_coord.max()
+    data_Z_coord_min = field.Z_coord.min()
+    data_Z_coord_max = field.Z_coord.max()
 
     @_event(terminal=True, direction=-1.0)
     def event_leave_simulation(
-        tau,
-        ray_parameters_2D,
-        K_zeta,
-        hamiltonian: Hamiltonian,
-        data_R_coord_min=field.R_coord.min(),
-        data_R_coord_max=field.R_coord.max(),
-        data_Z_coord_min=field.Z_coord.min(),
-        data_Z_coord_max=field.Z_coord.max(),
+        tau, ray_parameters_2D, K_zeta: float, hamiltonian: Hamiltonian
     ):
-        q_R = ray_parameters_2D[0]
-        q_Z = ray_parameters_2D[1]
+        q_R, q_Z, _, _ = ray_parameters_2D
 
         is_inside = (
             (q_R > data_R_coord_min)
@@ -502,8 +482,7 @@ def beam_me_up(
         # To implement crossing of higher harmonics as well
         delta_gyro_freq = 0.01
 
-        q_R = ray_parameters_2D[0]
-        q_Z = ray_parameters_2D[1]
+        q_R, q_Z, _, _ = ray_parameters_2D
 
         B_R = field.B_R(q_R, q_Z)
         B_T = field.B_T(q_R, q_Z)
