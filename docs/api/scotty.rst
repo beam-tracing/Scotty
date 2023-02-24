@@ -26,11 +26,10 @@ Submodules
    scotty.debugging
    scotty.density_fit
    scotty.fun_CFD
-   scotty.fun_FFD
    scotty.fun_evolution
    scotty.fun_general
-   scotty.fun_mix
    scotty.geometry
+   scotty.hamiltonian
    scotty.hornpy
    scotty.init_bruv
    scotty.launch
