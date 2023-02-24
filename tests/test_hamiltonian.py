@@ -46,7 +46,7 @@ class FakeHamiltonian(Hamiltonian):
 
 def test_hamiltonian_derivatives():
     H = FakeHamiltonian(1e-3, 1e-3, 1e-4, 1e-4, 1e-4)
-    dH = H.derivatives(1.2, 2.3, 3.4, 4.5, 5.6, order=2)
+    dH = H.derivatives(1.2, 2.3, 3.4, 4.5, 5.6, second_order=True)
 
     H0 = H(1.2, 2.3, 3.4, 4.5, 5.6)
 
@@ -95,7 +95,7 @@ def test_hamiltonian_derivatives():
 
 def test_hamiltonian_laplacians():
     H = FakeHamiltonian(1e-3, 1e-3, 1e-4, 1e-4, 1e-4)
-    dH = H.derivatives(1.2, 2.3, 3.4, 4.5, 5.6, order=2)
+    dH = H.derivatives(1.2, 2.3, 3.4, 4.5, 5.6, second_order=True)
     H0 = H(1.2, 2.3, 3.4, 4.5, 5.6)
 
     grad_grad_H, gradK_grad_H, gradK_gradK_H = laplacians(dH)
@@ -138,10 +138,10 @@ def test_hamiltonian_derivatives_scaling(derivative, expected):
     dx = 1e-3
     dx4 = dx / 4
     H = FakeHamiltonian(dx, dx, dx, dx, dx)
-    dH_0 = H.derivatives(1.2, 2.3, 3.4, 4.5, 5.6, order=2)
+    dH_0 = H.derivatives(1.2, 2.3, 3.4, 4.5, 5.6, second_order=True)
 
     dH_1 = FakeHamiltonian(dx4, dx4, dx4, dx4, dx4).derivatives(
-        1.2, 2.3, 3.4, 4.5, 5.6, order=2
+        1.2, 2.3, 3.4, 4.5, 5.6, second_order=True
     )
 
     H0 = H(1.2, 2.3, 3.4, 4.5, 5.6)

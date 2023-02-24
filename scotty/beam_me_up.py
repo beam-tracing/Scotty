@@ -541,7 +541,7 @@ def beam_me_up(
         K_Z = ray_parameters_2D[3]
         K_magnitude = np.sqrt(K_R**2 + K_Z**2 + K_zeta**2 / q_R**2)
 
-        dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z, order=1)
+        dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z)
 
         d_K_d_tau = -(1 / K_magnitude) * (
             dH["dH_dR"] * K_R + dH["dH_dZ"] * K_Z + dH["dH_dKR"] * q_R
@@ -900,7 +900,7 @@ def beam_me_up(
     electron_density_output = np.asfarray(find_density_1D(poloidal_flux_output))
 
     dH = hamiltonian.derivatives(
-        q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, order=2
+        q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, second_order=True
     )
 
     dH_dR_output = dH["dH_dR"]

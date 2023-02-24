@@ -231,7 +231,6 @@ def launch_beam(
             K_R_initial,
             K_zeta_initial,
             K_Z_initial,
-            order=1,
         )
 
         dH_dR_initial = dH["dH_dR"]

@@ -148,7 +148,7 @@ class Hamiltonian:
         K_R: ArrayLike,
         K_zeta: ArrayLike,
         K_Z: ArrayLike,
-        order: int,
+        second_order: bool = False,
     ):
         cache: Dict[CoordOffset, ArrayLike] = {}
 
@@ -183,7 +183,7 @@ class Hamiltonian:
             "dH_dKZ": apply_stencil(("K_Z",), CFD1_stencil),
         }
 
-        if order == 2:
+        if second_order:
             second_derivatives = {
                 "d2H_dR2": apply_stencil(("q_R",), FFD2_stencil, order=2),
                 "d2H_dZ2": apply_stencil(("q_Z",), FFD2_stencil, order=2),

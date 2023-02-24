@@ -49,7 +49,7 @@ def ray_evolution_2D_fun(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonia
     K_Z = ray_parameters_2D[3]
 
     # Find derivatives of H
-    dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z, order=1)
+    dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z)
 
     d_ray_parameters_2D_d_tau = np.zeros_like(ray_parameters_2D)
 
@@ -142,7 +142,7 @@ def beam_evolution_fun(tau, beam_parameters, K_zeta, hamiltonian: Hamiltonian):
     q_R, q_zeta, q_Z, K_R, K_Z, Psi_3D = unpack_beam_parameters(beam_parameters)
 
     # Find derivatives of H
-    dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z, order=2)
+    dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z, second_order=True)
 
     grad_grad_H, gradK_grad_H, gradK_gradK_H = laplacians(dH)
     grad_gradK_H = np.transpose(gradK_grad_H)
