@@ -517,11 +517,10 @@ def beam_me_up(
         return (gyro_freq - 1.0 - delta_gyro_freq) * (gyro_freq - 1.0 + delta_gyro_freq)
 
     @_event(terminal=False, direction=1.0)
-    def event_reach_cutoff(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
+    def event_reach_K_min(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
         # To find tau of the cut-off, that is the location where the
         # wavenumber K is minimised
         # This function finds the turning points
-        ## TODO: change function name to 'event_reach_K_min'
 
         q_R = ray_parameters_2D[0]
         q_Z = ray_parameters_2D[1]
@@ -557,7 +556,7 @@ def beam_me_up(
         event_leave_LCFS,
         event_leave_simulation,
         event_cross_resonance,
-        event_reach_cutoff,
+        event_reach_K_min
     )
 
     solver_ray_output = integrate.solve_ivp(
