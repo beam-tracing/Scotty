@@ -11,11 +11,50 @@ from scotty.typing import ArrayLike, FloatArray
 
 from dataclasses import dataclass, asdict
 import numpy as np
-from typing import Dict
+from typing import Dict, Tuple
 
 
-class PolarisationTensor:
-    def __init__(self, electron_density, angular_frequency, B_total):
+class DielectricTensor:
+    r"""Calculates the components of the cold plasma dielectric tensor for a
+    wave with angular frequency :math:`\Omega`:
+
+    .. math::
+
+        \epsilon =
+          \begin{pmatrix}
+            \epsilon_{11}  & -i\epsilon_{12} & 0 \\
+            i\epsilon_{12} & \epsilon_{11}   & 0 \\
+            0            & 0             & \epsilon_{bb} \\
+          \end{pmatrix}
+
+    where:
+
+    .. math::
+
+        \begin{align}
+          \epsilon_{11} &= 1 - \frac{\Omega_{pe}^2}{\Omega^2 - \Omega_{ce}^2} \\
+          \epsilon_{12} &=
+            1 - \frac{\Omega_{pe}^2\Omega_{ce}}{\Omega(\Omega^2 - \Omega_{ce}^2)} \\
+          \epsilon_{bb} &= 1 - \frac{\Omega_{pe}^2}{\Omega^2} \\
+        \end{align}
+
+    Parameters
+    ----------
+    electron_density:
+        Electron number density
+    angular_frequency:
+        Angular frequency of the beam
+    B_total:
+        Magnitude of the magnetic field
+
+    """
+
+    def __init__(
+        self,
+        electron_density: ArrayLike,
+        angular_frequency: float,
+        B_total: ArrayLike,
+    ):
         _plasma_freq_2 = (
             find_normalised_plasma_freq(electron_density, angular_frequency) ** 2
         )
@@ -28,22 +67,31 @@ class PolarisationTensor:
 
     @property
     def parallel(self):
+        r"""The :math:`\epsilon_{bb}` component"""
         return self._epsilon_bb
 
     @property
     def perpendicular(self):
+        r"""The :math:`\epsilon_{11}` component"""
         return self._epsilon_11
 
     @property
     def g(self):
+        r"""The :math:`\epsilon_{12}` component"""
         return self._epsilon_12
 
 
-FFD1_stencil = {(0,): -3 / 2, (1,): 2, (2,): -0.5}
-FFD2_stencil = {(0,): 2, (1,): -5, (2,): 4, (3,): -1}
-CFD1_stencil = {(-1,): -0.5, (1,): 0.5}
-CFD2_stencil = {(-1,): 1, (0,): -2, (1,): 1}
-FFD_FFD_stencil = {
+Stencil = Dict[Tuple, float]
+
+FFD1_stencil: Stencil = {(0,): -3 / 2, (1,): 2, (2,): -0.5}
+"""Stencil for the first forward-difference"""
+FFD2_stencil: Stencil = {(0,): 2, (1,): -5, (2,): 4, (3,): -1}
+"""Stencil for the second forward-difference"""
+CFD1_stencil: Stencil = {(-1,): -0.5, (1,): 0.5}
+"""Stencil for the first central-difference"""
+CFD2_stencil: Stencil = {(-1,): 1, (0,): -2, (1,): 1}
+"""Stencil for the second central-difference"""
+FFD_FFD_stencil: Stencil = {
     (0, 0): 2.25,
     (0, 1): -3,
     (0, 2): 0.75,
@@ -54,7 +102,8 @@ FFD_FFD_stencil = {
     (2, 1): -1,
     (2, 2): 0.25,
 }
-FFD_CFD_stencil = {
+"""Stencil for the mixed second forward-difference"""
+FFD_CFD_stencil: Stencil = {
     (0, -1): 0.25,
     (0, 0): 1,
     (0, 1): -1.25,
@@ -64,19 +113,69 @@ FFD_CFD_stencil = {
     (2, 0): 1,
     (2, 1): -0.75,
 }
-CFD_CFD_stencil = {(1, 1): 0.25, (1, -1): -0.25, (-1, 1): -0.25, (-1, -1): 0.25}
-
-
-@dataclass(frozen=True)
-class CoordOffset:
-    q_R: int = 0
-    q_Z: int = 0
-    K_R: int = 0
-    K_zeta: int = 0
-    K_Z: int = 0
+"""Stencil for the mixed second forward/central-difference"""
+CFD_CFD_stencil: Stencil = {
+    (1, 1): 0.25,
+    (1, -1): -0.25,
+    (-1, 1): -0.25,
+    (-1, -1): 0.25,
+}
+"""Stencil for the mixed second central-difference"""
 
 
 class Hamiltonian:
+    r"""Functor to evaluate derivatives of the Hamiltonian, :math:`H`, at a
+    given set of points.
+
+    ``Scotty`` calculates derivatives using a grid-free finite difference
+    approach. The Hamiltonian is evaluated at, essentially, an arbitrary set of
+    points around the location we wish to get the derivatives at. In practice we
+    define stencils as relative offsets from a central point, and the evaluation
+    points are the product of the spacing in a given direction with the stencil
+    offsets. By carefully choosing our stencils and evaluating all of the
+    derivatives at once, we can reuse evaluations of :math:`H` between
+    derivatives, saving a lot of computation.
+
+    The stencils are defined as a `dict` with a `tuple` of offsets as keys and
+    `float` weights as values. For example, the `CFD1_stencil`::
+
+        {(1,): 0.5, (-1,): -0.5}
+
+    defines the second-order first central-difference:
+
+    .. math::
+
+        f' = \frac{f(x + \delta_x) - f(x - \delta_x)}{2\delta_x}
+
+    The keys are tuples so that we can iterate over the offsets for the mixed
+    second derivatives.
+
+    The stencils have been chosen to maximise the reuse of Hamiltonian
+    evaluations without sacrificing accuracy.
+
+    Parameters
+    ----------
+    field
+        An object describing the magnetic field of the plasma
+    launch_angular_frequency
+        Angular frequency of the beam
+    mode_flag
+        Either ``+/-1``, used to determine which mode branch to use
+    density_fit
+        Function or ``Callable`` parameterising the density
+    delta_R
+        Finite difference spacing in the ``R`` direction
+    delta_Z
+        Finite difference spacing in the ``Z`` direction
+    delta_K_R
+        Finite difference spacing in the ``K_R`` direction
+    delta_K_zeta
+        Finite difference spacing in the ``K_zeta`` direction
+    delta_K_Z
+        Finite difference spacing in the ``K_Z`` direction
+
+    """
+
     def __init__(
         self,
         field: MagneticField,
@@ -102,7 +201,30 @@ class Hamiltonian:
             "K_Z": delta_K_Z,
         }
 
-    def __call__(self, q_R, q_Z, K_R, K_zeta, K_Z):
+    def __call__(
+        self,
+        q_R: ArrayLike,
+        q_Z: ArrayLike,
+        K_R: ArrayLike,
+        K_zeta: ArrayLike,
+        K_Z: ArrayLike,
+    ):
+        """Evaluate the Hamiltonian at the given coordinates
+
+        Parameters
+        ----------
+        q_R : ArrayLike
+        q_Z : ArrayLike
+        K_R : ArrayLike
+        K_zeta : ArrayLike
+        K_Z : ArrayLike
+
+        Returns
+        -------
+        ArrayLike
+
+        """
+
         K_magnitude = np.sqrt(K_R**2 + (K_zeta / q_R) ** 2 + K_Z**2)
         poloidal_flux = self.field.poloidal_flux(q_R, q_Z)
         electron_density = self.density(poloidal_flux)
@@ -122,7 +244,7 @@ class Hamiltonian:
             K_hat = K_hat.T
             sin_theta_m_sq = contract_special(b_hat, K_hat) ** 2
 
-        epsilon = PolarisationTensor(electron_density, self.angular_frequency, B_total)
+        epsilon = DielectricTensor(electron_density, self.angular_frequency, B_total)
 
         Booker_alpha = (epsilon.parallel * sin_theta_m_sq) + epsilon.perpendicular * (
             1 - sin_theta_m_sq
@@ -149,32 +271,79 @@ class Hamiltonian:
         K_zeta: ArrayLike,
         K_Z: ArrayLike,
         second_order: bool = False,
-    ):
+    ) -> Dict[str, ArrayLike]:
+        """Evaluate the first-order derivative in all directions at the given
+        point(s), and optionally the second-order ones too
+
+        Parameters
+        ----------
+        q_R : ArrayLike
+        q_Z : ArrayLike
+        K_R : ArrayLike
+        K_zeta : ArrayLike
+        K_Z : ArrayLike
+            Coordinates to evaluate the derivatives at
+        second_order : bool
+            If ``True``, also evaluate the second derivatives
+
+        """
+
+        @dataclass(frozen=True)
+        class CoordOffset:
+            """Helper class to store relative offsets in a dict"""
+
+            q_R: int = 0
+            q_Z: int = 0
+            K_R: int = 0
+            K_zeta: int = 0
+            K_Z: int = 0
+
+        # We cache Hamiltonian evaluations only during this function call
         cache: Dict[CoordOffset, ArrayLike] = {}
 
+        # Capture the location we want the derivatives at
         starts = {"q_R": q_R, "q_Z": q_Z, "K_R": K_R, "K_zeta": K_zeta, "K_Z": K_Z}
 
-        def apply_stencil(dims, stencil, order=1):
-            result = 0.0
+        def apply_stencil(dims: Tuple[str, ...], stencil: Stencil) -> ArrayLike:
+            """Apply a stencil in set of directions
 
-            dim_spacings = [self.spacings[dim] for dim in dims] * order
+            Parameters
+            ----------
+            dims
+                Tuple of direction names
+            stencil
+                Finite difference stencil
+            """
+
+            # Collect the relative spacings for the derivative dimensions
+            dim_spacings = [self.spacings[dim] for dim in dims]
+            # For second order derivatives, remove repeated dimensions
+            if len(dims) == 2 and dims[1] == dims[0]:
+                dims = (dims[0],)
+
+            result = np.zeros_like(starts["q_R"])
 
             for stencil_offsets, weight in stencil.items():
                 coord_offsets = CoordOffset(**dict(zip(dims, stencil_offsets)))
                 try:
-                    H_s0_s1 = cache[coord_offsets]
+                    # See if we've already evaluated H here...
+                    H_at_offset = cache[coord_offsets]
                 except KeyError:
+                    # ...if not, let's do so now
                     offsets = asdict(coord_offsets)
+                    # Convert integer offsets to absolute positions
                     coords = {
                         dim: start + offsets[dim] * self.spacings[dim]
                         for dim, start in starts.items()
                     }
-                    H_s0_s1 = self(**coords)
-                    cache[coord_offsets] = H_s0_s1
+                    # Evaluate the derivative at this offset and cache it
+                    H_at_offset = self(**coords)
+                    cache[coord_offsets] = H_at_offset
 
-                result += weight * H_s0_s1
+                result += weight * H_at_offset
             return result / np.prod(dim_spacings)
 
+        # We always compute the first order derivatives
         derivatives = {
             "dH_dR": apply_stencil(("q_R",), FFD1_stencil),
             "dH_dZ": apply_stencil(("q_Z",), FFD1_stencil),
@@ -185,11 +354,11 @@ class Hamiltonian:
 
         if second_order:
             second_derivatives = {
-                "d2H_dR2": apply_stencil(("q_R",), FFD2_stencil, order=2),
-                "d2H_dZ2": apply_stencil(("q_Z",), FFD2_stencil, order=2),
-                "d2H_dKR2": apply_stencil(("K_R",), CFD2_stencil, order=2),
-                "d2H_dKzeta2": apply_stencil(("K_zeta",), CFD2_stencil, order=2),
-                "d2H_dKZ2": apply_stencil(("K_Z",), CFD2_stencil, order=2),
+                "d2H_dR2": apply_stencil(("q_R", "q_R"), FFD2_stencil),
+                "d2H_dZ2": apply_stencil(("q_Z", "q_Z"), FFD2_stencil),
+                "d2H_dKR2": apply_stencil(("K_R", "K_R"), CFD2_stencil),
+                "d2H_dKzeta2": apply_stencil(("K_zeta", "K_zeta"), CFD2_stencil),
+                "d2H_dKZ2": apply_stencil(("K_Z", "K_Z"), CFD2_stencil),
                 "d2H_dR_dZ": apply_stencil(("q_R", "q_Z"), FFD_FFD_stencil),
                 "d2H_dR_dKR": apply_stencil(("q_R", "K_R"), FFD_CFD_stencil),
                 "d2H_dR_dKzeta": apply_stencil(("q_R", "K_zeta"), FFD_CFD_stencil),
@@ -209,11 +378,14 @@ def laplacians(dH: dict):
     r"""Compute the Laplacians of the Hamiltonian:
 
     .. math::
-        \grad \grad H
-        \grad_K \grad H
-        \grad_K \grad_K H
+          \begin{gather}
+            \nabla \nabla H \\
+            \nabla_K \nabla H \\
+            \nabla_K \nabla_K H \\
+          \end{gather}
 
-    given a ``dict`` containing the second derivatives of the Hamiltonian
+    given a ``dict`` containing the second derivatives of the Hamiltonian (as
+    returned from `Hamiltonian.derivatives` with ``second_order=True``)
     """
 
     d2H_dR2 = dH["d2H_dR2"]
