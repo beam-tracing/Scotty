@@ -33,6 +33,7 @@ Submodules
    scotty.geometry
    scotty.hornpy
    scotty.init_bruv
+   scotty.launch
    scotty.lensalot
    scotty.plot3_Torbeam_benchmark
    scotty.plot3_pretty

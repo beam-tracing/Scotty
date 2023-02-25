@@ -66,7 +66,6 @@ Units
 
 from __future__ import annotations
 import numpy as np
-import math
 from scipy import integrate as integrate
 from scipy import constants as constants
 import matplotlib.pyplot as plt
@@ -83,23 +82,14 @@ from scotty.fun_general import (
     find_x0,
     find_H,
     find_waist,
-)
-from scotty.fun_general import (
-    find_inverse_2D,
+    freq_GHz_to_angular_frequency,
+    angular_frequency_to_wavenumber,
     find_Psi_3D_lab,
-    find_q_lab_Cartesian,
-    find_K_lab_Cartesian,
-    find_K_lab,
-    find_Psi_3D_lab_Cartesian,
 )
+from scotty.fun_general import find_q_lab_Cartesian, find_Psi_3D_lab_Cartesian
 from scotty.fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq
 from scotty.fun_general import find_epsilon_para, find_epsilon_perp, find_epsilon_g
 from scotty.fun_general import find_dbhat_dR, find_dbhat_dZ
-from scotty.fun_general import (
-    find_d_poloidal_flux_dR,
-    find_d_poloidal_flux_dZ,
-    find_Psi_3D_plasma,
-)
 from scotty.fun_general import find_H_Cardano, find_D
 from scotty.fun_evolution import ray_evolution_2D_fun, beam_evolution_fun
 from scotty.fun_evolution import (
@@ -122,6 +112,7 @@ from scotty.geometry import (
     CurvySlabField,
     EFITField,
 )
+from scotty.launch import launch_beam
 from scotty.torbeam import Torbeam
 from scotty._version import __version__
 
@@ -131,31 +122,31 @@ from scotty.check_output import check_output
 
 # Type hints
 from typing import Optional, Union, Sequence
-from scotty.typing import PathLike
+from scotty.typing import PathLike, FloatArray
 
 
 def beam_me_up(
-    poloidal_launch_angle_Torbeam,
-    toroidal_launch_angle_Torbeam,
-    launch_freq_GHz,
-    mode_flag,
-    launch_beam_width,
-    launch_beam_curvature,
-    launch_position,
+    poloidal_launch_angle_Torbeam: float,
+    toroidal_launch_angle_Torbeam: float,
+    launch_freq_GHz: float,
+    mode_flag: int,
+    launch_beam_width: float,
+    launch_beam_curvature: float,
+    launch_position: FloatArray,
     ## keyword arguments begin
-    vacuumLaunch_flag=True,
+    vacuumLaunch_flag: bool = True,
     find_B_method: Union[str, MagneticField] = "torbeam",
     shot=None,
     equil_time=None,
-    vacuum_propagation_flag=False,
-    Psi_BC_flag=False,
-    poloidal_flux_enter=None,
+    vacuum_propagation_flag: bool = False,
+    Psi_BC_flag: bool = False,
+    poloidal_flux_enter: Optional[float] = None,
     ## Finite-difference and solver parameters
-    delta_R=-0.0001,  # in the same units as data_R_coord
-    delta_Z=0.0001,  # in the same units as data_Z_coord
-    delta_K_R=0.1,  # in the same units as K_R
-    delta_K_zeta=0.1,  # in the same units as K_zeta
-    delta_K_Z=0.1,  # in the same units as K_z
+    delta_R: float = -0.0001,  # in the same units as data_R_coord
+    delta_Z: float = 0.0001,  # in the same units as data_Z_coord
+    delta_K_R: float = 0.1,  # in the same units as K_R
+    delta_K_zeta: float = 0.1,  # in the same units as K_zeta
+    delta_K_Z: float = 0.1,  # in the same units as K_z
     interp_order=5,  # For the 2D interpolation functions
     len_tau=102,  # Number of tau_points to output
     rtol=1e-3,  # for solve_ivp of the beam solver
@@ -214,6 +205,46 @@ def beam_me_up(
 
     Parameters
     ==========
+    toroidal_launch_angle_Torbeam: float
+        Toroidal angle of antenna in TORBEAM convention
+    poloidal_launch_angle_Torbeam: float
+        Poloidal angle of antenna in TORBEAM convention
+    mode_flag: int
+        Either ``+/-1``, used to determine which mode branch to use
+    launch_beam_width: float
+        Width of the beam at launch
+    launch_beam_curvature: float
+        Curvatuve of the beam at launch
+    launch_position: FloatArray
+        Position of the antenna in cylindrical coordinates
+    vacuumLaunch_flag: bool
+        If ``True``, launch beam from vacuum, otherwise beam launch
+        position is inside the plasma already
+    vacuum_propagation_flag: bool
+        If ``True``, run solver from the launch position, and don't
+        use analytical vacuum propagation
+    Psi_BC_flag: bool
+        If ``True``, use matching boundary conditions at plasma entry
+        position, otherwise do no special treatment at plasma boundary
+    poloidal_flux_enter: Optional
+        Normalised poloidal flux label of plasma boundary. Required if
+        ``vacuum_propagation_flag`` is ``True``
+    plasmaLaunch_Psi_3D_lab_Cartesian: FloatArray
+        :math:`\Psi` of beam in lab Cartesian coordinates. Required if
+        ``vacuumLaunch_flag`` is ``False``
+    plasmaLaunch_K: FloatArray
+        Wavevector of beam at launch. Required if
+        ``vacuumLaunch_flag`` is ``False``
+    delta_R: float
+        Finite difference spacing to use for ``R``
+    delta_Z: float
+        Finite difference spacing to use for ``Z``
+    delta_K_R: float
+        Finite difference spacing to use for ``K_R``
+    delta_K_zeta: float
+        Finite difference spacing to use for ``K_zeta``
+    delta_K_Z: float
+        Finite difference spacing to use for ``K_Z``
     find_B_method:
         - ``"efitpp"`` uses magnetic field data from efitpp files
           directly
@@ -281,8 +312,8 @@ def beam_me_up(
     check_input(mode_flag)
 
     # Tidying up the input data
-    launch_angular_frequency = 2 * math.pi * 10.0**9 * launch_freq_GHz
-    wavenumber_K0 = launch_angular_frequency / constants.c
+    launch_angular_frequency = freq_GHz_to_angular_frequency(launch_freq_GHz)
+    wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
 
     # Ensure paths are `pathlib.Path`
     ne_data_path = pathlib.Path(ne_data_path)
@@ -333,354 +364,52 @@ def beam_me_up(
     # -------------------
     if vacuumLaunch_flag:
         print("Beam launched from outside the plasma")
-
-        K_R_launch = (
-            -wavenumber_K0
-            * np.cos(toroidal_launch_angle_Torbeam / 180.0 * math.pi)
-            * np.cos(poloidal_launch_angle_Torbeam / 180.0 * math.pi)
-        )  # K_R
-        K_zeta_launch = (
-            -wavenumber_K0
-            * np.sin(toroidal_launch_angle_Torbeam / 180.0 * math.pi)
-            * np.cos(poloidal_launch_angle_Torbeam / 180.0 * math.pi)
-            * launch_position[0]
-        )  # K_zeta
-        K_Z_launch = -wavenumber_K0 * np.sin(
-            poloidal_launch_angle_Torbeam / 180.0 * math.pi
-        )  # K_z
-        launch_K = np.array([K_R_launch, K_zeta_launch, K_Z_launch])
-
-        poloidal_rotation_angle = (90.0 + poloidal_launch_angle_Torbeam) / 180.0 * np.pi
-
-        Psi_w_beam_launch_cartersian = np.array(
-            [
-                [
-                    wavenumber_K0 * launch_beam_curvature
-                    + 2j * launch_beam_width ** (-2),
-                    0,
-                ],
-                [
-                    0,
-                    wavenumber_K0 * launch_beam_curvature
-                    + 2j * launch_beam_width ** (-2),
-                ],
-            ]
+        (
+            K_initial,
+            initial_position,
+            launch_K,
+            Psi_3D_lab_initial,
+            Psi_3D_lab_launch,
+            Psi_3D_lab_entry,
+            Psi_3D_lab_entry_cartersian,
+            distance_from_launch_to_entry,
+        ) = launch_beam(
+            toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
+            poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
+            mode_flag=mode_flag,
+            launch_beam_width=launch_beam_width,
+            launch_beam_curvature=launch_beam_curvature,
+            launch_position=launch_position,
+            launch_angular_frequency=launch_angular_frequency,
+            field=field,
+            find_density_1D=find_density_1D,
+            vacuum_propagation_flag=vacuum_propagation_flag,
+            Psi_BC_flag=Psi_BC_flag,
+            poloidal_flux_enter=poloidal_flux_enter,
+            delta_R=delta_R,
+            delta_Z=delta_Z,
+            delta_K_R=delta_K_R,
+            delta_K_zeta=delta_K_zeta,
+            delta_K_Z=delta_K_Z,
         )
-        identity_matrix_2D = np.array([[1, 0], [0, 1]])
-
-        rotation_matrix_pol = np.array(
-            [
-                [np.cos(poloidal_rotation_angle), 0, np.sin(poloidal_rotation_angle)],
-                [0, 1, 0],
-                [-np.sin(poloidal_rotation_angle), 0, np.cos(poloidal_rotation_angle)],
-            ]
-        )
-
-        rotation_matrix_tor = np.array(
-            [
-                [
-                    np.cos(toroidal_launch_angle_Torbeam / 180.0 * math.pi),
-                    np.sin(toroidal_launch_angle_Torbeam / 180.0 * math.pi),
-                    0,
-                ],
-                [
-                    -np.sin(toroidal_launch_angle_Torbeam / 180.0 * math.pi),
-                    np.cos(toroidal_launch_angle_Torbeam / 180.0 * math.pi),
-                    0,
-                ],
-                [0, 0, 1],
-            ]
-        )
-
-        rotation_matrix = np.matmul(rotation_matrix_pol, rotation_matrix_tor)
-        rotation_matrix_inverse = np.transpose(rotation_matrix)
-
-        Psi_3D_beam_launch_cartersian = np.array(
-            [
-                [
-                    Psi_w_beam_launch_cartersian[0][0],
-                    Psi_w_beam_launch_cartersian[0][1],
-                    0,
-                ],
-                [
-                    Psi_w_beam_launch_cartersian[1][0],
-                    Psi_w_beam_launch_cartersian[1][1],
-                    0,
-                ],
-                [0, 0, 0],
-            ]
-        )
-        Psi_3D_lab_launch_cartersian = np.matmul(
-            rotation_matrix_inverse,
-            np.matmul(Psi_3D_beam_launch_cartersian, rotation_matrix),
-        )
-        Psi_3D_lab_launch = find_Psi_3D_lab(
-            Psi_3D_lab_launch_cartersian,
-            launch_position[0],
-            launch_position[1],
-            K_R_launch,
-            K_zeta_launch,
-        )
-
-        if vacuum_propagation_flag:
-            Psi_w_beam_inverse_launch_cartersian = find_inverse_2D(
-                Psi_w_beam_launch_cartersian
-            )
-
-            # Finds entry point
-            search_Z_end = launch_position[2] - launch_position[0] * np.tan(
-                np.radians(poloidal_launch_angle_Torbeam)
-            )
-            numberOfCoarseSearchPoints = 50
-            R_coarse_search_array = np.linspace(
-                launch_position[0], 0, numberOfCoarseSearchPoints
-            )
-            Z_coarse_search_array = np.linspace(
-                launch_position[2], search_Z_end, numberOfCoarseSearchPoints
-            )
-            poloidal_flux_coarse_search_array = np.zeros(numberOfCoarseSearchPoints)
-            poloidal_flux_coarse_search_array = field.poloidal_flux(
-                R_coarse_search_array, Z_coarse_search_array
-            )
-            meets_flux_condition_array = (
-                poloidal_flux_coarse_search_array < 0.9 * poloidal_flux_enter
-            )
-            dummy_array = np.array(range(numberOfCoarseSearchPoints))
-            indices_inside_for_sure_array = dummy_array[meets_flux_condition_array]
-            first_inside_index = indices_inside_for_sure_array[0]
-            numberOfFineSearchPoints = 7500
-            R_fine_search_array = np.linspace(
-                launch_position[0],
-                R_coarse_search_array[first_inside_index],
-                numberOfFineSearchPoints,
-            )
-            Z_fine_search_array = np.linspace(
-                launch_position[2],
-                Z_coarse_search_array[first_inside_index],
-                numberOfFineSearchPoints,
-            )
-            poloidal_fine_search_array = np.zeros(numberOfFineSearchPoints)
-            poloidal_fine_search_array = field.poloidal_flux(
-                R_fine_search_array, Z_fine_search_array
-            )
-            entry_index = find_nearest(poloidal_fine_search_array, poloidal_flux_enter)
-            if poloidal_fine_search_array[entry_index] > poloidal_flux_enter:
-                # The first point needs to be in the plasma
-                # If the first point is outside, then there will be errors when the gradients are calculated
-                entry_index = entry_index + 1
-            entry_position = np.zeros(3)  # R,Z
-            entry_position[0] = R_fine_search_array[entry_index]
-            entry_position[1] = (
-                K_zeta_launch
-                / K_R_launch
-                * (1 / launch_position[0] - 1 / entry_position[0])
-            )
-            entry_position[2] = Z_fine_search_array[entry_index]
-
-            distance_from_launch_to_entry = np.sqrt(
-                launch_position[0] ** 2
-                + entry_position[0] ** 2
-                - 2
-                * launch_position[0]
-                * entry_position[0]
-                * np.cos(entry_position[1] - launch_position[1])
-                + (launch_position[2] - entry_position[2]) ** 2
-            )
-            # Entry point found
-
-            # Calculate entry parameters from launch parameters
-            # That is, find beam at start of plasma given its parameters at the antenna
-            K_lab_launch = np.array([K_R_launch, K_zeta_launch, K_Z_launch])
-            K_lab_Cartesian_launch = find_K_lab_Cartesian(K_lab_launch, launch_position)
-            K_lab_Cartesian_entry = K_lab_Cartesian_launch
-            entry_position_Cartesian = find_q_lab_Cartesian(entry_position)
-            K_lab_entry = find_K_lab(K_lab_Cartesian_entry, entry_position_Cartesian)
-
-            K_R_entry = K_lab_entry[0]  # K_R
-            K_zeta_entry = K_lab_entry[1]
-            K_Z_entry = K_lab_entry[2]  # K_z
-
-            Psi_w_beam_inverse_entry_cartersian = (
-                distance_from_launch_to_entry / (wavenumber_K0) * identity_matrix_2D
-                + Psi_w_beam_inverse_launch_cartersian
-            )
-            Psi_w_beam_entry_cartersian = find_inverse_2D(
-                Psi_w_beam_inverse_entry_cartersian
-            )
-
-            Psi_3D_beam_entry_cartersian = np.array(
-                [
-                    [
-                        Psi_w_beam_entry_cartersian[0][0],
-                        Psi_w_beam_entry_cartersian[0][1],
-                        0,
-                    ],
-                    [
-                        Psi_w_beam_entry_cartersian[1][0],
-                        Psi_w_beam_entry_cartersian[1][1],
-                        0,
-                    ],
-                    [0, 0, 0],
-                ]
-            )  # 'entry' is still in vacuum, so the components of Psi along g are all 0 (since \nabla H = 0)
-
-            Psi_3D_lab_entry_cartersian = np.matmul(
-                rotation_matrix_inverse,
-                np.matmul(Psi_3D_beam_entry_cartersian, rotation_matrix),
-            )
-
-            # Convert to cylindrical coordinates
-            Psi_3D_lab_entry = find_Psi_3D_lab(
-                Psi_3D_lab_entry_cartersian,
-                entry_position[0],
-                entry_position[1],
-                K_R_entry,
-                K_zeta_entry,
-            )
-
-            # -------------------
-            # Find initial parameters in plasma
-            # -------------------
-            K_R_initial = K_R_entry
-            K_zeta_initial = K_zeta_entry
-            K_Z_initial = K_Z_entry
-            initial_position = entry_position
-            if Psi_BC_flag:  # Use BCs
-                dH_dKR_initial = find_dH_dKR(
-                    initial_position[0],
-                    initial_position[2],
-                    K_R_initial,
-                    K_zeta_initial,
-                    K_Z_initial,
-                    launch_angular_frequency,
-                    mode_flag,
-                    delta_K_R,
-                    field.poloidal_flux,
-                    find_density_1D,
-                    field.B_R,
-                    field.B_T,
-                    field.B_Z,
-                )
-                dH_dKzeta_initial = find_dH_dKzeta(
-                    initial_position[0],
-                    initial_position[2],
-                    K_R_initial,
-                    K_zeta_initial,
-                    K_Z_initial,
-                    launch_angular_frequency,
-                    mode_flag,
-                    delta_K_zeta,
-                    field.poloidal_flux,
-                    find_density_1D,
-                    field.B_R,
-                    field.B_T,
-                    field.B_Z,
-                )
-                dH_dKZ_initial = find_dH_dKZ(
-                    initial_position[0],
-                    initial_position[2],
-                    K_R_initial,
-                    K_zeta_initial,
-                    K_Z_initial,
-                    launch_angular_frequency,
-                    mode_flag,
-                    delta_K_Z,
-                    field.poloidal_flux,
-                    find_density_1D,
-                    field.B_R,
-                    field.B_T,
-                    field.B_Z,
-                )
-                dH_dR_initial = find_dH_dR(
-                    initial_position[0],
-                    initial_position[2],
-                    K_R_initial,
-                    K_zeta_initial,
-                    K_Z_initial,
-                    launch_angular_frequency,
-                    mode_flag,
-                    delta_R,
-                    field.poloidal_flux,
-                    find_density_1D,
-                    field.B_R,
-                    field.B_T,
-                    field.B_Z,
-                )
-                dH_dZ_initial = find_dH_dZ(
-                    initial_position[0],
-                    initial_position[2],
-                    K_R_initial,
-                    K_zeta_initial,
-                    K_Z_initial,
-                    launch_angular_frequency,
-                    mode_flag,
-                    delta_Z,
-                    field.poloidal_flux,
-                    find_density_1D,
-                    field.B_R,
-                    field.B_T,
-                    field.B_Z,
-                )
-                d_poloidal_flux_d_R_boundary = find_d_poloidal_flux_dR(
-                    initial_position[0],
-                    initial_position[2],
-                    delta_R,
-                    field.poloidal_flux,
-                )
-                d_poloidal_flux_d_Z_boundary = find_d_poloidal_flux_dZ(
-                    initial_position[0],
-                    initial_position[2],
-                    delta_R,
-                    field.poloidal_flux,
-                )
-
-                Psi_3D_lab_initial = find_Psi_3D_plasma(
-                    Psi_3D_lab_entry,
-                    dH_dKR_initial,
-                    dH_dKzeta_initial,
-                    dH_dKZ_initial,
-                    dH_dR_initial,
-                    dH_dZ_initial,
-                    d_poloidal_flux_d_R_boundary.item(),
-                    d_poloidal_flux_d_Z_boundary.item(),
-                )  # . item() to convert variable from type ndarray to float, such that the array elements all have the same type
-            else:  # Do not use BCs
-                Psi_3D_lab_initial = Psi_3D_lab_entry
-
-        else:  # Run solver from the launch position, no analytical vacuum propagation
-            Psi_3D_lab_initial = Psi_3D_lab_launch
-            K_R_initial = K_R_launch
-            K_zeta_initial = K_zeta_launch
-            K_Z_initial = K_Z_launch
-            initial_position = launch_position
-
-            Psi_3D_lab_entry = None
-            distance_from_launch_to_entry = None
-            Psi_3D_lab_entry_cartersian = np.full_like(
-                Psi_3D_lab_launch, fill_value=np.nan
-            )
-
     else:
         print("Beam launched from inside the plasma")
-        K_R_launch = plasmaLaunch_K[0]
-        K_zeta_launch = plasmaLaunch_K[1]
-        K_Z_launch = plasmaLaunch_K[2]
-
         Psi_3D_lab_initial = find_Psi_3D_lab(
             plasmaLaunch_Psi_3D_lab_Cartesian,
             launch_position[0],
+            launch_position[1],
             plasmaLaunch_K[0],
             plasmaLaunch_K[1],
         )
-        K_R_initial = K_R_launch
-        K_zeta_initial = K_zeta_launch
-        K_Z_initial = K_Z_launch
+        K_initial = plasmaLaunch_K
         initial_position = launch_position
+        launch_K = None
+        Psi_3D_lab_launch = None
+        Psi_3D_lab_entry = None
+        Psi_3D_lab_entry_cartersian = None
+        distance_from_launch_to_entry = None
 
-    #        print(K_R_initial)
-    #        print(K_zeta_launch)
-    #        print(K_Z_launch)
-    # -------------------
+    K_R_initial, K_zeta_initial, K_Z_initial = K_initial
 
     # -------------------
 
