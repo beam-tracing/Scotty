@@ -10,7 +10,7 @@ Install
 To install `scotty` straight from Github:
 
 ```
-pip install git+https://github.com/valerian-chen/Scotty
+pip install git+https://github.com/beam-tracing/Scotty
 ```
 
 or from a local clone:
