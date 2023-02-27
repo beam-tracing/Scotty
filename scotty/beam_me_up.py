@@ -108,7 +108,7 @@ from scotty.geometry import (
     CurvySlabField,
     EFITField,
 )
-from scotty.hamiltonian import Hamiltonian, laplacians
+from scotty.hamiltonian import Hamiltonian, hessians
 from scotty.launch import launch_beam
 from scotty.torbeam import Torbeam
 from scotty._version import __version__
@@ -1890,7 +1890,7 @@ def beam_me_up(
     # print('ST first 2 terms / ST full: ', abs((G_term2[theta_m_min_idx]+G_term1[theta_m_min_idx])/G_full[theta_m_min_idx]) )
 
     # Calculates nabla nabla H, nabla_K nabla H, nabla_K nabla_K H
-    grad_grad_H, gradK_grad_H, gradK_gradK_H = laplacians(dH)
+    grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians(dH)
 
     # gradK_gradK_H[:,0,1] = - gradK_gradK_H[:,0,1]
 

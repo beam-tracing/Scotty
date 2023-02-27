@@ -374,8 +374,8 @@ class Hamiltonian:
         return derivatives
 
 
-def laplacians(dH: dict):
-    r"""Compute the Laplacians of the Hamiltonian:
+def hessians(dH: dict):
+    r"""Compute the elements of the Hessian of the Hamiltonian:
 
     .. math::
           \begin{gather}

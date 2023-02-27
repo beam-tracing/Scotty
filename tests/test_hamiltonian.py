@@ -1,4 +1,4 @@
-from scotty.hamiltonian import Hamiltonian, laplacians
+from scotty.hamiltonian import Hamiltonian, hessians
 from scotty.fun_general import freq_GHz_to_angular_frequency
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.beam_me_up import create_magnetic_geometry
@@ -93,12 +93,12 @@ def test_hamiltonian_derivatives():
     assert np.isclose(d2H_dKzeta_dKZ, k_K_zeta * k_K_Z)
 
 
-def test_hamiltonian_laplacians():
+def test_hamiltonian_hessians():
     H = FakeHamiltonian(1e-3, 1e-3, 1e-4, 1e-4, 1e-4)
     dH = H.derivatives(1.2, 2.3, 3.4, 4.5, 5.6, second_order=True)
     H0 = H(1.2, 2.3, 3.4, 4.5, 5.6)
 
-    grad_grad_H, gradK_grad_H, gradK_gradK_H = laplacians(dH)
+    grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians(dH)
 
     grad_grad_H_expected = np.array(
         [[k_q_R**2, 0, k_q_R * k_q_Z], [0, 0, 0], [k_q_R * k_q_Z, 0, k_q_Z**2]]

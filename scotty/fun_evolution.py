@@ -14,7 +14,7 @@ Run in Python 3,  does not work in Python 2
 
 import numpy as np
 
-from scotty.hamiltonian import Hamiltonian, laplacians
+from scotty.hamiltonian import Hamiltonian, hessians
 from scotty.typing import FloatArray
 
 
@@ -144,7 +144,7 @@ def beam_evolution_fun(tau, beam_parameters, K_zeta, hamiltonian: Hamiltonian):
     # Find derivatives of H
     dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z, second_order=True)
 
-    grad_grad_H, gradK_grad_H, gradK_gradK_H = laplacians(dH)
+    grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians(dH)
     grad_gradK_H = np.transpose(gradK_grad_H)
 
     dH_dR = dH["dH_dR"]
