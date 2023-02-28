@@ -563,21 +563,16 @@ def beam_me_up(
     ray_parameters_2D = solver_ray_output.y
     tau_ray = solver_ray_output.t
 
-    solver_ray_status = solver_ray_output.status
-    if solver_ray_status == 0:
-        print(
-            "Warning: Ray has not left plasma/simulation region. Increase tau_max or choose different initial conditions."
+    if solver_ray_output.status == 0:
+        raise RuntimeError(
+            "Ray has not left plasma/simulation region. "
+            "Increase tau_max or choose different initial conditions."
         )
-        print("We should not be here. I am prematurely terminating this simulation.")
+    if solver_ray_output.status == -1:
+        raise RuntimeError(
+            "Integration step failed. Check density interpolation is not negative"
+        )
 
-        sys.exit()
-    elif solver_ray_status == -1:
-        print("Warning: Integration step failed.")
-        # This is sometimes due to negative values of ne due to the spline
-        # interpolation of ne.dat
-        # If this happens on the way out of the plasma, the next step will do the trick.
-
-        sys.exit()
 
     tau_events = solver_ray_output.t_events
     ray_parameters_2D_events = solver_ray_output.y_events
