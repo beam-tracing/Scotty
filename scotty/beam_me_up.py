@@ -563,18 +563,6 @@ def beam_me_up(
     ray_parameters_2D = solver_ray_output.y
     tau_ray = solver_ray_output.t
 
-    # Uncomment to help with troubleshooting
-    # ray_parameters_2D_events = solver_ray_output.y_events
-    # ray_parameters_cutoff = np.squeeze(ray_parameters_2D_events[4])
-    # print(solver_ray_output.t_events)
-    # print(solver_ray_output.status)
-    # plt.title('Poloidal Plane')
-    # contour_levels = np.linspace(0,1,11)
-    # CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
-    # plt.plot(ray_parameters_2D[0,:], ray_parameters_2D[1,:])
-    # plt.plot(ray_parameters_cutoff[0],ray_parameters_cutoff[1],'o')
-    # plt.clabel(CS, inline=True, fontsize=10,inline_spacing=1,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
-
     solver_ray_status = solver_ray_output.status
     if solver_ray_status == 0:
         print(
