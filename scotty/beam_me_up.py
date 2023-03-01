@@ -69,7 +69,6 @@ import numpy as np
 from scipy import integrate as integrate
 from scipy import constants as constants
 import matplotlib.pyplot as plt
-import sys
 import bisect
 import time
 import json
