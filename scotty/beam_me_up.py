@@ -416,88 +416,6 @@ def beam_me_up(
 
     # -------------------
 
-    # Define events for the solver
-    # Notice how the beam parameters are allocated: this function only works correctly for the 2D case
-    @_event(terminal=True, direction=1.0)
-    def event_leave_plasma(
-        tau, ray_parameters_2D, K_zeta: float, hamiltonian: Hamiltonian
-    ):
-        q_R, q_Z, _, _ = ray_parameters_2D
-        poloidal_flux = field.poloidal_flux(q_R, q_Z)
-
-        # Leave at the same poloidal flux of entry
-        # goes from negative to positive when leaving the plasma
-        return poloidal_flux - poloidal_flux_enter
-
-    @_event(terminal=False, direction=1.0)
-    def event_leave_LCFS(
-        tau, ray_parameters_2D, K_zeta: float, hamiltonian: Hamiltonian
-    ):
-        q_R, q_Z, _, _ = ray_parameters_2D
-        poloidal_flux = field.poloidal_flux(q_R, q_Z)
-        poloidal_flux_LCFS = 1.0
-        # goes from negative to positive when leaving the LCFS
-        return poloidal_flux - poloidal_flux_LCFS
-
-    data_R_coord_min = field.R_coord.min()
-    data_R_coord_max = field.R_coord.max()
-    data_Z_coord_min = field.Z_coord.min()
-    data_Z_coord_max = field.Z_coord.max()
-
-    @_event(terminal=True, direction=-1.0)
-    def event_leave_simulation(
-        tau, ray_parameters_2D, K_zeta: float, hamiltonian: Hamiltonian
-    ):
-        q_R, q_Z, _, _ = ray_parameters_2D
-
-        is_inside = (
-            (q_R > data_R_coord_min)
-            and (q_R < data_R_coord_max)
-            and (q_Z > data_Z_coord_min)
-            and (q_Z < data_Z_coord_max)
-        )
-
-        # goes from positive (True) to negative(False) when leaving the simulation region
-        return is_inside
-
-    @_event(terminal=True, direction=0.0)
-    def event_cross_resonance(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
-        # Currently only works when crossing resonance.
-        # To implement crossing of higher harmonics as well
-        delta_gyro_freq = 0.01
-
-        q_R, q_Z, _, _ = ray_parameters_2D
-
-        B_R = field.B_R(q_R, q_Z)
-        B_T = field.B_T(q_R, q_Z)
-        B_Z = field.B_Z(q_R, q_Z)
-
-        B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
-        gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
-
-        # The function's return value gives zero when the gyrofreq on the ray goes from either
-        # above to below or below to above the resonance.
-        return (gyro_freq - 1.0 - delta_gyro_freq) * (gyro_freq - 1.0 + delta_gyro_freq)
-
-    @_event(terminal=False, direction=1.0)
-    def event_reach_K_min(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
-        # To find tau of the cut-off, that is the location where the
-        # wavenumber K is minimised
-        # This function finds the turning points
-
-        q_R = ray_parameters_2D[0]
-        q_Z = ray_parameters_2D[1]
-        K_R = ray_parameters_2D[2]
-        K_Z = ray_parameters_2D[3]
-        K_magnitude = np.sqrt(K_R**2 + K_Z**2 + K_zeta**2 / q_R**2)
-
-        dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z)
-
-        d_K_d_tau = -(1 / K_magnitude) * (
-            dH["dH_dR"] * K_R + dH["dH_dZ"] * K_Z + dH["dH_dKR"] * q_R
-        )
-        return d_K_d_tau
-
     # -------------------
 
     # Propagate the beam
@@ -520,13 +438,9 @@ def beam_me_up(
     # values. We can then pass the keys to our event handler along
     # with the returned events, and use these names instead of list
     # indices
-    solver_ray_events = {
-        "leave_plasma": event_leave_plasma,
-        "leave_LCFS": event_leave_LCFS,
-        "leave_simulation": event_leave_simulation,
-        "cross_resonance": event_cross_resonance,
-        "reach_K_min": event_reach_K_min,
-    }
+    solver_ray_events = make_solver_events(
+        poloidal_flux_enter, launch_angular_frequency, field
+    )
 
     # Ray evolves q_R, q_Z, K_R, K_Z
     ray_parameters_2D_initial = [
@@ -591,7 +505,7 @@ def beam_me_up(
             tau_points,
             K_zeta_initial,
             solver_arguments,
-            event_leave_plasma,
+            solver_ray_events["leave_plasma"],
         )
 
     """
@@ -2537,3 +2451,115 @@ def handle_no_resonance(
     tau_cutoff_fine = float(solver_ray_output_fine.t[index_cutoff_fine])
     return np.sort(np.append(tau_points, tau_cutoff_fine))
 
+
+def make_solver_events(
+    poloidal_flux_enter: float, launch_angular_frequency: float, field: MagneticField
+) -> Dict[str, Callable]:
+    """Define event handlers for the ray solver
+
+    Only works correctly for the 2D case
+
+    Parameters
+    ----------
+    poloidal_flux_enter : float
+        Poloidal flux label of plasma surface
+    launch_angular_frequency : float
+        Beam frequency
+    field : MagneticField
+        Magnetic field object
+
+    Returns
+    -------
+    Dict[str, Callable]
+        Dictionary of event handlers with names
+
+    """
+
+    @_event(terminal=True, direction=1.0)
+    def event_leave_plasma(
+        tau, ray_parameters_2D, K_zeta: float, hamiltonian: Hamiltonian
+    ):
+        q_R, q_Z, _, _ = ray_parameters_2D
+        poloidal_flux = field.poloidal_flux(q_R, q_Z)
+
+        # Leave at the same poloidal flux of entry
+        # goes from negative to positive when leaving the plasma
+        return poloidal_flux - poloidal_flux_enter
+
+    @_event(terminal=False, direction=1.0)
+    def event_leave_LCFS(
+        tau, ray_parameters_2D, K_zeta: float, hamiltonian: Hamiltonian
+    ):
+        q_R, q_Z, _, _ = ray_parameters_2D
+        poloidal_flux = field.poloidal_flux(q_R, q_Z)
+        poloidal_flux_LCFS = 1.0
+        # goes from negative to positive when leaving the LCFS
+        return poloidal_flux - poloidal_flux_LCFS
+
+    # Capture bounding box of magnetic field
+    data_R_coord_min = field.R_coord.min()
+    data_R_coord_max = field.R_coord.max()
+    data_Z_coord_min = field.Z_coord.min()
+    data_Z_coord_max = field.Z_coord.max()
+
+    @_event(terminal=True, direction=-1.0)
+    def event_leave_simulation(
+        tau, ray_parameters_2D, K_zeta: float, hamiltonian: Hamiltonian
+    ):
+        q_R, q_Z, _, _ = ray_parameters_2D
+
+        is_inside = (
+            (q_R > data_R_coord_min)
+            and (q_R < data_R_coord_max)
+            and (q_Z > data_Z_coord_min)
+            and (q_Z < data_Z_coord_max)
+        )
+
+        # goes from positive (True) to negative(False) when leaving the simulation region
+        return is_inside
+
+    @_event(terminal=True, direction=0.0)
+    def event_cross_resonance(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
+        # Currently only works when crossing resonance.
+        # To implement crossing of higher harmonics as well
+        delta_gyro_freq = 0.01
+
+        q_R, q_Z, _, _ = ray_parameters_2D
+
+        B_R = field.B_R(q_R, q_Z)
+        B_T = field.B_T(q_R, q_Z)
+        B_Z = field.B_Z(q_R, q_Z)
+
+        B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
+        gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
+
+        # The function's return value gives zero when the gyrofreq on the ray goes from either
+        # above to below or below to above the resonance.
+        return (gyro_freq - 1.0 - delta_gyro_freq) * (gyro_freq - 1.0 + delta_gyro_freq)
+
+    @_event(terminal=False, direction=1.0)
+    def event_reach_K_min(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
+        # To find tau of the cut-off, that is the location where the
+        # wavenumber K is minimised
+        # This function finds the turning points
+
+        q_R = ray_parameters_2D[0]
+        q_Z = ray_parameters_2D[1]
+        K_R = ray_parameters_2D[2]
+        K_Z = ray_parameters_2D[3]
+        K_magnitude = np.sqrt(K_R**2 + K_Z**2 + K_zeta**2 / q_R**2)
+
+        dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z)
+
+        d_K_d_tau = -(1 / K_magnitude) * (
+            dH["dH_dR"] * K_R + dH["dH_dZ"] * K_Z + dH["dH_dKR"] * q_R
+        )
+        return d_K_d_tau
+
+    return {
+        "leave_plasma": event_leave_plasma,
+        "leave_LCFS": event_leave_LCFS,
+        "leave_simulation": event_leave_simulation,
+        "cross_resonance": event_cross_resonance,
+        "reach_K_min": event_reach_K_min,
+    }
