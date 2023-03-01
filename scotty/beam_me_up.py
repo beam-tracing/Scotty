@@ -2446,8 +2446,18 @@ def _event(terminal: bool, direction: float):
 
 def handle_events(
     tau_events: Dict[str, FloatArray], ray_parameters_2D_events: FloatArray
-) -> FloatArray:
-    """Handle events detected by `scipy.integrate.solve_ivp`
+) -> float:
+    """Handle events detected by `scipy.integrate.solve_ivp`. This
+    only handles events due to the ray leaving the plasma or
+    simulation:
+
+    - ``"leave_plasma"``: the ray has left the plasma
+    - ``"leave_LCFS"``: the ray has left the last-closed flux
+      surface. For most simulations, this is likely identical to
+      leaving the plasma
+    - ``"leave_simulation"``: the ray has left the simulated area
+      (essentially the bounding box of the plasma)
+    - ``"cross_resonance"``: the ray has crossed a resonance
 
     Parameters
     ----------
@@ -2471,10 +2481,10 @@ def handle_events(
     # Event names here must match those in the `solver_ray_events`
     # dict defined outside this function
     if detected("leave_plasma") and not detected("leave_LCFS"):
-        return np.squeeze(tau_events["leave_plasma"])
+        return tau_events["leave_plasma"][0]
 
     if detected("cross_resonance"):
-        return np.squeeze(tau_events["cross_resonance"])
+        return tau_events["cross_resonance"][0]
 
     if not detected("leave_plasma") and detected("leave_LCFS"):
         return tau_events["leave_LCFS"][0]
@@ -2487,7 +2497,7 @@ def handle_events(
             return tau_events["leave_LCFS"][0]
 
         # Beam deflection sufficiently large, terminate at entry poloidal flux
-        return np.squeeze(tau_events["leave_plasma"])
+        return tau_events["leave_plasma"][0]
 
     # If one ends up here, things aren't going well. I can think of
     # two possible reasons:
@@ -2499,4 +2509,4 @@ def handle_events(
     #   when it really should
 
     print("Warning: Ray has left the simulation region without leaving the LCFS.")
-    return np.squeeze(tau_events["leave_simulation"])
+    return tau_events["leave_simulation"][0]
