@@ -20,53 +20,6 @@ from scotty.hamiltonian import Hamiltonian, hessians
 from scotty.typing import FloatArray, ArrayLike
 
 
-# Functions (solver)
-# Defines the ray evolution function
-# Not necessary for what I want to do, but it does make life easier
-def ray_evolution_2D_fun(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
-    """
-    Parameters
-    ----------
-    tau : float
-        Parameter along the ray.
-    ray_parameters_2D : complex128
-        q_R, q_Z, K_R, K_Z
-    hamiltonian:
-        Hamiltonian object
-
-    Returns
-    -------
-    d_beam_parameters_d_tau
-        d (beam_parameters) / d tau
-
-    Notes
-    -------
-
-    """
-
-    # Clean input up. Not necessary, but aids readability
-    q_R = ray_parameters_2D[0]
-    q_Z = ray_parameters_2D[1]
-    K_R = ray_parameters_2D[2]
-    K_Z = ray_parameters_2D[3]
-
-    # Find derivatives of H
-    dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z)
-
-    d_ray_parameters_2D_d_tau = np.zeros_like(ray_parameters_2D)
-
-    # d (q_R) / d tau
-    d_ray_parameters_2D_d_tau[0] = dH["dH_dKR"]
-    # d (q_Z) / d tau
-    d_ray_parameters_2D_d_tau[1] = dH["dH_dKZ"]
-    # d (K_R) / d tau
-    d_ray_parameters_2D_d_tau[2] = -dH["dH_dR"]
-    # d (K_Z) / d tau
-    d_ray_parameters_2D_d_tau[3] = -dH["dH_dZ"]
-
-    return d_ray_parameters_2D_d_tau
-
-
 def pack_beam_parameters(
     q_R: ArrayLike,
     q_zeta: ArrayLike,

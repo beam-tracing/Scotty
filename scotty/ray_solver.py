@@ -1,11 +1,10 @@
 from dataclasses import dataclass
 from time import time
-from typing import Any, Callable, Dict, Protocol, Tuple
+from typing import Any, Callable, Dict, Protocol, Tuple, Union
 
 import numpy as np
 from scipy.integrate import solve_ivp
 
-from scotty.fun_evolution import ray_evolution_2D_fun
 from scotty.fun_general import K_magnitude, find_normalised_gyro_freq
 from scotty.geometry import MagneticField
 from scotty.hamiltonian import Hamiltonian
@@ -342,3 +341,189 @@ def quick_K_cutoff(
     poloidal_flux = field.poloidal_flux(q_R, q_Z)
 
     return K_cutoff_data(q_R, q_Z, K_norm_min, poloidal_flux, theta_m)
+
+
+def ray_evolution_2D_fun(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
+    """
+    Parameters
+    ----------
+    tau : float
+        Parameter along the ray.
+    ray_parameters_2D : complex128
+        q_R, q_Z, K_R, K_Z
+    hamiltonian:
+        Hamiltonian object
+
+    Returns
+    -------
+    d_beam_parameters_d_tau
+        d (beam_parameters) / d tau
+
+    Notes
+    -------
+
+    """
+
+    # Clean input up. Not necessary, but aids readability
+    q_R = ray_parameters_2D[0]
+    q_Z = ray_parameters_2D[1]
+    K_R = ray_parameters_2D[2]
+    K_Z = ray_parameters_2D[3]
+
+    # Find derivatives of H
+    dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z)
+
+    d_ray_parameters_2D_d_tau = np.zeros_like(ray_parameters_2D)
+
+    # d (q_R) / d tau
+    d_ray_parameters_2D_d_tau[0] = dH["dH_dKR"]
+    # d (q_Z) / d tau
+    d_ray_parameters_2D_d_tau[1] = dH["dH_dKZ"]
+    # d (K_R) / d tau
+    d_ray_parameters_2D_d_tau[2] = -dH["dH_dR"]
+    # d (K_Z) / d tau
+    d_ray_parameters_2D_d_tau[3] = -dH["dH_dZ"]
+
+    return d_ray_parameters_2D_d_tau
+
+
+def propagate_ray(
+    poloidal_flux_enter: float,
+    launch_angular_frequency: float,
+    field: MagneticField,
+    initial_position: FloatArray,
+    K_initial: FloatArray,
+    hamiltonian: Hamiltonian,
+    rtol: float,
+    atol: float,
+    quick_run: bool,
+    len_tau: int,
+    tau_max: float = 1e5,
+    verbose: bool = True,
+) -> Union[Tuple[float, FloatArray], K_cutoff_data]:
+    """Propagate a ray. Quickly finds tau at which the ray leaves the
+    plasma, as well as estimates location of cut-off.
+
+    2
+
+    Parameters
+    ----------
+    poloidal_flux_enter : float
+        Flux label where ray enters plasma
+    launch_angular_frequency : float
+        Angular frequency of beam
+    field : MagneticField
+        Object describing magnetic field
+    initial_position : FloatArray
+        Initial position in ``q`` coordinates
+    K_initial : FloatArray
+        Initial wavevector
+    hamiltonian : Hamiltonian
+        Object to compute Hamiltonian
+    rtol : float
+        Relative tolerance
+    atol : float
+        Absolute tolerance
+    quick_run : bool
+        If true, use minimum of :math:`|K|` to estimate cut-off location
+    len_tau : int
+        Number of points for tau
+    tau_max : float
+        Maximum value of tau before the solver stops
+    verbose : bool
+        If true, print some timing information
+
+    Returns
+    -------
+    Union[Tuple[float, FloatArray], K_cutoff_data]
+        Returns either: value of tau where ray left plasma, along with
+        an array of tau points for the beam solver to output results
+        at; or, a `K_cutoff_data` with information about the estimated
+        location of the cut-off
+
+    """
+
+    # `solve_ivp` only takes a list of event handlers, which means we
+    # need to match indices with the returned events. To make that a
+    # bit easier, we make a dict here and pass `solve_ivp` the
+    # values. We can then pass the keys to our event handler along
+    # with the returned events, and use these names instead of list
+    # indices
+    solver_ray_events = make_solver_events(
+        poloidal_flux_enter, launch_angular_frequency, field
+    )
+
+    K_R_initial, K_zeta_initial, K_Z_initial = K_initial
+
+    # Ray evolves q_R, q_Z, K_R, K_Z
+    ray_parameters_2D_initial = [
+        initial_position[0],
+        initial_position[2],
+        K_R_initial,
+        K_Z_initial,
+    ]
+
+    # Additional arguments for solver
+    solver_arguments = (K_zeta_initial, hamiltonian)
+
+    solver_start_time = time()
+    solver_ray_output = solve_ivp(
+        ray_evolution_2D_fun,
+        [0, tau_max],
+        ray_parameters_2D_initial,
+        method="RK45",
+        t_eval=None,
+        dense_output=False,
+        events=solver_ray_events.values(),
+        vectorized=False,
+        args=solver_arguments,
+        rtol=rtol,
+        atol=atol,
+        max_step=50,
+    )
+    solver_end_time = time()
+    if verbose:
+        print("Time taken (ray solver)", solver_end_time - solver_start_time, "s")
+
+    if solver_ray_output.status == 0:
+        raise RuntimeError(
+            "Ray has not left plasma/simulation region. "
+            "Increase tau_max or choose different initial conditions."
+        )
+    if solver_ray_output.status == -1:
+        raise RuntimeError(
+            "Integration step failed. Check density interpolation is not negative"
+        )
+
+    # tau_events is a list with the same order as the values of
+    # solver_ray_events, so we can use the names from that dict
+    # instead of raw indices
+    tau_events = dict(zip(solver_ray_events.keys(), solver_ray_output.t_events))
+    ray_parameters_2D_events = dict(
+        zip(solver_ray_events.keys(), solver_ray_output.y_events)
+    )
+    tau_leave = handle_leaving_plasma_events(
+        tau_events, ray_parameters_2D_events["leave_LCFS"]
+    )
+
+    if quick_run:
+        return quick_K_cutoff(
+            ray_parameters_2D_events["reach_K_min"], K_zeta_initial, field
+        )
+
+    # The beam solver outputs data at these values of tau
+    # Don't include `tau_leave` itself so that last point is inside
+    # the plasma
+    tau_points = np.linspace(0, tau_leave, len_tau - 1, endpoint=False)
+
+    if len(tau_events["cross_resonance"]) == 0:
+        tau_points = handle_no_resonance(
+            solver_ray_output,
+            tau_leave,
+            tau_points,
+            K_zeta_initial,
+            solver_arguments,
+            solver_ray_events["leave_plasma"],
+        )
+
+    return tau_leave, tau_points

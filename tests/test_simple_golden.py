@@ -781,16 +781,10 @@ def test_quick_run(tmp_path, generator):
     poloidal_flux_cutoff_expected = 0.53061
     theta_m_cutoff_expected = 0.132552
 
-    (
-        q_R_cutoff,
-        q_Z_cutoff,
-        K_norm,
-        poloidal_flux_cutoff,
-        theta_m_cutoff,
-    ) = beam_me_up(**kwargs_dict)
+    cutoff = beam_me_up(**kwargs_dict)
 
-    assert np.isclose(q_R_cutoff, q_R_cutoff_expected)
-    assert np.isclose(q_Z_cutoff, q_Z_cutoff_expected)
-    assert np.isclose(K_norm, K_norm_expected)
-    assert np.isclose(poloidal_flux_cutoff, poloidal_flux_cutoff_expected)
-    assert np.isclose(theta_m_cutoff, theta_m_cutoff_expected)
+    assert np.isclose(cutoff.q_R, q_R_cutoff_expected)
+    assert np.isclose(cutoff.q_Z, q_Z_cutoff_expected)
+    assert np.isclose(cutoff.K_norm_min, K_norm_expected)
+    assert np.isclose(cutoff.poloidal_flux, poloidal_flux_cutoff_expected)
+    assert np.isclose(cutoff.theta_m, theta_m_cutoff_expected)

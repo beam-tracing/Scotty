@@ -89,7 +89,6 @@ from scotty.fun_general import find_epsilon_para, find_epsilon_perp, find_epsilo
 from scotty.fun_general import find_dbhat_dR, find_dbhat_dZ
 from scotty.fun_general import find_H_Cardano, find_D
 from scotty.fun_evolution import (
-    ray_evolution_2D_fun,
     beam_evolution_fun,
     pack_beam_parameters,
     unpack_beam_parameters,
@@ -109,12 +108,7 @@ from scotty.geometry import (
 from scotty.hamiltonian import Hamiltonian, hessians
 from scotty.launch import launch_beam
 from scotty.torbeam import Torbeam
-from scotty.solver import (
-    make_solver_events,
-    handle_leaving_plasma_events,
-    handle_no_resonance,
-    quick_K_cutoff,
-)
+from scotty.ray_solver import propagate_ray
 from scotty._version import __version__
 
 # Checks
@@ -423,92 +417,23 @@ def beam_me_up(
 
     # Propagate the beam
 
-    # If the ray hasn't left the plasma by the time this tau is reached, the solver gives up
-    tau_max = 10e5
-    # Stuff the solver needs to evolve beam_parameters
-    solver_arguments = (K_zeta_initial, hamiltonian)
-
-    """
-    Propagate a ray. Quickly finds tau at which the ray leaves the plasma, as well as estimates location of cut-off
-    """
     print("Starting the solvers")
-    solver_start_time = time.time()
-
-    # `solve_ivp` only takes a list of event handlers, which means we
-    # need to match indices with the returned events. To make that a
-    # bit easier, we make a dict here and pass `solve_ivp` the
-    # values. We can then pass the keys to our event handler along
-    # with the returned events, and use these names instead of list
-    # indices
-    solver_ray_events = make_solver_events(
-        poloidal_flux_enter, launch_angular_frequency, field
+    ray_solver_output = propagate_ray(
+        poloidal_flux_enter,
+        launch_angular_frequency,
+        field,
+        initial_position,
+        K_initial,
+        hamiltonian,
+        rtol,
+        atol,
+        quick_run,
+        len_tau,
     )
-
-    # Ray evolves q_R, q_Z, K_R, K_Z
-    ray_parameters_2D_initial = [
-        initial_position[0],
-        initial_position[2],
-        K_R_initial,
-        K_Z_initial,
-    ]
-
-    solver_ray_output = integrate.solve_ivp(
-        ray_evolution_2D_fun,
-        [0, tau_max],
-        ray_parameters_2D_initial,
-        method="RK45",
-        t_eval=None,
-        dense_output=False,
-        events=solver_ray_events.values(),
-        vectorized=False,
-        args=solver_arguments,
-        rtol=rtol,
-        atol=atol,
-        max_step=50,
-    )
-    solver_end_time = time.time()
-    print("Time taken (ray solver)", solver_end_time - solver_start_time, "s")
-
-    if solver_ray_output.status == 0:
-        raise RuntimeError(
-            "Ray has not left plasma/simulation region. "
-            "Increase tau_max or choose different initial conditions."
-        )
-    if solver_ray_output.status == -1:
-        raise RuntimeError(
-            "Integration step failed. Check density interpolation is not negative"
-        )
-
-    # tau_events is a list with the same order as the values of
-    # solver_ray_events, so we can use the names from that dict
-    # instead of raw indices
-    tau_events = dict(zip(solver_ray_events.keys(), solver_ray_output.t_events))
-    ray_parameters_2D_events = dict(
-        zip(solver_ray_events.keys(), solver_ray_output.y_events)
-    )
-    tau_leave = handle_leaving_plasma_events(
-        tau_events, ray_parameters_2D_events["leave_LCFS"]
-    )
-
     if quick_run:
-        return quick_K_cutoff(
-            ray_parameters_2D_events["reach_K_min"], K_zeta_initial, field
-        )
+        return ray_solver_output
 
-    # The beam solver outputs data at these values of tau
-    # Don't include `tau_leave` itself so that last point is inside
-    # the plasma
-    tau_points = np.linspace(0, tau_leave, len_tau - 1, endpoint=False)
-
-    if len(tau_events["cross_resonance"]) == 0:
-        tau_points = handle_no_resonance(
-            solver_ray_output,
-            tau_leave,
-            tau_points,
-            K_zeta_initial,
-            solver_arguments,
-            solver_ray_events["leave_plasma"],
-        )
+    tau_leave, tau_points = ray_solver_output
 
     """
     - Propagates the beam
@@ -536,7 +461,7 @@ def beam_me_up(
         dense_output=False,
         events=None,
         vectorized=False,
-        args=solver_arguments,
+        args=(K_zeta_initial, hamiltonian),
         rtol=rtol,
         atol=atol,
     )
