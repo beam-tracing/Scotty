@@ -83,6 +83,7 @@ from scotty.fun_general import (
     freq_GHz_to_angular_frequency,
     angular_frequency_to_wavenumber,
     find_Psi_3D_lab,
+    K_magnitude,
 )
 from scotty.fun_general import find_q_lab_Cartesian, find_Psi_3D_lab_Cartesian
 from scotty.fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq
@@ -117,7 +118,7 @@ from scotty.check_input import check_input
 from scotty.check_output import check_output
 
 # Type hints
-from typing import Optional, Union, Sequence, Protocol, Any, Dict
+from typing import Optional, Union, Sequence, Protocol, Any, Dict, Tuple, Callable
 from scotty.typing import PathLike, FloatArray
 
 
@@ -572,15 +573,15 @@ def beam_me_up(
             "Integration step failed. Check density interpolation is not negative"
         )
 
-
-    tau_events = solver_ray_output.t_events
-    ray_parameters_2D_events = solver_ray_output.y_events
-
     # tau_events is a list with the same order as the values of
     # solver_ray_events, so we can use the names from that dict
     # instead of raw indices
-    tau_leave = handle_events(
-        dict(zip(solver_ray_events.keys(), tau_events)), ray_parameters_2D_events[1]
+    tau_events = dict(zip(solver_ray_events.keys(), solver_ray_output.t_events))
+    ray_parameters_2D_events = dict(
+        zip(solver_ray_events.keys(), solver_ray_output.y_events)
+    )
+    tau_leave = handle_leaving_plasma_events(
+        tau_events, ray_parameters_2D_events["leave_LCFS"]
     )
 
     if quick_run:
@@ -631,70 +632,19 @@ def beam_me_up(
         )
 
     # The beam solver outputs data at these values of tau
-    # Tell the solver which values of tau we want for the output
-    tau_points = np.linspace(0, tau_leave, len_tau)
-    # Remove the last point, probably does a good job of making sure that the new last point is inside the plasma
-    tau_points = np.delete(tau_points, -1).tolist()
-    ##
+    # Don't include `tau_leave` itself so that last point is inside
+    # the plasma
+    tau_points = np.linspace(0, tau_leave, len_tau - 1, endpoint=False)
 
-    if len(tau_events[3]) == 0:
-        """
-        Only run this part if the beam does NOT reach a resonance
-        Adds an additional tau point at the cut-off (minimum K)
-
-        - Propagates another ray to find the cut-off location (minimum K)
-        - suffix _fine for variables in this section
-        - I guess I could've used 'dense_output' for the section above and got the information from there, and one day I'll go and see which method works better/faster
-        """
-        max_tau_idx = int(np.argmax(tau_ray[tau_ray <= tau_leave]))
-
-        K_magnitude_ray = (
-            (np.real(ray_parameters_2D[2, :max_tau_idx])) ** 2
-            + K_zeta_initial**2 / (np.real(ray_parameters_2D[0, :max_tau_idx])) ** 2
-            + (np.real(ray_parameters_2D[3, :max_tau_idx])) ** 2
-        ) ** (0.5)
-
-        index_cutoff_estimate = K_magnitude_ray.argmin()
-
-        ray_parameters_2D_initial_fine = ray_parameters_2D[
-            :, max(0, index_cutoff_estimate - 1)
-        ]
-        tau_start_fine = tau_ray[max(0, index_cutoff_estimate - 1)]
-        tau_end_fine = tau_ray[min(len(tau_ray) - 1, index_cutoff_estimate + 1)]
-        tau_points_fine = np.linspace(tau_start_fine, tau_end_fine, 1001)
-        # The max and min in the indices are to ensure that the index is not out of bounds
-
-        solver_start_time = time.time()
-
-        solver_ray_output_fine = integrate.solve_ivp(
-            ray_evolution_2D_fun,
-            [tau_start_fine, tau_end_fine],
-            ray_parameters_2D_initial_fine,
-            method="RK45",
-            t_eval=tau_points_fine,
-            dense_output=False,
-            events=event_leave_plasma,
-            vectorized=False,
-            args=solver_arguments,
+    if len(tau_events["cross_resonance"]) == 0:
+        tau_points = handle_no_resonance(
+            solver_ray_output,
+            tau_leave,
+            tau_points,
+            K_zeta_initial,
+            solver_arguments,
+            event_leave_plasma,
         )
-
-        solver_end_time = time.time()
-        print("Time taken (cut-off finder)", solver_end_time - solver_start_time, "s")
-
-        ray_parameters_2D_fine = solver_ray_output_fine.y
-        K_magnitude_ray_fine = (
-            (np.real(ray_parameters_2D_fine[2, :])) ** 2
-            + K_zeta_initial**2 / (np.real(ray_parameters_2D_fine[0, :])) ** 2
-            + (np.real(ray_parameters_2D_fine[3, :])) ** 2
-        ) ** (0.5)
-        index_cutoff_fine = K_magnitude_ray_fine.argmin()
-        tau_ray_fine = solver_ray_output_fine.t
-        tau_cutoff_fine = tau_ray_fine[index_cutoff_fine]
-
-        # I'm using a list because it makes the insertion of tau_cutoff_fine easier
-        # This function modifies tau_points via a side-effect
-        bisect.insort(tau_points, tau_cutoff_fine)
-        tau_points = np.array(tau_points)
 
     """
     - Propagates the beam
@@ -2444,7 +2394,7 @@ def _event(terminal: bool, direction: float):
     return decorator_event
 
 
-def handle_events(
+def handle_leaving_plasma_events(
     tau_events: Dict[str, FloatArray], ray_parameters_2D_events: FloatArray
 ) -> float:
     """Handle events detected by `scipy.integrate.solve_ivp`. This
@@ -2510,3 +2460,76 @@ def handle_events(
 
     print("Warning: Ray has left the simulation region without leaving the LCFS.")
     return tau_events["leave_simulation"][0]
+
+
+def handle_no_resonance(
+    solver_ray_output,
+    tau_leave: float,
+    tau_points: FloatArray,
+    K_zeta: float,
+    solver_arguments,
+    event_leave_plasma: Callable,
+) -> FloatArray:
+    """Add an additional tau point at the cut-off (minimum K) if the
+    beam does NOT reach a resonance
+
+    Propagates another ray to find the cut-off location
+
+    TODO
+    ----
+    Check if using ``dense_output`` in the initial ray solver can get
+    the same information better/faster
+
+    """
+    ray_parameters_2D = solver_ray_output.y
+    tau_ray = solver_ray_output.t
+
+    max_tau_idx = int(np.argmax(tau_ray[tau_ray <= tau_leave]))
+
+    K_magnitude_ray = K_magnitude(
+        K_R=ray_parameters_2D[2, :max_tau_idx],
+        K_zeta=K_zeta,
+        K_Z=ray_parameters_2D[3, :max_tau_idx],
+        q_R=ray_parameters_2D[0, :max_tau_idx],
+    )
+
+    index_cutoff_estimate = int(np.argmin(K_magnitude_ray))
+    start = max(0, index_cutoff_estimate - 1)
+    stop = min(len(tau_ray) - 1, index_cutoff_estimate + 1)
+
+    ray_parameters_2D_initial_fine = ray_parameters_2D[:, start]
+    tau_start_fine = tau_ray[start]
+    tau_end_fine = tau_ray[stop]
+    tau_points_fine = np.linspace(tau_start_fine, tau_end_fine, 1001)
+
+    solver_start_time = time.time()
+
+    solver_ray_output_fine = integrate.solve_ivp(
+        ray_evolution_2D_fun,
+        [tau_start_fine, tau_end_fine],
+        ray_parameters_2D_initial_fine,
+        method="RK45",
+        t_eval=tau_points_fine,
+        dense_output=False,
+        events=event_leave_plasma,
+        vectorized=False,
+        args=solver_arguments,
+    )
+
+    solver_end_time = time.time()
+    print("Time taken (cut-off finder)", solver_end_time - solver_start_time, "s")
+
+    K_magnitude_ray_fine = K_magnitude(
+        K_R=solver_ray_output_fine.y[2, :],
+        K_zeta=K_zeta,
+        K_Z=solver_ray_output_fine.y[3, :],
+        q_R=solver_ray_output_fine.y[0, :],
+    )
+    index_cutoff_fine = np.argmin(K_magnitude_ray_fine)
+    tau_cutoff_fine = float(solver_ray_output_fine.t[index_cutoff_fine])
+
+    # I'm using a list because it makes the insertion of tau_cutoff_fine easier
+    # This function modifies tau_points via a side-effect
+    tau_points = tau_points.tolist()
+    bisect.insort(tau_points, tau_cutoff_fine)
+    return np.array(tau_points)
