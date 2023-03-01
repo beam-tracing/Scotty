@@ -417,20 +417,6 @@ def beam_me_up(
 
     # -------------------
 
-    # Initial conditions for the solver
-    beam_parameters_initial = pack_beam_parameters(
-        initial_position[0],
-        initial_position[1],
-        initial_position[2],
-        K_R_initial,
-        K_Z_initial,
-        Psi_3D_lab_initial,
-    )
-
-    ray_parameters_initial = np.real(beam_parameters_initial[0:5])
-    ray_parameters_2D_initial = np.delete(ray_parameters_initial, 1)  # Remove q_zeta
-    # -------------------
-
     # Define events for the solver
     # Notice how the beam parameters are allocated: this function only works correctly for the 2D case
     @_event(terminal=True, direction=1.0)
@@ -543,6 +529,14 @@ def beam_me_up(
         "reach_K_min": event_reach_K_min,
     }
 
+    # Ray evolves q_R, q_Z, K_R, K_Z
+    ray_parameters_2D_initial = [
+        initial_position[0],
+        initial_position[2],
+        K_R_initial,
+        K_Z_initial,
+    ]
+
     solver_ray_output = integrate.solve_ivp(
         ray_evolution_2D_fun,
         [0, tau_max],
@@ -556,12 +550,9 @@ def beam_me_up(
         rtol=rtol,
         atol=atol,
         max_step=50,
-    )  # This seems to be throwing a warning about ragged arrays, see if new scipy update fixes this
+    )
     solver_end_time = time.time()
     print("Time taken (ray solver)", solver_end_time - solver_start_time, "s")
-
-    ray_parameters_2D = solver_ray_output.y
-    tau_ray = solver_ray_output.t
 
     if solver_ray_output.status == 0:
         raise RuntimeError(
@@ -607,6 +598,18 @@ def beam_me_up(
     """
     - Propagates the beam
     """
+    # -------------------
+
+    # Initial conditions for the solver
+    beam_parameters_initial = pack_beam_parameters(
+        initial_position[0],
+        initial_position[1],
+        initial_position[2],
+        K_R_initial,
+        K_Z_initial,
+        Psi_3D_lab_initial,
+    )
+
     solver_start_time = time.time()
 
     solver_beam_output = integrate.solve_ivp(
