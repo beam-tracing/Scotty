@@ -585,50 +585,8 @@ def beam_me_up(
     )
 
     if quick_run:
-        ray_parameters_2D_events = solver_ray_output.y_events
-        ray_parameters_turning_pt = ray_parameters_2D_events[4]
-        numTurningPoints, _ = np.shape(ray_parameters_turning_pt)
-        K_turning_pt = np.zeros(numTurningPoints)
-        print(ray_parameters_turning_pt)
-        for ii in range(0, numTurningPoints):
-            # tau = tau_events[4]
-            q_R = ray_parameters_turning_pt[ii][0]
-            K_R = ray_parameters_turning_pt[ii][2]
-            K_Z = ray_parameters_turning_pt[ii][3]
-
-            K_turning_pt[ii] = np.linalg.norm(
-                np.array([K_R, K_zeta_initial / q_R, K_Z])
-            )
-
-        K_min_idx = np.argmin(K_turning_pt)
-        q_R_cutoff = ray_parameters_turning_pt[K_min_idx][0]
-        q_Z_cutoff = ray_parameters_turning_pt[K_min_idx][1]
-        K_R_cutoff = ray_parameters_turning_pt[K_min_idx][2]
-        K_Z_cutoff = ray_parameters_turning_pt[K_min_idx][3]
-
-        B_R_cutoff = field.B_R(q_R_cutoff, q_Z_cutoff)
-        B_T_cutoff = field.B_T(q_R_cutoff, q_Z_cutoff)
-        B_Z_cutoff = field.B_Z(q_R_cutoff, q_Z_cutoff)
-
-        K_cutoff = np.array([K_R_cutoff, K_zeta_initial / q_R_cutoff, K_Z_cutoff])
-        B_cutoff = np.array([B_R_cutoff, B_T_cutoff, B_Z_cutoff])
-
-        sin_theta_m_cutoff = np.dot(B_cutoff, K_cutoff) / (
-            np.linalg.norm(K_cutoff) * np.linalg.norm(B_cutoff)
-        )
-        # Assumes the mismatch angle is never smaller than -90deg or bigger than 90deg
-        theta_m_cutoff = np.sign(sin_theta_m_cutoff) * np.arcsin(
-            abs(sin_theta_m_cutoff)
-        )
-
-        poloidal_flux_cutoff = field.poloidal_flux(q_R_cutoff, q_Z_cutoff)
-
-        return (
-            q_R_cutoff,
-            q_Z_cutoff,
-            np.linalg.norm(K_cutoff),
-            poloidal_flux_cutoff,
-            theta_m_cutoff,
+        return quick_K_cutoff(
+            ray_parameters_2D_events["reach_K_min"], K_zeta_initial, field
         )
 
     # The beam solver outputs data at these values of tau
@@ -2460,6 +2418,54 @@ def handle_leaving_plasma_events(
 
     print("Warning: Ray has left the simulation region without leaving the LCFS.")
     return tau_events["leave_simulation"][0]
+
+
+def quick_K_cutoff(
+    ray_parameters_turning_pt: FloatArray, K_zeta: float, field: MagneticField
+) -> Tuple[float, float, float, float, float]:
+    r"""Calculate some quantities at the minimum :math:`|K|` along the ray
+
+    Parameters
+    ----------
+    ray_parameters_turning_pt : FloatArray
+        State vector from ray evolution
+    K_zeta : float
+        :math:`K_\zeta` for the ray
+    field : MagneticField
+        Object describing the magnetic field
+
+    Returns
+    -------
+    q_R, q_Z, K_norm, poloidal_flux, theta_m
+        Ray coordinates, :math:`|K|`, magnetic flux, and mismatch
+        angle
+
+    """
+
+    K_turning_pt = np.array(
+        [
+            K_magnitude(K_R, K_zeta, K_Z, q_R)
+            for (q_R, _, K_R, K_Z) in ray_parameters_turning_pt
+        ]
+    )
+    K_min_idx = np.argmin(K_turning_pt)
+    q_R, q_Z, K_R, K_Z = ray_parameters_turning_pt[K_min_idx]
+
+    B_R = field.B_R(q_R, q_Z)
+    B_T = field.B_T(q_R, q_Z)
+    B_Z = field.B_Z(q_R, q_Z)
+    B = np.array([B_R, B_T, B_Z])
+
+    K = np.array([K_R, K_zeta / q_R, K_Z])
+    K_norm_min = K_turning_pt[K_min_idx]
+
+    sin_theta_m = np.dot(B, K) / (K_norm_min * np.linalg.norm(B))
+    # Assumes the mismatch angle is never smaller than -90deg or bigger than 90deg
+    theta_m = np.sign(sin_theta_m) * np.arcsin(abs(sin_theta_m))
+
+    poloidal_flux = field.poloidal_flux(q_R, q_Z)
+
+    return q_R, q_Z, K_norm_min, poloidal_flux, theta_m
 
 
 def handle_no_resonance(
