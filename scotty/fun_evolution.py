@@ -12,10 +12,12 @@ valerian_hall-chen@ihpc.a-star.edu.sg
 Run in Python 3,  does not work in Python 2
 """
 
+from typing import Tuple
+
 import numpy as np
 
 from scotty.hamiltonian import Hamiltonian, hessians
-from scotty.typing import FloatArray
+from scotty.typing import FloatArray, ArrayLike
 
 
 # Functions (solver)
@@ -65,7 +67,16 @@ def ray_evolution_2D_fun(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonia
     return d_ray_parameters_2D_d_tau
 
 
-def pack_beam_parameters(q_R, q_zeta, q_Z, K_R, K_Z, Psi):
+def pack_beam_parameters(
+    q_R: ArrayLike,
+    q_zeta: ArrayLike,
+    q_Z: ArrayLike,
+    K_R: ArrayLike,
+    K_Z: ArrayLike,
+    Psi: FloatArray,
+) -> FloatArray:
+    """Pack coordinates and Psi matrix into single flat array for"""
+
     # This used to be complex, with a length of 11, but the solver
     # throws a warning saying that something is casted to real It
     # seems to be fine, bu
@@ -94,7 +105,13 @@ def pack_beam_parameters(q_R, q_zeta, q_Z, K_R, K_Z, Psi):
     return beam_parameters
 
 
-def unpack_beam_parameters(beam_parameters: FloatArray):
+def unpack_beam_parameters(
+    beam_parameters: FloatArray,
+) -> Tuple[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, FloatArray]:
+    """Unpack the flat solver state vector into separate coordinate
+    variables and Psi matrix
+
+    """
     q_R = beam_parameters[0, ...]
     q_zeta = beam_parameters[1, ...]
     q_Z = beam_parameters[2, ...]
