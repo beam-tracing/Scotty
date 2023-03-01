@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from time import time
 from typing import Any, Callable, Dict, Protocol, Tuple
 
@@ -286,9 +287,18 @@ def handle_no_resonance(
     return np.sort(np.append(tau_points, tau_cutoff_fine))
 
 
+@dataclass
+class K_cutoff_data:
+    q_R: float
+    q_Z: float
+    K_norm_min: float
+    poloidal_flux: float
+    theta_m: float
+
+
 def quick_K_cutoff(
     ray_parameters_turning_pt: FloatArray, K_zeta: float, field: MagneticField
-) -> Tuple[float, float, float, float, float]:
+) -> K_cutoff_data:
     r"""Calculate some quantities at the minimum :math:`|K|` along the ray
 
     Parameters
@@ -331,4 +341,4 @@ def quick_K_cutoff(
 
     poloidal_flux = field.poloidal_flux(q_R, q_Z)
 
-    return q_R, q_Z, K_norm_min, poloidal_flux, theta_m
+    return K_cutoff_data(q_R, q_Z, K_norm_min, poloidal_flux, theta_m)
