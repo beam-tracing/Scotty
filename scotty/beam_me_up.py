@@ -69,7 +69,6 @@ import numpy as np
 from scipy import integrate as integrate
 from scipy import constants as constants
 import matplotlib.pyplot as plt
-import bisect
 import time
 import json
 import pathlib
@@ -2536,9 +2535,5 @@ def handle_no_resonance(
     )
     index_cutoff_fine = np.argmin(K_magnitude_ray_fine)
     tau_cutoff_fine = float(solver_ray_output_fine.t[index_cutoff_fine])
+    return np.sort(np.append(tau_points, tau_cutoff_fine))
 
-    # I'm using a list because it makes the insertion of tau_cutoff_fine easier
-    # This function modifies tau_points via a side-effect
-    tau_points = tau_points.tolist()
-    bisect.insort(tau_points, tau_cutoff_fine)
-    return np.array(tau_points)
