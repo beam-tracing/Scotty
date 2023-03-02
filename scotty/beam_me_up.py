@@ -128,7 +128,7 @@ def beam_me_up(
     launch_beam_width: float,
     launch_beam_curvature: float,
     launch_position: FloatArray,
-    ## keyword arguments begin
+    # keyword arguments begin
     vacuumLaunch_flag: bool = True,
     find_B_method: Union[str, MagneticField] = "torbeam",
     density_fit_parameters: Optional[Sequence] = None,
@@ -137,18 +137,18 @@ def beam_me_up(
     vacuum_propagation_flag: bool = False,
     Psi_BC_flag: bool = False,
     poloidal_flux_enter: float = 1.0,
-    ## Finite-difference and solver parameters
+    # Finite-difference and solver parameters
     delta_R: float = -0.0001,  # in the same units as data_R_coord
     delta_Z: float = 0.0001,  # in the same units as data_Z_coord
     delta_K_R: float = 0.1,  # in the same units as K_R
     delta_K_zeta: float = 0.1,  # in the same units as K_zeta
     delta_K_Z: float = 0.1,  # in the same units as K_z
     interp_order=5,  # For the 2D interpolation functions
-    len_tau=102,  # Number of tau_points to output
-    rtol=1e-3,  # for solve_ivp of the beam solver
-    atol=1e-6,  # for solve_ivp of the beam solver
+    len_tau: int = 102,
+    rtol: float = 1e-3,  # for solve_ivp of the beam solver
+    atol: float = 1e-6,  # for solve_ivp of the beam solver
     interp_smoothing=0,  # For the 2D interpolation functions. For no smoothing, set to 0
-    ## Input and output settings
+    # Input and output settings
     ne_data_path=pathlib.Path("."),
     magnetic_data_path=pathlib.Path("."),
     output_path=pathlib.Path("."),
@@ -157,19 +157,19 @@ def beam_me_up(
     figure_flag=True,
     detailed_analysis_flag=True,
     verbose_output_flag=True,
-    ## For quick runs (only ray tracing)
-    quick_run=False,
-    ## For launching within the plasma
+    # For quick runs (only ray tracing)
+    quick_run: bool = False,
+    # For launching within the plasma
     plasmaLaunch_K=np.zeros(3),
     plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3, 3]),
     density_fit_method: Optional[Union[str, DensityFitLike]] = None,
-    ## For circular flux surfaces
+    # For circular flux surfaces
     B_T_axis=None,
     B_p_a=None,
     R_axis=None,
     minor_radius_a=None,
 ):
-    r"""
+    r"""Run the beam tracer
 
     Overview
     ========
@@ -189,21 +189,20 @@ def beam_me_up(
         - curvy slab
         - test/test_notime
     3. Initialise beam launch parameters (vacuum/plasma)
-    4. Initialise event functions for IVP solver
-    5. Propagate single ray with IVP solver (?)
-    6. Handle events
-    7. Possible early exit if ``quick_run`` (?)
-    8. Propagate beam with IVP solver
-    9. Dump raw output (?)
-    10. Analysis
-    11. Dump analysis
+    4. Propagate single ray with IVP solver to find point where beam
+       leaves plasma
+    5. Propagate beam with IVP solver
+    6. Dump raw output
+    7. Analysis
 
     Parameters
     ==========
-    toroidal_launch_angle_Torbeam: float
-        Toroidal angle of antenna in TORBEAM convention
     poloidal_launch_angle_Torbeam: float
         Poloidal angle of antenna in TORBEAM convention
+    toroidal_launch_angle_Torbeam: float
+        Toroidal angle of antenna in TORBEAM convention
+    launch_freq_GHz: float
+        Frequency of the launched beam in GHz
     mode_flag: int
         Either ``+/-1``, used to determine which mode branch to use
     launch_beam_width: float
@@ -240,6 +239,10 @@ def beam_me_up(
     delta_K_Z: float
         Finite difference spacing to use for ``K_Z``
     find_B_method:
+        See `create_magnetic_geometry` for more information.
+
+        Common options:
+
         - ``"efitpp"`` uses magnetic field data from efitpp files
           directly
         - ``"torbeam"`` uses magnetic field data from TORBEAM input
@@ -290,6 +293,16 @@ def beam_me_up(
            guessed from the length of ``density_fit_parameters``. In
            this case, ``quadratic`` and ``tanh`` parameters _should_
            include ``poloidal_flux_enter`` as the last value.
+    len_tau: int
+        Number of output ``tau`` points
+    rtol: float
+        Relative tolerance for ODE solver
+    atol: float
+        Absolute tolerance for ODE solver
+    quick_run: bool
+        If true, then run only the ray tracer and get an analytic
+        estimate of the :math:`K` cut-off location
+
     """
 
     # major_radius = 0.9
@@ -414,8 +427,7 @@ def beam_me_up(
     K_R_initial, K_zeta_initial, K_Z_initial = K_initial
 
     # -------------------
-
-    # Propagate the beam
+    # Propagate the ray
 
     print("Starting the solvers")
     ray_solver_output = propagate_ray(
@@ -435,10 +447,8 @@ def beam_me_up(
 
     tau_leave, tau_points = cast(tuple, ray_solver_output)
 
-    """
-    - Propagates the beam
-    """
     # -------------------
+    # Propagate the beam
 
     # Initial conditions for the solver
     beam_parameters_initial = pack_beam_parameters(
