@@ -839,27 +839,6 @@ def beam_me_up(
             H_output=H_output,
             H_other=H_other,
             poloidal_flux_output=poloidal_flux_output,
-            **save_kwargs
-            # dB_dR_FFD_debugging=dB_dR_FFD_debugging,dB_dZ_FFD_debugging=dB_dZ_FFD_debugging,
-            # d2B_dR2_FFD_debugging=d2B_dR2_FFD_debugging,d2B_dZ2_FFD_debugging=d2B_dZ2_FFD_debugging,d2B_dR_dZ_FFD_debugging=d2B_dR_dZ_FFD_debugging,
-            # poloidal_flux_debugging_1R=poloidal_flux_debugging_1R,
-            # poloidal_flux_debugging_2R=poloidal_flux_debugging_2R,
-            # poloidal_flux_debugging_3R=poloidal_flux_debugging_3R,
-            # poloidal_flux_debugging_1Z=poloidal_flux_debugging_1Z,
-            # poloidal_flux_debugging_2Z=poloidal_flux_debugging_2Z,
-            # poloidal_flux_debugging_3Z=poloidal_flux_debugging_3Z,
-            # poloidal_flux_debugging_2R_2Z=poloidal_flux_debugging_2R_2Z,
-            # electron_density_debugging_1R=electron_density_debugging_1R,
-            # electron_density_debugging_2R=electron_density_debugging_2R,
-            # electron_density_debugging_3R=electron_density_debugging_3R,
-            # electron_density_debugging_1Z=electron_density_debugging_1Z,
-            # electron_density_debugging_2Z=electron_density_debugging_2Z,
-            # electron_density_debugging_3Z=electron_density_debugging_3Z,
-            # electron_density_debugging_2R_2Z=electron_density_debugging_2R_2Z,
-            # dpolflux_dR_FFD_debugging=dpolflux_dR_FFD_debugging,
-            # dpolflux_dZ_FFD_debugging=dpolflux_dZ_FFD_debugging,
-            # d2polflux_dR2_FFD_debugging=d2polflux_dR2_FFD_debugging,
-            # d2polflux_dZ2_FFD_debugging=d2polflux_dZ2_FFD_debugging,
         )
     else:
         np.savez(
@@ -888,11 +867,6 @@ def beam_me_up(
             dH_dKZ_output=dH_dKZ_output,
             dH_dR_output=dH_dR_output,
             dH_dZ_output=dH_dZ_output,
-            # grad_grad_H_output=grad_grad_H_output,gradK_grad_H_output=gradK_grad_H_output,gradK_gradK_H_output=gradK_gradK_H_output,
-            # d_poloidal_flux_dR_output=d_poloidal_flux_dR_output,
-            # d_poloidal_flux_dZ_output=d_poloidal_flux_dZ_output,
-            # epsilon_para_output=epsilon_para_output,epsilon_perp_output=epsilon_perp_output,epsilon_g_output=epsilon_g_output,
-            # electron_density_output=electron_density_output,H_output=H_output
         )
 
     print("Data saved")
@@ -931,18 +905,6 @@ def beam_me_up(
         B_magnitude, launch_angular_frequency
     )
 
-    #         # Calculates when the beam 'enters' and 'leaves' the plasma
-    #         # Here, entry and exit refer to crossing poloidal_flux_enter, if specified
-    #         # Otherwise, entry and exit refer to crossing the LCFS, poloidal_flux = 1.0
-    #     if poloidal_flux_enter is None:
-    #         in_out_poloidal_flux = 1.0
-    #     else:
-    #         in_out_poloidal_flux = poloidal_flux_enter
-    #     poloidal_flux_a = poloidal_flux_output[0:cutoff_index]
-    #     poloidal_flux_b = poloidal_flux_output[cutoff_index::]
-    #     in_index = find_nearest(poloidal_flux_a,in_out_poloidal_flux)
-    #     out_index = cutoff_index + find_nearest(poloidal_flux_b,in_out_poloidal_flux)
-
     # Calcuating the angles theta and theta_m
     sin_theta_m_analysis = np.zeros(numberOfDataPoints)
     sin_theta_m_analysis[:] = (
@@ -961,7 +923,7 @@ def beam_me_up(
     kperp1_hat_output = make_unit_vector_from_cross_product(y_hat_output, b_hat_output)
     # The negative sign is there by definition
     sin_theta_analysis = -contract_special(x_hat_output, kperp1_hat_output)
-    # sin_theta_analysis = -contract_special(g_hat_output,b_hat_output) # The negative sign is there by definition. Alternative way to get sin_theta
+    # The negative sign is there by definition. Alternative way to get sin_theta
     # Assumes theta is never smaller than -90deg or bigger than 90deg
     theta_output = np.sign(sin_theta_analysis) * np.arcsin(abs(sin_theta_analysis))
 
@@ -1093,43 +1055,6 @@ def beam_me_up(
     # This should be 0. Good to check.
     kappa_dot_ghat_output = contract_special(ray_curvature_kappa_output, g_hat_output)
     d_xhat_d_tau_dot_yhat_output = contract_special(d_xhat_d_tau_output, y_hat_output)
-
-    # bhat_dot_grad_bhat = contract_special(b_hat_output,grad_bhat_output)
-    # bhat_dot_grad_bhat_dot_ghat_output = contract_special(bhat_dot_grad_bhat,g_hat_output)
-    # M_xx_output = Psi_xx_output - (k_perp_1_bs/2) * bhat_dot_grad_bhat_dot_ghat_output
-
-    # k_perp_2_bs = 0  # As argued with separation of scales and stuff
-
-    # M_xx_output = (
-    #     Psi_xx_output
-    #     + (k_perp_1_bs/2) * (
-    #         (sin_theta_analysis / g_magnitude_output) * d_theta_d_tau
-    #         - kappa_dot_xhat_output * sin_theta_analysis
-    #         + xhat_dot_grad_bhat_dot_ghat_output
-    #         - xhat_dot_grad_bhat_dot_xhat_output * tan_theta_analysis
-    #     )
-    #     + (k_perp_2_bs/2) * (
-    #         (tan_theta_analysis / g_magnitude_output) *
-    #         d_xhat_d_tau_dot_yhat_output
-    #         + xhat_dot_grad_bhat_dot_yhat_output / cos_theta_analysis
-    #     )
-    # )
-
-    # M_xy_output = (
-    #     Psi_xy_output
-    #     + (k_perp_1_bs/2) * (
-    #         - kappa_dot_yhat_output * sin_theta_analysis
-    #         + yhat_dot_grad_bhat_dot_ghat_output
-    #         + (sin_theta_analysis * tan_theta_analysis /
-    #            g_magnitude_output) * d_xhat_d_tau_dot_yhat_output
-    #         - yhat_dot_grad_bhat_dot_xhat_output * tan_theta_analysis
-    #     )
-    #     + (k_perp_2_bs/2) * (
-    #         yhat_dot_grad_bhat_dot_yhat_output / cos_theta_analysis
-    #     )
-    # )
-
-    # M_yy_output = Psi_yy_output
 
     # Calculates the components of M_w, only taking into consideration
     # correction terms that are not small in mismatch
@@ -1455,12 +1380,7 @@ def beam_me_up(
         distance_along_line - distance_along_line[cutoff_index]
     )  # Distance from cutoff
 
-    # plt.figure()
-    # plt.plot(l_lc,theta_m_output)
-    # plt.axhline(constants.e**4 / (launch_angular_frequency**2 *constants.epsilon_0*constants.m_e)**2,c='k')
-
     # Combining the various localisation pieces to get some overall localisation
-    # loc_p_r_s   =                  loc_p * loc_r * loc_s
     loc_b_r_s = loc_b * loc_r * loc_s
     loc_b_r = loc_b * loc_r
 
@@ -1684,169 +1604,9 @@ def beam_me_up(
         * G_term1**2
         * d_tau_B_d_tau_C**2
     ) ** (-1)
-    # print('ST 1st term: ', G_term1[theta_m_min_idx])
-    # print('ST 2nd term: ', G_term2[theta_m_min_idx])
-    # print('ST full: ', G_full[theta_m_min_idx])
-    # print('ST 2nd term / ST 1st term: ', abs(G_term2[theta_m_min_idx]/G_term1[theta_m_min_idx]))
-    # print('ST first 2 terms / ST full: ', abs((G_term2[theta_m_min_idx]+G_term1[theta_m_min_idx])/G_full[theta_m_min_idx]) )
 
     # Calculates nabla nabla H, nabla_K nabla H, nabla_K nabla_K H
     grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians(dH)
-
-    # gradK_gradK_H[:,0,1] = - gradK_gradK_H[:,0,1]
-
-    # ## Mode conversion stuff
-    # def find_N(Booker_alpha,Booker_beta,Booker_gamma,mode_flag):
-    #     N = np.sqrt( - (
-    #             Booker_beta - mode_flag *
-    #             np.sqrt(np.maximum(
-    #                     np.zeros_like(Booker_beta),
-    #                     (Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
-    #                 )
-    #             )
-    #             # np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
-    #             ) / (2 * Booker_alpha) )
-
-    #     return N
-
-    # #
-    # sin_theta_m_sq = (np.sin(theta_m_output))**2
-    # Booker_alpha = epsilon_para_output*sin_theta_m_sq + epsilon_perp_output*(1-sin_theta_m_sq)
-    # Booker_beta = (
-    #         - epsilon_perp_output * epsilon_para_output * (1+sin_theta_m_sq)
-    #         - (epsilon_perp_output**2 - epsilon_g_output**2) * (1-sin_theta_m_sq)
-    #                 )
-    # Booker_gamma = epsilon_para_output*(epsilon_perp_output**2 - epsilon_g_output**2)
-
-    # N_X = find_N(Booker_alpha,Booker_beta,Booker_gamma,-1)
-    # N_O = find_N(Booker_alpha,Booker_beta,Booker_gamma,1)
-
-    # B_Z_plus = find_B_Z(q_R_array+delta_R,q_Z_array)
-    # B_T_plus = find_B_T(q_R_array+delta_R,q_Z_array)
-    # B_Z_minus = find_B_Z(q_R_array-delta_R,q_Z_array)
-    # B_T_minus = find_B_T(q_R_array-delta_R,q_Z_array)
-
-    # pitch_angle = np.arctan2(B_Z_output,B_T_output)
-    # pitch_angle_plus = np.arctan2(B_Z_plus,B_T_plus)
-    # pitch_angle_minus = np.arctan2(B_Z_minus,B_T_minus)
-
-    # d_pitch_angle_d_R = (pitch_angle_plus - pitch_angle_minus) / 2 * delta_R
-
-    # # ---
-    # anisotropy_term = (1 - N_O**2 / N_X**2)
-    # shear_term = (1/(4 * wavenumber_K0)) * d_pitch_angle_d_R
-    # print((abs(anisotropy_term)-abs(shear_term)))
-    # plt.figure()
-    # plt.plot(l_lc, (abs(anisotropy_term)-abs(shear_term)))
-    # ##
-
-    # Running some tests
-
-    # plt.figure()
-    # plt.plot(l_lc, H_output)
-
-    # g_hat_Cartesian = np.zeros([numberOfDataPoints,3])
-    # g_hat_Cartesian[:,0] = g_hat_output[:,0]*np.cos(q_zeta_array ) - g_hat_output[:,1]*np.sin(q_zeta_array )
-    # g_hat_Cartesian[:,1] = g_hat_output[:,0]*np.sin(q_zeta_array ) + g_hat_output[:,1]*np.cos(q_zeta_array )
-    # g_hat_Cartesian[:,2] = g_hat_output[:,2]
-
-    # Psi_xg_output = contract_special(x_hat_Cartesian,contract_special(Psi_3D_Cartesian,g_hat_Cartesian))
-    # Psi_yg_output = contract_special(y_hat_Cartesian,contract_special(Psi_3D_Cartesian,g_hat_Cartesian))
-    # Psi_gg_output = contract_special(g_hat_Cartesian,contract_special(Psi_3D_Cartesian,g_hat_Cartesian))
-
-    # plt.figure()
-    # plt.plot(l_lc, np.imag(Psi_xg_output)/det_imag_Psi_w_analysis)
-    # plt.plot(l_lc, np.imag(Psi_yg_output)/det_imag_Psi_w_analysis)
-    # plt.plot(l_lc, np.imag(Psi_gg_output)/det_imag_Psi_w_analysis)
-
-    # Psi_3D_test = np.zeros_like(Psi_3D_output,dtype='complex128')
-    # d_Psi_d_tau_all = np.zeros_like(Psi_3D_output,dtype='complex128')
-
-    # Psi_3D_test[0,:,:] = Psi_3D_output[0,:,:]
-
-    # for ii in range(1,len(q_R_array)):
-    #     d_Psi_d_tau = ( - grad_grad_H[ii-1,:,:]
-    #             - np.matmul(
-    #                         Psi_3D_test[ii-1,:,:], gradK_grad_H[ii-1,:,:]
-    #                         )
-    #             - np.matmul(
-    #                         grad_gradK_H[ii-1,:,:], Psi_3D_test[ii-1,:,:]
-    #                         )
-    #             - np.matmul(np.matmul(
-    #                         Psi_3D_test[ii-1,:,:], gradK_gradK_H[ii-1,:,:]
-    #                         ),
-    #                         Psi_3D_test[ii-1,:,:]
-    #                         )
-    #         )
-    #     d_Psi_d_tau_all[ii-1,:,:] = d_Psi_d_tau
-
-    #     if  ii<3:
-    #         Psi_3D_test[ii,:,:] =  Psi_3D_test[ii-1,:,:] + (tau_array[ii] - tau_array[ii-1]) * d_Psi_d_tau_all[ii-1,:,:]
-    #     else:
-    #         Psi_3D_test[ii,:,:] =  Psi_3D_test[ii-1,:,:] + (tau_array[ii] - tau_array[ii-1]) * (
-    #                   (23/12) * d_Psi_d_tau_all[ii-1,:,:]
-    #                 - (16/12) * d_Psi_d_tau_all[ii-2,:,:]
-    #                 + (5/12)  * d_Psi_d_tau_all[ii-3,:,:]
-    #             )
-
-    # Psi_3D_Cartesian_test = find_Psi_3D_lab_Cartesian(Psi_3D_test, q_R_array, q_zeta_array, K_R_array, K_zeta_initial)
-    # Psi_xx_test = contract_special(x_hat_Cartesian,contract_special(Psi_3D_Cartesian_test,x_hat_Cartesian))
-    # Psi_xy_test = contract_special(x_hat_Cartesian,contract_special(Psi_3D_Cartesian_test,y_hat_Cartesian))
-    # Psi_yy_test = contract_special(y_hat_Cartesian,contract_special(Psi_3D_Cartesian_test,y_hat_Cartesian))
-
-    # plt.figure()
-    # plt.plot(l_lc,np.imag(Psi_3D_test[:,0,0]),'r')
-    # plt.plot(l_lc,np.imag(Psi_3D_output[:,0,0]),'k')
-
-    # plt.figure()
-    # plt.subplot(2,3,1)
-    # plt.plot(l_lc,np.imag(Psi_xx_test),'r')
-    # plt.plot(l_lc,np.imag(Psi_xx_output),'k')
-    # plt.subplot(2,3,2)
-    # plt.plot(l_lc,np.imag(Psi_xy_test),'r')
-    # plt.plot(l_lc,np.imag(Psi_xy_output),'k')
-    # plt.subplot(2,3,3)
-    # plt.plot(l_lc,np.imag(Psi_yy_test),'r')
-    # plt.plot(l_lc,np.imag(Psi_yy_output),'k')
-    # plt.subplot(2,3,4)
-    # plt.plot(l_lc,np.real(Psi_xx_test),'r')
-    # plt.plot(l_lc,np.real(Psi_xx_output),'k')
-    # plt.subplot(2,3,5)
-    # plt.plot(l_lc,np.real(Psi_xy_test),'r')
-    # plt.plot(l_lc,np.real(Psi_xy_output),'k')
-    # plt.subplot(2,3,6)
-    # plt.plot(l_lc,np.real(Psi_yy_test),'r')
-    # plt.plot(l_lc,np.real(Psi_yy_output),'k')
-
-    # plt.figure()
-    # plt.subplot(3,3,1)
-    # plt.plot(l_lc,gradK_gradK_H[:,0,0],'r')
-    # plt.subplot(3,3,2)
-    # plt.plot(l_lc,gradK_gradK_H[:,1,0],'r')
-    # plt.subplot(3,3,3)
-    # plt.plot(l_lc,gradK_gradK_H[:,2,0],'r')
-    # plt.subplot(3,3,5)
-    # plt.plot(l_lc,gradK_gradK_H[:,1,1],'r')
-    # plt.subplot(3,3,6)
-    # plt.plot(l_lc,gradK_gradK_H[:,1,2],'r')
-    # plt.subplot(3,3,9)
-    # plt.plot(l_lc,gradK_gradK_H[:,2,2],'r')
-    ##
-
-    # plt.figure()
-    # plt.subplot(2,2,1)
-    # plt.plot(l_lc,loc_ST_decay,label=r'$\exp [ \frac{1}{2} Im [ (\Delta k_{\perp,1} K_0 \frac{d \theta_m}{d \tau})^2 M_{xx,0}^{-1} (\frac{d K}{d \tau})^{-2} ] ]$')
-    # plt.legend(fontsize=6)
-    # plt.subplot(2,2,2)
-    # plt.plot(l_lc,theta_m_output,label=r'$\theta_{m}$')
-    # plt.legend()
-    # plt.subplot(2,2,3)
-    # plt.plot(l_lc,delta_kperp1_ST,label=r'$\Delta k_{\perp,1}$')
-    # plt.legend()
-    # plt.subplot(2,2,4)
-    # plt.plot(l_lc,loc_m,label=r'$loc_m$')
-    # plt.legend()
-    # plt.gcf().set_dpi(300)
 
     # -------------------
     # This saves the data generated by the analysis after the main loop
@@ -2015,64 +1775,6 @@ def beam_me_up(
         plt.plot(l_lc, abs(H_3_Cardano_array), "b")
         plt.savefig(output_path / f"H_{output_figurename_suffix}")
         plt.close()
-
-        # Commented out because this does not work properly
-        # """
-        # Plots Psi before and after the BCs are applied
-        # """
-        # K_magnitude_entry = np.sqrt(K_R_entry**2 + K_zeta_entry**2 * entry_position[0]**2 + K_Z_entry**2)
-
-        # Psi_w_entry = np.array([
-        # [Psi_xx_entry,Psi_xy_entry],
-        # [Psi_xy_entry,Psi_yy_entry]
-        # ])
-
-        # Psi_w_initial = np.array([
-        #         [Psi_xx_output[0],Psi_xy_output[0]],
-        #         [Psi_xy_output[0],Psi_yy_output[0]]
-        #         ])
-
-        # [Psi_w_entry_real_eigval_a, Psi_w_entry_real_eigval_b], Psi_w_entry_real_eigvec = np.linalg.eig(np.real(Psi_w_entry))
-        # [Psi_w_entry_imag_eigval_a, Psi_w_entry_imag_eigval_b], Psi_w_entry_imag_eigvec = np.linalg.eig(np.imag(Psi_w_entry))
-        # Psi_w_entry_real_eigvec_a = Psi_w_entry_real_eigvec[:,0]
-        # Psi_w_entry_real_eigvec_b = Psi_w_entry_real_eigvec[:,1]
-        # Psi_w_entry_imag_eigvec_a = Psi_w_entry_imag_eigvec[:,0]
-        # Psi_w_entry_imag_eigvec_b = Psi_w_entry_imag_eigvec[:,1]
-
-        # [Psi_w_initial_real_eigval_a, Psi_w_initial_real_eigval_b], Psi_w_initial_real_eigvec = np.linalg.eig(np.real(Psi_w_initial))
-        # [Psi_w_initial_imag_eigval_a, Psi_w_initial_imag_eigval_b], Psi_w_initial_imag_eigvec = np.linalg.eig(np.imag(Psi_w_initial))
-        # Psi_w_initial_real_eigvec_a = Psi_w_initial_real_eigvec[:,0]
-        # Psi_w_initial_real_eigvec_b = Psi_w_initial_real_eigvec[:,1]
-        # Psi_w_initial_imag_eigvec_a = Psi_w_initial_imag_eigvec[:,0]
-        # Psi_w_initial_imag_eigvec_b = Psi_w_initial_imag_eigvec[:,1]
-
-        # numberOfPlotPoints = 50
-        # sin_array = np.sin(np.linspace(0,2*np.pi,numberOfPlotPoints))
-        # cos_array = np.cos(np.linspace(0,2*np.pi,numberOfPlotPoints))
-
-        # width_ellipse_entry = np.zeros([numberOfPlotPoints,2])
-        # width_ellipse_initial = np.zeros([numberOfPlotPoints,2])
-        # rad_curv_ellipse_entry = np.zeros([numberOfPlotPoints,2])
-        # rad_curv_ellipse_initial = np.zeros([numberOfPlotPoints,2])
-        # for ii in range(0,numberOfPlotPoints):
-        #     width_ellipse_entry[ii,:] = np.sqrt(2/Psi_w_entry_imag_eigval_a)*Psi_w_entry_imag_eigvec_a*sin_array[ii] + np.sqrt(2/Psi_w_entry_imag_eigval_b)*Psi_w_entry_imag_eigvec_b*cos_array[ii]
-        #     width_ellipse_initial[ii,:] = np.sqrt(2/Psi_w_initial_imag_eigval_a)*Psi_w_initial_imag_eigvec_a*sin_array[ii] + np.sqrt(2/Psi_w_initial_imag_eigval_b)*Psi_w_initial_imag_eigvec_b*cos_array[ii]
-
-        #     rad_curv_ellipse_entry[ii,:] = (K_magnitude_entry/Psi_w_entry_real_eigval_a)*Psi_w_entry_real_eigvec_a*sin_array[ii] + (K_magnitude_entry/Psi_w_entry_real_eigval_b)*Psi_w_entry_real_eigvec_b*cos_array[ii]
-        #     rad_curv_ellipse_initial[ii,:] = (K_magnitude_array[0]/Psi_w_initial_real_eigval_a)*Psi_w_initial_real_eigvec_a*sin_array[ii] + (K_magnitude_array[0]/Psi_w_initial_real_eigval_b)*Psi_w_initial_real_eigvec_b*cos_array[ii]
-
-        # plt.figure()
-        # plt.subplot(1,2,1)
-        # plt.plot(width_ellipse_entry[:,0],width_ellipse_entry[:,1])
-        # plt.plot(width_ellipse_initial[:,0],width_ellipse_initial[:,1])
-        # plt.gca().set_aspect('equal', adjustable='box')
-
-        # plt.subplot(1,2,2)
-        # plt.plot(rad_curv_ellipse_entry[:,0],rad_curv_ellipse_entry[:,1])
-        # plt.plot(rad_curv_ellipse_initial[:,0],rad_curv_ellipse_initial[:,1])
-        # plt.gca().set_aspect('equal', adjustable='box')
-        # plt.savefig('BC_' + output_filename_suffix)
-        # plt.close()
 
         print("Figures have been saved")
     # -------------------
