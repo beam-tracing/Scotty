@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from time import time
-from typing import Any, Callable, Dict, Protocol, Tuple, Union
+from typing import Any, Callable, Dict, Protocol, Tuple, Union, cast
 
 import numpy as np
 from scipy.integrate import solve_ivp
@@ -340,7 +340,7 @@ def quick_K_cutoff(
 
     poloidal_flux = field.poloidal_flux(q_R, q_Z)
 
-    return K_cutoff_data(q_R, q_Z, K_norm_min, poloidal_flux, theta_m)
+    return K_cutoff_data(q_R, q_Z, K_norm_min, cast(float, poloidal_flux), theta_m)
 
 
 def ray_evolution_2D_fun(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):

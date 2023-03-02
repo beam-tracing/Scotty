@@ -116,7 +116,7 @@ from scotty.check_input import check_input
 from scotty.check_output import check_output
 
 # Type hints
-from typing import Optional, Union, Sequence
+from typing import Optional, Union, Sequence, cast
 from scotty.typing import PathLike, FloatArray
 
 
@@ -433,7 +433,7 @@ def beam_me_up(
     if quick_run:
         return ray_solver_output
 
-    tau_leave, tau_points = ray_solver_output
+    tau_leave, tau_points = cast(tuple, ray_solver_output)
 
     """
     - Propagates the beam
