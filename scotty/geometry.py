@@ -131,7 +131,11 @@ class CircularCrossSectionField(MagneticField):
 
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
-        return self.B_p_a * q_Z / (q_R * self.minor_radius_a * self.rho(q_R, q_Z))
+        return np.where(
+            abs(q_Z) < 1e-12,
+            0.0,
+            self.B_p_a * q_Z / (q_R * self.minor_radius_a * self.rho(q_R, q_Z)),
+        )
 
     def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
@@ -139,10 +143,12 @@ class CircularCrossSectionField(MagneticField):
 
     def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
-        return (
+        return np.where(
+            abs(q_R - self.R_axis) < 1e-12,
+            0.0,
             -self.B_p_a
             * (q_R - self.R_axis)
-            / (q_R * self.minor_radius_a * self.rho(q_R, q_Z))
+            / (q_R * self.minor_radius_a * self.rho(q_R, q_Z)),
         )
 
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
