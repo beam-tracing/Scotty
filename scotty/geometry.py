@@ -82,6 +82,20 @@ class MagneticField(ABC):
             {"q_R": delta_R, "q_Z": delta_Z},
         )
 
+    def magnitude(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        """Returns :math:`|B|`, the magnitude of the magnetic field"""
+        return np.sqrt(
+            self.B_R(q_R, q_Z) ** 2 + self.B_T(q_R, q_Z) ** 2 + self.B_Z(q_R, q_Z) ** 2
+        )
+
+    def unit(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        r"""Returns :math:`\mathbf{B}/|B|`, the unit vector of the magnetic field"""
+        magnitude = self.magnitude(q_R, q_Z)
+        unit_vector = np.array(
+            [self.B_R(q_R, q_Z), self.B_T(q_R, q_Z), self.B_Z(q_R, q_Z)]
+        ).T
+        return unit_vector / magnitude
+
 
 class CircularCrossSectionField(MagneticField):
     """Simple circular cross-section magnetic geometry
