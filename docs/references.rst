@@ -1,5 +1,7 @@
+.. _references:
+
 References
 ==========================
 
-.. references:
+Beam model of Doppler backscattering
 

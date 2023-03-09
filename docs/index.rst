@@ -21,6 +21,7 @@ cases are provided through `get_parameters_for_Scotty`.
 Indices and tables
 ==================
 
+* :ref:`InputsAndOutputs`
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`

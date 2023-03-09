@@ -1,0 +1,1 @@
+These are notes on how to write documentation and locally compile them to html.
