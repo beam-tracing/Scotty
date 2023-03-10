@@ -38,9 +38,12 @@ class DielectricTensor:
           \epsilon_{bb} &= 1 - \frac{\Omega_{pe}^2}{\Omega^2} \\
         \end{align}
 
-    The components of the dielectric tensor are calculated in the :math:`(\hat{\mathbf{u}}_1, \hat{\mathbf{u}}_2, \hat{\mathbf{b}})` basis. 
-    Hence, :math:`\epsilon_{11}`, :math:`\epsilon_{12}`, and :math:`\epsilon_{bb}` correspond to the ``S``, ``D``, and ``P`` variables in Stix, respectively. The notation
-    used in this code is chosen to be consistent with Hall-Chen, Parra, Hillesheim, PPCF 2022.
+    The components of the dielectric tensor are calculated in the
+    :math:`(\hat{\mathbf{u}}_1, \hat{\mathbf{u}}_2, \hat{\mathbf{b}})` basis.
+    Hence, :math:`\epsilon_{11}`, :math:`\epsilon_{12}`, and
+    :math:`\epsilon_{bb}` correspond to the ``S``, ``D``, and ``P`` variables in
+    Stix, respectively. The notation used in this code is chosen to be
+    consistent with Hall-Chen, Parra, Hillesheim, PPCF 2022.
 
     Parameters
     ----------
