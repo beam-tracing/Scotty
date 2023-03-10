@@ -70,17 +70,17 @@ class DielectricTensor:
         self._epsilon_12 = _plasma_freq_2 * _gyro_freq / (1 - _gyro_freq_2)
 
     @property
-    def parallel(self):
+    def e_bb(self):
         r"""The :math:`\epsilon_{bb}` component"""
         return self._epsilon_bb
 
     @property
-    def perpendicular(self):
+    def e_11(self):
         r"""The :math:`\epsilon_{11}` component"""
         return self._epsilon_11
 
     @property
-    def g(self):
+    def e_12(self):
         r"""The :math:`\epsilon_{12}` component"""
         return self._epsilon_12
 
@@ -250,13 +250,13 @@ class Hamiltonian:
 
         epsilon = DielectricTensor(electron_density, self.angular_frequency, B_total)
 
-        Booker_alpha = (epsilon.parallel * sin_theta_m_sq) + epsilon.perpendicular * (
+        Booker_alpha = (epsilon.e_bb * sin_theta_m_sq) + epsilon.e_11 * (
             1 - sin_theta_m_sq
         )
-        Booker_beta = (
-            -epsilon.perpendicular * epsilon.parallel * (1 + sin_theta_m_sq)
-        ) - (epsilon.perpendicular**2 - epsilon.g**2) * (1 - sin_theta_m_sq)
-        Booker_gamma = epsilon.parallel * (epsilon.perpendicular**2 - epsilon.g**2)
+        Booker_beta = (-epsilon.e_11 * epsilon.e_bb * (1 + sin_theta_m_sq)) - (
+            epsilon.e_11**2 - epsilon.e_12**2
+        ) * (1 - sin_theta_m_sq)
+        Booker_gamma = epsilon.e_bb * (epsilon.e_11**2 - epsilon.e_12**2)
 
         H_discriminant = np.maximum(
             np.zeros_like(Booker_beta),
