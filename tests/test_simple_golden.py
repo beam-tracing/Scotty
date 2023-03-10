@@ -10,6 +10,7 @@ from scotty.fun_general import (
     freq_GHz_to_angular_frequency,
     angular_frequency_to_wavenumber,
 )
+from scotty.hamiltonian import Hamiltonian
 from scotty.launch import find_entry_point, launch_beam
 
 import json
@@ -575,6 +576,17 @@ def test_launch_golden_answer(tmp_path, generator):
 
     launch_angular_frequency = freq_GHz_to_angular_frequency(args["launch_freq_GHz"])
 
+    hamiltonian = Hamiltonian(
+        field,
+        launch_angular_frequency,
+        mode_flag=args["mode_flag"],
+        density_fit=density_fit,
+        delta_R=-1e-3,
+        delta_Z=1e-3,
+        delta_K_R=0.1,
+        delta_K_zeta=0.1,
+        delta_K_Z=0.1,
+    )
     (
         K_initial,
         initial_position,
@@ -586,17 +598,16 @@ def test_launch_golden_answer(tmp_path, generator):
         distance_from_launch_to_entry,
     ) = launch_beam(
         field=field,
-        find_density_1D=density_fit,
+        hamiltonian=hamiltonian,
         toroidal_launch_angle_Torbeam=args["toroidal_launch_angle_Torbeam"],
         poloidal_launch_angle_Torbeam=args["poloidal_launch_angle_Torbeam"],
-        mode_flag=args["mode_flag"],
         launch_beam_width=args["launch_beam_width"],
         launch_beam_curvature=args["launch_beam_curvature"],
         launch_position=args["launch_position"],
+        launch_angular_frequency=launch_angular_frequency,
         vacuum_propagation_flag=args["vacuum_propagation_flag"],
         Psi_BC_flag=args["Psi_BC_flag"],
         poloidal_flux_enter=args["poloidal_flux_enter"],
-        launch_angular_frequency=launch_angular_frequency,
     )
 
     expected_K_initial = np.array([-1146.4000699962507, -0.0, -120.4915026654739])

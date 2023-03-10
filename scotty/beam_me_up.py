@@ -80,7 +80,6 @@ from scotty.fun_general import (
     contract_special,
     make_unit_vector_from_cross_product,
     find_x0,
-    find_H,
     find_waist,
     freq_GHz_to_angular_frequency,
     angular_frequency_to_wavenumber,
@@ -91,15 +90,12 @@ from scotty.fun_general import find_normalised_plasma_freq, find_normalised_gyro
 from scotty.fun_general import find_epsilon_para, find_epsilon_perp, find_epsilon_g
 from scotty.fun_general import find_dbhat_dR, find_dbhat_dZ
 from scotty.fun_general import find_H_Cardano, find_D
-from scotty.fun_evolution import ray_evolution_2D_fun, beam_evolution_fun
 from scotty.fun_evolution import (
-    find_grad_grad_H_vectorised,
-    find_gradK_grad_H_vectorised,
-    find_gradK_gradK_H_vectorised,
+    ray_evolution_2D_fun,
+    beam_evolution_fun,
+    pack_beam_parameters,
+    unpack_beam_parameters,
 )
-
-from scotty.fun_FFD import find_dH_dR, find_dH_dZ  # \nabla H
-from scotty.fun_CFD import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta  # \nabla_K H
 
 # For find_B if using efit files directly
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
@@ -112,6 +108,7 @@ from scotty.geometry import (
     CurvySlabField,
     EFITField,
 )
+from scotty.hamiltonian import Hamiltonian, hessians
 from scotty.launch import launch_beam
 from scotty.torbeam import Torbeam
 from scotty._version import __version__
@@ -359,6 +356,18 @@ def beam_me_up(
         delta_Z,
     )
 
+    hamiltonian = Hamiltonian(
+        field,
+        launch_angular_frequency,
+        mode_flag,
+        find_density_1D,
+        delta_R,
+        delta_Z,
+        delta_K_R,
+        delta_K_zeta,
+        delta_K_Z,
+    )
+
     # -------------------
     # Launch parameters
     # -------------------
@@ -376,21 +385,17 @@ def beam_me_up(
         ) = launch_beam(
             toroidal_launch_angle_Torbeam=toroidal_launch_angle_Torbeam,
             poloidal_launch_angle_Torbeam=poloidal_launch_angle_Torbeam,
-            mode_flag=mode_flag,
             launch_beam_width=launch_beam_width,
             launch_beam_curvature=launch_beam_curvature,
             launch_position=launch_position,
             launch_angular_frequency=launch_angular_frequency,
             field=field,
-            find_density_1D=find_density_1D,
+            hamiltonian=hamiltonian,
             vacuum_propagation_flag=vacuum_propagation_flag,
             Psi_BC_flag=Psi_BC_flag,
             poloidal_flux_enter=poloidal_flux_enter,
             delta_R=delta_R,
             delta_Z=delta_Z,
-            delta_K_R=delta_K_R,
-            delta_K_zeta=delta_K_zeta,
-            delta_K_Z=delta_K_Z,
         )
     else:
         print("Beam launched from inside the plasma")
@@ -414,31 +419,14 @@ def beam_me_up(
     # -------------------
 
     # Initial conditions for the solver
-    beam_parameters_initial = np.zeros(17)
-    # This used to be complex, with a length of 11, but the solver throws a warning saying that something is casted to real
-    # It seems to be fine, bu
-
-    beam_parameters_initial[0] = initial_position[0]  # q_R
-    # q_zeta (This should be = 0)
-    beam_parameters_initial[1] = initial_position[1]
-    beam_parameters_initial[2] = initial_position[2]  # q_Z
-
-    beam_parameters_initial[3] = K_R_initial
-    beam_parameters_initial[4] = K_Z_initial
-
-    beam_parameters_initial[5] = np.real(Psi_3D_lab_initial[0, 0])  # Psi_RR
-    beam_parameters_initial[6] = np.real(Psi_3D_lab_initial[1, 1])  # Psi_zetazeta
-    beam_parameters_initial[7] = np.real(Psi_3D_lab_initial[2, 2])  # Psi_ZZ
-    beam_parameters_initial[8] = np.real(Psi_3D_lab_initial[0, 1])  # Psi_Rzeta
-    beam_parameters_initial[9] = np.real(Psi_3D_lab_initial[0, 2])  # Psi_RZ
-    beam_parameters_initial[10] = np.real(Psi_3D_lab_initial[1, 2])  # Psi_zetaZ
-
-    beam_parameters_initial[11] = np.imag(Psi_3D_lab_initial[0, 0])  # Psi_RR
-    beam_parameters_initial[12] = np.imag(Psi_3D_lab_initial[1, 1])  # Psi_zetazeta
-    beam_parameters_initial[13] = np.imag(Psi_3D_lab_initial[2, 2])  # Psi_ZZ
-    beam_parameters_initial[14] = np.imag(Psi_3D_lab_initial[0, 1])  # Psi_Rzeta
-    beam_parameters_initial[15] = np.imag(Psi_3D_lab_initial[0, 2])  # Psi_RZ
-    beam_parameters_initial[16] = np.imag(Psi_3D_lab_initial[1, 2])  # Psi_zetaZ
+    beam_parameters_initial = pack_beam_parameters(
+        initial_position[0],
+        initial_position[1],
+        initial_position[2],
+        K_R_initial,
+        K_Z_initial,
+        Psi_3D_lab_initial,
+    )
 
     ray_parameters_initial = np.real(beam_parameters_initial[0:5])
     ray_parameters_2D_initial = np.delete(ray_parameters_initial, 1)  # Remove q_zeta
@@ -450,18 +438,7 @@ def beam_me_up(
         tau,
         ray_parameters_2D,
         K_zeta,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        hamiltonian: Hamiltonian,
         poloidal_flux_leave=poloidal_flux_enter,
     ):  # Leave at the same poloidal flux of entry
         q_R = ray_parameters_2D[0]
@@ -483,18 +460,7 @@ def beam_me_up(
         tau,
         ray_parameters_2D,
         K_zeta,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        hamiltonian: Hamiltonian,
         poloidal_flux_LCFS=1.0,
     ):
         q_R = ray_parameters_2D[0]
@@ -516,18 +482,7 @@ def beam_me_up(
         tau,
         ray_parameters_2D,
         K_zeta,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
+        hamiltonian: Hamiltonian,
         data_R_coord_min=field.R_coord.min(),
         data_R_coord_max=field.R_coord.max(),
         data_Z_coord_min=field.Z_coord.min(),
@@ -551,23 +506,7 @@ def beam_me_up(
     # negative value, when function result goes from positive to negative
     event_leave_simulation.direction = -1.0
 
-    def event_cross_resonance(
-        tau,
-        ray_parameters_2D,
-        K_zeta,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    ):
+    def event_cross_resonance(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
         # Currently only works when crossing resonance.
         # To implement crossing of higher harmonics as well
         delta_gyro_freq = 0.01
@@ -590,23 +529,7 @@ def beam_me_up(
     # Stop the solver when the beam is in a region of resonance
     event_cross_resonance.terminal = True
 
-    def event_reach_cutoff(
-        tau,
-        ray_parameters_2D,
-        K_zeta,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        interp_poloidal_flux,
-        find_density_1D,
-        find_B_R,
-        find_B_T,
-        find_B_Z,
-    ):
+    def event_reach_cutoff(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
         # To find tau of the cut-off, that is the location where the
         # wavenumber K is minimised
         # This function finds the turning points
@@ -618,53 +541,11 @@ def beam_me_up(
         K_Z = ray_parameters_2D[3]
         K_magnitude = np.sqrt(K_R**2 + K_Z**2 + K_zeta**2 / q_R**2)
 
-        dH_dKR = find_dH_dKR(
-            q_R,
-            q_Z,
-            K_R,
-            K_zeta,
-            K_Z,
-            launch_angular_frequency,
-            mode_flag,
-            delta_K_R,
-            interp_poloidal_flux,
-            find_density_1D,
-            find_B_R,
-            find_B_T,
-            find_B_Z,
-        )
-        dH_dR = find_dH_dR(
-            q_R,
-            q_Z,
-            K_R,
-            K_zeta,
-            K_Z,
-            launch_angular_frequency,
-            mode_flag,
-            delta_R,
-            interp_poloidal_flux,
-            find_density_1D,
-            find_B_R,
-            find_B_T,
-            find_B_Z,
-        )
-        dH_dZ = find_dH_dZ(
-            q_R,
-            q_Z,
-            K_R,
-            K_zeta,
-            K_Z,
-            launch_angular_frequency,
-            mode_flag,
-            delta_Z,
-            interp_poloidal_flux,
-            find_density_1D,
-            find_B_R,
-            find_B_T,
-            find_B_Z,
-        )
+        dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z)
 
-        d_K_d_tau = -(1 / K_magnitude) * (dH_dR * K_R + dH_dZ * K_Z + dH_dKR * q_R)
+        d_K_d_tau = -(1 / K_magnitude) * (
+            dH["dH_dR"] * K_R + dH["dH_dZ"] * K_Z + dH["dH_dKR"] * q_R
+        )
         return d_K_d_tau
 
     event_reach_cutoff.direction = 1.0
@@ -679,21 +560,7 @@ def beam_me_up(
     # If the ray hasn't left the plasma by the time this tau is reached, the solver gives up
     tau_max = 10**5
     # Stuff the solver needs to evolve beam_parameters
-    solver_arguments = (
-        K_zeta_initial,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )  # Stuff the solver needs to evolve beam_parameters
+    solver_arguments = (K_zeta_initial, hamiltonian)
 
     """
     Propagate a ray. Quickly finds tau at which the ray leaves the plasma, as well as estimates location of cut-off
@@ -883,7 +750,7 @@ def beam_me_up(
         - suffix _fine for variables in this section
         - I guess I could've used 'dense_output' for the section above and got the information from there, and one day I'll go and see which method works better/faster
         """
-        max_tau_idx = np.argmax(tau_ray[tau_ray <= tau_leave])
+        max_tau_idx = int(np.argmax(tau_ray[tau_ray <= tau_leave]))
 
         K_magnitude_ray = (
             (np.real(ray_parameters_2D[2, :max_tau_idx])) ** 2
@@ -953,7 +820,12 @@ def beam_me_up(
     )
 
     solver_end_time = time.time()
-    print("Time taken (beam solver)", solver_end_time - solver_start_time, "s")
+    solver_time = solver_end_time - solver_start_time
+    print(f"Time taken (beam solver) {solver_time}s")
+    print(f"Number of beam evolution evaluations: {solver_beam_output.nfev}")
+    print(
+        f"Time per beam evolution evaluation: {solver_time / solver_beam_output.nfev}"
+    )
 
     beam_parameters = solver_beam_output.y
     tau_array = solver_beam_output.t
@@ -961,35 +833,14 @@ def beam_me_up(
 
     numberOfDataPoints = len(tau_array)
 
-    q_R_array = np.real(beam_parameters[0, :])
-    q_zeta_array = np.real(beam_parameters[1, :])
-    q_Z_array = np.real(beam_parameters[2, :])
-
-    K_R_array = np.real(beam_parameters[3, :])
-    K_Z_array = np.real(beam_parameters[4, :])
-
-    Psi_3D_output = np.zeros([numberOfDataPoints, 3, 3], dtype="complex128")
-    Psi_3D_output[:, 0, 0] = (
-        beam_parameters[5, :] + 1j * beam_parameters[11, :]
-    )  # d (Psi_RR) / d tau
-    Psi_3D_output[:, 1, 1] = (
-        beam_parameters[6, :] + 1j * beam_parameters[12, :]
-    )  # d (Psi_zetazeta) / d tau
-    Psi_3D_output[:, 2, 2] = (
-        beam_parameters[7, :] + 1j * beam_parameters[13, :]
-    )  # d (Psi_ZZ) / d tau
-    Psi_3D_output[:, 0, 1] = (
-        beam_parameters[8, :] + 1j * beam_parameters[14, :]
-    )  # d (Psi_Rzeta) / d tau
-    Psi_3D_output[:, 0, 2] = (
-        beam_parameters[9, :] + 1j * beam_parameters[15, :]
-    )  # d (Psi_RZ) / d tau
-    Psi_3D_output[:, 1, 2] = (
-        beam_parameters[10, :] + 1j * beam_parameters[16, :]
-    )  # d (Psi_zetaZ) / d tau
-    Psi_3D_output[:, 1, 0] = Psi_3D_output[:, 0, 1]
-    Psi_3D_output[:, 2, 0] = Psi_3D_output[:, 0, 2]
-    Psi_3D_output[:, 2, 1] = Psi_3D_output[:, 1, 2]
+    (
+        q_R_array,
+        q_zeta_array,
+        q_Z_array,
+        K_R_array,
+        K_Z_array,
+        Psi_3D_output,
+    ) = unpack_beam_parameters(beam_parameters)
 
     print("Main loop complete")
     # -------------------
@@ -1048,53 +899,17 @@ def beam_me_up(
     poloidal_flux_output = field.poloidal_flux(q_R_array, q_Z_array)
     electron_density_output = np.asfarray(find_density_1D(poloidal_flux_output))
 
-    # Calculates nabla_K H
-    dH_dKR_output = find_dH_dKR(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_R,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
-    dH_dKzeta_output = find_dH_dKzeta(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_zeta,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
-    dH_dKZ_output = find_dH_dKZ(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_Z,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
+    dH = hamiltonian.derivatives(
+        q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, second_order=True
     )
 
+    dH_dR_output = dH["dH_dR"]
+    dH_dZ_output = dH["dH_dZ"]
+    dH_dKR_output = dH["dH_dKR"]
+    dH_dKzeta_output = dH["dH_dKzeta"]
+    dH_dKZ_output = dH["dH_dKZ"]
+
+    # Calculates nabla_K H
     # Calculates g_hat
     g_hat_output = np.zeros([numberOfDataPoints, 3])
     g_magnitude_output = (
@@ -1155,66 +970,19 @@ def beam_me_up(
     # But good for checking whether things are working properly
     # -------------------
     #
-    H_output = find_H(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
-    H_other = find_H(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
+    H_output = hamiltonian(q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array)
+    # Create and immediately evaluate a Hamiltonian with the opposite mode
+    H_other = Hamiltonian(
+        field,
         launch_angular_frequency,
         -mode_flag,
-        field.poloidal_flux,
         find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
-
-    # nabla H along the ray
-    dH_dR_output = find_dH_dR(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
         delta_R,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
-    dH_dZ_output = find_dH_dZ(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
         delta_Z,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
+        delta_K_R,
+        delta_K_zeta,
+        delta_K_Z,
+    )(q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array)
 
     # Gradients of poloidal flux along the ray
     dpolflux_dR_debugging = find_dpolflux_dR(
@@ -1223,15 +991,6 @@ def beam_me_up(
     dpolflux_dZ_debugging = find_dpolflux_dZ(
         q_R_array, q_Z_array, delta_Z, field.poloidal_flux
     )
-    # d2polflux_dR2_FFD_debugging =
-    # d2polflux_dZ2_FFD_debugging =
-
-    # Gradients of the total magnetic field along the ray
-    # dB_dR_FFD_debugging     =
-    # dB_dZ_FFD_debugging     =
-    # d2B_dR2_FFD_debugging   =
-    # d2B_dZ2_FFD_debugging   =
-    # d2B_dR_dZ_FFD_debugging =
 
     # -------------------
     # This saves the data generated by the main loop and the input data
@@ -2131,61 +1890,7 @@ def beam_me_up(
     # print('ST first 2 terms / ST full: ', abs((G_term2[theta_m_min_idx]+G_term1[theta_m_min_idx])/G_full[theta_m_min_idx]) )
 
     # Calculates nabla nabla H, nabla_K nabla H, nabla_K nabla_K H
-    grad_grad_H = find_grad_grad_H_vectorised(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
-
-    gradK_grad_H = find_gradK_grad_H_vectorised(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        delta_R,
-        delta_Z,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
-    grad_gradK_H = np.swapaxes(gradK_grad_H, 2, 1)
-
-    gradK_gradK_H = find_gradK_gradK_H_vectorised(
-        q_R_array,
-        q_Z_array,
-        K_R_array,
-        K_zeta_initial,
-        K_Z_array,
-        launch_angular_frequency,
-        mode_flag,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        field.poloidal_flux,
-        find_density_1D,
-        field.B_R,
-        field.B_T,
-        field.B_Z,
-    )
+    grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians(dH)
 
     # gradK_gradK_H[:,0,1] = - gradK_gradK_H[:,0,1]
 

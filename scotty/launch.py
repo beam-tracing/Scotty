@@ -1,5 +1,3 @@
-from scotty.fun_FFD import find_dH_dR, find_dH_dZ
-from scotty.fun_CFD import find_dH_dKR, find_dH_dKZ, find_dH_dKzeta
 from scotty.fun_general import (
     make_array_3x3,
     find_Psi_3D_lab,
@@ -12,8 +10,8 @@ from scotty.fun_general import (
     find_d_poloidal_flux_dZ,
     angular_frequency_to_wavenumber,
 )
+from scotty.hamiltonian import Hamiltonian
 from scotty.typing import FloatArray
-from scotty.density_fit import DensityFitLike
 from scotty.geometry import MagneticField
 
 from typing import Optional
@@ -25,21 +23,18 @@ from scipy.optimize import direct, root_scalar
 def launch_beam(
     toroidal_launch_angle_Torbeam: float,
     poloidal_launch_angle_Torbeam: float,
-    mode_flag: int,
     launch_beam_width: float,
     launch_beam_curvature: float,
     launch_position: FloatArray,
     launch_angular_frequency: float,
     field: MagneticField,
-    find_density_1D: DensityFitLike,
+    hamiltonian: Hamiltonian,
+    vacuumLaunch_flag: bool = True,
     vacuum_propagation_flag: bool = True,
     Psi_BC_flag: bool = True,
     poloidal_flux_enter: Optional[float] = None,
     delta_R: float = -1e-4,
     delta_Z: float = 1e-4,
-    delta_K_R: float = 1e-1,
-    delta_K_zeta: float = 1e-1,
-    delta_K_Z: float = 1e-1,
 ):
     r"""
     Propagate the beam from its initial position at the antenna to
@@ -51,8 +46,6 @@ def launch_beam(
         Toroidal angle of antenna in TORBEAM convention
     poloidal_launch_angle_Torbeam: float
         Poloidal angle of antenna in TORBEAM convention
-    mode_flag: int
-        Either ``+/-1``, used to determine which mode branch to use
     launch_beam_width: float
         Width of the beam at launch
     launch_beam_curvature: float
@@ -63,8 +56,6 @@ def launch_beam(
         Angular frequency of the beam at launch
     field: MagneticField
         Object describing the magnetic field of the plasma
-    find_density_1D: DensityFitLike
-        Function or ``Callable`` parameterising the density
     vacuumLaunch_flag: bool
         If ``True``, launch beam from vacuum, otherwise beam launch
         position is inside the plasma already
@@ -81,12 +72,6 @@ def launch_beam(
         Finite difference spacing to use for ``R``
     delta_Z: float
         Finite difference spacing to use for ``Z``
-    delta_K_R: float
-        Finite difference spacing to use for ``K_R``
-    delta_K_zeta: float
-        Finite difference spacing to use for ``K_zeta``
-    delta_K_Z: float
-        Finite difference spacing to use for ``K_Z``
 
     Returns
     -------
@@ -240,26 +225,19 @@ def launch_beam(
     K_Z_initial = K_Z_entry
     initial_position = entry_position
     if Psi_BC_flag:  # Use BCs
-        find_H_args = {
-            "q_R": initial_position[0],
-            "q_Z": initial_position[2],
-            "K_R": K_R_initial,
-            "K_zeta": K_zeta_initial,
-            "K_Z": K_Z_initial,
-            "launch_angular_frequency": launch_angular_frequency,
-            "mode_flag": mode_flag,
-            "interp_poloidal_flux": field.poloidal_flux,
-            "find_density_1D": find_density_1D,
-            "find_B_R": field.B_R,
-            "find_B_T": field.B_T,
-            "find_B_Z": field.B_Z,
-        }
+        dH = hamiltonian.derivatives(
+            initial_position[0],
+            initial_position[2],
+            K_R_initial,
+            K_zeta_initial,
+            K_Z_initial,
+        )
 
-        dH_dKR_initial = find_dH_dKR(delta_K_R=delta_K_R, **find_H_args)
-        dH_dKzeta_initial = find_dH_dKzeta(delta_K_zeta=delta_K_zeta, **find_H_args)
-        dH_dKZ_initial = find_dH_dKZ(delta_K_Z=delta_K_Z, **find_H_args)
-        dH_dR_initial = find_dH_dR(delta_R=delta_R, **find_H_args)
-        dH_dZ_initial = find_dH_dZ(delta_Z=delta_Z, **find_H_args)
+        dH_dR_initial = dH["dH_dR"]
+        dH_dZ_initial = dH["dH_dZ"]
+        dH_dKR_initial = dH["dH_dKR"]
+        dH_dKzeta_initial = dH["dH_dKzeta"]
+        dH_dKZ_initial = dH["dH_dKZ"]
         d_poloidal_flux_d_R_boundary = find_d_poloidal_flux_dR(
             initial_position[0],
             initial_position[2],

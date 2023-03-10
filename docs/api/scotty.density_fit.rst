@@ -5,4 +5,3 @@ scotty.density\_fit module
    :members:
    :undoc-members:
    :show-inheritance:
-   :special-members: __call__
