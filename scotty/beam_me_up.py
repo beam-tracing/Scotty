@@ -4,7 +4,7 @@ Created on Fri Jun  8 10:44:34 2018
 
 @author: VH Hall-Chen
 Valerian Hongjie Hall-Chen
-valerian.chen@gmail.com
+valerian_hall-chen@ihpc.a-star.edu.sg
 
 Run in Python 3, does not work in Python 2
 
@@ -133,6 +133,7 @@ def beam_me_up(
     ## keyword arguments begin
     vacuumLaunch_flag: bool = True,
     find_B_method: Union[str, MagneticField] = "torbeam",
+    density_fit_parameters: Optional[Sequence] = None,
     shot=None,
     equil_time=None,
     vacuum_propagation_flag: bool = False,
@@ -163,7 +164,6 @@ def beam_me_up(
     ## For launching within the plasma
     plasmaLaunch_K=np.zeros(3),
     plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3, 3]),
-    density_fit_parameters: Optional[Sequence] = None,
     density_fit_method: Optional[Union[str, DensityFitLike]] = None,
     ## For circular flux surfaces
     B_T_axis=None,
@@ -2393,7 +2393,7 @@ def create_magnetic_geometry(
 
     elif find_B_method == "omfit":
         print("Using OMFIT JSON Torbeam file for B and poloidal flux")
-        topfile_filename = magnetic_data_path / "topfile.json"
+        topfile_filename = magnetic_data_path / f"topfile{input_filename_suffix}.json"
 
         with open(topfile_filename) as f:
             data = json.load(f)

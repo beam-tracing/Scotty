@@ -1,0 +1,11 @@
+These are notes on how to write documentation and locally compile them to html.
+
+To compile: enter 'make.bat html' in cmd prompt
+
+Using Sphinx for a new project
+https://www.sphinx-doc.org/en/master/tutorial/index.html
+
+Syntax for restructured text
+https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html
+- inline markup
+- lists and blocks
