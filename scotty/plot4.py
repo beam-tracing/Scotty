@@ -462,6 +462,10 @@ def plot(suffix: str = ""):
     plt.legend()
     plt.xlabel("l - l_c")
 
+    # curv_eigval = np.zeros_like(W_eigval)
+    # curv_eigval[:,0] = (Psi_real_eigval[:,0] / K_magnitude_array) * (np.cos(theta_m_output+theta_output))**2
+    # curv_eigval[:,1] = (Psi_real_eigval[:,1] / K_magnitude_array) * (np.cos(theta_m_output+theta_output))**2
+
 
 if __name__ == "__main__":
     plot()
