@@ -299,6 +299,7 @@ def handle_no_resonance(
 @dataclass
 class K_cutoff_data:
     """Properties of :math:`K`-cutoff"""
+
     q_R: float
     q_Z: float
     K_norm_min: float

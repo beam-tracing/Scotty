@@ -5,7 +5,7 @@ from scotty.fun_general import (
     find_Psi_3D_lab,
     find_Psi_3D_lab_Cartesian,
     make_array_3x3,
-    K_magnitude
+    K_magnitude,
 )
 
 import io
