@@ -180,6 +180,7 @@ def beam_me_up(
         - O(3) polynomial
         - tanh
         - quadratic
+       See `density_fit` for more details
     2. Initialise magnetic field method. One of:
         - TORBEAM
         - OMFIT
@@ -188,9 +189,11 @@ def beam_me_up(
         - UDA
         - curvy slab
         - test/test_notime
-    3. Initialise beam launch parameters (vacuum/plasma)
+       See `geometry` for more details
+    3. Initialise beam launch parameters (vacuum/plasma). See `launch`
+       for more details.
     4. Propagate single ray with IVP solver to find point where beam
-       leaves plasma
+       leaves plasma. See `ray_solver` for more details
     5. Propagate beam with IVP solver
     6. Dump raw output
     7. Analysis

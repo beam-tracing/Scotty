@@ -1,3 +1,13 @@
+"""Functions for evolving a single ray
+
+Used by the main code to find the point where the beam leaves the
+plasma, which then sets the integration limits for the beam solver.
+
+"""
+
+# Copyright 2023, Valerian Hall-Chen and Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
 from dataclasses import dataclass
 from time import time
 from typing import Any, Callable, Dict, Protocol, Tuple, Union, cast
@@ -288,6 +298,7 @@ def handle_no_resonance(
 
 @dataclass
 class K_cutoff_data:
+    """Properties of :math:`K`-cutoff"""
     q_R: float
     q_Z: float
     K_norm_min: float
@@ -403,8 +414,6 @@ def propagate_ray(
 ) -> Union[Tuple[float, FloatArray], K_cutoff_data]:
     """Propagate a ray. Quickly finds tau at which the ray leaves the
     plasma, as well as estimates location of cut-off.
-
-    2
 
     Parameters
     ----------

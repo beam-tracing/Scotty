@@ -7,7 +7,9 @@ Saved in data_input
 * launch_K - initial wavevector
 * launch_position - initial position
 * mode_flag - polarisation
-See `beam_me_up` for a detailed description of input parameters.
+
+See :py:func:`scotty.beam_me_up <scotty.beam_me_up.beam_me_up>` for a
+detailed description of input parameters.
 
 Saved in data_output. Everything in cylindrical units unless otherwise stated ('Cartesian' or with the lower case 'x' or 'y')
 
