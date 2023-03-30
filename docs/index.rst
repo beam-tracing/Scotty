@@ -15,16 +15,15 @@ cases are provided through `get_parameters_for_Scotty`.
    :maxdepth: 2
    :caption: Contents:
 
+   input
+   output
+   references
    api/modules
 
 
 Indices and tables
 ==================
 
-* :ref:`input`
-* :ref:`output`
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-* :ref:`references`
-
