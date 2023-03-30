@@ -11,17 +11,8 @@ Checks various quantities that beam_me_up calculates
 
 from __future__ import annotations
 import numpy as np
-import pathlib
 import warnings
 
-# For find_B if using efit files directly
-from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
-from scotty.density_fit import density_fit, DensityFitLike
-from scotty._version import __version__
-
-# Type hints
-from typing import Optional, Union, Sequence
-from scotty.typing import PathLike
 
 
 def check_H_output(H_output):

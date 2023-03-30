@@ -14,9 +14,7 @@ Run in Python 3,  does not work in Python 2
 import numpy as np
 from scipy import constants as constants
 from scipy import interpolate as interpolate
-from scipy import optimize as optimize
 from scipy import integrate as integrate
-import sys
 from typing import TextIO, List, Any, Tuple
 from numpy.typing import NDArray
 
