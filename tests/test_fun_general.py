@@ -5,6 +5,7 @@ from scotty.fun_general import (
     find_Psi_3D_lab,
     find_Psi_3D_lab_Cartesian,
     make_array_3x3,
+    contract_special,
 )
 
 import io
@@ -134,3 +135,39 @@ def test_make_array_3x3():
 
     expected = np.array([[1, 2, 0], [3, 4, 0], [0, 0, 0]])
     npt.assert_array_equal(B, expected)
+
+
+def test_contract_special_vector_vector():
+    vector1 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    vector2 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    expected = np.array([1, 1, 1])
+    result = contract_special(vector1, vector2)
+    npt.assert_array_equal(result, expected)
+
+
+def test_contract_special_matrix_vector():
+    matrix = np.array(
+        [
+            [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+        ]
+    )
+    vector = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    expected = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    result = contract_special(matrix, vector)
+    npt.assert_array_equal(result, expected)
+
+
+def test_contract_special_vector_matrix():
+    matrix = np.array(
+        [
+            [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+        ]
+    )
+    vector = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    expected = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    result = contract_special(vector, matrix)
+    npt.assert_array_equal(result, expected)
