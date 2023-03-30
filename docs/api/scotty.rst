@@ -12,9 +12,7 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
-   scotty.B_derivative_test
    scotty.FindPsiBeam4
-   scotty.OMFITsave_test
    scotty.PlotAllLocalisationLog
    scotty.PlotInput
    scotty.PlotPsiBC2
@@ -23,7 +21,6 @@ Submodules
    scotty.check_input
    scotty.check_output
    scotty.compare_plot
-   scotty.debugging
    scotty.density_fit
    scotty.fun_CFD
    scotty.fun_evolution
