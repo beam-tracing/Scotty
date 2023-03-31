@@ -1,28 +1,49 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""
-Created on Mon Jul 24 14:31:24 2017
+"""Created on Mon Jul 24 14:31:24 2017
 
 @author: Valerian Chen
 
-Notes
+Utilities for reading/writing TORBEAM geometry files
 
-- Bear in mind that Te currently uses the same function as ne. Not important for me since I don't care about temperature
-- I've checked (CompareTopfiles) that B_z and B_r does indeed have the correct symmetry
+Notes
+-----
+
+- Bear in mind that Te currently uses the same function as ne. Not
+  important for me since I don't care about temperature
+- I've checked (CompareTopfiles) that B_z and B_r does indeed have the
+  correct symmetry
 
 Version history
 
-v3 - Added a function for the generation of density (n_e) profiles.
-     Used this function to make the profiles linear in rho rather than psi
-v4 - Fixed bug with B_z and B_r
-   - Made B_poloidal = B_poloidal max outside the last closed flux surface
-   - Changed the way B_z, B_r, and B_poloidal are written, such that they use
-     for loops. Not elegant, but at least I've made them work.
-   - Cleaned up the transposes and the order part of reshape to be more understandable
-v5 - B_toroidal now has correct units
-v6 - Added two different methods of selecting the launch position
-v7 - Fixed an issue where psi was transposed (shape(psi) = transpose(shape(B))) because meshgrid was using 'xy' by default, instead of ik
+- v3:
+
+  - Added a function for the generation of density (n_e) profiles.
+    Used this function to make the profiles linear in rho rather than psi
+
+- v4:
+
+  - Fixed bug with B_z and B_r
+  - Made B_poloidal = B_poloidal max outside the last closed flux surface
+  - Changed the way B_z, B_r, and B_poloidal are written, such that they use
+    for loops. Not elegant, but at least I've made them work.
+  - Cleaned up the transposes and the order part of reshape to be more understandable
+
+- v5:
+
+  - B_toroidal now has correct units
+
+- v6:
+
+  - Added two different methods of selecting the launch position
+
+- v7:
+
+  - Fixed an issue where psi was transposed (shape(psi) =
+    transpose(shape(B))) because meshgrid was using 'xy' by default,
+    instead of ik
+
 """
 from __future__ import annotations
 import argparse
