@@ -1,3 +1,6 @@
+# Copyright 2017 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
 from os import PathLike as os_PathLike
 from typing import Union
 import numpy as np

@@ -1,3 +1,6 @@
+# Copyright 2023 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
 from scotty.geometry import MagneticField
 from scotty.density_fit import DensityFitLike
 from scotty.fun_general import (

@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Sat Apr 17 09:43:34 2021
-
-@author: VH Hall-Chen (valerian_hall-chen@ihpc.a-star.edu.sg)
-
-This module calculates the Gaussian beam properties based on the horn and lens.
+# Copyright 2021 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+"""This module calculates the Gaussian beam properties based on the horn and lens.
 
 Much of the theory is very nicely explained in Goldsmith's Quasioptics. Just
 note that what he calls 'flare angle', I call 'semiflare angle'.

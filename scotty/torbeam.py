@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# Copyright 2017 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
 
-"""Created on Mon Jul 24 14:31:24 2017
-
-@author: Valerian Chen
-
-Utilities for reading/writing TORBEAM geometry files
+"""Utilities for reading/writing TORBEAM geometry files
 
 Notes
 -----

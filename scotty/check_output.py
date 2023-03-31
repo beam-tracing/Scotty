@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Created on 08 November 2022
+# Copyright 2022 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
 
-@author: VH Hall-Chen
-Valerian Hongjie Hall-Chen
-valerian.chen@gmail.com
-
-Checks various quantities that `beam_me_up
-<scotty.beam_me_up.beam_me_up>` calculates
-
-"""
+"""Checks various quantities that `beam_me_up <scotty.beam_me_up.beam_me_up>` calculates"""
 
 from __future__ import annotations
 import numpy as np

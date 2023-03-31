@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
+# Copyright 2021 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
 r"""
-lens-a-lot
-
-Created on Sat Apr 17 16:23:01 2021
-
-@author: VH Hall-Chen (valerian_hall-chen@ihpc.a-star.edu.sg)
-
 Transfer matrix (2x2):
 
 .. math::
