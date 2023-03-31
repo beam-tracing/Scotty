@@ -18,11 +18,11 @@
 # -- Project information -----------------------------------------------------
 
 project = "Scotty"
-copyright = "2022, Valerian Hall-Chen"
+copyright = "2023, Valerian Hall-Chen and the Scotty contributors"
 author = "Valerian Hall-Chen"
 
 # The full version, including alpha/beta/rc tags
-release = "0.1.0"
+release = "2.3.0"
 
 
 # -- General configuration ---------------------------------------------------
