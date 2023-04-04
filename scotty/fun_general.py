@@ -1,25 +1,19 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Jun  8 10:44:34 2018
+# Copyright 2018 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
 
-Functions for Scotty (excluding functions for finding derivatives of H).
-
-@author: chenv
-Valerian Hongjie Hall-Chen
-valerian_hall-chen@ihpc.a-star.edu.sg
-
-Run in Python 3,  does not work in Python 2
+"""Functions for Scotty (excluding functions for finding derivatives of H).
 """
 
 import numpy as np
 from scipy import constants as constants
 from scipy import interpolate as interpolate
-from scipy import optimize as optimize
 from scipy import integrate as integrate
-import sys
-from typing import TextIO, List
+from typing import TextIO, List, Any, Tuple
 from numpy.typing import NDArray
 from scotty.typing import ArrayLike
+
+from .typing import ArrayLike
 
 
 def read_floats_into_list_until(terminator: str, lines: TextIO) -> NDArray[np.float64]:
@@ -43,23 +37,33 @@ def read_floats_into_list_until(terminator: str, lines: TextIO) -> NDArray[np.fl
     return np.asarray(lst)
 
 
-def find_nearest(array, value):  # returns the index
+def find_nearest(array: NDArray, value: Any) -> int:
+    """Returns the index of the first element in ``array`` closest in
+    absolute value to ``value``
+
+    """
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return int(idx)
 
 
-def contract_special(arg_a, arg_b):
-    """
-    Takes
-    Either:
-        matrix of TxMxN and a vector of TxN  or TxM
-        For each T, contract the matrix with the vector
-    Or:
-        two vectors of size TxN
-    For each T, contract the indices N
-    Covers the case that matmul and dot don't do very elegantly
-    Avoids having to use a for loop to iterate over T
+def contract_special(arg_a: NDArray, arg_b: NDArray) -> NDArray:
+    """Dot product of arrays of vectors or matrices.
+
+    Covers the case that matmul and dot don't do very elegantly, and
+    avoids having to use a for loop to iterate over the array slices.
+
+    Parameters
+    ----------
+    arg_a, arg_b:
+        One of:
+
+        - matrix with shape TxMxN and a vector with TxN or TxM
+        - two vectors of shape TxN
+
+        For each T, independently compute the dot product of the
+        matrices/vectors
+
     """
     if (
         np.ndim(arg_a) == 3 and np.ndim(arg_b) == 2
@@ -1020,9 +1024,8 @@ def find_widths_and_curvatures(Psi_xx, Psi_xy, Psi_yy, K_magnitude):
 
 
 def find_dB_dR_CFD(q_R, q_Z, delta_R, find_B_R, find_B_T, find_B_Z):
-    """
-    Finds \fract{d B}{d Z}, where B is the magnitude of the B field
-    """
+    r"""Finds :math:`\frac{d B}{d R}`, where B is the magnitude of the B field"""
+
     B_R_plus_R = np.squeeze(find_B_R(q_R + delta_R, q_Z))
     B_T_plus_R = np.squeeze(find_B_T(q_R + delta_R, q_Z))
     B_Z_plus_R = np.squeeze(find_B_Z(q_R + delta_R, q_Z))
@@ -1040,9 +1043,8 @@ def find_dB_dR_CFD(q_R, q_Z, delta_R, find_B_R, find_B_T, find_B_Z):
 
 
 def find_dB_dZ_CFD(q_R, q_Z, delta_Z, find_B_R, find_B_T, find_B_Z):
-    """
-    Finds \fract{d B}{d Z}, where B is the magnitude of the B field
-    """
+    r"""Finds :math:`\frac{d B}{d Z}`, where B is the magnitude of the B field"""
+
     B_R_plus_Z = np.squeeze(find_B_R(q_R, q_Z + delta_Z))
     B_T_plus_Z = np.squeeze(find_B_T(q_R, q_Z + delta_Z))
     B_Z_plus_Z = np.squeeze(find_B_Z(q_R, q_Z + delta_Z))
@@ -1075,9 +1077,8 @@ def find_dB_dZ_CFD(q_R, q_Z, delta_Z, find_B_R, find_B_T, find_B_Z):
 
 
 def find_d2B_dR2_CFD(q_R, q_Z, delta_R, find_B_R, find_B_T, find_B_Z):
-    """
-    Finds \fract{d^2 B}{d R^2}, where B is the magnitude of the B field
-    """
+    r"""Finds :math:`\frac{d^2 B}{d R^2}`, where B is the magnitude of the B field"""
+
     B_R_0 = np.squeeze(find_B_R(q_R, q_Z))
     B_T_0 = np.squeeze(find_B_T(q_R, q_Z))
     B_Z_0 = np.squeeze(find_B_Z(q_R, q_Z))
@@ -1146,9 +1147,7 @@ def find_d2B_dZ2_CFD(q_R, q_Z, delta_Z, find_B_R, find_B_T, find_B_Z):
 
 
 def find_dB_dR_FFD(q_R, q_Z, delta_R, find_B_R, find_B_T, find_B_Z):
-    """
-    Finds \fract{d B}{d Z}, where B is the magnitude of the B field
-    """
+    r"""Finds :math:`\frac{d B}{d Z}`, where B is the magnitude of the B field"""
     B_R_0 = np.squeeze(find_B_R(q_R, q_Z))
     B_T_0 = np.squeeze(find_B_T(q_R, q_Z))
     B_Z_0 = np.squeeze(find_B_Z(q_R, q_Z))
@@ -1171,9 +1170,8 @@ def find_dB_dR_FFD(q_R, q_Z, delta_R, find_B_R, find_B_T, find_B_Z):
 
 
 def find_dB_dZ_FFD(q_R, q_Z, delta_Z, find_B_R, find_B_T, find_B_Z):
-    """
-    Finds \fract{d B}{d Z}, where B is the magnitude of the B field
-    """
+    r"""Finds :math:`\frac{d B}{d Z}`, where B is the magnitude of the B field"""
+
     B_R_0 = np.squeeze(find_B_R(q_R, q_Z))
     B_T_0 = np.squeeze(find_B_T(q_R, q_Z))
     B_Z_0 = np.squeeze(find_B_Z(q_R, q_Z))
@@ -1196,9 +1194,8 @@ def find_dB_dZ_FFD(q_R, q_Z, delta_Z, find_B_R, find_B_T, find_B_Z):
 
 
 def find_d2B_dR2_FFD(q_R, q_Z, delta_R, find_B_R, find_B_T, find_B_Z):
-    """
-    Finds \fract{d B}{d Z}, where B is the magnitude of the B field
-    """
+    r"""Finds :math:`\frac{d^2 B}{d R^2}`, where B is the magnitude of the B field"""
+
     B_R_0 = np.squeeze(find_B_R(q_R, q_Z))
     B_T_0 = np.squeeze(find_B_T(q_R, q_Z))
     B_Z_0 = np.squeeze(find_B_Z(q_R, q_Z))
@@ -1371,19 +1368,35 @@ def reflector_make(r, t):
 
 
 def genray_angles_from_mirror_angles(
-    rot_ang_deg, tilt_ang_deg, offset_for_window_norm_to_R=3.0
-):
-    """
-    Input args are steering mirror rotation and tilt angles in degrees (rot_ang_deg,tilt_ang_deg).
-    rot_ang_deg,tilt_ang_deg = 0,0 imply beam propagates in negative window normal direction.
-    optional keyword offset_for_window_norm_to_R gives toroial angle (in degrees) of
-    window normal to major radial direction, so for rot_ang_deg,tilt_ang_deg = 0,0, beam would have
-    toroidal angle given by offset_for_window_norm_to_R.
+    rot_ang_deg: ArrayLike,
+    tilt_ang_deg: ArrayLike,
+    offset_for_window_norm_to_R: ArrayLike = 3.0,
+) -> Tuple[ArrayLike, ArrayLike]:
+    """Compute the GENRAY-equivalent angles from mirror angles
 
-    can get from rot_ang_deg,tilt_ang_deg buy using toroidal and poloidal "genray angles" (tor_ang, pol_ang)
-    in IDL savefile log (/u/jhilles/DBS/dbs_logbook_2013.idl).  The angles were calculated according to the logic:
+    ``rot_ang_deg = 0``, ``tilt_ang_deg = 0`` implies beam propagates
+    in negative window normal direction.
+
+    Can get from ``rot_ang_deg, tilt_ang_deg`` by using toroidal and
+    poloidal "genray angles" (``tor_ang, pol_ang``) in IDL savefile
+    log. The angles were calculated according to the logic::
+
         tor_ang = 3.0 - rot_ang_deg
         pol_ang = tilt_ang_deg
+
+
+    Parameters
+    ----------
+    rot_ang_deg:
+        Steering mirror rotation angle in degrees
+    tilt_ang_deg:
+        Steering mirror tilt angle in degrees
+    offset_for_window_norm_to_R:
+        Toroidal angle in degrees of window normal to major radial
+        position, such that for ``rot_ang_deg = 0``, ``tilt_ang_deg =
+        0`` beam would have toroidal angle given by
+        ``offset_for_window_norm_to_R``.
+
     """
 
     beam0 = np.array([0, -1, 0])

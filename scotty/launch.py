@@ -1,3 +1,6 @@
+# Copyright 2023 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
 from scotty.fun_general import (
     make_array_3x3,
     find_Psi_3D_lab,

@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Created on 26 April 2021
+# Copyright 2021 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
 
-@author: VH Hall-Chen
-Valerian Hongjie Hall-Chen
-valerian_hall-chen@ihpc.a-star.edu.sg
-
-Initialisation.
+"""Initialisation.
 
 This file contains the default settings for a range of various cases. This is
 split into a set of dictionaries (`DEFAULT_DIAGNOSTIC_PARAMETERS`,

@@ -6,24 +6,25 @@
 Welcome to Scotty's documentation!
 ==================================
 
-The main interface to Scotty is through :py:func:`scotty.beam_me_up
+The main interface to Scotty is through `beam_me_up()
 <scotty.beam_me_up.beam_me_up>`. Many standard cases are provided
-through `scotty.get_parameters_for_Scotty`.
+through `get_parameters_for_Scotty()
+<scotty.get_parameters_for_Scotty>`.
+
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
+   input
+   output
+   references
    api/modules
 
 
 Indices and tables
 ==================
 
-* :ref:`input`
-* :ref:`output`
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-* :ref:`references`
-

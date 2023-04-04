@@ -1,15 +1,10 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Jun  8 10:44:34 2018
+# Copyright 2018 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
 
-Functions for Scotty to evolve the beam or ray.
+"""Functions for Scotty to evolve the beam or ray.
 I've separated this from scotty.fun_general to prevent circular importing
 
-@author: chenv
-Valerian Hongjie Hall-Chen
-valerian_hall-chen@ihpc.a-star.edu.sg
-
-Run in Python 3,  does not work in Python 2
 """
 
 from typing import Tuple

@@ -1,3 +1,6 @@
+# Copyright 2023 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
 from __future__ import annotations
 
 from abc import ABC
@@ -14,18 +17,13 @@ from scotty.typing import ArrayLike, FloatArray
 
 
 class MagneticField(ABC):
-    """Abstract base class for magnetic field geometries
+    """Abstract base class for magnetic field geometries"""
 
-    Attributes
-    ----------
-    R_coord:
-    Z_coord:
-        Arrays with the (original) sample locations for the poloidal
-        flux and magnetic field components
-    """
-
+    #: Sample locations for the major radius coordinate
     R_coord: FloatArray
+    #: Sample locations for the vertical coordinate
     Z_coord: FloatArray
+    #: Value of the poloidal magnetic flux, :math:`\psi`, on ``(R_coord, Z_coord)``
     poloidalFlux_grid: FloatArray
 
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
