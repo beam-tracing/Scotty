@@ -6,7 +6,6 @@ from typing import Callable, Optional
 
 from netCDF4 import Dataset
 import numpy as np
-import numpy.typing as npt
 from scipy.interpolate import RectBivariateSpline, UnivariateSpline
 
 from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ

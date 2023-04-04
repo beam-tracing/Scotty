@@ -19,6 +19,7 @@ from scipy import integrate as integrate
 import sys
 from typing import TextIO, List
 from numpy.typing import NDArray
+from scotty.typing import ArrayLike
 
 
 def read_floats_into_list_until(terminator: str, lines: TextIO) -> NDArray[np.float64]:
@@ -1428,3 +1429,16 @@ def make_array_3x3(array):
         raise ValueError(f"Expected array shape to be (2, 2), got {array.shape}")
 
     return np.append(np.append(array, [[0, 0]], axis=0), [[0], [0], [0]], axis=1)
+
+
+def K_magnitude(
+    K_R: ArrayLike, K_zeta: ArrayLike, K_Z: ArrayLike, q_R: ArrayLike
+) -> ArrayLike:
+    r"""Returns the magnitude of the wavevector :math:`\mathbf{K}`:
+
+    .. math::
+
+        |K| = \sqrt{\mathbf{K}\cdot\mathbf{K}}
+            = \sqrt{K_R^2 + (K_\zeta / q_R)^2 + K_Z^2}
+    """
+    return np.sqrt(K_R**2 + (K_zeta / q_R) ** 2 + K_Z**2)

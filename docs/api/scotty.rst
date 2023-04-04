@@ -38,5 +38,6 @@ Submodules
    scotty.plot3_pretty
    scotty.plot4
    scotty.postmortem2
+   scotty.ray_solver
    scotty.torbeam
    scotty.typing

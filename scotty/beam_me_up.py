@@ -69,8 +69,6 @@ import numpy as np
 from scipy import integrate as integrate
 from scipy import constants as constants
 import matplotlib.pyplot as plt
-import sys
-import bisect
 import time
 import json
 import pathlib
@@ -91,7 +89,6 @@ from scotty.fun_general import find_epsilon_para, find_epsilon_perp, find_epsilo
 from scotty.fun_general import find_dbhat_dR, find_dbhat_dZ
 from scotty.fun_general import find_H_Cardano, find_D
 from scotty.fun_evolution import (
-    ray_evolution_2D_fun,
     beam_evolution_fun,
     pack_beam_parameters,
     unpack_beam_parameters,
@@ -111,6 +108,7 @@ from scotty.geometry import (
 from scotty.hamiltonian import Hamiltonian, hessians
 from scotty.launch import launch_beam
 from scotty.torbeam import Torbeam
+from scotty.ray_solver import propagate_ray
 from scotty._version import __version__
 
 # Checks
@@ -118,7 +116,7 @@ from scotty.check_input import check_input
 from scotty.check_output import check_output
 
 # Type hints
-from typing import Optional, Union, Sequence
+from typing import Optional, Union, Sequence, cast
 from scotty.typing import PathLike, FloatArray
 
 
@@ -130,7 +128,7 @@ def beam_me_up(
     launch_beam_width: float,
     launch_beam_curvature: float,
     launch_position: FloatArray,
-    ## keyword arguments begin
+    # keyword arguments begin
     vacuumLaunch_flag: bool = True,
     find_B_method: Union[str, MagneticField] = "torbeam",
     density_fit_parameters: Optional[Sequence] = None,
@@ -138,19 +136,19 @@ def beam_me_up(
     equil_time=None,
     vacuum_propagation_flag: bool = False,
     Psi_BC_flag: bool = False,
-    poloidal_flux_enter: Optional[float] = None,
-    ## Finite-difference and solver parameters
+    poloidal_flux_enter: float = 1.0,
+    # Finite-difference and solver parameters
     delta_R: float = -0.0001,  # in the same units as data_R_coord
     delta_Z: float = 0.0001,  # in the same units as data_Z_coord
     delta_K_R: float = 0.1,  # in the same units as K_R
     delta_K_zeta: float = 0.1,  # in the same units as K_zeta
     delta_K_Z: float = 0.1,  # in the same units as K_z
     interp_order=5,  # For the 2D interpolation functions
-    len_tau=102,  # Number of tau_points to output
-    rtol=1e-3,  # for solve_ivp of the beam solver
-    atol=1e-6,  # for solve_ivp of the beam solver
+    len_tau: int = 102,
+    rtol: float = 1e-3,  # for solve_ivp of the beam solver
+    atol: float = 1e-6,  # for solve_ivp of the beam solver
     interp_smoothing=0,  # For the 2D interpolation functions. For no smoothing, set to 0
-    ## Input and output settings
+    # Input and output settings
     ne_data_path=pathlib.Path("."),
     magnetic_data_path=pathlib.Path("."),
     output_path=pathlib.Path("."),
@@ -159,19 +157,19 @@ def beam_me_up(
     figure_flag=True,
     detailed_analysis_flag=True,
     verbose_output_flag=True,
-    ## For quick runs (only ray tracing)
-    quick_run=False,
-    ## For launching within the plasma
+    # For quick runs (only ray tracing)
+    quick_run: bool = False,
+    # For launching within the plasma
     plasmaLaunch_K=np.zeros(3),
     plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3, 3]),
     density_fit_method: Optional[Union[str, DensityFitLike]] = None,
-    ## For circular flux surfaces
+    # For circular flux surfaces
     B_T_axis=None,
     B_p_a=None,
     R_axis=None,
     minor_radius_a=None,
 ):
-    r"""
+    r"""Run the beam tracer
 
     Overview
     ========
@@ -182,6 +180,7 @@ def beam_me_up(
         - O(3) polynomial
         - tanh
         - quadratic
+       See `density_fit` for more details
     2. Initialise magnetic field method. One of:
         - TORBEAM
         - OMFIT
@@ -190,22 +189,23 @@ def beam_me_up(
         - UDA
         - curvy slab
         - test/test_notime
-    3. Initialise beam launch parameters (vacuum/plasma)
-    4. Initialise event functions for IVP solver
-    5. Propagate single ray with IVP solver (?)
-    6. Handle events
-    7. Possible early exit if ``quick_run`` (?)
-    8. Propagate beam with IVP solver
-    9. Dump raw output (?)
-    10. Analysis
-    11. Dump analysis
+       See `geometry` for more details
+    3. Initialise beam launch parameters (vacuum/plasma). See `launch`
+       for more details.
+    4. Propagate single ray with IVP solver to find point where beam
+       leaves plasma. See `ray_solver` for more details
+    5. Propagate beam with IVP solver
+    6. Dump raw output
+    7. Analysis
 
     Parameters
     ==========
-    toroidal_launch_angle_Torbeam: float
-        Toroidal angle of antenna in TORBEAM convention
     poloidal_launch_angle_Torbeam: float
         Poloidal angle of antenna in TORBEAM convention
+    toroidal_launch_angle_Torbeam: float
+        Toroidal angle of antenna in TORBEAM convention
+    launch_freq_GHz: float
+        Frequency of the launched beam in GHz
     mode_flag: int
         Either ``+/-1``, used to determine which mode branch to use
     launch_beam_width: float
@@ -223,9 +223,8 @@ def beam_me_up(
     Psi_BC_flag: bool
         If ``True``, use matching boundary conditions at plasma entry
         position, otherwise do no special treatment at plasma boundary
-    poloidal_flux_enter: Optional
-        Normalised poloidal flux label of plasma boundary. Required if
-        ``vacuum_propagation_flag`` is ``True``
+    poloidal_flux_enter: float
+        Normalised poloidal flux label of plasma boundary
     plasmaLaunch_Psi_3D_lab_Cartesian: FloatArray
         :math:`\Psi` of beam in lab Cartesian coordinates. Required if
         ``vacuumLaunch_flag`` is ``False``
@@ -243,6 +242,10 @@ def beam_me_up(
     delta_K_Z: float
         Finite difference spacing to use for ``K_Z``
     find_B_method:
+        See `create_magnetic_geometry` for more information.
+
+        Common options:
+
         - ``"efitpp"`` uses magnetic field data from efitpp files
           directly
         - ``"torbeam"`` uses magnetic field data from TORBEAM input
@@ -293,6 +296,16 @@ def beam_me_up(
            guessed from the length of ``density_fit_parameters``. In
            this case, ``quadratic`` and ``tanh`` parameters _should_
            include ``poloidal_flux_enter`` as the last value.
+    len_tau: int
+        Number of output ``tau`` points
+    rtol: float
+        Relative tolerance for ODE solver
+    atol: float
+        Absolute tolerance for ODE solver
+    quick_run: bool
+        If true, then run only the ray tracer and get an analytic
+        estimate of the :math:`K` cut-off location
+
     """
 
     # major_radius = 0.9
@@ -417,6 +430,28 @@ def beam_me_up(
     K_R_initial, K_zeta_initial, K_Z_initial = K_initial
 
     # -------------------
+    # Propagate the ray
+
+    print("Starting the solvers")
+    ray_solver_output = propagate_ray(
+        poloidal_flux_enter,
+        launch_angular_frequency,
+        field,
+        initial_position,
+        K_initial,
+        hamiltonian,
+        rtol,
+        atol,
+        quick_run,
+        len_tau,
+    )
+    if quick_run:
+        return ray_solver_output
+
+    tau_leave, tau_points = cast(tuple, ray_solver_output)
+
+    # -------------------
+    # Propagate the beam
 
     # Initial conditions for the solver
     beam_parameters_initial = pack_beam_parameters(
@@ -428,381 +463,6 @@ def beam_me_up(
         Psi_3D_lab_initial,
     )
 
-    ray_parameters_initial = np.real(beam_parameters_initial[0:5])
-    ray_parameters_2D_initial = np.delete(ray_parameters_initial, 1)  # Remove q_zeta
-    # -------------------
-
-    # Define events for the solver
-    # Notice how the beam parameters are allocated: this function only works correctly for the 2D case
-    def event_leave_plasma(
-        tau,
-        ray_parameters_2D,
-        K_zeta,
-        hamiltonian: Hamiltonian,
-        poloidal_flux_leave=poloidal_flux_enter,
-    ):  # Leave at the same poloidal flux of entry
-        q_R = ray_parameters_2D[0]
-        q_Z = ray_parameters_2D[1]
-
-        poloidal_flux = field.poloidal_flux(q_R, q_Z)
-
-        poloidal_flux_difference = poloidal_flux - poloidal_flux_leave
-
-        # goes from negative to positive when leaving the plasma
-        return poloidal_flux_difference
-
-    # Stop the solver when the beam leaves the plasma
-    event_leave_plasma.terminal = True
-    # positive value, when function result goes from negative to positive
-    event_leave_plasma.direction = 1.0
-
-    def event_leave_LCFS(
-        tau,
-        ray_parameters_2D,
-        K_zeta,
-        hamiltonian: Hamiltonian,
-        poloidal_flux_LCFS=1.0,
-    ):
-        q_R = ray_parameters_2D[0]
-        q_Z = ray_parameters_2D[1]
-
-        poloidal_flux = field.poloidal_flux(q_R, q_Z)
-
-        poloidal_flux_difference = poloidal_flux - poloidal_flux_LCFS
-
-        # goes from negative to positive when leaving the LCFS
-        return poloidal_flux_difference
-
-    # Do not stop the solver when the beam leaves the plasma
-    event_leave_LCFS.terminal = False
-    # positive value, when function result goes from negative to positive
-    event_leave_LCFS.direction = 1.0
-
-    def event_leave_simulation(
-        tau,
-        ray_parameters_2D,
-        K_zeta,
-        hamiltonian: Hamiltonian,
-        data_R_coord_min=field.R_coord.min(),
-        data_R_coord_max=field.R_coord.max(),
-        data_Z_coord_min=field.Z_coord.min(),
-        data_Z_coord_max=field.Z_coord.max(),
-    ):
-        q_R = ray_parameters_2D[0]
-        q_Z = ray_parameters_2D[1]
-
-        is_inside = (
-            (q_R > data_R_coord_min)
-            and (q_R < data_R_coord_max)
-            and (q_Z > data_Z_coord_min)
-            and (q_Z < data_Z_coord_max)
-        )
-
-        # goes from positive (True) to negative(False) when leaving the simulation region
-        return is_inside
-
-    # Stop the solver when the beam leaves the simulation region. Entering the simulation region is fine
-    event_leave_simulation.terminal = True
-    # negative value, when function result goes from positive to negative
-    event_leave_simulation.direction = -1.0
-
-    def event_cross_resonance(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
-        # Currently only works when crossing resonance.
-        # To implement crossing of higher harmonics as well
-        delta_gyro_freq = 0.01
-
-        q_R = ray_parameters_2D[0]
-        q_Z = ray_parameters_2D[1]
-
-        B_R = field.B_R(q_R, q_Z)
-        B_T = field.B_T(q_R, q_Z)
-        B_Z = field.B_Z(q_R, q_Z)
-
-        B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
-        gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
-
-        # The function's return value gives zero when the gyrofreq on the ray goes from either
-        # above to below or below to above the resonance.
-        return (gyro_freq - 1.0 - delta_gyro_freq) * (gyro_freq - 1.0 + delta_gyro_freq)
-
-    event_cross_resonance.direction = 0.0
-    # Stop the solver when the beam is in a region of resonance
-    event_cross_resonance.terminal = True
-
-    def event_reach_cutoff(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
-        # To find tau of the cut-off, that is the location where the
-        # wavenumber K is minimised
-        # This function finds the turning points
-        ## TODO: change function name to 'event_reach_K_min'
-
-        q_R = ray_parameters_2D[0]
-        q_Z = ray_parameters_2D[1]
-        K_R = ray_parameters_2D[2]
-        K_Z = ray_parameters_2D[3]
-        K_magnitude = np.sqrt(K_R**2 + K_Z**2 + K_zeta**2 / q_R**2)
-
-        dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z)
-
-        d_K_d_tau = -(1 / K_magnitude) * (
-            dH["dH_dR"] * K_R + dH["dH_dZ"] * K_Z + dH["dH_dKR"] * q_R
-        )
-        return d_K_d_tau
-
-    event_reach_cutoff.direction = 1.0
-    # positive value, when function result goes from negative to positive
-    event_reach_cutoff.terminal = False
-
-    # -------------------
-
-    # Propagate the beam
-    # Calls scipy's initial value problem solver
-
-    # If the ray hasn't left the plasma by the time this tau is reached, the solver gives up
-    tau_max = 10**5
-    # Stuff the solver needs to evolve beam_parameters
-    solver_arguments = (K_zeta_initial, hamiltonian)
-
-    """
-    Propagate a ray. Quickly finds tau at which the ray leaves the plasma, as well as estimates location of cut-off
-    """
-    print("Starting the solvers")
-    solver_start_time = time.time()
-
-    solver_ray_events = (
-        event_leave_plasma,
-        event_leave_LCFS,
-        event_leave_simulation,
-        event_cross_resonance,
-        event_reach_cutoff,
-    )
-
-    solver_ray_output = integrate.solve_ivp(
-        ray_evolution_2D_fun,
-        [0, tau_max],
-        ray_parameters_2D_initial,
-        method="RK45",
-        t_eval=None,
-        dense_output=False,
-        events=solver_ray_events,
-        vectorized=False,
-        args=solver_arguments,
-        rtol=rtol,
-        atol=atol,
-        max_step=50,
-    )  # This seems to be throwing a warning about ragged arrays, see if new scipy update fixes this
-    solver_end_time = time.time()
-    print("Time taken (ray solver)", solver_end_time - solver_start_time, "s")
-
-    ray_parameters_2D = solver_ray_output.y
-    tau_ray = solver_ray_output.t
-
-    # Uncomment to help with troubleshooting
-    # ray_parameters_2D_events = solver_ray_output.y_events
-    # ray_parameters_cutoff = np.squeeze(ray_parameters_2D_events[4])
-    # print(solver_ray_output.t_events)
-    # print(solver_ray_output.status)
-    # plt.title('Poloidal Plane')
-    # contour_levels = np.linspace(0,1,11)
-    # CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
-    # plt.plot(ray_parameters_2D[0,:], ray_parameters_2D[1,:])
-    # plt.plot(ray_parameters_cutoff[0],ray_parameters_cutoff[1],'o')
-    # plt.clabel(CS, inline=True, fontsize=10,inline_spacing=1,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
-
-    solver_ray_status = solver_ray_output.status
-    if solver_ray_status == 0:
-        print(
-            "Warning: Ray has not left plasma/simulation region. Increase tau_max or choose different initial conditions."
-        )
-        print("We should not be here. I am prematurely terminating this simulation.")
-
-        sys.exit()
-    elif solver_ray_status == -1:
-        print("Warning: Integration step failed.")
-        # This is sometimes due to negative values of ne due to the spline
-        # interpolation of ne.dat
-        # If this happens on the way out of the plasma, the next step will do the trick.
-
-        sys.exit()
-
-    tau_events = solver_ray_output.t_events
-    ray_parameters_2D_events = solver_ray_output.y_events
-    ray_parameters_LCFS = ray_parameters_2D_events[1]
-
-    if (len(tau_events[0]) != 0) and (len(tau_events[1]) == 0):
-        """
-        If event_leave_plasma occurs and event_leave_LCFS does not
-        """
-        tau_leave = np.squeeze(tau_events[0])
-
-    elif len(tau_events[3]) != 0:
-        """
-        If the beam reaches a resonance
-        """
-        tau_cross_resonance = np.squeeze(tau_events[3])
-        tau_leave = tau_cross_resonance
-
-    elif (len(tau_events[0]) == 0) and (len(tau_events[1]) != 0):
-        """
-        - If event_leave_plasma doesn't occur, but event_leave_LCFS does.
-        """
-        tau_leave_LCFS = tau_events[1]
-        tau_leave = tau_leave_LCFS[0]
-    elif (len(tau_events[0]) != 0) and (len(tau_events[1]) != 0):
-        """
-        If both event_leave_plasma and event_leave_LCFS occur
-        """
-        K_R_LCFS = ray_parameters_LCFS[0][2]
-
-        if K_R_LCFS < 0:
-            """
-            Beam has gone through the plasma, terminate at LCFS
-            """
-            tau_leave_LCFS = tau_events[1]
-            tau_leave = tau_leave_LCFS[0]
-        else:
-            """
-            Beam deflection sufficiently large, terminate at entry poloidal flux
-            """
-            tau_leave = np.squeeze(tau_events[0])
-
-    else:
-        """
-        If one ends up here, things aren't going well. I can think of two possible reasons
-        - The launch conditions are really weird (hasn't happened yet, in my experience)
-        - The max_step setting of the solver is too large, such that the ray
-          leaves the LCFS and enters a region where poloidal_flux < 1 in a
-          single step. The solver thus doesn't log the event when it really should
-        """
-
-        # plt.figure()
-        # plt.plot(ray_parameters_2D[0,:],ray_parameters_2D[1,:],'o')
-        # contour_levels = np.linspace(0,1,11)
-        # CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(poloidalFlux_grid), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
-        # plt.clabel(CS, inline=True, fontsize=10,inline_spacing=-5,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
-        # print(tau_events)
-
-        print("Warning: Ray has left the simulation region without leaving the LCFS.")
-        # print('We should not be here. I am prematurely terminating this simulation.')
-        # sys.exit()
-        tau_leave = np.squeeze(tau_events[2])
-        ##
-
-    if quick_run:
-        ray_parameters_2D_events = solver_ray_output.y_events
-        ray_parameters_turning_pt = ray_parameters_2D_events[4]
-        numTurningPoints, _ = np.shape(ray_parameters_turning_pt)
-        K_turning_pt = np.zeros(numTurningPoints)
-        print(ray_parameters_turning_pt)
-        for ii in range(0, numTurningPoints):
-            # tau = tau_events[4]
-            q_R = ray_parameters_turning_pt[ii][0]
-            K_R = ray_parameters_turning_pt[ii][2]
-            K_Z = ray_parameters_turning_pt[ii][3]
-
-            K_turning_pt[ii] = np.linalg.norm(
-                np.array([K_R, K_zeta_initial / q_R, K_Z])
-            )
-
-        K_min_idx = np.argmin(K_turning_pt)
-        q_R_cutoff = ray_parameters_turning_pt[K_min_idx][0]
-        q_Z_cutoff = ray_parameters_turning_pt[K_min_idx][1]
-        K_R_cutoff = ray_parameters_turning_pt[K_min_idx][2]
-        K_Z_cutoff = ray_parameters_turning_pt[K_min_idx][3]
-
-        B_R_cutoff = field.B_R(q_R_cutoff, q_Z_cutoff)
-        B_T_cutoff = field.B_T(q_R_cutoff, q_Z_cutoff)
-        B_Z_cutoff = field.B_Z(q_R_cutoff, q_Z_cutoff)
-
-        K_cutoff = np.array([K_R_cutoff, K_zeta_initial / q_R_cutoff, K_Z_cutoff])
-        B_cutoff = np.array([B_R_cutoff, B_T_cutoff, B_Z_cutoff])
-
-        sin_theta_m_cutoff = np.dot(B_cutoff, K_cutoff) / (
-            np.linalg.norm(K_cutoff) * np.linalg.norm(B_cutoff)
-        )
-        # Assumes the mismatch angle is never smaller than -90deg or bigger than 90deg
-        theta_m_cutoff = np.sign(sin_theta_m_cutoff) * np.arcsin(
-            abs(sin_theta_m_cutoff)
-        )
-
-        poloidal_flux_cutoff = field.poloidal_flux(q_R_cutoff, q_Z_cutoff)
-
-        return (
-            q_R_cutoff,
-            q_Z_cutoff,
-            np.linalg.norm(K_cutoff),
-            poloidal_flux_cutoff,
-            theta_m_cutoff,
-        )
-
-    # The beam solver outputs data at these values of tau
-    # Tell the solver which values of tau we want for the output
-    tau_points = np.linspace(0, tau_leave, len_tau)
-    # Remove the last point, probably does a good job of making sure that the new last point is inside the plasma
-    tau_points = np.delete(tau_points, -1).tolist()
-    ##
-
-    if len(tau_events[3]) == 0:
-        """
-        Only run this part if the beam does NOT reach a resonance
-        Adds an additional tau point at the cut-off (minimum K)
-
-        - Propagates another ray to find the cut-off location (minimum K)
-        - suffix _fine for variables in this section
-        - I guess I could've used 'dense_output' for the section above and got the information from there, and one day I'll go and see which method works better/faster
-        """
-        max_tau_idx = int(np.argmax(tau_ray[tau_ray <= tau_leave]))
-
-        K_magnitude_ray = (
-            (np.real(ray_parameters_2D[2, :max_tau_idx])) ** 2
-            + K_zeta_initial**2 / (np.real(ray_parameters_2D[0, :max_tau_idx])) ** 2
-            + (np.real(ray_parameters_2D[3, :max_tau_idx])) ** 2
-        ) ** (0.5)
-
-        index_cutoff_estimate = K_magnitude_ray.argmin()
-
-        ray_parameters_2D_initial_fine = ray_parameters_2D[
-            :, max(0, index_cutoff_estimate - 1)
-        ]
-        tau_start_fine = tau_ray[max(0, index_cutoff_estimate - 1)]
-        tau_end_fine = tau_ray[min(len(tau_ray) - 1, index_cutoff_estimate + 1)]
-        tau_points_fine = np.linspace(tau_start_fine, tau_end_fine, 1001)
-        # The max and min in the indices are to ensure that the index is not out of bounds
-
-        solver_start_time = time.time()
-
-        solver_ray_output_fine = integrate.solve_ivp(
-            ray_evolution_2D_fun,
-            [tau_start_fine, tau_end_fine],
-            ray_parameters_2D_initial_fine,
-            method="RK45",
-            t_eval=tau_points_fine,
-            dense_output=False,
-            events=event_leave_plasma,
-            vectorized=False,
-            args=solver_arguments,
-        )
-
-        solver_end_time = time.time()
-        print("Time taken (cut-off finder)", solver_end_time - solver_start_time, "s")
-
-        ray_parameters_2D_fine = solver_ray_output_fine.y
-        K_magnitude_ray_fine = (
-            (np.real(ray_parameters_2D_fine[2, :])) ** 2
-            + K_zeta_initial**2 / (np.real(ray_parameters_2D_fine[0, :])) ** 2
-            + (np.real(ray_parameters_2D_fine[3, :])) ** 2
-        ) ** (0.5)
-        index_cutoff_fine = K_magnitude_ray_fine.argmin()
-        tau_ray_fine = solver_ray_output_fine.t
-        tau_cutoff_fine = tau_ray_fine[index_cutoff_fine]
-
-        # I'm using a list because it makes the insertion of tau_cutoff_fine easier
-        # This function modifies tau_points via a side-effect
-        bisect.insort(tau_points, tau_cutoff_fine)
-        tau_points = np.array(tau_points)
-
-    """
-    - Propagates the beam
-    """
     solver_start_time = time.time()
 
     solver_beam_output = integrate.solve_ivp(
@@ -814,7 +474,7 @@ def beam_me_up(
         dense_output=False,
         events=None,
         vectorized=False,
-        args=solver_arguments,
+        args=(K_zeta_initial, hamiltonian),
         rtol=rtol,
         atol=atol,
     )
