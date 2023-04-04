@@ -758,3 +758,33 @@ def test_find_entry_point(
     )
 
     assert_allclose(entry_position, expected_entry, 1e-6, 1e-6)
+
+
+@pytest.mark.parametrize(
+    "generator",
+    [pytest.param(simple, id="simple")],
+)
+def test_quick_run(tmp_path, generator):
+    """Golden answer test to check basic functionality using circular
+    flux surfaces with quick_run=True"""
+
+    kwargs_dict = generator(tmp_path)
+    kwargs_dict["output_filename_suffix"] = "_Bpa0.10"
+    kwargs_dict["figure_flag"] = False
+    kwargs_dict["len_tau"] = 10
+    kwargs_dict["output_path"] = tmp_path
+    kwargs_dict["quick_run"] = True
+
+    q_R_cutoff_expected = 1.694
+    q_Z_cutoff_expected = -0.18097
+    K_norm_expected = 561.52
+    poloidal_flux_cutoff_expected = 0.53061
+    theta_m_cutoff_expected = 0.132552
+
+    cutoff = beam_me_up(**kwargs_dict)
+
+    assert np.isclose(cutoff.q_R, q_R_cutoff_expected)
+    assert np.isclose(cutoff.q_Z, q_Z_cutoff_expected)
+    assert np.isclose(cutoff.K_norm_min, K_norm_expected)
+    assert np.isclose(cutoff.poloidal_flux, poloidal_flux_cutoff_expected)
+    assert np.isclose(cutoff.theta_m, theta_m_cutoff_expected)

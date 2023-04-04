@@ -5,7 +5,8 @@ from scotty.fun_general import (
     find_Psi_3D_lab,
     find_Psi_3D_lab_Cartesian,
     make_array_3x3,
-    contract_special,
+    K_magnitude,
+    contract_special
 )
 
 import io
@@ -137,6 +138,7 @@ def test_make_array_3x3():
     npt.assert_array_equal(B, expected)
 
 
+
 def test_contract_special_vector_vector():
     vector1 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     vector2 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
@@ -171,3 +173,13 @@ def test_contract_special_vector_matrix():
     expected = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     result = contract_special(vector, matrix)
     npt.assert_array_equal(result, expected)
+
+
+def test_K_magnitude():
+    # Pythagorean quadruple (2, 10, 11, 15)
+    K_R = 2
+    K_zeta = 20
+    K_Z = 11
+    q_R = 2
+    expected_K = 15
+    assert K_magnitude(K_R, K_zeta, K_Z, q_R) == expected_K

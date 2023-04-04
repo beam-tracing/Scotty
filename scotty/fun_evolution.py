@@ -7,60 +7,24 @@ I've separated this from scotty.fun_general to prevent circular importing
 
 """
 
+from typing import Tuple
+
 import numpy as np
 
 from scotty.hamiltonian import Hamiltonian, hessians
-from scotty.typing import FloatArray
+from scotty.typing import FloatArray, ArrayLike
 
 
-# Functions (solver)
-# Defines the ray evolution function
-# Not necessary for what I want to do, but it does make life easier
-def ray_evolution_2D_fun(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
-    """
-    Parameters
-    ----------
-    tau : float
-        Parameter along the ray.
-    ray_parameters_2D : complex128
-        q_R, q_Z, K_R, K_Z
-    hamiltonian:
-        Hamiltonian object
+def pack_beam_parameters(
+    q_R: ArrayLike,
+    q_zeta: ArrayLike,
+    q_Z: ArrayLike,
+    K_R: ArrayLike,
+    K_Z: ArrayLike,
+    Psi: FloatArray,
+) -> FloatArray:
+    """Pack coordinates and Psi matrix into single flat array for"""
 
-    Returns
-    -------
-    d_beam_parameters_d_tau
-        d (beam_parameters) / d tau
-
-    Notes
-    -------
-
-    """
-
-    # Clean input up. Not necessary, but aids readability
-    q_R = ray_parameters_2D[0]
-    q_Z = ray_parameters_2D[1]
-    K_R = ray_parameters_2D[2]
-    K_Z = ray_parameters_2D[3]
-
-    # Find derivatives of H
-    dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z)
-
-    d_ray_parameters_2D_d_tau = np.zeros_like(ray_parameters_2D)
-
-    # d (q_R) / d tau
-    d_ray_parameters_2D_d_tau[0] = dH["dH_dKR"]
-    # d (q_Z) / d tau
-    d_ray_parameters_2D_d_tau[1] = dH["dH_dKZ"]
-    # d (K_R) / d tau
-    d_ray_parameters_2D_d_tau[2] = -dH["dH_dR"]
-    # d (K_Z) / d tau
-    d_ray_parameters_2D_d_tau[3] = -dH["dH_dZ"]
-
-    return d_ray_parameters_2D_d_tau
-
-
-def pack_beam_parameters(q_R, q_zeta, q_Z, K_R, K_Z, Psi):
     # This used to be complex, with a length of 11, but the solver
     # throws a warning saying that something is casted to real It
     # seems to be fine, bu
@@ -89,7 +53,13 @@ def pack_beam_parameters(q_R, q_zeta, q_Z, K_R, K_Z, Psi):
     return beam_parameters
 
 
-def unpack_beam_parameters(beam_parameters: FloatArray):
+def unpack_beam_parameters(
+    beam_parameters: FloatArray,
+) -> Tuple[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, FloatArray]:
+    """Unpack the flat solver state vector into separate coordinate
+    variables and Psi matrix
+
+    """
     q_R = beam_parameters[0, ...]
     q_zeta = beam_parameters[1, ...]
     q_Z = beam_parameters[2, ...]
