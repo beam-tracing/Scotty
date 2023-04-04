@@ -6,7 +6,7 @@ from scotty.fun_general import (
     find_Psi_3D_lab_Cartesian,
     make_array_3x3,
     K_magnitude,
-    contract_special
+    contract_special,
 )
 
 import io
@@ -136,7 +136,6 @@ def test_make_array_3x3():
 
     expected = np.array([[1, 2, 0], [3, 4, 0], [0, 0, 0]])
     npt.assert_array_equal(B, expected)
-
 
 
 def test_contract_special_vector_vector():
