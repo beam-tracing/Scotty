@@ -311,9 +311,6 @@ def beam_me_up(
     # Input data #
     # ------------------------------
 
-    # Checking input data
-    check_input(mode_flag)
-
     # Tidying up the input data
     launch_angular_frequency = freq_GHz_to_angular_frequency(launch_freq_GHz)
     wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
@@ -373,6 +370,9 @@ def beam_me_up(
         delta_K_zeta,
         delta_K_Z,
     )
+
+    # Checking input data
+    check_input(mode_flag, poloidal_flux_enter, launch_position, field)
 
     # -------------------
     # Launch parameters
