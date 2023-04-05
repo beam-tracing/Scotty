@@ -7,7 +7,7 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "Scotty"
+name = "scotty-beam-tracing"
 description = "Beam tracing for tokamak DBS diagnostics"
 requires-python = ">3.7"
 readme = "README.md"
