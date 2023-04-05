@@ -6,6 +6,9 @@
 
 from __future__ import annotations
 
+from .typing import FloatArray
+from .geometry import MagneticField
+
 
 def check_mode_flag(mode_flag: int) -> None:
     """Mode flag should be either -1 (X-mode) or 1 (O-mode)"""
@@ -16,5 +19,23 @@ def check_mode_flag(mode_flag: int) -> None:
         )
 
 
-def check_input(mode_flag: int) -> None:
+def check_launch_position(
+    poloidal_flux_enter: float, launch_position: FloatArray, field: MagneticField
+) -> None:
+    R, _, Z = launch_position
+    launch_psi = field.poloidal_flux(R, Z)
+
+    if launch_psi < poloidal_flux_enter:
+        raise ValueError(
+            f"Launch position (R={R:.4f}, Z={Z:.4f}, psi={launch_psi:.4f}) is inside plasma (psi={poloidal_flux_enter})"
+        )
+
+
+def check_input(
+    mode_flag: int,
+    poloidal_flux_enter: float,
+    launch_position: FloatArray,
+    field: MagneticField,
+) -> None:
     check_mode_flag(mode_flag)
+    check_launch_position(poloidal_flux_enter, launch_position, field)
