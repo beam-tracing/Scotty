@@ -8,13 +8,17 @@ from scotty.fun_general import (
     apply_continuous_BC,
     find_inverse_2D,
     find_K_lab_Cartesian,
-    find_q_lab_Cartesian,
     find_K_lab,
     angular_frequency_to_wavenumber,
 )
 from scotty.hamiltonian import Hamiltonian
 from scotty.typing import FloatArray
 from scotty.geometry import MagneticField
+from scotty.fun_general import (
+    cartesian_to_cylindrical,
+    cylindrical_to_cartesian,
+    toroidal_to_cartesian,
+)
 
 from typing import Union
 import warnings
@@ -220,7 +224,7 @@ def launch_beam(
     K_lab_launch = np.array([K_R_launch, K_zeta_launch, K_Z_launch])
     K_lab_Cartesian_launch = find_K_lab_Cartesian(K_lab_launch, launch_position)
     K_lab_Cartesian_entry = K_lab_Cartesian_launch
-    entry_position_Cartesian = find_q_lab_Cartesian(entry_position)
+    entry_position_Cartesian = cylindrical_to_cartesian(*entry_position)
     K_lab_entry = find_K_lab(K_lab_Cartesian_entry, entry_position_Cartesian)
 
     K_R_entry = K_lab_entry[0]  # K_R
@@ -351,18 +355,14 @@ def find_entry_point(
     # We parameterise beam in a line normal to the antenna up to
     # max_length, and we can be sure the beam will either hit the
     # plasma or miss it entirely.
-    X_step = max_length * np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
-    Y_step = max_length * np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
-    Z_step = max_length * np.sin(poloidal_launch_angle)
+    X_step, Y_step, Z_step = toroidal_to_cartesian(
+        max_length, poloidal_launch_angle, toroidal_launch_angle
+    )
     step_array = np.array((X_step, Y_step, Z_step))
 
     def beam_line(tau):
         """Parameterised line in beam direction"""
         return launch_position + tau * step_array
-
-    def cartesian_to_cylindrical(X, Y, Z):
-        """Cartesian to cylindrical coordinates"""
-        return np.sqrt(X**2 + Y**2), np.arctan2(Y, X), Z
 
     def poloidal_flux_boundary_along_line(tau):
         """Signed poloidal flux distance to plasma boundary"""

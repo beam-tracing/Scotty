@@ -12,8 +12,7 @@ from scipy import integrate as integrate
 from typing import TextIO, List, Any, Tuple
 from scotty.typing import ArrayLike, FloatArray
 
-from .typing import ArrayLike
-from typing import Optional, Union
+from typing import NamedTuple
 
 
 def read_floats_into_list_until(terminator: str, lines: TextIO) -> FloatArray:
@@ -1863,3 +1862,42 @@ def K_magnitude(
             = \sqrt{K_R^2 + (K_\zeta / q_R)^2 + K_Z^2}
     """
     return np.sqrt(K_R**2 + (K_zeta / q_R) ** 2 + K_Z**2)
+
+
+CartesianCoords = NamedTuple(
+    "CartesianCoords", (("X", ArrayLike), ("Y", ArrayLike), ("Z", ArrayLike))
+)
+CylindricalCoords = NamedTuple(
+    "CylindricalCoords", (("R", ArrayLike), ("phi", ArrayLike), ("Z", ArrayLike))
+)
+ToroidalCoords = NamedTuple(
+    "ToroidalCoords", (("R", ArrayLike), ("theta", ArrayLike), ("phi", ArrayLike))
+)
+
+
+def cartesian_to_cylindrical(
+    X: ArrayLike, Y: ArrayLike, Z: ArrayLike
+) -> CylindricalCoords:
+    """Convert Cartesian to cylindrical coordinates"""
+    return CylindricalCoords(np.sqrt(X**2 + Y**2), np.arctan2(Y, X), Z)
+
+
+def cylindrical_to_cartesian(
+    R: ArrayLike, phi: ArrayLike, Z: ArrayLike
+) -> CartesianCoords:
+    """Convert cylindrical to Cartesian coordinates"""
+    return R * np.cos(phi), R * np.sin(phi), Z
+
+
+def toroidal_to_cartesian(
+    rho: ArrayLike, theta: ArrayLike, phi: ArrayLike, R0: float = 0.0
+) -> CartesianCoords:
+    """Convert toroidal to Cartesian coordinates
+
+    Left-handed coordinate system?
+    """
+    return CartesianCoords(
+        (R0 + rho * np.cos(theta)) * np.cos(phi),
+        (R0 + rho * np.cos(theta)) * np.sin(phi),
+        rho * np.sin(theta),
+    )
