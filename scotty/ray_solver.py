@@ -111,7 +111,7 @@ def make_solver_events(
         )
 
         # goes from positive (True) to negative(False) when leaving the simulation region
-        return is_inside
+        return +1 if is_inside else -1
 
     @_event(terminal=True, direction=0.0)
     def event_cross_resonance(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
