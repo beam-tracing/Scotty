@@ -484,5 +484,5 @@ class outplot(object):
             plt.xlabel("l - l_c")
         
         else: 
-            raise ValueError('Plot option must be 0 (generate all plots) or 1-15')
+            raise ValueError('Plot option must be 0 (generate all plots) or integer from 1-15')
     
