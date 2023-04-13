@@ -708,38 +708,37 @@ def find_K_plasma(
     
     return K_p_R, K_p_zeta, K_p_Z
     
+
 def find_Psi_3D_plasma2(
     Psi_vacuum_3D,
-    K_v_R, K_v_zeta, K_v_Z,
-    dH_dKR, # In the plasma
-    dH_dKzeta, # In the plasma
-    dH_dKZ, # In the plasma
-    dH_dR, # In the plasma
-    dH_dZ, # In the plasma
-    electron_density, # In the plasma
-    B_R, # Continuous (but give value in the plasma if not)
-    B_T, # Continuous (but give value in the plasma if not)
-    B_Z, # Continuous (but give value in the plasma if not)
-    q_R, # Continuous
-    mode_flag, # Continuous
-    launch_angular_frequency, # Continuous
-    dpolflux_dR, # Continuous
-    dpolflux_dZ, # Continuous
+    K_v_R,
+    K_v_zeta,
+    K_v_Z,
+    dH_dKR,  # In the plasma
+    dH_dKzeta,  # In the plasma
+    dH_dKZ,  # In the plasma
+    dH_dR,  # In the plasma
+    dH_dZ,  # In the plasma
+    electron_density,  # In the plasma
+    B_R,  # Continuous (but give value in the plasma if not)
+    B_T,  # Continuous (but give value in the plasma if not)
+    B_Z,  # Continuous (but give value in the plasma if not)
+    q_R,  # Continuous
+    mode_flag,  # Continuous
+    launch_angular_frequency,  # Continuous
+    dpolflux_dR,  # Continuous
+    dpolflux_dZ,  # Continuous
 ):
     ## Work in progress
-    
+
     ## Get components of the Booker quartic
     B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
-    K_mag = np.sqrt(K_v_R**2 + (K_v_zeta / q_R)**2 + K_v_Z**2)
-    sin_theta_m_vac = (
-        B_R * K_v_R
-        + B_T * K_v_zeta / q_R
-        + B_Z * K_v_Z
-    ) / (
+    K_mag = np.sqrt(K_v_R**2 + (K_v_zeta / q_R) ** 2 + K_v_Z**2)
+    sin_theta_m_vac = (B_R * K_v_R + B_T * K_v_zeta / q_R + B_Z * K_v_Z) / (
         B_Total * K_mag
     )  # B \cdot K / (abs (B) abs(K))
     sin_theta_m_sq = sin_theta_m_vac**2
-        
+
     Booker_alpha = find_Booker_alpha(
         electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency
     )
@@ -749,38 +748,40 @@ def find_Psi_3D_plasma2(
     Booker_gamma = find_Booker_gamma(
         electron_density, B_Total, launch_angular_frequency
     )
-    
+
     ## Calculate wavevector in plasma
     K_p_zeta = K_v_zeta
-    
-    K_v_pol = -K_v_R*dpolflux_dZ + K_v_Z*dpolflux_dR
+
+    K_v_pol = -K_v_R * dpolflux_dZ + K_v_Z * dpolflux_dR
     K_p_pol = K_v_pol
-    
+
     ## This only works if the mismatch angle is continuous. It is not
     ## I need to implement an iterative solver for this
-    K_p_rad = - np.sqrt(abs(
-        K_mag**2 * (
-            - Booker_beta
-            - mode_flag*np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma) / (2*Booker_alpha)
+    K_p_rad = -np.sqrt(
+        abs(
+            K_mag**2
+            * (
+                -Booker_beta
+                - mode_flag
+                * np.sqrt(Booker_beta**2 - 4 * Booker_alpha * Booker_gamma)
+                / (2 * Booker_alpha)
             )
-        - (K_p_zeta/q_R)**2
-        - K_p_pol**2
-        ))
-    
+            - (K_p_zeta / q_R) ** 2
+            - K_p_pol**2
+        )
+    )
+
     [
         K_p_R,
         K_p_Z,
     ] = np.matmul(
-        np.linalg.inv([
-            [-dpolflux_dZ, dpolflux_dR],
-            [ dpolflux_dR, dpolflux_dZ]
-            ]),
+        np.linalg.inv([[-dpolflux_dZ, dpolflux_dR], [dpolflux_dR, dpolflux_dZ]]),
         [
             K_p_pol,
             K_p_rad,
         ],
     )
-    
+
     # When beam is entering plasma from vacuum
     Psi_v_R_R = Psi_vacuum_3D[0, 0]
     Psi_v_zeta_zeta = Psi_vacuum_3D[1, 1]
@@ -824,7 +825,10 @@ def find_Psi_3D_plasma2(
             Psi_v_R_R * dpolflux_dZ**2
             - 2 * Psi_v_R_Z * dpolflux_dR * dpolflux_dZ
             + Psi_v_Z_Z * dpolflux_dR**2,
-            -Psi_v_R_zeta * dpolflux_dZ + Psi_v_zeta_Z * dpolflux_dR + 2*(K_v_R-K_p_R)*dpolflux_dR*eta + 2*(K_v_Z-K_p_Z)*dpolflux_dZ*eta,
+            -Psi_v_R_zeta * dpolflux_dZ
+            + Psi_v_zeta_Z * dpolflux_dR
+            + 2 * (K_v_R - K_p_R) * dpolflux_dR * eta
+            + 2 * (K_v_Z - K_p_Z) * dpolflux_dZ * eta,
             -dH_dR,
             -dH_dZ,
             0,
@@ -843,6 +847,7 @@ def find_Psi_3D_plasma2(
     Psi_3D_plasma[2, 1] = Psi_3D_plasma[1, 2]
 
     return Psi_3D_plasma
+
 
 # -----------------
 
@@ -1205,12 +1210,11 @@ def propagate_beam(Psi_w_initial_cartesian, propagation_distance, freq_GHz):
     return Psi_w_final_cartesian
 
 
-def find_widths_and_curvatures(Psi_xx, Psi_xy, Psi_yy, 
-                               K_magnitude, theta_m, theta):
+def find_widths_and_curvatures(Psi_xx, Psi_xy, Psi_yy, K_magnitude, theta_m, theta):
     """
     Calculates beam widths and curvatures from components of Psi_w
-    
-    Equations (15) and (16) of VH Hall-Chen et al., PPCF (2022) https://doi.org/10.1088/1361-6587/ac57a1 
+
+    Equations (15) and (16) of VH Hall-Chen et al., PPCF (2022) https://doi.org/10.1088/1361-6587/ac57a1
 
     Parameters
     ----------
@@ -1226,7 +1230,7 @@ def find_widths_and_curvatures(Psi_xx, Psi_xy, Psi_yy,
         Mismatch angle, in radians. Equation (109) of the above paper
     theta : TYPE
         Equation (107) of the above paper.
-        
+
     Returns
     -------
     widths : TYPE
@@ -1248,7 +1252,7 @@ def find_widths_and_curvatures(Psi_xx, Psi_xy, Psi_yy,
 
     widths = np.sqrt(2 / Psi_w_imag_eigvals)
     # curvature = 1/radius_of_curvature
-    curvatures = Psi_w_real_eigvals / K_magnitude * (np.cos(theta_m+theta))**2
+    curvatures = Psi_w_real_eigvals / K_magnitude * (np.cos(theta_m + theta)) ** 2
 
     return widths, Psi_w_imag_eigvecs, curvatures, Psi_w_real_eigvecs
 
