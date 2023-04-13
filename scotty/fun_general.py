@@ -641,29 +641,29 @@ def find_Psi_3D_plasma(
 
     return Psi_3D_plasma
 
-def find_K_plasma(
-        q_R,
-        K_v_R, K_v_zeta, K_v_Z,
-        launch_angular_frequency,
-        mode_flag,
-        B_R,B_T,B_Z,
-        electron_density_p, # in the plasma
-        dpolflux_dR,
-        dpolflux_dZ,
-        ):
 
+def find_K_plasma(
+    q_R,
+    K_v_R,
+    K_v_zeta,
+    K_v_Z,
+    launch_angular_frequency,
+    mode_flag,
+    B_R,
+    B_T,
+    B_Z,
+    electron_density_p,  # in the plasma
+    dpolflux_dR,
+    dpolflux_dZ,
+):
     ## Get components of the Booker quartic
     B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
-    K_mag = np.sqrt(K_v_R**2 + (K_v_zeta / q_R)**2 + K_v_Z**2)
-    sin_theta_m_vac = (
-        B_R * K_v_R
-        + B_T * K_v_zeta / q_R
-        + B_Z * K_v_Z
-    ) / (
+    K_mag = np.sqrt(K_v_R**2 + (K_v_zeta / q_R) ** 2 + K_v_Z**2)
+    sin_theta_m_vac = (B_R * K_v_R + B_T * K_v_zeta / q_R + B_Z * K_v_Z) / (
         B_Total * K_mag
     )  # B \cdot K / (abs (B) abs(K))
     sin_theta_m_sq = sin_theta_m_vac**2
-        
+
     Booker_alpha = find_Booker_alpha(
         electron_density_p, B_Total, sin_theta_m_sq, launch_angular_frequency
     )
@@ -673,41 +673,43 @@ def find_K_plasma(
     Booker_gamma = find_Booker_gamma(
         electron_density_p, B_Total, launch_angular_frequency
     )
-    
+
     ## Calculate wavevector in plasma
     K_p_zeta = K_v_zeta
-    
-    K_v_pol = -K_v_R*dpolflux_dZ + K_v_Z*dpolflux_dR
+
+    K_v_pol = -K_v_R * dpolflux_dZ + K_v_Z * dpolflux_dR
     K_p_pol = K_v_pol
 
-    ## TODO    
+    ## TODO
     ## This only works if the mismatch angle is continuous. It is not
     ## I need to implement an iterative solver for this
-    K_p_rad = - np.sqrt(abs(
-        K_mag**2 * (
-            - Booker_beta
-            - mode_flag*np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma) / (2*Booker_alpha)
+    K_p_rad = -np.sqrt(
+        abs(
+            K_mag**2
+            * (
+                -Booker_beta
+                - mode_flag
+                * np.sqrt(Booker_beta**2 - 4 * Booker_alpha * Booker_gamma)
+                / (2 * Booker_alpha)
             )
-        - (K_p_zeta/q_R)**2
-        - K_p_pol**2
-        ))
-    
+            - (K_p_zeta / q_R) ** 2
+            - K_p_pol**2
+        )
+    )
+
     [
         K_p_R,
         K_p_Z,
     ] = np.matmul(
-        np.linalg.inv([
-            [-dpolflux_dZ, dpolflux_dR],
-            [ dpolflux_dR, dpolflux_dZ]
-            ]),
+        np.linalg.inv([[-dpolflux_dZ, dpolflux_dR], [dpolflux_dR, dpolflux_dZ]]),
         [
             K_p_pol,
             K_p_rad,
         ],
-    )    
-    
+    )
+
     return K_p_R, K_p_zeta, K_p_Z
-    
+
 
 def find_Psi_3D_plasma2(
     Psi_vacuum_3D,
