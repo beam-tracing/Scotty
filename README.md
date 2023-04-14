@@ -1,43 +1,37 @@
-Scotty
-======
+# Hello there! 👋 Welcome to Scotty!
 
-Beam tracing for tokamak DBS diagnostics
+# 🌌 Scotty
 
+Scotty is a Python package for beam tracing in tokamak Doppler backscattering (DBS) diagnostics. It provides a set of tools for simulating and analyzing DBS signals in tokamak plasmas.
 
-Install
--------
+## 🚀 Installation
 
-Scotty can be installed using `pip`:
+Scotty can be installed using pip:
 
-```
-pip install scotty-beam-tracing
-```
+`pip install scotty-beam-tracing`
 
-Note that the package to install is called `scotty-beam-tracing`, but
-the python module is just `scotty`.
+Note that the package to install is called `scotty-beam-tracing`, but the Python module is just `scotty`.
 
-To install the development version of `scotty` straight from Github:
+To install the development version of `scotty` straight from GitHub:
 
-```
-pip install git+https://github.com/beam-tracing/Scotty
-```
+`pip install git+https://github.com/beam-tracing/Scotty`
 
 or from a local clone:
 
-```
-pip install .
-```
+`pip install .`
 
-Documentation
--------
-https://scotty.readthedocs.io/
+## 📖 Usage
 
-Background
--------
-Description of the Scotty [[1]](#1), derivation of beam tracing given in Appendix A.
+To use Scotty, you first need to import the `scotty` module:
 
-## References
-<a id="1">[1]</a> 
-Hall-Chen, V. H., Parra, F. I., & Hillesheim, J. C. (2022). 
-[Beam model of Doppler backscattering](https://iopscience.iop.org/article/10.1088/1361-6587/ac57a1). 
-*Plasma Physics and Controlled Fusion*, **64**(9), 095002.
+`import scotty`
+
+Then you can use its functions to simulate DBS signals.
+
+For more information on how to use Scotty, see the 📚 [documentation:](https://scotty.readthedocs.io/)
+
+## 📄 License
+
+Scotty is licensed under the MIT License. See the [LICENSE.md](https://github.com/beam-tracing/Scotty/blob/master/LICENSE.md) file for more information.
+
+Made with ❤️ and ☕️ by the Scotty team.
