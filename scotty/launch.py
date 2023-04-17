@@ -13,6 +13,9 @@ from scotty.fun_general import (
     find_K_lab,
     find_d_poloidal_flux_dR,
     find_d_poloidal_flux_dZ,
+    find_d2_poloidal_flux_dR2,
+    find_d2_poloidal_flux_dZ2,
+    find_d2_poloidal_flux_dRdZ,
     angular_frequency_to_wavenumber,
 )
 from scotty.hamiltonian import Hamiltonian
@@ -223,31 +226,58 @@ def launch_beam(
     # -------------------
     initial_position = entry_position
     if Psi_BC_flag2:  # Use new BCs (WIP)
+        print('test')
+        d_poloidal_flux_dR_boundary = find_d_poloidal_flux_dR(
+            initial_position[0],
+            initial_position[2],
+            delta_R,
+            field.poloidal_flux,
+        )
+        d_poloidal_flux_dZ_boundary = find_d_poloidal_flux_dZ(
+            initial_position[0],
+            initial_position[2],
+            delta_Z,
+            field.poloidal_flux,
+        )
+        d2_poloidal_flux_dR2_boundary = find_d2_poloidal_flux_dR2(
+            initial_position[0],
+            initial_position[2],
+            delta_R,
+            field.poloidal_flux,
+        )
+        d2_poloidal_flux_dZ2_boundary = find_d2_poloidal_flux_dZ2(
+            initial_position[0],
+            initial_position[2],
+            delta_Z,
+            field.poloidal_flux,
+        )
+        d2_poloidal_flux_dRdZ_boundary = find_d2_poloidal_flux_dRdZ(
+            initial_position[0],
+            initial_position[2],
+            delta_R,
+            delta_Z,
+            field.poloidal_flux,
+        )
+
         poloidal_flux_boundary = field.poloidal_flux(initial_position[0],initial_position[1])
-        d_poloidal_flux_d_R_boundary = find_d_poloidal_flux_dR(
-            initial_position[0],
-            initial_position[2],
-            delta_R,
-            field.poloidal_flux,
-        )
-        d_poloidal_flux_d_Z_boundary = find_d_poloidal_flux_dZ(
-            initial_position[0],
-            initial_position[2],
-            delta_R,
-            field.poloidal_flux,
-        )
-        
         K_R_initial, K_zeta_initial, K_Z_initial = find_K_plasma(
             initial_position[0], ## q_R
             K_R_entry, K_zeta_entry, K_Z_entry,
             launch_angular_frequency,
             mode_flag,
-            field.B_R,field.B_T,field.B_Z,
-            Hamiltonian.density(poloidal_flux_boundary), # in the plasma
-            d_poloidal_flux_d_R_boundary,
-            d_poloidal_flux_d_Z_boundary,
+            field.B_R(initial_position[0],initial_position[2]),
+            field.B_T(initial_position[0],initial_position[2]),
+            field.B_Z(initial_position[0],initial_position[2]),
+            hamiltonian.density(poloidal_flux_boundary), # in the plasma
+            d_poloidal_flux_dR_boundary,
+            d_poloidal_flux_dZ_boundary,
             )
-    
+        
+        print('K_R', K_R_entry, K_R_initial)
+        print('K_zeta', K_zeta_entry, K_zeta_initial)
+        print('K_Z', K_Z_entry, K_Z_initial)
+
+        
         dH = hamiltonian.derivatives(
             initial_position[0],
             initial_position[2],
@@ -263,16 +293,27 @@ def launch_beam(
         dH_dKZ_initial = dH["dH_dKZ"]
 
 
-        Psi_3D_lab_initial = find_Psi_3D_plasma(
+        Psi_3D_lab_initial = find_Psi_3D_plasma2(
             Psi_3D_lab_entry,
+            K_R_entry,
+            K_zeta_entry,
+            K_Z_entry,            
+            K_R_initial,
+            K_zeta_initial,
+            K_Z_initial,
             dH_dKR_initial,
             dH_dKzeta_initial,
             dH_dKZ_initial,
             dH_dR_initial,
             dH_dZ_initial,
-            d_poloidal_flux_d_R_boundary,
-            d_poloidal_flux_d_Z_boundary,
+            d_poloidal_flux_dR_boundary,
+            d_poloidal_flux_dZ_boundary,
+            d2_poloidal_flux_dR2_boundary,
+            d2_poloidal_flux_dZ2_boundary,
+            d2_poloidal_flux_dRdZ_boundary,
         )    
+        
+
     elif Psi_BC_flag:  # Use BCs
         K_R_initial = K_R_entry
         K_zeta_initial = K_zeta_entry
@@ -300,7 +341,7 @@ def launch_beam(
         d_poloidal_flux_d_Z_boundary = find_d_poloidal_flux_dZ(
             initial_position[0],
             initial_position[2],
-            delta_R,
+            delta_Z,
             field.poloidal_flux,
         )
 

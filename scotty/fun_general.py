@@ -546,26 +546,112 @@ def find_H_numba(
 
 # Functions (interface)
 # For going from vacuum to plasma (Will one day implement going from plasma to vacuum)
-def find_d_poloidal_flux_dR(q_R, q_Z, delta_R, interp_poloidal_flux):
-    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
-    poloidal_flux_1 = interp_poloidal_flux(q_R + delta_R, q_Z)
-    poloidal_flux_2 = interp_poloidal_flux(q_R + 2 * delta_R, q_Z)
-    d_poloidal_flux_dR = (
-        (-3 / 2) * poloidal_flux_0 + (2) * poloidal_flux_1 + (-1 / 2) * poloidal_flux_2
-    ) / (delta_R)
+def find_d_poloidal_flux_dR(q_R, q_Z, delta_R, interp_poloidal_flux,
+                            method='CFD4'):
+    """
+    If poloidal flux is continuous at the boundary, use CFD.
+    If discontinuous, use FFD
+    """
+    if method == 'FFD':
+        poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
+        poloidal_flux_1 = interp_poloidal_flux(q_R + delta_R, q_Z)
+        poloidal_flux_2 = interp_poloidal_flux(q_R + 2 * delta_R, q_Z)
+        d_poloidal_flux_dR = (
+            (-3 / 2) * poloidal_flux_0 + (2) * poloidal_flux_1 + (-1 / 2) * poloidal_flux_2
+        ) / (delta_R)
+    elif method == 'CFD':
+        ## Accurate to second order
+        poloidal_flux_p = interp_poloidal_flux(q_R + delta_R, q_Z)
+        poloidal_flux_m = interp_poloidal_flux(q_R - delta_R, q_Z)
+        d_poloidal_flux_dR = (
+            poloidal_flux_p - poloidal_flux_m
+        ) / (2*delta_R)
+    elif method == 'CFD4':
+        ## Accurate to fourth order
+        poloidal_flux_p2 = interp_poloidal_flux(q_R + 2*delta_R, q_Z)
+        poloidal_flux_p1 = interp_poloidal_flux(q_R + delta_R, q_Z)
+        poloidal_flux_m1 = interp_poloidal_flux(q_R - delta_R, q_Z)
+        poloidal_flux_m2 = interp_poloidal_flux(q_R - 2*delta_R, q_Z)
+        d_poloidal_flux_dR = (
+            - (1/12) * poloidal_flux_p2
+            + (2/3) * poloidal_flux_p1
+            - (2/3) * poloidal_flux_m1
+            + (1/12) * poloidal_flux_m2
+        ) / (delta_R)
+    else:
+        print('Invalid finite difference method for find_d_poloidal_flux_dR')
 
     return d_poloidal_flux_dR
 
 
-def find_d_poloidal_flux_dZ(q_R, q_Z, delta_Z, interp_poloidal_flux):
-    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
-    poloidal_flux_1 = interp_poloidal_flux(q_R, q_Z + delta_Z)
-    poloidal_flux_2 = interp_poloidal_flux(q_R, q_Z + 2 * delta_Z)
-    d_poloidal_flux_dZ = (
-        (-3 / 2) * poloidal_flux_0 + (2) * poloidal_flux_1 + (-1 / 2) * poloidal_flux_2
-    ) / (delta_Z)
-
+def find_d_poloidal_flux_dZ(q_R, q_Z, delta_Z, interp_poloidal_flux,
+                            method='CFD4'):
+    """
+    If poloidal flux is continuous at the boundary, use CFD.
+    If discontinuous, use FFD
+    """
+    if method == 'FFD':
+        poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
+        poloidal_flux_1 = interp_poloidal_flux(q_R, q_Z + delta_Z)
+        poloidal_flux_2 = interp_poloidal_flux(q_R, q_Z + 2 * delta_Z)
+        d_poloidal_flux_dZ = (
+            (-3 / 2) * poloidal_flux_0 + (2) * poloidal_flux_1 + (-1 / 2) * poloidal_flux_2
+        ) / (delta_Z)
+    elif method == 'CFD':
+        ## Accurate to second order
+        poloidal_flux_p = interp_poloidal_flux(q_R, q_Z + delta_Z)
+        poloidal_flux_m = interp_poloidal_flux(q_R, q_Z - delta_Z)
+        d_poloidal_flux_dZ = (
+            poloidal_flux_p - poloidal_flux_m
+        ) / (2*delta_Z)
+    elif method == 'CFD4':
+        ## Accurate to fourth order
+        poloidal_flux_p2 = interp_poloidal_flux(q_R, q_Z + 2* delta_Z)
+        poloidal_flux_p1 = interp_poloidal_flux(q_R, q_Z + delta_Z)
+        poloidal_flux_m1 = interp_poloidal_flux(q_R, q_Z - delta_Z)
+        poloidal_flux_m2 = interp_poloidal_flux(q_R, q_Z - 2* delta_Z)
+        d_poloidal_flux_dZ = (
+            - (1/12) * poloidal_flux_p2
+            + (2/3) * poloidal_flux_p1
+            - (2/3) * poloidal_flux_m1
+            + (1/12) * poloidal_flux_m2
+        ) / (delta_Z)
+    else:
+        print('Invalid finite difference method for find_d_poloidal_flux_dZ')
+        
     return d_poloidal_flux_dZ
+
+
+def find_d2_poloidal_flux_dR2(q_R, q_Z, delta_R, interp_poloidal_flux):  
+    poloidal_flux_p = interp_poloidal_flux(q_R + delta_R, q_Z)
+    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
+    poloidal_flux_m = interp_poloidal_flux(q_R - delta_R, q_Z)
+    d2_poloidal_flux_dR2 = (
+        poloidal_flux_p - 2*poloidal_flux_0 + poloidal_flux_m
+    ) / (delta_R**2)
+
+    return d2_poloidal_flux_dR2
+
+def find_d2_poloidal_flux_dZ2(q_R, q_Z, delta_Z, interp_poloidal_flux):  
+    poloidal_flux_p = interp_poloidal_flux(q_R, q_Z + delta_Z)
+    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
+    poloidal_flux_m = interp_poloidal_flux(q_R, q_Z - delta_Z)
+    d2_poloidal_flux_dZ2 = (
+        poloidal_flux_p - 2*poloidal_flux_0 + poloidal_flux_m
+    ) / (delta_Z**2)
+
+    return d2_poloidal_flux_dZ2
+
+def find_d2_poloidal_flux_dRdZ(q_R, q_Z, delta_R, delta_Z, interp_poloidal_flux):  
+    poloidal_flux_pR_pZ = interp_poloidal_flux(q_R + delta_R, q_Z + delta_Z)
+    poloidal_flux_mR_pZ = interp_poloidal_flux(q_R - delta_R, q_Z + delta_Z)
+    poloidal_flux_pR_mZ = interp_poloidal_flux(q_R + delta_R, q_Z - delta_Z)
+    poloidal_flux_mR_mZ = interp_poloidal_flux(q_R - delta_R, q_Z - delta_Z)
+    d2_poloidal_flux_dRdZ = (
+        poloidal_flux_pR_pZ - poloidal_flux_mR_pZ - poloidal_flux_pR_mZ + poloidal_flux_mR_mZ
+    ) / (4*delta_R * delta_Z)
+
+    return d2_poloidal_flux_dRdZ
 
 
 def find_Psi_3D_plasma(
@@ -651,16 +737,18 @@ def find_K_plasma(
         dpolflux_dR,
         dpolflux_dZ,
         ):
+    print('version 8')
+    print('dpolflux_dR', dpolflux_dR, 'dpolflux_dZ',dpolflux_dZ)
 
     ## Get components of the Booker quartic
     B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
-    K_mag = np.sqrt(K_v_R**2 + (K_v_zeta / q_R)**2 + K_v_Z**2)
+    K_v_mag = np.sqrt(K_v_R**2 + (K_v_zeta / q_R)**2 + K_v_Z**2)
     sin_theta_m_vac = (
         B_R * K_v_R
         + B_T * K_v_zeta / q_R
         + B_Z * K_v_Z
     ) / (
-        B_Total * K_mag
+        B_Total * K_v_mag
     )  # B \cdot K / (abs (B) abs(K))
     sin_theta_m_sq = sin_theta_m_vac**2
         
@@ -677,17 +765,17 @@ def find_K_plasma(
     ## Calculate wavevector in plasma
     K_p_zeta = K_v_zeta
     
-    K_v_pol = -K_v_R*dpolflux_dZ + K_v_Z*dpolflux_dR
+    K_v_pol = (-K_v_R*dpolflux_dZ + K_v_Z*dpolflux_dR) / np.sqrt(dpolflux_dR**2 + dpolflux_dZ**2)
     K_p_pol = K_v_pol
 
     ## TODO    
     ## This only works if the mismatch angle is continuous. It is not
     ## I need to implement an iterative solver for this
     K_p_rad = - np.sqrt(abs(
-        K_mag**2 * (
+        K_v_mag**2 * (
             - Booker_beta
-            - mode_flag*np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma) / (2*Booker_alpha)
-            )
+            + mode_flag*np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma) 
+            ) / (2*Booker_alpha)
         - (K_p_zeta/q_R)**2
         - K_p_pol**2
         ))
@@ -699,13 +787,24 @@ def find_K_plasma(
         np.linalg.inv([
             [-dpolflux_dZ, dpolflux_dR],
             [ dpolflux_dR, dpolflux_dZ]
-            ]),
+            ]) * np.sqrt(dpolflux_dR**2 + dpolflux_dZ**2),
         [
             K_p_pol,
             K_p_rad,
         ],
     )    
     
+    ## For checking
+    H = (K_p_R**2 + (K_p_zeta / q_R)**2 + K_p_Z**2)/(K_v_mag)**2 - ((
+            - Booker_beta
+            + mode_flag*np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma) 
+            ) / (2*Booker_alpha)        
+        )
+        
+    print('H',H)
+    print('K_v_pol',K_v_pol,'K_p_pol',K_p_pol)
+    print('K_v_rad',np.sqrt(K_v_mag**2-(K_v_zeta / q_R)**2-K_v_pol**2),'K_p_rad',K_p_rad)
+        
     return K_p_R, K_p_zeta, K_p_Z
     
 
@@ -714,74 +813,28 @@ def find_Psi_3D_plasma2(
     K_v_R,
     K_v_zeta,
     K_v_Z,
+    K_p_R,
+    K_p_zeta,
+    K_p_Z,
     dH_dKR,  # In the plasma
     dH_dKzeta,  # In the plasma
     dH_dKZ,  # In the plasma
     dH_dR,  # In the plasma
     dH_dZ,  # In the plasma
-    electron_density,  # In the plasma
-    B_R,  # Continuous (but give value in the plasma if not)
-    B_T,  # Continuous (but give value in the plasma if not)
-    B_Z,  # Continuous (but give value in the plasma if not)
-    q_R,  # Continuous
-    mode_flag,  # Continuous
-    launch_angular_frequency,  # Continuous
     dpolflux_dR,  # Continuous
     dpolflux_dZ,  # Continuous
+    d2polflux_dR2,  # Continuous
+    d2polflux_dZ2,  # Continuous
+    d2polflux_dRdZ,  # Continuous
 ):
     ## Work in progress
 
-    ## Get components of the Booker quartic
-    B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
-    K_mag = np.sqrt(K_v_R**2 + (K_v_zeta / q_R) ** 2 + K_v_Z**2)
-    sin_theta_m_vac = (B_R * K_v_R + B_T * K_v_zeta / q_R + B_Z * K_v_Z) / (
-        B_Total * K_mag
-    )  # B \cdot K / (abs (B) abs(K))
-    sin_theta_m_sq = sin_theta_m_vac**2
-
-    Booker_alpha = find_Booker_alpha(
-        electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency
-    )
-    Booker_beta = find_Booker_beta(
-        electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency
-    )
-    Booker_gamma = find_Booker_gamma(
-        electron_density, B_Total, launch_angular_frequency
-    )
-
-    ## Calculate wavevector in plasma
-    K_p_zeta = K_v_zeta
-
-    K_v_pol = -K_v_R * dpolflux_dZ + K_v_Z * dpolflux_dR
-    K_p_pol = K_v_pol
-
-    ## This only works if the mismatch angle is continuous. It is not
-    ## I need to implement an iterative solver for this
-    K_p_rad = -np.sqrt(
-        abs(
-            K_mag**2
-            * (
-                -Booker_beta
-                - mode_flag
-                * np.sqrt(Booker_beta**2 - 4 * Booker_alpha * Booker_gamma)
-                / (2 * Booker_alpha)
-            )
-            - (K_p_zeta / q_R) ** 2
-            - K_p_pol**2
-        )
-    )
-
-    [
-        K_p_R,
-        K_p_Z,
-    ] = np.matmul(
-        np.linalg.inv([[-dpolflux_dZ, dpolflux_dR], [dpolflux_dR, dpolflux_dZ]]),
-        [
-            K_p_pol,
-            K_p_rad,
-        ],
-    )
-
+    eta = -0.5*(
+        d2polflux_dR2 * dpolflux_dZ**2
+        + 2*d2polflux_dRdZ*dpolflux_dR*dpolflux_dZ
+        + d2polflux_dZ2 * dpolflux_dR**2
+        ) / (dpolflux_dR**2 + dpolflux_dZ**2)
+    
     # When beam is entering plasma from vacuum
     Psi_v_R_R = Psi_vacuum_3D[0, 0]
     Psi_v_zeta_zeta = Psi_vacuum_3D[1, 1]
@@ -1063,7 +1116,6 @@ def find_ST_terms(
         g_magnitude_Cardano / g_magnitude_output
     )  # d tau_Booker / d tau_Cardano
 
-    cutoff_idx = np.argmin(K_magnitude_array)
     theta_m_min_idx = np.argmin(abs(theta_m_output))
     # delta_kperp1_ST = k_perp_1_bs - k_perp_1_bs[theta_m_min_idx]
 
