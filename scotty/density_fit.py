@@ -36,7 +36,7 @@ class DensityFit:
     def __call__(self, poloidal_flux: ArrayLike) -> ArrayLike:
         """Returns the interpolated density at ``poloidal_flux`` points."""
         tol = 1e-10
-        
+
         poloidal_flux = np.asfarray(poloidal_flux)
         density = np.asfarray(self._fit_impl(poloidal_flux))
         # Mask density inside plasma

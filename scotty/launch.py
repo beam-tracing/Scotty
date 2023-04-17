@@ -5,7 +5,7 @@ from scotty.fun_general import (
     make_array_3x3,
     find_Psi_3D_lab,
     find_Psi_3D_plasma,
-    find_Psi_3D_plasma2, ## Work-in-progress
+    find_Psi_3D_plasma2,  ## Work-in-progress
     find_K_plasma,
     find_inverse_2D,
     find_K_lab_Cartesian,
@@ -41,7 +41,7 @@ def launch_beam(
     vacuumLaunch_flag: bool = True,
     vacuum_propagation_flag: bool = True,
     Psi_BC_flag: bool = True,
-    Psi_BC_flag2: bool = True, ## Work in progress, tidy up later
+    Psi_BC_flag2: bool = True,  ## Work in progress, tidy up later
     poloidal_flux_enter: float = 1.0,
     delta_R: float = -1e-4,
     delta_Z: float = 1e-4,
@@ -226,7 +226,7 @@ def launch_beam(
     # -------------------
     initial_position = entry_position
     if Psi_BC_flag2:  # Use new BCs (WIP)
-        print('test')
+        print("test")
         d_poloidal_flux_dR_boundary = find_d_poloidal_flux_dR(
             initial_position[0],
             initial_position[2],
@@ -259,25 +259,28 @@ def launch_beam(
             field.poloidal_flux,
         )
 
-        poloidal_flux_boundary = field.poloidal_flux(initial_position[0],initial_position[1])
+        poloidal_flux_boundary = field.poloidal_flux(
+            initial_position[0], initial_position[1]
+        )
         K_R_initial, K_zeta_initial, K_Z_initial = find_K_plasma(
-            initial_position[0], ## q_R
-            K_R_entry, K_zeta_entry, K_Z_entry,
+            initial_position[0],  ## q_R
+            K_R_entry,
+            K_zeta_entry,
+            K_Z_entry,
             launch_angular_frequency,
             mode_flag,
-            field.B_R(initial_position[0],initial_position[2]),
-            field.B_T(initial_position[0],initial_position[2]),
-            field.B_Z(initial_position[0],initial_position[2]),
-            hamiltonian.density(poloidal_flux_boundary), # in the plasma
+            field.B_R(initial_position[0], initial_position[2]),
+            field.B_T(initial_position[0], initial_position[2]),
+            field.B_Z(initial_position[0], initial_position[2]),
+            hamiltonian.density(poloidal_flux_boundary),  # in the plasma
             d_poloidal_flux_dR_boundary,
             d_poloidal_flux_dZ_boundary,
-            )
-        
-        print('K_R', K_R_entry, K_R_initial)
-        print('K_zeta', K_zeta_entry, K_zeta_initial)
-        print('K_Z', K_Z_entry, K_Z_initial)
+        )
 
-        
+        print("K_R", K_R_entry, K_R_initial)
+        print("K_zeta", K_zeta_entry, K_zeta_initial)
+        print("K_Z", K_Z_entry, K_Z_initial)
+
         dH = hamiltonian.derivatives(
             initial_position[0],
             initial_position[2],
@@ -292,12 +295,11 @@ def launch_beam(
         dH_dKzeta_initial = dH["dH_dKzeta"]
         dH_dKZ_initial = dH["dH_dKZ"]
 
-
         Psi_3D_lab_initial = find_Psi_3D_plasma2(
             Psi_3D_lab_entry,
             K_R_entry,
             K_zeta_entry,
-            K_Z_entry,            
+            K_Z_entry,
             K_R_initial,
             K_zeta_initial,
             K_Z_initial,
@@ -311,14 +313,13 @@ def launch_beam(
             d2_poloidal_flux_dR2_boundary,
             d2_poloidal_flux_dZ2_boundary,
             d2_poloidal_flux_dRdZ_boundary,
-        )    
-        
+        )
 
     elif Psi_BC_flag:  # Use BCs
         K_R_initial = K_R_entry
         K_zeta_initial = K_zeta_entry
-        K_Z_initial = K_Z_entry    
-    
+        K_Z_initial = K_Z_entry
+
         dH = hamiltonian.derivatives(
             initial_position[0],
             initial_position[2],

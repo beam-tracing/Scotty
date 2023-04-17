@@ -16,8 +16,8 @@ from scotty.fun_general import (
     find_Booker_alpha,
     find_Booker_beta,
     find_Booker_gamma,
-    freq_GHz_to_angular_frequency
-    )
+    freq_GHz_to_angular_frequency,
+)
 
 B_p_a = 0.0
 B_T_axis = 1.0
@@ -48,12 +48,12 @@ kwargs_dict = {
     "B_p_a": B_p_a,
     "R_axis": R_axis,
     "minor_radius_a": minor_radius_a,
-    "output_path": 'D:\\Dropbox\\VHChen2022\\Data - Scotty\\Run 11\\',
-    "ne_data_path": 'D:\\Dropbox\\VHChen2022\\Data - Equilibrium\\TestNewBCs\\',
+    "output_path": "D:\\Dropbox\\VHChen2022\\Data - Scotty\\Run 11\\",
+    "ne_data_path": "D:\\Dropbox\\VHChen2022\\Data - Equilibrium\\TestNewBCs\\",
 }
 
 edge_ne = 0.5
-B_Total = np.sqrt((B_T_axis*R_axis/(R_axis+minor_radius_a))**2 + B_p_a**2)
+B_Total = np.sqrt((B_T_axis * R_axis / (R_axis + minor_radius_a)) ** 2 + B_p_a**2)
 
 ## Approximation
 sin_theta_m_sq = 0
@@ -65,15 +65,13 @@ Booker_alpha = find_Booker_alpha(
 Booker_beta = find_Booker_beta(
     edge_ne, B_Total, sin_theta_m_sq, launch_angular_frequency
 )
-Booker_gamma = find_Booker_gamma(
-    edge_ne, B_Total, launch_angular_frequency
-)
+Booker_gamma = find_Booker_gamma(edge_ne, B_Total, launch_angular_frequency)
 
 N_sq = (
-    - Booker_beta
-    + kwargs_dict['mode_flag']*np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma) 
-    ) / (2*Booker_alpha)
-print('N',np.sqrt(N_sq))
+    -Booker_beta
+    + kwargs_dict["mode_flag"]
+    * np.sqrt(Booker_beta**2 - 4 * Booker_alpha * Booker_gamma)
+) / (2 * Booker_alpha)
+print("N", np.sqrt(N_sq))
 
 beam_me_up(**kwargs_dict)
-
