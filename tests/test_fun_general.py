@@ -265,4 +265,4 @@ def test_find_Psi_3D_plasma_discontinuous():
         ]
     )
 
-    assert Psi_3D_plasma == expected_Psi_3D_plasma
+    npt.assert_array_equal(Psi_3D_plasma, expected_Psi_3D_plasma)

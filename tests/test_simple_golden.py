@@ -605,6 +605,7 @@ def test_launch_golden_answer(tmp_path, generator):
         launch_beam_curvature=args["launch_beam_curvature"],
         launch_position=args["launch_position"],
         launch_angular_frequency=launch_angular_frequency,
+        mode_flag=args["mode_flag"],
         vacuum_propagation_flag=args["vacuum_propagation_flag"],
         Psi_BC_flag=args["Psi_BC_flag"],
         poloidal_flux_enter=args["poloidal_flux_enter"],
