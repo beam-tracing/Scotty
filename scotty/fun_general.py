@@ -398,10 +398,11 @@ def find_Psi_3D_lab_Cartesian(Psi_3D_lab, q_R, q_zeta, K_R, K_zeta):
 
 # Functions (beam tracing 1)
 def find_normalised_plasma_freq(electron_density, launch_angular_frequency):
-    #    if electron_density < 0:
-    #        print(electron_density)
-    #        electron_density=0
+    # if electron_density < 0:
+    #     print(electron_density)
+    #     electron_density=0
     # Electron density in units of 10^19 m-3
+    
     normalised_plasma_freq = (
         constants.e
         * np.sqrt(electron_density * 10**19 / (constants.epsilon_0 * constants.m_e))
@@ -669,7 +670,19 @@ def find_Psi_3D_plasma_continuous(
 ):
     ## For continuous ne across the plasma-vacuum boundary
     ## Potential future improvement: write wrapper function to wrap find_Psi_3D_plasma_continuous and find_Psi_3D_plasma_discontinuous
-
+    
+    # Gradients are the plasma-vacuum boundary can be finnicky and it's good to check
+    if np.isnan(dH_dKR):
+        print('Warning, dH_dKR is NaN')
+    elif np.isnan(dH_dKzeta):
+        print('Warning, dH_dKzeta is NaN')
+    elif np.isnan(dH_dKZ):
+        print('Warning, dH_dKZ is NaN')
+    elif np.isnan(dH_dR):
+        print('Warning, dH_dR is NaN')
+    elif np.isnan(dH_dZ):
+        print('Warning, dH_dZ is NaN')
+        
     # When beam is entering plasma from vacuum
     Psi_v_R_R = Psi_vacuum_3D[0, 0]
     Psi_v_zeta_zeta = Psi_vacuum_3D[1, 1]
