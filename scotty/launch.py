@@ -4,8 +4,8 @@
 from scotty.fun_general import (
     make_array_3x3,
     find_Psi_3D_lab,
-    find_Psi_3D_plasma,
-    find_Psi_3D_plasma2,  ## Work-in-progress
+    find_Psi_3D_plasma_discontinuous,
+    find_Psi_3D_plasma_continuous,  
     find_K_plasma,
     find_inverse_2D,
     find_K_lab_Cartesian,
@@ -24,6 +24,7 @@ from scotty.geometry import MagneticField
 
 from typing import Optional
 
+import sys
 import numpy as np
 from scipy.optimize import direct, root_scalar
 
@@ -41,7 +42,6 @@ def launch_beam(
     vacuumLaunch_flag: bool = True,
     vacuum_propagation_flag: bool = True,
     Psi_BC_flag: bool = True,
-    Psi_BC_flag2: bool = True,  ## Work in progress, tidy up later
     poloidal_flux_enter: float = 1.0,
     delta_R: float = -1e-4,
     delta_Z: float = 1e-4,
@@ -72,9 +72,10 @@ def launch_beam(
     vacuum_propagation_flag: bool
         If ``True``, run solver from the launch position, and don't
         use analytical vacuum propagation
-    Psi_BC_flag: bool
-        If ``True``, use matching boundary conditions at plasma entry
-        position, otherwise do no special treatment at plasma boundary
+    Psi_BC_flag: String
+        If ``None``, do no special treatment at plasma-vacuum boundary
+        If ``continuous``, apply BCs for continuous ne but discontinuous gradient of ne
+        If ``discontinuous``, apply BCs for discontinuous ne
     poloidal_flux_enter: float
         Normalised poloidal flux label of plasma boundary
     delta_R: float
@@ -97,6 +98,26 @@ def launch_beam(
     distance_from_launch_to_entry: float
 
     """
+    
+    if Psi_BC_flag is True:
+        print('Deprecation warning: Psi_BC_flag = True')
+        print("Setting Psi_BC_flag = 'continuous' for backward compatibility ")
+        Psi_BC_flag = 'continuous'
+    elif Psi_BC_flag is False:
+        print('Deprecation warning: Psi_BC_flag = False')
+        print("Setting Psi_BC_flag = None for backward compatibility ")
+        Psi_BC_flag = None
+    elif (
+            (Psi_BC_flag is not None) 
+            and
+            (Psi_BC_flag != 'continuous') 
+            and
+            (Psi_BC_flag != 'discontinuous') 
+        ):
+        print('Psi_BC_flag is', Psi_BC_flag)
+        print("Psi_BC_flag should only be None, 'continuous, or 'discontinuous' ")
+        print('Ending the simulation')
+        sys.exit()
 
     toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam)
     poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_Torbeam)
@@ -225,7 +246,7 @@ def launch_beam(
     # Find initial parameters in plasma
     # -------------------
     initial_position = entry_position
-    if Psi_BC_flag2:  # Use new BCs (WIP)
+    if Psi_BC_flag == 'discontinuous':  # Use new BCs (WIP)
         print("test")
         d_poloidal_flux_dR_boundary = find_d_poloidal_flux_dR(
             initial_position[0],
@@ -277,10 +298,6 @@ def launch_beam(
             d_poloidal_flux_dZ_boundary,
         )
 
-        print("K_R", K_R_entry, K_R_initial)
-        print("K_zeta", K_zeta_entry, K_zeta_initial)
-        print("K_Z", K_Z_entry, K_Z_initial)
-
         dH = hamiltonian.derivatives(
             initial_position[0],
             initial_position[2],
@@ -295,7 +312,7 @@ def launch_beam(
         dH_dKzeta_initial = dH["dH_dKzeta"]
         dH_dKZ_initial = dH["dH_dKZ"]
 
-        Psi_3D_lab_initial = find_Psi_3D_plasma2(
+        Psi_3D_lab_initial = find_Psi_3D_plasma_discontinuous(
             Psi_3D_lab_entry,
             K_R_entry,
             K_zeta_entry,
@@ -315,7 +332,7 @@ def launch_beam(
             d2_poloidal_flux_dRdZ_boundary,
         )
 
-    elif Psi_BC_flag:  # Use BCs
+    elif Psi_BC_flag == 'continuous':  # Use BCs
         K_R_initial = K_R_entry
         K_zeta_initial = K_zeta_entry
         K_Z_initial = K_Z_entry
@@ -346,7 +363,7 @@ def launch_beam(
             field.poloidal_flux,
         )
 
-        Psi_3D_lab_initial = find_Psi_3D_plasma(
+        Psi_3D_lab_initial = find_Psi_3D_plasma_continuous(
             Psi_3D_lab_entry,
             dH_dKR_initial,
             dH_dKzeta_initial,
@@ -357,6 +374,9 @@ def launch_beam(
             d_poloidal_flux_d_Z_boundary,
         )
     else:  # Do not use BCs
+        K_R_initial = K_R_entry
+        K_zeta_initial = K_zeta_entry
+        K_Z_initial = K_Z_entry
         Psi_3D_lab_initial = Psi_3D_lab_entry
 
     return (

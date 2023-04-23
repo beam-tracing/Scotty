@@ -128,8 +128,7 @@ def beam_me_up(
     shot=None,
     equil_time=None,
     vacuum_propagation_flag: bool = False,
-    Psi_BC_flag: bool = False,
-    Psi_BC_flag2: bool = False,  ## Work in progress
+    Psi_BC_flag: str = None,
     poloidal_flux_enter: float = 1.0,
     # Finite-difference and solver parameters
     delta_R: float = -0.0001,  # in the same units as data_R_coord
@@ -214,9 +213,10 @@ def beam_me_up(
     vacuum_propagation_flag: bool
         If ``True``, run solver from the launch position, and don't
         use analytical vacuum propagation
-    Psi_BC_flag: bool
-        If ``True``, use matching boundary conditions at plasma entry
-        position, otherwise do no special treatment at plasma boundary
+    Psi_BC_flag: String
+        If ``None``, do no special treatment at plasma-vacuum boundary
+        If ``continuous``, apply BCs for continuous ne but discontinuous gradient of ne
+        If ``discontinuous``, apply BCs for discontinuous ne
     poloidal_flux_enter: float
         Normalised poloidal flux label of plasma boundary
     plasmaLaunch_Psi_3D_lab_Cartesian: FloatArray
@@ -401,7 +401,6 @@ def beam_me_up(
             hamiltonian=hamiltonian,
             vacuum_propagation_flag=vacuum_propagation_flag,
             Psi_BC_flag=Psi_BC_flag,
-            Psi_BC_flag2=Psi_BC_flag2,  ## Work in progress
             poloidal_flux_enter=poloidal_flux_enter,
             delta_R=delta_R,
             delta_Z=delta_Z,

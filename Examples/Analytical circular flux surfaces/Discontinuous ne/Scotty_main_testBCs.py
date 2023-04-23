@@ -9,7 +9,7 @@ valerian_hall-chen@ihpc.a-star.edu.sg
 
 """
 
-from beam_me_up import beam_me_up
+from scotty.beam_me_up import beam_me_up
 import numpy as np
 
 from scotty.fun_general import (
@@ -19,15 +19,15 @@ from scotty.fun_general import (
     freq_GHz_to_angular_frequency,
 )
 
-B_p_a = 0.0
+B_p_a = 0.3
 B_T_axis = 1.0
 R_axis = 1.5
 minor_radius_a = 0.5
-launch_freq_GHz = 45.0
+launch_freq_GHz = 35.0
 
 kwargs_dict = {
     "poloidal_launch_angle_Torbeam": 7.0,
-    "toroidal_launch_angle_Torbeam": 0.0,
+    "toroidal_launch_angle_Torbeam": 6.5,
     "launch_freq_GHz": launch_freq_GHz,
     "mode_flag": 1,
     "launch_beam_width": 0.04,
@@ -38,8 +38,7 @@ kwargs_dict = {
     "delta_R": -1e-5,
     "delta_Z": 1e-5,
     "find_B_method": "analytical",
-    "Psi_BC_flag": False,
-    "Psi_BC_flag2": True,
+    "Psi_BC_flag": 'discontinuous',
     "figure_flag": False,
     "vacuum_propagation_flag": True,
     "vacuumLaunch_flag": True,
@@ -49,7 +48,7 @@ kwargs_dict = {
     "R_axis": R_axis,
     "minor_radius_a": minor_radius_a,
     "output_path": "D:\\Dropbox\\VHChen2022\\Data - Scotty\\Run 11\\",
-    "ne_data_path": "D:\\Dropbox\\VHChen2022\\Data - Equilibrium\\TestNewBCs\\",
+    "ne_data_path": ".",
 }
 
 edge_ne = 0.5

@@ -657,7 +657,7 @@ def find_d2_poloidal_flux_dRdZ(q_R, q_Z, delta_R, delta_Z, interp_poloidal_flux)
     return d2_poloidal_flux_dRdZ
 
 
-def find_Psi_3D_plasma(
+def find_Psi_3D_plasma_continuous(
     Psi_vacuum_3D,
     dH_dKR,
     dH_dKzeta,
@@ -667,6 +667,9 @@ def find_Psi_3D_plasma(
     d_poloidal_flux_d_R,
     d_poloidal_flux_d_Z,
 ):
+    ## For continuous ne across the plasma-vacuum boundary
+    ## Potential future improvement: write wrapper function to wrap find_Psi_3D_plasma_continuous and find_Psi_3D_plasma_discontinuous
+    
     # When beam is entering plasma from vacuum
     Psi_v_R_R = Psi_vacuum_3D[0, 0]
     Psi_v_zeta_zeta = Psi_vacuum_3D[1, 1]
@@ -745,9 +748,14 @@ def find_K_plasma(
     dpolflux_dR,
     dpolflux_dZ,
 ):
-    print("version 8")
-    print("dpolflux_dR", dpolflux_dR, "dpolflux_dZ", dpolflux_dZ)
 
+    ## Finds
+
+    ## Checks the plasma density
+    plasma_freq = find_normalised_plasma_freq(electron_density_p, launch_angular_frequency)    
+    if plasma_freq >= launch_angular_frequency:
+        print('Error')
+    
     ## Get components of the Booker quartic
     B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
     K_v_mag = np.sqrt(K_v_R**2 + (K_v_zeta / q_R) ** 2 + K_v_Z**2)
@@ -804,27 +812,22 @@ def find_K_plasma(
     )
 
     ## For checking
-    H = (K_p_R**2 + (K_p_zeta / q_R) ** 2 + K_p_Z**2) / (K_v_mag) ** 2 - (
+    H_bar = (K_p_R**2 + (K_p_zeta / q_R) ** 2 + K_p_Z**2) / (K_v_mag) ** 2 - (
         (
             -Booker_beta
             + mode_flag * np.sqrt(Booker_beta**2 - 4 * Booker_alpha * Booker_gamma)
         )
         / (2 * Booker_alpha)
     )
+    tol = 1e-3
+    if abs(H_bar) > tol:
+        print('find_K_plasma not working properly')
 
-    print("H", H)
-    print("K_v_pol", K_v_pol, "K_p_pol", K_p_pol)
-    print(
-        "K_v_rad",
-        np.sqrt(K_v_mag**2 - (K_v_zeta / q_R) ** 2 - K_v_pol**2),
-        "K_p_rad",
-        K_p_rad,
-    )
 
     return K_p_R, K_p_zeta, K_p_Z
 
 
-def find_Psi_3D_plasma2(
+def find_Psi_3D_plasma_discontinuous(
     Psi_vacuum_3D,
     K_v_R,
     K_v_zeta,
@@ -843,7 +846,7 @@ def find_Psi_3D_plasma2(
     d2polflux_dZ2,  # Continuous
     d2polflux_dRdZ,  # Continuous
 ):
-    ## Work in progress
+    ## For discontinuous ne
 
     eta = (
         -0.5
