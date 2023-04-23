@@ -5,7 +5,7 @@ from scotty.fun_general import (
     make_array_3x3,
     find_Psi_3D_lab,
     find_Psi_3D_plasma_discontinuous,
-    find_Psi_3D_plasma_continuous,  
+    find_Psi_3D_plasma_continuous,
     find_K_plasma,
     find_inverse_2D,
     find_K_lab_Cartesian,
@@ -98,25 +98,23 @@ def launch_beam(
     distance_from_launch_to_entry: float
 
     """
-    
+
     if Psi_BC_flag is True:
-        print('Deprecation warning: Psi_BC_flag = True')
+        print("Deprecation warning: Psi_BC_flag = True")
         print("Setting Psi_BC_flag = 'continuous' for backward compatibility ")
-        Psi_BC_flag = 'continuous'
+        Psi_BC_flag = "continuous"
     elif Psi_BC_flag is False:
-        print('Deprecation warning: Psi_BC_flag = False')
+        print("Deprecation warning: Psi_BC_flag = False")
         print("Setting Psi_BC_flag = None for backward compatibility ")
         Psi_BC_flag = None
     elif (
-            (Psi_BC_flag is not None) 
-            and
-            (Psi_BC_flag != 'continuous') 
-            and
-            (Psi_BC_flag != 'discontinuous') 
-        ):
-        print('Psi_BC_flag is', Psi_BC_flag)
+        (Psi_BC_flag is not None)
+        and (Psi_BC_flag != "continuous")
+        and (Psi_BC_flag != "discontinuous")
+    ):
+        print("Psi_BC_flag is", Psi_BC_flag)
         print("Psi_BC_flag should only be None, 'continuous, or 'discontinuous' ")
-        print('Ending the simulation')
+        print("Ending the simulation")
         sys.exit()
 
     toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam)
@@ -246,7 +244,7 @@ def launch_beam(
     # Find initial parameters in plasma
     # -------------------
     initial_position = entry_position
-    if Psi_BC_flag == 'discontinuous':  # Use new BCs (WIP)
+    if Psi_BC_flag == "discontinuous":  # Use new BCs (WIP)
         print("test")
         d_poloidal_flux_dR_boundary = find_d_poloidal_flux_dR(
             initial_position[0],
@@ -332,7 +330,7 @@ def launch_beam(
             d2_poloidal_flux_dRdZ_boundary,
         )
 
-    elif Psi_BC_flag == 'continuous':  # Use BCs
+    elif Psi_BC_flag == "continuous":  # Use BCs
         K_R_initial = K_R_entry
         K_zeta_initial = K_zeta_entry
         K_Z_initial = K_Z_entry

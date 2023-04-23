@@ -669,7 +669,7 @@ def find_Psi_3D_plasma_continuous(
 ):
     ## For continuous ne across the plasma-vacuum boundary
     ## Potential future improvement: write wrapper function to wrap find_Psi_3D_plasma_continuous and find_Psi_3D_plasma_discontinuous
-    
+
     # When beam is entering plasma from vacuum
     Psi_v_R_R = Psi_vacuum_3D[0, 0]
     Psi_v_zeta_zeta = Psi_vacuum_3D[1, 1]
@@ -748,14 +748,15 @@ def find_K_plasma(
     dpolflux_dR,
     dpolflux_dZ,
 ):
-
     ## Finds
 
     ## Checks the plasma density
-    plasma_freq = find_normalised_plasma_freq(electron_density_p, launch_angular_frequency)    
+    plasma_freq = find_normalised_plasma_freq(
+        electron_density_p, launch_angular_frequency
+    )
     if plasma_freq >= launch_angular_frequency:
-        print('Error')
-    
+        print("Error")
+
     ## Get components of the Booker quartic
     B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
     K_v_mag = np.sqrt(K_v_R**2 + (K_v_zeta / q_R) ** 2 + K_v_Z**2)
@@ -821,8 +822,7 @@ def find_K_plasma(
     )
     tol = 1e-3
     if abs(H_bar) > tol:
-        print('find_K_plasma not working properly')
-
+        print("find_K_plasma not working properly")
 
     return K_p_R, K_p_zeta, K_p_Z
 
