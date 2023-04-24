@@ -100,7 +100,10 @@ def launch_beam(
     """
 
     if Psi_BC_flag is True:
-        warnings.warn("Boolean `Psi_BC_flag` is deprecated, please use None, 'continuous', or 'discontinuous'", DeprecationWarning)
+        warnings.warn(
+            "Boolean `Psi_BC_flag` is deprecated, please use None, 'continuous', or 'discontinuous'",
+            DeprecationWarning,
+        )
         print("Setting Psi_BC_flag = 'continuous' for backward compatibility")
         Psi_BC_flag = "continuous"
     elif Psi_BC_flag is False:
@@ -112,7 +115,9 @@ def launch_beam(
         and (Psi_BC_flag != "continuous")
         and (Psi_BC_flag != "discontinuous")
     ):
-        raise ValueError(f"Unexpected value for `Psi_BC_flag` ({Psi_BC_flag}), expected one of None, 'continuous, or 'discontinuous'")
+        raise ValueError(
+            f"Unexpected value for `Psi_BC_flag` ({Psi_BC_flag}), expected one of None, 'continuous, or 'discontinuous'"
+        )
 
     toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam)
     poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_Torbeam)
