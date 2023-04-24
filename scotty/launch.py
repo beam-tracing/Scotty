@@ -112,10 +112,7 @@ def launch_beam(
         and (Psi_BC_flag != "continuous")
         and (Psi_BC_flag != "discontinuous")
     ):
-        print("Psi_BC_flag is", Psi_BC_flag)
-        print("Psi_BC_flag should only be None, 'continuous, or 'discontinuous' ")
-        print("Ending the simulation")
-        sys.exit()
+        raise ValueError(f"Unexpected value for `Psi_BC_flag` ({Psi_BC_flag}), expected one of None, 'continuous, or 'discontinuous'")
 
     toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam)
     poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_Torbeam)
