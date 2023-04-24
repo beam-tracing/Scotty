@@ -188,6 +188,7 @@ def test_K_magnitude():
 def test_find_Psi_3D_plasma_discontinuous():
     ## Values from a test case that I used
     ## TODO: Integrate this test with a circular-flux-surface case which has discontinuous ne
+    ## Find values from a simple slab case and test them
 
     Psi_vacuum_3D = np.array(
         [

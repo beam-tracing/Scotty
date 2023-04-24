@@ -673,15 +673,15 @@ def find_Psi_3D_plasma_continuous(
 
     # Gradients are the plasma-vacuum boundary can be finnicky and it's good to check
     if np.isnan(dH_dKR):
-        print("Warning, dH_dKR is NaN")
+        raise ValueError("Error, dH_dKR is NaN in find_Psi_3D_plasma_continuous")
     elif np.isnan(dH_dKzeta):
-        print("Warning, dH_dKzeta is NaN")
+        raise ValueError("Error, dH_dKzeta is NaN in find_Psi_3D_plasma_continuous")
     elif np.isnan(dH_dKZ):
-        print("Warning, dH_dKZ is NaN")
+        raise ValueError("Error, dH_dKZ is NaN in find_Psi_3D_plasma_continuous")
     elif np.isnan(dH_dR):
-        print("Warning, dH_dR is NaN")
+        raise ValueError("Error, dH_dR is NaN in find_Psi_3D_plasma_continuous")
     elif np.isnan(dH_dZ):
-        print("Warning, dH_dZ is NaN")
+        raise ValueError("Error, dH_dZ is NaN in find_Psi_3D_plasma_continuous")
 
     # When beam is entering plasma from vacuum
     Psi_v_R_R = Psi_vacuum_3D[0, 0]
@@ -937,6 +937,155 @@ def find_Psi_3D_plasma_discontinuous(
 
     return Psi_3D_plasma
 
+def apply_discontinuous_BC(
+    q_R,
+    q_Z,
+    Psi_vacuum_3D,
+    K_v_R,
+    K_v_zeta,
+    K_v_Z,
+    launch_angular_frequency,
+    mode_flag,
+    delta_R,
+    delta_Z,
+    field, # Field object
+    hamiltonian # Hamiltonian object
+):
+    
+
+    d_poloidal_flux_dR_boundary = find_d_poloidal_flux_dR(
+        q_R,
+        q_Z,
+        delta_R,
+        field.poloidal_flux,
+    )
+    d_poloidal_flux_dZ_boundary = find_d_poloidal_flux_dZ(
+        q_R,
+        q_Z,
+        delta_Z,
+        field.poloidal_flux,
+    )
+    d2_poloidal_flux_dR2_boundary = find_d2_poloidal_flux_dR2(
+        q_R,
+        q_Z,
+        delta_R,
+        field.poloidal_flux,
+    )
+    d2_poloidal_flux_dZ2_boundary = find_d2_poloidal_flux_dZ2(
+        q_R,
+        q_Z,
+        delta_Z,
+        field.poloidal_flux,
+    )
+    d2_poloidal_flux_dRdZ_boundary = find_d2_poloidal_flux_dRdZ(
+        q_R,
+        q_Z,
+        delta_R,
+        delta_Z,
+        field.poloidal_flux,
+    )
+
+    poloidal_flux_boundary = field.poloidal_flux(q_R, q_Z)    
+
+    K_plasma = find_K_plasma(
+        q_R,
+        K_v_R,
+        K_v_zeta,
+        K_v_Z,
+        launch_angular_frequency,
+        mode_flag,
+        field.B_R(q_R, q_Z),
+        field.B_T(q_R, q_Z),
+        field.B_Z(q_R, q_Z),
+        hamiltonian.density(poloidal_flux_boundary),  # in the plasma
+        d_poloidal_flux_dR_boundary,
+        d_poloidal_flux_dZ_boundary,
+    )
+    
+    dH = hamiltonian.derivatives(
+        q_R,
+        q_Z,
+        K_plasma[0],
+        K_plasma[1],
+        K_plasma[2],
+    )
+    
+    Psi_3D_plasma = find_Psi_3D_plasma_discontinuous(
+        Psi_vacuum_3D,
+        K_v_R,
+        K_v_zeta,
+        K_v_Z,
+        K_plasma[0],
+        K_plasma[1],
+        K_plasma[2],
+        dH["dH_dKR"],  # In the plasma
+        dH["dH_dKzeta"],  # In the plasma
+        dH["dH_dKZ"],  # In the plasma
+        dH["dH_dR"],  # In the plasma
+        dH["dH_dZ"],  # In the plasma
+        d_poloidal_flux_dR_boundary,  # Continuous
+        d_poloidal_flux_dZ_boundary,  # Continuous
+        d2_poloidal_flux_dR2_boundary,  # Continuous
+        d2_poloidal_flux_dZ2_boundary,  # Continuous
+        d2_poloidal_flux_dRdZ_boundary,  # Continuous
+    )
+     
+    return K_plasma, Psi_3D_plasma
+
+def apply_continuous_BC(
+    q_R,
+    q_Z,
+    Psi_vacuum_3D,
+    K_v_R,
+    K_v_zeta,
+    K_v_Z,
+    delta_R,
+    delta_Z,
+    field, # Field object
+    hamiltonian # Hamiltonian object
+):
+    
+    ## When the equilibrium is continuous, the wavevector is continuous
+    K_plasma = [K_v_R,K_v_zeta,K_v_Z]
+
+    dH = hamiltonian.derivatives(
+        q_R,
+        q_Z,
+        K_plasma[0],
+        K_plasma[1],
+        K_plasma[2],
+    )
+
+    dH_dR_initial = dH["dH_dR"]
+    dH_dZ_initial = dH["dH_dZ"]
+    dH_dKR_initial = dH["dH_dKR"]
+    dH_dKzeta_initial = dH["dH_dKzeta"]
+    dH_dKZ_initial = dH["dH_dKZ"]
+    d_poloidal_flux_d_R_boundary = find_d_poloidal_flux_dR(
+        q_R,
+        q_Z,
+        delta_R,
+        field.poloidal_flux,
+    )
+    d_poloidal_flux_d_Z_boundary = find_d_poloidal_flux_dZ(
+        q_R,
+        q_Z,
+        delta_Z,
+        field.poloidal_flux,
+    )
+
+    Psi_3D_plasma = find_Psi_3D_plasma_continuous(
+        Psi_vacuum_3D,
+        dH_dKR_initial,
+        dH_dKzeta_initial,
+        dH_dKZ_initial,
+        dH_dR_initial,
+        dH_dZ_initial,
+        d_poloidal_flux_d_R_boundary,
+        d_poloidal_flux_d_Z_boundary,
+    )  
+    
+    return K_plasma, Psi_3D_plasma
 
 # -----------------
 
