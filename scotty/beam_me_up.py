@@ -128,7 +128,7 @@ def beam_me_up(
     shot=None,
     equil_time=None,
     vacuum_propagation_flag: bool = False,
-    Psi_BC_flag: str = None,
+    Psi_BC_flag: Union[bool, str, None] = None,
     poloidal_flux_enter: float = 1.0,
     poloidal_flux_zero_density: float = 1.0,  ## When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
     # Finite-difference and solver parameters
