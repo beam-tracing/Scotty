@@ -100,8 +100,8 @@ def launch_beam(
     """
 
     if Psi_BC_flag is True:
-        print("Deprecation warning: Psi_BC_flag = True")
-        print("Setting Psi_BC_flag = 'continuous' for backward compatibility ")
+        warnings.warn("Boolean `Psi_BC_flag` is deprecated, please use None, 'continuous', or 'discontinuous'", DeprecationWarning)
+        print("Setting Psi_BC_flag = 'continuous' for backward compatibility")
         Psi_BC_flag = "continuous"
     elif Psi_BC_flag is False:
         print("Deprecation warning: Psi_BC_flag = False")
