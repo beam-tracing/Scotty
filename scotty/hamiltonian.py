@@ -3,6 +3,7 @@
 
 from scotty.geometry import MagneticField
 from scotty.density_fit import DensityFitLike
+from scotty.derivatives import derivative, CoordOffset
 from scotty.fun_general import (
     angular_frequency_to_wavenumber,
     find_normalised_gyro_freq,
@@ -89,48 +90,6 @@ class DielectricTensor:
     def e_12(self):
         r"""The :math:`\epsilon_{12}` component"""
         return self._epsilon_12
-
-
-Stencil = Dict[Tuple, float]
-
-FFD1_stencil: Stencil = {(0,): -3 / 2, (1,): 2, (2,): -0.5}
-"""Stencil for the first forward-difference"""
-FFD2_stencil: Stencil = {(0,): 2, (1,): -5, (2,): 4, (3,): -1}
-"""Stencil for the second forward-difference"""
-CFD1_stencil: Stencil = {(-1,): -0.5, (1,): 0.5}
-"""Stencil for the first central-difference"""
-CFD2_stencil: Stencil = {(-1,): 1, (0,): -2, (1,): 1}
-"""Stencil for the second central-difference"""
-FFD_FFD_stencil: Stencil = {
-    (0, 0): 2.25,
-    (0, 1): -3,
-    (0, 2): 0.75,
-    (1, 0): -3,
-    (1, 1): 4,
-    (1, 2): -1,
-    (2, 0): 0.75,
-    (2, 1): -1,
-    (2, 2): 0.25,
-}
-"""Stencil for the mixed second forward-difference"""
-FFD_CFD_stencil: Stencil = {
-    (0, -1): 0.25,
-    (0, 0): 1,
-    (0, 1): -1.25,
-    (1, 0): -2,
-    (1, 1): 2,
-    (2, -1): -0.25,
-    (2, 0): 1,
-    (2, 1): -0.75,
-}
-"""Stencil for the mixed second forward/central-difference"""
-CFD_CFD_stencil: Stencil = {
-    (1, 1): 0.25,
-    (1, -1): -0.25,
-    (-1, 1): -0.25,
-    (-1, -1): 0.25,
-}
-"""Stencil for the mixed second central-difference"""
 
 
 class Hamiltonian:
@@ -298,87 +257,41 @@ class Hamiltonian:
 
         """
 
-        @dataclass(frozen=True)
-        class CoordOffset:
-            """Helper class to store relative offsets in a dict"""
-
-            q_R: int = 0
-            q_Z: int = 0
-            K_R: int = 0
-            K_zeta: int = 0
-            K_Z: int = 0
-
         # We cache Hamiltonian evaluations only during this function call
         cache: Dict[CoordOffset, ArrayLike] = {}
 
         # Capture the location we want the derivatives at
         starts = {"q_R": q_R, "q_Z": q_Z, "K_R": K_R, "K_zeta": K_zeta, "K_Z": K_Z}
 
-        def apply_stencil(dims: Tuple[str, ...], stencil: Stencil) -> ArrayLike:
-            """Apply a stencil in set of directions
-
-            Parameters
-            ----------
-            dims
-                Tuple of direction names
-            stencil
-                Finite difference stencil
-            """
-
-            # Collect the relative spacings for the derivative dimensions
-            dim_spacings = [self.spacings[dim] for dim in dims]
-            # For second order derivatives, remove repeated dimensions
-            if len(dims) == 2 and dims[1] == dims[0]:
-                dims = (dims[0],)
-
-            result = np.zeros_like(starts["q_R"])
-
-            for stencil_offsets, weight in stencil.items():
-                coord_offsets = CoordOffset(**dict(zip(dims, stencil_offsets)))
-                try:
-                    # See if we've already evaluated H here...
-                    H_at_offset = cache[coord_offsets]
-                except KeyError:
-                    # ...if not, let's do so now
-                    offsets = asdict(coord_offsets)
-                    # Convert integer offsets to absolute positions
-                    coords = {
-                        dim: start + offsets[dim] * self.spacings[dim]
-                        for dim, start in starts.items()
-                    }
-                    # Evaluate the derivative at this offset and cache it
-                    H_at_offset = self(**coords)
-                    cache[coord_offsets] = H_at_offset
-
-                result += weight * H_at_offset
-            return result / np.prod(dim_spacings)
+        def apply_stencil(dims: Tuple[str,...], stencil: str):
+            return derivative(self, dims, starts, self.spacings, stencil, cache)
 
         # We always compute the first order derivatives
         derivatives = {
-            "dH_dR": apply_stencil(("q_R",), FFD1_stencil),
-            "dH_dZ": apply_stencil(("q_Z",), FFD1_stencil),
-            "dH_dKR": apply_stencil(("K_R",), CFD1_stencil),
-            "dH_dKzeta": apply_stencil(("K_zeta",), CFD1_stencil),
-            "dH_dKZ": apply_stencil(("K_Z",), CFD1_stencil),
+            "dH_dR": apply_stencil(("q_R",), "d1_FFD2"),
+            "dH_dZ": apply_stencil(("q_Z",), "d1_FFD2"),
+            "dH_dKR": apply_stencil(("K_R",), "d1_CFD2"),
+            "dH_dKzeta": apply_stencil(("K_zeta",), "d1_CFD2"),
+            "dH_dKZ": apply_stencil(("K_Z",), "d1_CFD2"),
         }
 
         if second_order:
             second_derivatives = {
-                "d2H_dR2": apply_stencil(("q_R", "q_R"), FFD2_stencil),
-                "d2H_dZ2": apply_stencil(("q_Z", "q_Z"), FFD2_stencil),
-                "d2H_dKR2": apply_stencil(("K_R", "K_R"), CFD2_stencil),
-                "d2H_dKzeta2": apply_stencil(("K_zeta", "K_zeta"), CFD2_stencil),
-                "d2H_dKZ2": apply_stencil(("K_Z", "K_Z"), CFD2_stencil),
-                "d2H_dR_dZ": apply_stencil(("q_R", "q_Z"), FFD_FFD_stencil),
-                "d2H_dR_dKR": apply_stencil(("q_R", "K_R"), FFD_CFD_stencil),
-                "d2H_dR_dKzeta": apply_stencil(("q_R", "K_zeta"), FFD_CFD_stencil),
-                "d2H_dR_dKZ": apply_stencil(("q_R", "K_Z"), FFD_CFD_stencil),
-                "d2H_dZ_dKR": apply_stencil(("q_Z", "K_R"), FFD_CFD_stencil),
-                "d2H_dZ_dKzeta": apply_stencil(("q_Z", "K_zeta"), FFD_CFD_stencil),
-                "d2H_dZ_dKZ": apply_stencil(("q_Z", "K_Z"), FFD_CFD_stencil),
-                "d2H_dKR_dKZ": apply_stencil(("K_R", "K_Z"), CFD_CFD_stencil),
-                "d2H_dKR_dKzeta": apply_stencil(("K_R", "K_zeta"), CFD_CFD_stencil),
-                "d2H_dKzeta_dKZ": apply_stencil(("K_zeta", "K_Z"), CFD_CFD_stencil),
+                "d2H_dR2": apply_stencil(("q_R", "q_R"), "d2_FFD2"),
+                "d2H_dZ2": apply_stencil(("q_Z", "q_Z"), "d2_FFD2"),
+                "d2H_dKR2": apply_stencil(("K_R", "K_R"), "d2_CFD2"),
+                "d2H_dKzeta2": apply_stencil(("K_zeta", "K_zeta"), "d2_CFD2"),
+                "d2H_dKZ2": apply_stencil(("K_Z", "K_Z"), "d2_CFD2"),
+                "d2H_dR_dZ": apply_stencil(("q_R", "q_Z"), "d2d2_FFD_FFD2"),
+                "d2H_dR_dKR": apply_stencil(("q_R", "K_R"), "d2d2_FFD_CFD2"),
+                "d2H_dR_dKzeta": apply_stencil(("q_R", "K_zeta"), "d2d2_FFD_CFD2"),
+                "d2H_dR_dKZ": apply_stencil(("q_R", "K_Z"), "d2d2_FFD_CFD2"),
+                "d2H_dZ_dKR": apply_stencil(("q_Z", "K_R"), "d2d2_FFD_CFD2"),
+                "d2H_dZ_dKzeta": apply_stencil(("q_Z", "K_zeta"), "d2d2_FFD_CFD2"),
+                "d2H_dZ_dKZ": apply_stencil(("q_Z", "K_Z"), "d2d2_FFD_CFD2"),
+                "d2H_dKR_dKZ": apply_stencil(("K_R", "K_Z"), "d2d2_CFD_CFD2"),
+                "d2H_dKR_dKzeta": apply_stencil(("K_R", "K_zeta"), "d2d2_CFD_CFD2"),
+                "d2H_dKzeta_dKZ": apply_stencil(("K_zeta", "K_Z"), "d2d2_CFD_CFD2"),
             }
             derivatives.update(second_derivatives)
         return derivatives
