@@ -937,6 +937,7 @@ def find_Psi_3D_plasma_discontinuous(
 
     return Psi_3D_plasma
 
+
 def apply_discontinuous_BC(
     q_R,
     q_Z,
@@ -948,11 +949,9 @@ def apply_discontinuous_BC(
     mode_flag,
     delta_R,
     delta_Z,
-    field, # Field object
-    hamiltonian # Hamiltonian object
+    field,  # Field object
+    hamiltonian,  # Hamiltonian object
 ):
-    
-
     d_poloidal_flux_dR_boundary = find_d_poloidal_flux_dR(
         q_R,
         q_Z,
@@ -985,7 +984,7 @@ def apply_discontinuous_BC(
         field.poloidal_flux,
     )
 
-    poloidal_flux_boundary = field.poloidal_flux(q_R, q_Z)    
+    poloidal_flux_boundary = field.poloidal_flux(q_R, q_Z)
 
     K_plasma = find_K_plasma(
         q_R,
@@ -1001,7 +1000,7 @@ def apply_discontinuous_BC(
         d_poloidal_flux_dR_boundary,
         d_poloidal_flux_dZ_boundary,
     )
-    
+
     dH = hamiltonian.derivatives(
         q_R,
         q_Z,
@@ -1009,7 +1008,7 @@ def apply_discontinuous_BC(
         K_plasma[1],
         K_plasma[2],
     )
-    
+
     Psi_3D_plasma = find_Psi_3D_plasma_discontinuous(
         Psi_vacuum_3D,
         K_v_R,
@@ -1029,8 +1028,9 @@ def apply_discontinuous_BC(
         d2_poloidal_flux_dZ2_boundary,  # Continuous
         d2_poloidal_flux_dRdZ_boundary,  # Continuous
     )
-     
+
     return K_plasma, Psi_3D_plasma
+
 
 def apply_continuous_BC(
     q_R,
@@ -1041,12 +1041,11 @@ def apply_continuous_BC(
     K_v_Z,
     delta_R,
     delta_Z,
-    field, # Field object
-    hamiltonian # Hamiltonian object
+    field,  # Field object
+    hamiltonian,  # Hamiltonian object
 ):
-    
     ## When the equilibrium is continuous, the wavevector is continuous
-    K_plasma = [K_v_R,K_v_zeta,K_v_Z]
+    K_plasma = [K_v_R, K_v_zeta, K_v_Z]
 
     dH = hamiltonian.derivatives(
         q_R,
@@ -1083,9 +1082,10 @@ def apply_continuous_BC(
         dH_dZ_initial,
         d_poloidal_flux_d_R_boundary,
         d_poloidal_flux_d_Z_boundary,
-    )  
-    
+    )
+
     return K_plasma, Psi_3D_plasma
+
 
 # -----------------
 
