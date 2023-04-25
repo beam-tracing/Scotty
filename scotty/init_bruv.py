@@ -150,7 +150,9 @@ def get_parameters_for_Scotty(
 
         density_fit = ne_settings(diagnostic, shot, equil_time, find_ne_method)
         parameters["density_fit_method"] = density_fit.fit
-        parameters["poloidal_flux_zero_density"] = density_fit.poloidal_flux_zero_density
+        parameters[
+            "poloidal_flux_zero_density"
+        ] = density_fit.poloidal_flux_zero_density
 
     # MAST and MAST-U specific B-field and poloidal flux settings
     if find_B_method == "UDA":
