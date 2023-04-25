@@ -150,7 +150,7 @@ def get_parameters_for_Scotty(
 
         density_fit = ne_settings(diagnostic, shot, equil_time, find_ne_method)
         parameters["density_fit_method"] = density_fit.fit
-        parameters["poloidal_flux_enter"] = density_fit.poloidal_flux_enter
+        parameters["poloidal_flux_zero_density"] = density_fit.poloidal_flux_zero_density
 
     # MAST and MAST-U specific B-field and poloidal flux settings
     if find_B_method == "UDA":
@@ -224,7 +224,7 @@ class DensityFitParameters(NamedTuple):
     """Fit parameterisation"""
     time_ms: Optional[float]
     """Actual shot time (in milliseconds) that parameters correspond to"""
-    poloidal_flux_enter: Optional[float]
+    poloidal_flux_zero_density: Optional[float]
     """Poloidal flux surface label where the density goes to zero"""
 
 
@@ -273,7 +273,7 @@ def ne_settings(
     ne_fit_time = ne_fit_times[nearest_time_idx]
     print("Nearest ne fit time:", ne_fit_time)
 
-    return DensityFitParameters(ne_fit, ne_fit_time, ne_fit.poloidal_flux_enter)
+    return DensityFitParameters(ne_fit, ne_fit_time, ne_fit.poloidal_flux_zero_density)
 
 
 def user_settings(diagnostic, user, shot):
@@ -425,8 +425,8 @@ def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
 
 
 def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
-    poloidal_flux_enter = 1.0
-    ne_fit = QuadraticFit(poloidal_flux_enter, 4.0)
+    poloidal_flux_zero_density = 1.0
+    ne_fit = QuadraticFit(poloidal_flux_zero_density, 4.0)
     return {
         "poloidal_launch_angle_Torbeam": 6.0,
         "toroidal_launch_angle_Torbeam": 0.0,
@@ -442,7 +442,7 @@ def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
         "figure_flag": False,
         "vacuum_propagation_flag": True,
         "vacuumLaunch_flag": True,
-        "poloidal_flux_enter": poloidal_flux_enter,
+        "poloidal_flux_zero_density": poloidal_flux_zero_density,
         "B_T_axis": 1.0,
         "B_p_a": 0.1,
         "R_axis": 1.5,
