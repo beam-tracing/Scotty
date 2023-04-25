@@ -130,7 +130,7 @@ def beam_me_up(
     vacuum_propagation_flag: bool = False,
     Psi_BC_flag: str = None,
     poloidal_flux_enter: float = 1.0,
-    poloidal_flux_zero_density: float = 1.0, ## When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
+    poloidal_flux_zero_density: float = 1.0,  ## When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
     # Finite-difference and solver parameters
     delta_R: float = -0.0001,  # in the same units as data_R_coord
     delta_Z: float = 0.0001,  # in the same units as data_Z_coord
@@ -219,7 +219,7 @@ def beam_me_up(
         If ``continuous``, apply BCs for continuous ne but discontinuous gradient of ne
         If ``discontinuous``, apply BCs for discontinuous ne
     poloidal_flux_enter: float
-        Normalised poloidal flux label of plasma boundary. 
+        Normalised poloidal flux label of plasma boundary.
         If vacuum_propagation_flag, then this is where the solver begins.
         If Psi_BC_flag, then this is where the plasma-vacuum BCs are applied
     poloidal_flux_zero_density: float
@@ -346,7 +346,10 @@ def beam_me_up(
         ne_filename = None
 
     find_density_1D = make_density_fit(
-        density_fit_method, poloidal_flux_zero_density, density_fit_parameters, ne_filename
+        density_fit_method,
+        poloidal_flux_zero_density,
+        density_fit_parameters,
+        ne_filename,
     )
 
     field = create_magnetic_geometry(
