@@ -130,6 +130,7 @@ def beam_me_up(
     vacuum_propagation_flag: bool = False,
     Psi_BC_flag: str = None,
     poloidal_flux_enter: float = 1.0,
+    poloidal_flux_zero_density: float = 1.0, ## When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
     # Finite-difference and solver parameters
     delta_R: float = -0.0001,  # in the same units as data_R_coord
     delta_Z: float = 0.0001,  # in the same units as data_Z_coord
@@ -218,7 +219,11 @@ def beam_me_up(
         If ``continuous``, apply BCs for continuous ne but discontinuous gradient of ne
         If ``discontinuous``, apply BCs for discontinuous ne
     poloidal_flux_enter: float
-        Normalised poloidal flux label of plasma boundary
+        Normalised poloidal flux label of plasma boundary. 
+        If vacuum_propagation_flag, then this is where the solver begins.
+        If Psi_BC_flag, then this is where the plasma-vacuum BCs are applied
+    poloidal_flux_zero_density: float
+        At and above this normalised poloidal flux label, Scotty sets the electron density to zero
     plasmaLaunch_Psi_3D_lab_Cartesian: FloatArray
         :math:`\Psi` of beam in lab Cartesian coordinates. Required if
         ``vacuumLaunch_flag`` is ``False``
@@ -260,7 +265,7 @@ def beam_me_up(
         individual methods for the meaning of their parameters
 
         .. note:: These parameters should *not* include
-           ``poloidal_flux_enter``
+           ``poloidal_flux_zero_density``
     density_fit_method:
         Parameterisation of the density profile. Either a callable
         (see `DensityFit`), or one of the following options:
@@ -278,7 +283,7 @@ def beam_me_up(
 
         If ``density_fit_method`` is a string, then the corresponding
         `DensityFit` object is constructed using
-        ``poloidal_flux_enter`` and ``density_fit_parameters``.
+        ``poloidal_flux_zero_density`` and ``density_fit_parameters``.
 
         ``"smoothing-spline-file"`` looks for a file called
         ``ne<input_filename_suffix>.dat`` in ``ne_data_path``. It also
@@ -289,7 +294,7 @@ def beam_me_up(
            If ``None`` (the default) is passed, the method will be
            guessed from the length of ``density_fit_parameters``. In
            this case, ``quadratic`` and ``tanh`` parameters _should_
-           include ``poloidal_flux_enter`` as the last value.
+           include ``poloidal_flux_zero_density`` as the last value.
     len_tau: int
         Number of output ``tau`` points
     rtol: float
@@ -341,7 +346,7 @@ def beam_me_up(
         ne_filename = None
 
     find_density_1D = make_density_fit(
-        density_fit_method, poloidal_flux_enter, density_fit_parameters, ne_filename
+        density_fit_method, poloidal_flux_zero_density, density_fit_parameters, ne_filename
     )
 
     field = create_magnetic_geometry(
@@ -1936,7 +1941,7 @@ def beam_me_up(
 
 def make_density_fit(
     method: Optional[Union[str, DensityFitLike]],
-    poloidal_flux_enter: float,
+    poloidal_flux_zero_density: float,
     parameters: Optional[Sequence],
     filename: Optional[PathLike],
 ) -> DensityFitLike:
@@ -1958,7 +1963,7 @@ def make_density_fit(
             f"Passing `density_fit_method` ({method}) as string or None requires a list/array of parameters"
         )
 
-    return density_fit(method, poloidal_flux_enter, parameters, filename)
+    return density_fit(method, poloidal_flux_zero_density, parameters, filename)
 
 
 def create_magnetic_geometry(

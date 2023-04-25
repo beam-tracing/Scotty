@@ -31,6 +31,7 @@ kwargs_dict = {
     "vacuum_propagation_flag": True,
     "vacuumLaunch_flag": True,
     "poloidal_flux_enter": 1.0,
+    "poloidal_flux_zero_density": 1.0,
     "B_T_axis": 1.0,
     "B_p_a": 0.1,
     "R_axis": 1.5,
