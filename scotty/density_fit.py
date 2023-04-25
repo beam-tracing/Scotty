@@ -71,7 +71,10 @@ class QuadraticFit(DensityFit):
     """
 
     def __init__(
-        self, poloidal_flux_zero_density: float, ne_0: float, psi_0: Optional[float] = None
+        self,
+        poloidal_flux_zero_density: float,
+        ne_0: float,
+        psi_0: Optional[float] = None,
     ):
         super().__init__(poloidal_flux_zero_density)
         self.ne_0 = ne_0
@@ -89,7 +92,9 @@ class QuadraticFit(DensityFit):
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
         poloidal_flux = np.asfarray(poloidal_flux)
-        return self.ne_0 - ((self.ne_0 / self.poloidal_flux_zero_density) * poloidal_flux**2)
+        return self.ne_0 - (
+            (self.ne_0 / self.poloidal_flux_zero_density) * poloidal_flux**2
+        )
 
     def __repr__(self):
         return f"QuadraticFit({self.poloidal_flux_zero_density}, ne_0={self.ne_0})"
@@ -147,9 +152,7 @@ class TanhFit(DensityFit):
         )
 
     def __repr__(self):
-        return (
-            f"TanhFit({self.poloidal_flux_zero_density}, ne_0={self.ne_0}, ne_1={self.ne_1})"
-        )
+        return f"TanhFit({self.poloidal_flux_zero_density}, ne_0={self.ne_0}, ne_1={self.ne_1})"
 
 
 class PolynomialFit(DensityFit):
@@ -179,9 +182,7 @@ class PolynomialFit(DensityFit):
         return np.polyval(self.coefficients, poloidal_flux)
 
     def __repr__(self):
-        return (
-            f"PolynomialFit({self.poloidal_flux_zero_density}, {', '.join(self.coefficients)})"
-        )
+        return f"PolynomialFit({self.poloidal_flux_zero_density}, {', '.join(self.coefficients)})"
 
 
 class StefanikovaFit(DensityFit):
@@ -321,7 +322,11 @@ class SmoothingSplineFit(DensityFit):
         poloidal_flux_array = radialcoord_array**2
 
         return cls(
-            poloidal_flux_zero_density, poloidal_flux_array, density_array, order, smoothing
+            poloidal_flux_zero_density,
+            poloidal_flux_array,
+            density_array,
+            order,
+            smoothing,
         )
 
     def _fit_impl(self, poloidal_flux):
