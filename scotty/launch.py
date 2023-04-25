@@ -106,7 +106,7 @@ def launch_beam(
         warnings.warn(
             "Boolean `Psi_BC_flag` is deprecated, please use None, 'continuous', or 'discontinuous'",
             DeprecationWarning,
-        )        
+        )
         print("Setting Psi_BC_flag = None for backward compatibility ")
         Psi_BC_flag = None
     elif (
@@ -257,9 +257,9 @@ def launch_beam(
             mode_flag,
             delta_R,
             delta_Z,
-            field, # Field object
-            hamiltonian # Hamiltonian object
-            )
+            field,  # Field object
+            hamiltonian,  # Hamiltonian object
+        )
     elif Psi_BC_flag == "continuous":
         K_initial, Psi_3D_lab_initial = apply_continuous_BC(
             entry_position[0],
@@ -270,9 +270,9 @@ def launch_beam(
             K_Z_entry,
             delta_R,
             delta_Z,
-            field, # Field object
-            hamiltonian # Hamiltonian object
-            )
+            field,  # Field object
+            hamiltonian,  # Hamiltonian object
+        )
     else:
         # No BC case
         K_initial = [K_R_entry, K_zeta_entry, K_Z_entry]
