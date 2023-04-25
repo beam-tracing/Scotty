@@ -569,7 +569,7 @@ def test_launch_golden_answer(tmp_path, generator):
 
     density_fit = make_density_fit(
         args["density_fit_method"],
-        args["poloidal_flux_enter"],
+        args["poloidal_flux_zero_density"],
         parameters,
         ne_filename,
     )
