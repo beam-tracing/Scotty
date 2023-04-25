@@ -5,13 +5,13 @@ from __future__ import annotations
 
 from abc import ABC
 import pathlib
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 from netCDF4 import Dataset
 import numpy as np
 from scipy.interpolate import RectBivariateSpline, UnivariateSpline
 
-from scotty.fun_CFD import find_dpolflux_dR, find_dpolflux_dZ
+from scotty.derivatives import derivative
 from scotty.fun_general import find_nearest
 from scotty.typing import ArrayLike, FloatArray
 
@@ -37,6 +37,61 @@ class MagneticField(ABC):
 
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         raise NotImplementedError
+
+    def d_poloidal_flux_dR(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
+    ) -> FloatArray:
+        return derivative(
+            self.poloidal_flux,
+            "q_R",
+            {"q_R": q_R, "q_Z": q_Z},
+            {"q_R": delta_R},
+            "d1_CFD2",
+        )
+
+    def d_poloidal_flux_dZ(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_Z: float
+    ) -> FloatArray:
+        return derivative(
+            self.poloidal_flux,
+            "q_Z",
+            {"q_R": q_R, "q_Z": q_Z},
+            {"q_Z": delta_Z},
+            "d1_CFD2",
+        )
+
+    def d2_poloidal_flux_dR2(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
+    ) -> FloatArray:
+        return derivative(
+            self.poloidal_flux,
+            ("q_R", "q_R"),
+            {"q_R": q_R, "q_Z": q_Z},
+            {"q_R": delta_R},
+            "d2_CFD2",
+        )
+
+    def d2_poloidal_flux_dZ2(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_Z: float
+    ) -> FloatArray:
+        return derivative(
+            self.poloidal_flux,
+            ("q_Z", "q_Z"),
+            {"q_R": q_R, "q_Z": q_Z},
+            {"q_Z": delta_Z},
+            "d2_CFD2",
+        )
+
+    def d2_poloidal_flux_dRdZ(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float, delta_Z: float
+    ) -> FloatArray:
+        return derivative(
+            self.poloidal_flux,
+            ("q_R", "q_Z"),
+            {"q_R": q_R, "q_Z": q_Z},
+            {"q_Z": delta_Z},
+            "d2_CFD2",
+        )
 
 
 class CircularCrossSectionField(MagneticField):
@@ -195,7 +250,7 @@ class CurvySlabField(MagneticField):
 
 def _make_rect_spline(
     R_grid, Z_grid, array, interp_order: int, interp_smoothing: int
-) -> Callable[[ArrayLike, ArrayLike], FloatArray]:
+) -> Tuple[Callable[[ArrayLike, ArrayLike], FloatArray], RectBivariateSpline]:
     spline = RectBivariateSpline(
         R_grid,
         Z_grid,
@@ -205,7 +260,31 @@ def _make_rect_spline(
         ky=interp_order,
         s=interp_smoothing,
     )
-    return lambda q_R, q_Z: spline(q_R, q_Z, grid=False)
+    return lambda q_R, q_Z: spline(q_R, q_Z, grid=False), spline
+
+
+def _make_spline_derivatives(
+    spline: RectBivariateSpline,
+) -> Tuple[
+    Callable[[ArrayLike, ArrayLike], FloatArray],
+    Callable[[ArrayLike, ArrayLike], FloatArray],
+    Callable[[ArrayLike, ArrayLike], FloatArray],
+    Callable[[ArrayLike, ArrayLike], FloatArray],
+    Callable[[ArrayLike, ArrayLike], FloatArray],
+]:
+    dpsi_dR = spline.partial_derivative(1, 0)
+    dpsi_dZ = spline.partial_derivative(0, 1)
+    d2psi_dR2 = spline.partial_derivative(2, 0)
+    d2psi_dZ2 = spline.partial_derivative(0, 2)
+    d2psi_dRdZ = spline.partial_derivative(1, 1)
+
+    return (
+        lambda q_R, q_Z: dpsi_dR(q_R, q_Z, grid=False),
+        lambda q_R, q_Z: dpsi_dZ(q_R, q_Z, grid=False),
+        lambda q_R, q_Z: d2psi_dR2(q_R, q_Z, grid=False),
+        lambda q_R, q_Z: d2psi_dZ2(q_R, q_Z, grid=False),
+        lambda q_R, q_Z: d2psi_dRdZ(q_R, q_Z, grid=False),
+    )
 
 
 class InterpolatedField(MagneticField):
@@ -242,18 +321,25 @@ class InterpolatedField(MagneticField):
         interp_order: int = 5,
         interp_smoothing: int = 0,
     ):
-        self._interp_B_R = _make_rect_spline(
+        self._interp_B_R, _ = _make_rect_spline(
             R_grid, Z_grid, B_R, interp_order, interp_smoothing
         )
-        self._interp_B_T = _make_rect_spline(
+        self._interp_B_T, _ = _make_rect_spline(
             R_grid, Z_grid, B_T, interp_order, interp_smoothing
         )
-        self._interp_B_Z = _make_rect_spline(
+        self._interp_B_Z, _ = _make_rect_spline(
             R_grid, Z_grid, B_Z, interp_order, interp_smoothing
         )
-        self._interp_poloidal_flux = _make_rect_spline(
+        self._interp_poloidal_flux, psi_spline = _make_rect_spline(
             R_grid, Z_grid, psi, interp_order, interp_smoothing
         )
+        (
+            self._dpsi_dR,
+            self._dpsi_dZ,
+            self._d2psi_dR2,
+            self._d2psi_dZ2,
+            self._d2psi_dRdZ,
+        ) = _make_spline_derivatives(psi_spline)
 
         self.R_coord = R_grid
         self.Z_coord = Z_grid
@@ -271,6 +357,31 @@ class InterpolatedField(MagneticField):
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         return self._interp_poloidal_flux(q_R, q_Z)
 
+    def d_poloidal_flux_dR(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
+    ) -> FloatArray:
+        return self._dpsi_dR(q_R, q_Z)
+
+    def d_poloidal_flux_dZ(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
+    ) -> FloatArray:
+        return self._dpsi_dZ(q_R, q_Z)
+
+    def d2_poloidal_flux_dR2(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
+    ) -> FloatArray:
+        return self._d2psi_dR2(q_R, q_Z)
+
+    def d2_poloidal_flux_dZ2(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
+    ) -> FloatArray:
+        return self._d2psi_dZ2(q_R, q_Z)
+
+    def d2_poloidal_flux_dRdZ(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float, delta_Z: float
+    ) -> FloatArray:
+        return self._d2psi_dRdZ(q_R, q_Z)
+
 
 class EFITField(MagneticField):
     def __init__(
@@ -282,8 +393,6 @@ class EFITField(MagneticField):
         psi_unnorm_axis: float,
         psi_unnorm_boundary: float,
         psi_norm_1D: Optional[FloatArray] = None,
-        delta_R: float = 0.0001,
-        delta_Z: float = 0.0001,
         interp_order: int = 5,
         interp_smoothing: int = 0,
     ):
@@ -291,12 +400,16 @@ class EFITField(MagneticField):
         self.Z_coord = Z_grid
         self.poloidalFlux_grid = psi_norm_2D
 
-        self.delta_R = delta_R
-        self.delta_Z = delta_Z
-
-        self._interp_poloidal_flux = _make_rect_spline(
+        self._interp_poloidal_flux, psi_spline = _make_rect_spline(
             R_grid, Z_grid, psi_norm_2D, interp_order, interp_smoothing
         )
+        (
+            self._dpsi_dR,
+            self._dpsi_dZ,
+            self._d2psi_dR2,
+            self._d2psi_dZ2,
+            self._d2psi_dRdZ,
+        ) = _make_spline_derivatives(psi_spline)
 
         self.poloidal_flux_gradient = psi_unnorm_boundary - psi_unnorm_axis
         if psi_norm_1D is None:
@@ -314,9 +427,7 @@ class EFITField(MagneticField):
         )
 
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        dpolflux_dZ = find_dpolflux_dZ(
-            q_R, q_Z, self.delta_Z, self._interp_poloidal_flux
-        )
+        dpolflux_dZ = self.d_poloidal_flux_dZ(q_R, q_Z, 0.0)
         return -dpolflux_dZ * self.poloidal_flux_gradient / q_R
 
     def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
@@ -324,21 +435,42 @@ class EFITField(MagneticField):
         return self._interp_rBphi(polflux) / q_R
 
     def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        dpolflux_dR = find_dpolflux_dR(
-            q_R, q_Z, self.delta_R, self._interp_poloidal_flux
-        )
+        dpolflux_dR = self.d_poloidal_flux_dR(q_R, q_Z, 0.0)
         return dpolflux_dR * self.poloidal_flux_gradient / q_R
 
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         return self._interp_poloidal_flux(q_R, q_Z)
+
+    def d_poloidal_flux_dR(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
+    ) -> FloatArray:
+        return self._dpsi_dR(q_R, q_Z)
+
+    def d_poloidal_flux_dZ(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
+    ) -> FloatArray:
+        return self._dpsi_dZ(q_R, q_Z)
+
+    def d2_poloidal_flux_dR2(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
+    ) -> FloatArray:
+        return self._d2psi_dR2(q_R, q_Z)
+
+    def d2_poloidal_flux_dZ2(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
+    ) -> FloatArray:
+        return self._d2psi_dZ2(q_R, q_Z)
+
+    def d2_poloidal_flux_dRdZ(
+        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float, delta_Z: float
+    ) -> FloatArray:
+        return self._d2psi_dRdZ(q_R, q_Z)
 
     @classmethod
     def from_EFITpp(
         cls,
         filename: pathlib.Path,
         equil_time: float,
-        delta_R: float,
-        delta_Z: float,
         interp_order: int,
         interp_smoothing: int,
     ):
@@ -372,8 +504,6 @@ class EFITField(MagneticField):
             psi_norm_1D=norm_psi_1D,
             psi_unnorm_axis=0.0,
             psi_unnorm_boundary=polflux_const_m,
-            delta_R=delta_R,
-            delta_Z=delta_Z,
             interp_order=interp_order,
             interp_smoothing=interp_smoothing,
         )
@@ -383,8 +513,6 @@ class EFITField(MagneticField):
         cls,
         filename: pathlib.Path,
         equil_time: float,
-        delta_R: float,
-        delta_Z: float,
         interp_order: int,
         interp_smoothing: int,
     ):
@@ -424,8 +552,6 @@ class EFITField(MagneticField):
             psi_norm_1D=poloidalFlux,
             psi_unnorm_axis=psi_axis,
             psi_unnorm_boundary=psi_boundary,
-            delta_R=delta_R,
-            delta_Z=delta_Z,
             interp_order=interp_order,
             interp_smoothing=interp_smoothing,
         )
@@ -435,8 +561,6 @@ class EFITField(MagneticField):
         cls,
         filename: pathlib.Path,
         equil_time: float,
-        delta_R: float,
-        delta_Z: float,
         interp_order: int,
         interp_smoothing: int,
     ):
@@ -455,8 +579,6 @@ class EFITField(MagneticField):
                 psi_unnorm_boundary=loadfile["poloidalFlux_unnormalised_boundary"][
                     t_idx
                 ],
-                delta_R=delta_R,
-                delta_Z=delta_Z,
                 interp_order=interp_order,
                 interp_smoothing=interp_smoothing,
             )

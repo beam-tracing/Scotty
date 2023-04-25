@@ -2113,11 +2113,6 @@ def create_magnetic_geometry(
     ########################################
     # Interpolated numerical geometries from EFIT data
 
-    if delta_R is None:
-        raise ValueError(missing_arg("delta_R"))
-    if delta_Z is None:
-        raise ValueError(missing_arg("delta_Z"))
-
     if find_B_method == "UDA_saved" and shot is None:
         print("Using MAST(-U) saved UDA data")
         # If using this part of the code, magnetic_data_path needs to include the filename
@@ -2130,8 +2125,6 @@ def create_magnetic_geometry(
                 psi_norm_2D=loadfile["poloidalFlux_grid"],
                 psi_unnorm_axis=loadfile["poloidalFlux_unnormalised_axis"],
                 psi_unnorm_boundary=loadfile["poloidalFlux_unnormalised_boundary"],
-                delta_R=delta_R,
-                delta_Z=delta_Z,
                 interp_order=interp_order,
                 interp_smoothing=interp_smoothing,
             )
@@ -2148,8 +2141,6 @@ def create_magnetic_geometry(
         return EFITField.from_EFITpp(
             magnetic_data_path / "efitOut.nc",
             equil_time,
-            delta_R,
-            delta_Z,
             interp_order,
             interp_smoothing,
         )
@@ -2160,12 +2151,7 @@ def create_magnetic_geometry(
         # data saved differently for MAST-U shots
         filename = magnetic_data_path / f"{shot}_equilibrium_data.npz"
         return EFITField.from_MAST_saved(
-            filename,
-            equil_time,
-            delta_R,
-            delta_Z,
-            interp_order,
-            interp_smoothing,
+            filename, equil_time, interp_order, interp_smoothing
         )
 
     if find_B_method == "UDA_saved" and shot is not None and shot > 30471:  # MAST-U
@@ -2174,12 +2160,7 @@ def create_magnetic_geometry(
         # data saved differently for MAST-U shots
         filename = magnetic_data_path / f"{shot}_equilibrium_data.npz"
         return EFITField.from_MAST_U_saved(
-            filename,
-            equil_time,
-            delta_R,
-            delta_Z,
-            interp_order,
-            interp_smoothing,
+            filename, equil_time, interp_order, interp_smoothing
         )
 
     raise ValueError(f"Invalid find_B_method '{find_B_method}'")
