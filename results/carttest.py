@@ -298,7 +298,7 @@ def grad_B_xyz(mag_field_obj, q_R, q_zeta, q_Z):
     B_zplus = B_xyz(mag_field_obj, q_R, q_Z+d)[:,:,2]
     B_zminus = B_xyz(mag_field_obj, q_R, q_Z-d)[:,:,2]
     
-    return np.stack(B_xplus - B_xminus, B_yplus - B_yminus, B_zplus - B_zminus, axis=-1)
+    return np.stack(B_xplus - B_xminus, B_yplus - B_yminus, B_zplus - B_zminus, axis=-1)/d
 
 def bhat_xyz(mag_field_obj, q_R, q_Z):
     """
@@ -337,4 +337,4 @@ def grad_bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z):
     bhat_zplus = bhat_xyz(mag_field_obj, q_R, q_Z+d)[:,:,2]
     bhat_zminus = bhat_xyz(mag_field_obj, q_R, q_Z-d)[:,:,2]
     
-    return np.stack(bhat_xplus - bhat_xminus, bhat_yplus - bhat_yminus, bhat_zplus - bhat_zminus, axis=-1)
+    return np.stack(bhat_xplus - bhat_xminus, bhat_yplus - bhat_yminus, bhat_zplus - bhat_zminus, axis=-1)/d
