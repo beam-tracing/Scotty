@@ -277,18 +277,19 @@ class Hamiltonian:
                 "d2H_dKR2": apply_stencil(("K_R", "K_R"), "d2_CFD2"),
                 "d2H_dKzeta2": apply_stencil(("K_zeta", "K_zeta"), "d2_CFD2"),
                 "d2H_dKZ2": apply_stencil(("K_Z", "K_Z"), "d2_CFD2"),
-                "d2H_dR_dZ": apply_stencil(("q_R", "q_Z"), "d2d2_FFD_FFD2"),
-                "d2H_dR_dKR": apply_stencil(("q_R", "K_R"), "d2d2_FFD_CFD2"),
-                "d2H_dR_dKzeta": apply_stencil(("q_R", "K_zeta"), "d2d2_FFD_CFD2"),
-                "d2H_dR_dKZ": apply_stencil(("q_R", "K_Z"), "d2d2_FFD_CFD2"),
-                "d2H_dZ_dKR": apply_stencil(("q_Z", "K_R"), "d2d2_FFD_CFD2"),
-                "d2H_dZ_dKzeta": apply_stencil(("q_Z", "K_zeta"), "d2d2_FFD_CFD2"),
-                "d2H_dZ_dKZ": apply_stencil(("q_Z", "K_Z"), "d2d2_FFD_CFD2"),
-                "d2H_dKR_dKZ": apply_stencil(("K_R", "K_Z"), "d2d2_CFD_CFD2"),
-                "d2H_dKR_dKzeta": apply_stencil(("K_R", "K_zeta"), "d2d2_CFD_CFD2"),
-                "d2H_dKzeta_dKZ": apply_stencil(("K_zeta", "K_Z"), "d2d2_CFD_CFD2"),
+                "d2H_dR_dZ": apply_stencil(("q_R", "q_Z"), "d1d1_FFD_FFD2"),
+                "d2H_dR_dKR": apply_stencil(("q_R", "K_R"), "d1d1_FFD_CFD2"),
+                "d2H_dR_dKzeta": apply_stencil(("q_R", "K_zeta"), "d1d1_FFD_CFD2"),
+                "d2H_dR_dKZ": apply_stencil(("q_R", "K_Z"), "d1d1_FFD_CFD2"),
+                "d2H_dZ_dKR": apply_stencil(("q_Z", "K_R"), "d1d1_FFD_CFD2"),
+                "d2H_dZ_dKzeta": apply_stencil(("q_Z", "K_zeta"), "d1d1_FFD_CFD2"),
+                "d2H_dZ_dKZ": apply_stencil(("q_Z", "K_Z"), "d1d1_FFD_CFD2"),
+                "d2H_dKR_dKZ": apply_stencil(("K_R", "K_Z"), "d1d1_CFD_CFD2"),
+                "d2H_dKR_dKzeta": apply_stencil(("K_R", "K_zeta"), "d1d1_CFD_CFD2"),
+                "d2H_dKzeta_dKZ": apply_stencil(("K_zeta", "K_Z"), "d1d1_CFD_CFD2"),
             }
             derivatives.update(second_derivatives)
+
         return derivatives
 
 

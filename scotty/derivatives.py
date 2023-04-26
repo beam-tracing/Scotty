@@ -56,7 +56,7 @@ STENCILS: Dict[str, Stencil] = {
     "d1_CFD2": {(-1,): -0.5, (1,): 0.5},
     "d1_CFD4": {(-2,): 1 / 12, (-1,): -2 / 3, (1,): 2 / 3, (2,): -1 / 12},
     "d2_CFD2": {(-1,): 1, (0,): -2, (1,): 1},
-    "d2d2_FFD_FFD2": {
+    "d1d1_FFD_FFD2": {
         (0, 0): 2.25,
         (0, 1): -3,
         (0, 2): 0.75,
@@ -67,7 +67,7 @@ STENCILS: Dict[str, Stencil] = {
         (2, 1): -1,
         (2, 2): 0.25,
     },
-    "d2d2_FFD_CFD2": {
+    "d1d1_FFD_CFD2": {
         (0, -1): 0.25,
         (0, 0): 1,
         (0, 1): -1.25,
@@ -77,16 +77,31 @@ STENCILS: Dict[str, Stencil] = {
         (2, 0): 1,
         (2, 1): -0.75,
     },
-    "d2d2_CFD_CFD2": {
+    "d1d1_CFD_CFD2": {
         (1, 1): 0.25,
         (1, -1): -0.25,
         (-1, 1): -0.25,
         (-1, -1): 0.25,
     },
 }
+"""Finite difference stencils for `derivative`.
 
+The second-derivative stencils are optimised for minimal function evaluations.
 
+The naming scheme here is ``<order>_<kind><error>`` with:
 
+- ``<order>`` is ``d<n>`` for the ``n``th derivative, and this is repeated for
+  multiple dimensions
+- ``<kind>`` is either ``FFD`` for forward finite difference or ``CFD`` for
+  central finite difference, again repeated for each dimension
+- ``<error>`` is the order of the error scaling
+
+So ``d1d1_FFD_CFD2`` is the first mixed-derivative of two dimensions, using
+forward differences for the first dimension and central for the second, with
+second-order error overall
+"""
+
+_derivative_function_cache: Dict[Callable, Callable] = {}
 
 
 def derivative(
@@ -172,7 +187,7 @@ def derivative(
 
     if stencil is None:
         if len(dims) == 2:
-            stencil = "d2d2_CFD_CFD2"
+            stencil = "d1d1_CFD_CFD2"
         elif len(dim_spacings) == 2:
             stencil = "d2_CFD2"
         elif len(dim_spacings) == 1:
