@@ -4,6 +4,51 @@ import numpy as np
 from typing import Callable, Dict, Optional, Tuple, Union
 from scotty.typing import ArrayLike, FloatArray
 
+import functools
+
+
+def _maybe_bytes(arg):
+    """Return either ``arg`` as bytes if possible, or just ``arg``"""
+    try:
+        return arg.tobytes()
+    except AttributeError:
+        return arg
+
+
+def cache(func):
+    """Simple caching of a function compatible with numpy array arguments"""
+    hits = misses = 0
+
+    @functools.wraps(func)
+    def wrapper_cache(*args, **kwargs):
+        nonlocal hits, misses
+        cache_key = hash(
+            (
+                tuple(map(_maybe_bytes, args)),
+                tuple((k, _maybe_bytes(v)) for k, v in kwargs.items()),
+            )
+        )
+
+        try:
+            result = wrapper_cache.cache[cache_key]
+            hits += 1
+        except KeyError:
+            result = func(*args, **kwargs)
+            wrapper_cache.cache[cache_key] = result
+            misses += 1
+
+        return result
+
+    def cache_info():
+        """Return some information on cache usage by this function"""
+        nonlocal hits, misses
+        return {"hits": hits, "misses": misses}
+
+    wrapper_cache.cache = {}
+    wrapper_cache.cache_info = cache_info
+    return wrapper_cache
+
+
 Stencil = Dict[Tuple, float]
 
 STENCILS: Dict[str, Stencil] = {
