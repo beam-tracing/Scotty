@@ -3,7 +3,7 @@
 
 from scotty.geometry import MagneticField
 from scotty.density_fit import DensityFitLike
-from scotty.derivatives import derivative, CoordOffset
+from scotty.derivatives import derivative
 from scotty.fun_general import (
     angular_frequency_to_wavenumber,
     find_normalised_gyro_freq,
@@ -12,8 +12,6 @@ from scotty.fun_general import (
 )
 from scotty.typing import ArrayLike, FloatArray
 
-
-from dataclasses import dataclass, asdict
 import numpy as np
 from typing import Dict, Tuple
 
@@ -257,14 +255,11 @@ class Hamiltonian:
 
         """
 
-        # We cache Hamiltonian evaluations only during this function call
-        cache: Dict[CoordOffset, ArrayLike] = {}
-
         # Capture the location we want the derivatives at
         starts = {"q_R": q_R, "q_Z": q_Z, "K_R": K_R, "K_zeta": K_zeta, "K_Z": K_Z}
 
-        def apply_stencil(dims: Tuple[str,...], stencil: str):
-            return derivative(self, dims, starts, self.spacings, stencil, cache)
+        def apply_stencil(dims: Tuple[str, ...], stencil: str):
+            return derivative(self, dims, starts, self.spacings, stencil)
 
         # We always compute the first order derivatives
         derivatives = {

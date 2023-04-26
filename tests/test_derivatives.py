@@ -6,26 +6,14 @@ from time import sleep, time_ns
 
 
 def test_first_derivative():
-    result = derivative(
-        lambda q_R: np.sin(q_R),
-        "q_R",
-        {"q_R": 0.0},
-        spacings={"q_R": 1e-8},
-        stencil="d1_CFD2",
-    )
+    result = derivative(lambda x: np.sin(x), "x", {"x": 0.0})
 
     assert np.isclose(result, 1.0)
 
 
 def test_2D_derivative():
-    cache = {}
     result = derivative(
-        lambda q_R, q_Z: np.sin(q_R) * q_Z**2,
-        ("q_R", "q_Z"),
-        {"q_R": 0.0, "q_Z": 2.0},
-        spacings={"q_R": 1e-8, "q_Z": 1e-8},
-        stencil="d2d2_CFD_CFD2",
-        cache=cache,
+        lambda x, y: np.sin(x) * y**2, ("x", "y"), {"x": 0.0, "y": 2.0}
     )
     assert np.isclose(result, 4.0)
 

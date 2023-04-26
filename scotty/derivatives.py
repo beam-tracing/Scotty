@@ -1,4 +1,3 @@
-from dataclasses import dataclass, asdict
 import numpy as np
 
 from typing import Callable, Dict, Optional, Tuple, Union
@@ -87,57 +86,54 @@ STENCILS: Dict[str, Stencil] = {
 }
 
 
-@dataclass(frozen=True)
-class CoordOffset:
-    """Helper class to store relative offsets in a dict"""
 
-    q_R: int = 0
-    q_Z: int = 0
-    K_R: int = 0
-    K_zeta: int = 0
-    K_Z: int = 0
 
 
 def derivative(
     func: Callable,
     dims: Union[str, Tuple[str, ...]],
-    location: Dict[str, ArrayLike],
-    spacings: Dict[str, float],
-    stencil: str,
-    cache: Optional[Dict[CoordOffset, ArrayLike]] = None,
+    args: Dict[str, ArrayLike],
+    spacings: Union[float, Dict[str, float]] = 1e-8,
+    stencil: Optional[str] = None,
+    use_cache: bool = True,
 ) -> FloatArray:
-    """Take the derivative of a function in arbitrary dimensions.
+    """Partial derivative of a function along one or more of its arguments.
 
-    The arguments to ``func`` must be exactly the keys of ``location``. The
-    function will be evaluated at positions around ``location`` given by the
+    Currently this can take partial derivatives in one or two arguments, given
+    by ``dims`` and evaluated at ``args``. The arguments to ``func`` must be
+    exactly the keys of ``args``, and ``func`` must be able to take them as
+    keyword arguments.
+
+    The function will be evaluated at points around ``args`` given by the
     integer offsets in the stencil multiplied by the step size in each dimension
     given in ``spacings``.
 
-    An optional cache can be given in order to reuse function evaluations
-    between derivatives of the function. The keys of the cache mapping will be
-    `CoordOffset` instances, representing the integer offsets of the
-    stencil. Practically, this means that the cache should only be used for
-    derivatives at the same location, and should be cleared to evaluate
-    derivatives at other locations.
+    By default, calls to ``func`` with a given set of arguments will be cached,
+    which enables re-use of evaluation points across multiple derivatives. This
+    is particularly useful when needing to take partial derivatives in many
+    directions. However, if ``func`` has side effects, such as printing
+    variables, these will not work, and you should set ``use_cache = False``.
 
     Parameters
     ----------
-    func : Callable
+    func:
         Function to take the derivative of
-    dims : Union[str, Tuple[str, ...]]
+    dims:
         The name(s) of the dimension(s) to take the derivative along. ``dims``
-        must appear in the keys of ``location``
-    location : Dict[str, ArrayLike]
-        Mapping of dimension names to evaluation point values. The evaluation
-        points may be scalars or arrays. If arrays, they should all be the same
-        size and ``func`` must be capable of vectorised arguments.
-    spacings : Dict[str, float]
-        Mapping of dimension names to step size. The keys must be identical to
-        those of ``location``
-    stencil : Optional[str]
-        Stencil name (see `STENCILS` for supported stencils)
-    cache : Optional[Dict[CoordOffset, ArrayLike]]
-        Mapping of integer offsets to previous evaluations of ``func``
+        must appear in the keys of ``args``. For second derivatives in one
+        dimension, pass a tuple with the argument name repeated, for example
+        ``("x", "x")`` for the second derivative in ``x``
+    args:
+        Arguments to ``func`` at the point to evaluate the derivative
+    spacings:
+        Step size for derivative. If a single float, used for all dimensions,
+        otherwise if a mapping of dimension names to step size then the keys
+        must be identical to those of ``dims``
+    stencil:
+        Stencil name (see `STENCILS` for supported stencils). Defaults to
+        central differences
+    use_cache:
+        If true, then wraps ``func`` with the decorator `cache`
 
     Returns
     -------
@@ -146,10 +142,11 @@ def derivative(
 
     Examples
     --------
-    >>> derivative(lambda q_R: np.sin(q_R), "q_R", {"q_R": 0.0}, spacings={"q_R": 1e-8})
+    >>> derivative(lambda x: np.sin(x), "x", {"x": 0.0})
     1.0
 
-    >>>
+    >>> derivative(lambda x, y: np.sin(x) * y**2, ("x", "y"), {"x": 0.0, "y": 2.0})
+    4.0
 
     """
 
@@ -157,17 +154,33 @@ def derivative(
     if isinstance(dims, str):
         dims = (dims,)
 
+    for dim in dims:
+        if dim not in args:
+            raise ValueError(f"Dimension '{dim}' not in 'args' ({list(args.keys())})")
+
+    if not isinstance(spacings, dict):
+        default_spacing = spacings
+        spacings = {dim: default_spacing for dim in dims}
+
     # Collect the relative spacings for the derivative dimensions
     dim_spacings = [spacings[dim] for dim in dims]
-    # For second order derivatives, remove repeated dimensions
+    # For second order derivatives, remove repeated dimensions. We need to do
+    # this after getting the list of step sizes so that this is correct for
+    # second order derivatives
     if len(dims) == 2 and dims[1] == dims[0]:
         dims = (dims[0],)
 
-    # We need an array the same shape as the input arrays in `location`
-    result = np.zeros(np.broadcast(*location.values()).shape)
-
-    if cache is None:
-        cache = {}
+    if stencil is None:
+        if len(dims) == 2:
+            stencil = "d2d2_CFD_CFD2"
+        elif len(dim_spacings) == 2:
+            stencil = "d2_CFD2"
+        elif len(dim_spacings) == 1:
+            stencil = "d1_CFD2"
+        else:
+            raise ValueError(
+                f"No stencil given and unsupported derivative order (dims={dims})"
+            )
 
     try:
         stencil_ = STENCILS[stencil]
@@ -176,22 +189,27 @@ def derivative(
             f"Unknown stencil name '{stencil}', expected one of {list(STENCILS.keys())}"
         )
 
-    for stencil_offsets, weight in stencil_.items():
-        coord_offsets = CoordOffset(**dict(zip(dims, stencil_offsets)))
+    # Retrieve or create a version of the user function that caches results
+    global _derivative_function_cache
+    if use_cache:
         try:
-            # See if we've already evaluated func here...
-            func_at_offset = cache[coord_offsets]
+            cached_func = _derivative_function_cache[func]
         except KeyError:
-            # ...if not, let's do so now
-            offsets = asdict(coord_offsets)
-            # Convert integer offsets to absolute positions
-            coords = {
-                dim: start + offsets[dim] * spacings.get(dim, 0.0)
-                for dim, start in location.items()
-            }
-            # Evaluate the derivative at this offset and cache it
-            func_at_offset = func(**coords)
-            cache[coord_offsets] = func_at_offset
+            cached_func = cache(func)
+            _derivative_function_cache[func] = cached_func
+    else:
+        cached_func = func
 
-        result += weight * func_at_offset
+    # We need an array with a shape compatible with input arrays in `args`
+    result = np.zeros(np.broadcast(*args.values()).shape)
+
+    # Now we can actually compute the derivative
+    for stencil_offsets, weight in stencil_.items():
+        offsets = dict(zip(dims, stencil_offsets))
+        # Convert integer offsets to absolute positions
+        coords = {
+            dim: start + offsets.get(dim, 0) * spacings.get(dim, 0.0)
+            for dim, start in args.items()
+        }
+        result += weight * cached_func(**coords)
     return result / np.prod(dim_spacings)

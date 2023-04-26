@@ -42,22 +42,14 @@ class MagneticField(ABC):
         self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
     ) -> FloatArray:
         return derivative(
-            self.poloidal_flux,
-            "q_R",
-            {"q_R": q_R, "q_Z": q_Z},
-            {"q_R": delta_R},
-            "d1_CFD2",
+            self.poloidal_flux, "q_R", {"q_R": q_R, "q_Z": q_Z}, {"q_R": delta_R}
         )
 
     def d_poloidal_flux_dZ(
         self, q_R: ArrayLike, q_Z: ArrayLike, delta_Z: float
     ) -> FloatArray:
         return derivative(
-            self.poloidal_flux,
-            "q_Z",
-            {"q_R": q_R, "q_Z": q_Z},
-            {"q_Z": delta_Z},
-            "d1_CFD2",
+            self.poloidal_flux, "q_Z", {"q_R": q_R, "q_Z": q_Z}, {"q_Z": delta_Z}
         )
 
     def d2_poloidal_flux_dR2(
@@ -68,7 +60,6 @@ class MagneticField(ABC):
             ("q_R", "q_R"),
             {"q_R": q_R, "q_Z": q_Z},
             {"q_R": delta_R},
-            "d2_CFD2",
         )
 
     def d2_poloidal_flux_dZ2(
@@ -79,7 +70,6 @@ class MagneticField(ABC):
             ("q_Z", "q_Z"),
             {"q_R": q_R, "q_Z": q_Z},
             {"q_Z": delta_Z},
-            "d2_CFD2",
         )
 
     def d2_poloidal_flux_dRdZ(
@@ -89,8 +79,7 @@ class MagneticField(ABC):
             self.poloidal_flux,
             ("q_R", "q_Z"),
             {"q_R": q_R, "q_Z": q_Z},
-            {"q_Z": delta_Z},
-            "d2_CFD2",
+            {"q_R": delta_R, "q_Z": delta_Z},
         )
 
 
