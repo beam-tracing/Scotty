@@ -28,6 +28,8 @@ from scotty.fun_general import (
     freq_GHz_to_angular_frequency,
     angular_frequency_to_wavenumber,
     find_Psi_3D_lab,
+    find_dbhat_dR,
+    find_dbhat_dZ,
 )
 
 def create_magnetic_geometry(
@@ -261,80 +263,145 @@ field = create_magnetic_geometry(
     delta_Z = 0.0001,
 )
 
-def B_xyz(mag_field_obj, q_R, q_Z):
+def B_xyz(mag_field_obj, q_R, q_zeta, q_Z):
     """
     Finds B-field in Cartesian (X, Y, Z) coordinates from MagneticField object.
     Input:
         mag_field_obj (MagneticField instance): instance of MagneticField object
-        q_R (array): q_R array
-        q_Z (array): q_Z array
+        q_R (array): radius R of position q
+        q_zeta (array): angle zeta of position q
+        q_Z (array): height Z of position q
     Output:
         B_xyz array of B field in X, Y, Z coordinates, with coordinate dimensions as last dimension
     """
     B_R = mag_field_obj.B_R(q_R, q_Z)
-    B_T = mag_field_obj.B_T(q_R, q_Z)# assuming this is rad
+    B_T = mag_field_obj.B_T(q_R, q_Z)
     B_Z = mag_field_obj.B_Z(q_R, q_Z)
     #B_mag = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
-    return np.stack(B_R*np.cos(B_T), B_R*np.sin(B_T), B_Z, axis=-1)
+    
+    return np.stack(B_R*np.cos(q_zeta) - B_T*np.sin(q_zeta), B_R*np.sin(q_zeta) + B_T*np.cos(q_zeta), B_Z, axis=-1)
 
-def grad_B_xyz(mag_field_obj, q_R, q_zeta, q_Z):
+def grad_B_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
     """
     Finds gradient of B-field in Cartesian (X, Y, Z) coordinates from MagneticField object.
     Input:
         mag_field_obj (MagneticField instance): instance of MagneticField object
-        q_R (array): q_R array
-        q_zeta (array): q_zeta array
-        q_Z (array): q_Z array
+        q_R (array): radius R of position q
+        q_zeta (array): angle zeta of position q
+        q_Z (array): height Z of position q
     Output:
         grad_B_xyz array of B field in X, Y, Z coordinates, with coordinate dimensions as last dimension
     """
-    d = 1e-3
-    dr_x = d/np.cos(q_zeta)
-    dr_y = d/np.sin(q_zeta)
-    B_xplus = B_xyz(mag_field_obj, q_R+dr_x, q_Z)[:,:,0]
-    B_xminus = B_xyz(mag_field_obj, q_R-dr_x, q_Z)[:,:,0]
-    B_yplus = B_xyz(mag_field_obj, q_R+dr_y, q_Z)[:,:,1]
-    B_yminus = B_xyz(mag_field_obj, q_R-dr_y, q_Z)[:,:,1]
-    B_zplus = B_xyz(mag_field_obj, q_R, q_Z+d)[:,:,2]
-    B_zminus = B_xyz(mag_field_obj, q_R, q_Z-d)[:,:,2]
+    #delta = 1e-3
+    dr_x = delta/np.cos(q_zeta)
+    dr_y = delta/np.sin(q_zeta)
+    dzeta_x = -delta/np.sin(q_zeta)
+    dzeta_y = dr_x#delta/np.cos(q_zeta)
     
-    return np.stack(B_xplus - B_xminus, B_yplus - B_yminus, B_zplus - B_zminus, axis=-1)/d
+    B_xplus = B_xyz(mag_field_obj, q_R +dr_x, q_zeta +dzeta_x, q_Z)[:,:,0]
+    B_xminus = B_xyz(mag_field_obj, q_R -dr_x, q_zeta -dzeta_x, q_Z)[:,:,0]
+    B_yplus = B_xyz(mag_field_obj, q_R +dr_y, q_zeta +dzeta_y, q_Z)[:,:,1]
+    B_yminus = B_xyz(mag_field_obj, q_R -dr_y, q_zeta -dzeta_y, q_Z)[:,:,1]
+    B_zplus = B_xyz(mag_field_obj, q_R, q_zeta, q_Z +delta)[:,:,2]
+    B_zminus = B_xyz(mag_field_obj, q_R, q_zeta, q_Z -delta)[:,:,2]
+    
+    return 0.5*np.stack(B_xplus - B_xminus, B_yplus - B_yminus, B_zplus - B_zminus, axis=-1)/delta
 
-def bhat_xyz(mag_field_obj, q_R, q_Z):
+def bhat(mag_field_obj, q_R, q_Z):
+    """
+    Finds bhat (in cylindrical (R, zeta, Z)) coordinates from MagneticField object.
+    Input:
+        mag_field_obj (MagneticField instance): instance of MagneticField object
+        q_R (array): radius R of position q
+        q_Z (array): height Z of position q
+    Output:
+        bhat array of B field in R, zeta, Z coordinates, with coordinate dimensions as last dimension
+    """
+    B_R = mag_field_obj.B_R(q_R, q_Z)
+    B_T = mag_field_obj.B_T(q_R, q_Z)
+    B_Z = mag_field_obj.B_Z(q_R, q_Z)
+    B_mag = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
+    
+    return np.stack(B_R, B_T, B_Z, axis=-1)/B_mag
+
+def bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z):
     """
     Finds bhat in Cartesian (X, Y, Z) coordinates from MagneticField object.
     Input:
         mag_field_obj (MagneticField instance): instance of MagneticField object
-        q_R (array): q_R array
-        q_Z (array): q_Z array
+        q_R (array): radius R of position q
+        q_zeta (array): angle zeta of position q
+        q_Z (array): height Z of position q
     Output:
         bhat_xyz array of B field in X, Y, Z coordinates, with coordinate dimensions as last dimension
     """
     B_R = mag_field_obj.B_R(q_R, q_Z)
-    B_T = mag_field_obj.B_T(q_R, q_Z)# assuming this is rad
+    B_T = mag_field_obj.B_T(q_R, q_Z)
     B_Z = mag_field_obj.B_Z(q_R, q_Z)
     B_mag = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
-    return np.stack(B_R*np.cos(B_T), B_R*np.sin(B_T), B_Z, axis=-1)/B_mag
+    
+    return np.stack(B_R*np.cos(q_zeta) - B_T*np.sin(q_zeta), B_R*np.sin(q_zeta) + B_T*np.cos(q_zeta), B_Z, axis=-1)/B_mag
 
-def grad_bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z):
+def grad_bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
     """
     Finds gradient of bhat in Cartesian (X, Y, Z) coordinates from MagneticField object.
     Input:
         mag_field_obj (MagneticField instance): instance of MagneticField object
-        q_R (array): q_R array
-        q_zeta (array): q_zeta array
-        q_Z (array): q_Z array
+        q_R (array): radius R of position q
+        q_zeta (array): angle zeta of position q
+        q_Z (array): height Z of position q
     Output:
         grad_bhat_xyz array of B field in X, Y, Z coordinates, with coordinate dimensions as last dimension
     """
-    d = 1e-3
-    dr_x = d/np.cos(q_zeta)
-    dr_y = d/np.sin(q_zeta)
-    bhat_xplus = bhat_xyz(mag_field_obj, q_R+dr_x, q_Z)[:,:,0]
-    bhat_xminus = bhat_xyz(mag_field_obj, q_R-dr_x, q_Z)[:,:,0]
-    bhat_yplus = bhat_xyz(mag_field_obj, q_R+dr_y, q_Z)[:,:,1]
-    bhat_yminus = bhat_xyz(mag_field_obj, q_R-dr_y, q_Z)[:,:,1]
-    bhat_zplus = bhat_xyz(mag_field_obj, q_R, q_Z+d)[:,:,2]
-    bhat_zminus = bhat_xyz(mag_field_obj, q_R, q_Z-d)[:,:,2]
+    #delta = 1e-3
+    dr_x = delta/np.cos(q_zeta)
+    dr_y = delta/np.sin(q_zeta)
+    dzeta_x = -delta/np.sin(q_zeta)
+    dzeta_y = dr_x#delta/np.cos(q_zeta)
     
-    return np.stack(bhat_xplus - bhat_xminus, bhat_yplus - bhat_yminus, bhat_zplus - bhat_zminus, axis=-1)/d
+    bhat_xplus = bhat_xyz(mag_field_obj, q_R +dr_x, q_zeta +dzeta_x, q_Z)[:,:,0]
+    bhat_xminus = bhat_xyz(mag_field_obj, q_R -dr_x, q_zeta -dzeta_x, q_Z)[:,:,0]
+    bhat_yplus = bhat_xyz(mag_field_obj, q_R +dr_y, q_zeta +dzeta_y, q_Z)[:,:,1]
+    bhat_yminus = bhat_xyz(mag_field_obj, q_R -dr_y, q_zeta -dzeta_y, q_Z)[:,:,1]
+    bhat_zplus = bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z +delta)[:,:,2]
+    bhat_zminus = bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z -delta)[:,:,2]
+    
+    return 0.5*np.stack(bhat_xplus - bhat_xminus, bhat_yplus - bhat_yminus, bhat_zplus - bhat_zminus, axis=-1)/delta
+
+def compare_grad_B(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
+    """
+    Compares gradient of B-field found in Cartesian (X, Y, Z) and cylindrical (R, zeta, Z) coordinates.
+    Input:
+        mag_field_obj (MagneticField instance): instance of MagneticField object
+        q_R (array): radius R of position q
+        q_zeta (array): angle zeta of position q
+        q_Z (array): height Z of position q
+    Output:
+        compare_grad_B array of B field in CARTESIAN (X, Y, Z) coordinates, with coordinate dimensions as last dimension
+    """
+    grad_B_xyz_array = grad_B_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=delta)
+    
+    grad_B_R_array = 0.5*(mag_field_obj.B_R(q_R +delta, q_Z) - mag_field_obj.B_R(q_R -delta, q_Z))/delta
+    #grad_B_T_array = 0#.5*(mag_field_obj.B_Z(q_R, q_Z) - mag_field_obj.B_Z(q_R, q_Z))/delta
+    grad_B_Z_array = 0.5*(mag_field_obj.B_Z(q_R, q_Z +delta) - mag_field_obj.B_Z(q_R, q_Z -delta))/delta
+    
+    return grad_B_xyz_array - np.stack(grad_B_R_array*np.cos(q_zeta), grad_B_R_array*np.sin(q_zeta), grad_B_Z_array, axis=-1)
+
+def compare_grad_bhat(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
+    """
+    Compares gradient of bhat found in Cartesian (X, Y, Z) and cylindrical (R, zeta, Z) coordinates.
+    Input:
+        mag_field_obj (MagneticField instance): instance of MagneticField object
+        q_R (array): radius R of position q
+        q_zeta (array): angle zeta of position q
+        q_Z (array): height Z of position q
+    Output:
+        compare_grad_bhat array of B field in CARTESIAN (X, Y, Z) coordinates, with coordinate dimensions as last dimension
+    """
+    grad_bhat_xyz_array = grad_bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=delta)
+    
+    grad_bhat_R_array = 0.5*(bhat(mag_field_obj, q_R +delta, q_Z) - bhat(mag_field_obj, q_R -delta, q_Z))[:,:,0]/delta
+    #grad_bhat_T_array = 0#.5*(bhat(mag_field_obj, q_R, q_Z) - bhat(mag_field_obj, q_R, q_Z))[:,:,1]/delta
+    grad_bhat_Z_array = 0.5*(bhat(mag_field_obj, q_R, q_Z +delta) - bhat(mag_field_obj, q_R, q_Z -delta))[:,:,2]/delta
+    
+    return grad_bhat_xyz_array - np.stack(grad_bhat_R_array*np.cos(q_zeta), grad_bhat_R_array*np.sin(q_zeta), grad_bhat_Z_array, axis=-1)
