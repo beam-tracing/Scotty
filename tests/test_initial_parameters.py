@@ -81,8 +81,8 @@ def test_parameters_DBS_NSTX_MAST():
     }
     assert sorted(expected.keys()) == sorted(parameters.keys())
     for key, value in expected.items():
-        if isinstance(value, (bool, type(None))):
-            assert parameters[key] is value, key
+        if isinstance(value, (bool, type(None), str)):
+            assert parameters[key] == value, key
         else:
             assert np.allclose(parameters[key], value), key
 
@@ -108,7 +108,7 @@ def test_parameters_DBS_UCLA_DIII_D_240():
     assert sorted(expected.keys()) == sorted(parameters.keys())
     for key, value in expected.items():
         print(key, value, parameters[key])
-        if isinstance(value, (bool, type(None))):
-            assert parameters[key] is value, key
+        if isinstance(value, (bool, type(None), str)):
+            assert parameters[key] == value, key
         else:
             assert np.allclose(parameters[key], value), key
