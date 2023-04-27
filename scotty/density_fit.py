@@ -25,20 +25,21 @@ class DensityFit:
 
     Parameters
     ==========
-    poloidal_flux_enter:
+    poloidal_flux_zero_density:
         Flux at edge of plasma. Density is zero outside this flux label
 
     """
 
-    def __init__(self, poloidal_flux_enter: float):
-        self.poloidal_flux_enter = poloidal_flux_enter
+    def __init__(self, poloidal_flux_zero_density: float):
+        self.poloidal_flux_zero_density = poloidal_flux_zero_density
 
     def __call__(self, poloidal_flux: ArrayLike) -> ArrayLike:
         """Returns the interpolated density at ``poloidal_flux`` points."""
+
         poloidal_flux = np.asfarray(poloidal_flux)
         density = np.asfarray(self._fit_impl(poloidal_flux))
         # Mask density inside plasma
-        is_inside = poloidal_flux <= self.poloidal_flux_enter
+        is_inside = poloidal_flux <= self.poloidal_flux_zero_density
         return is_inside * density
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
@@ -58,21 +59,24 @@ class QuadraticFit(DensityFit):
 
     Parameters
     ==========
-    poloidal_flux_enter:
+    poloidal_flux_zero_density:
         Poloidal flux where density goes to zero (:math:`\psi_0` above)
     ne_0:
         Density at magnetic axis (:math:`n_{e0} \equiv n_e(\psi = 0)`)
     psi_0:
-        If passed, this must be the same as ``poloidal_flux_enter``
+        If passed, this must be the same as ``poloidal_flux_zero_density``
 
         .. deprecated:: 2.4.0
            ``psi_0`` can be safely dropped
     """
 
     def __init__(
-        self, poloidal_flux_enter: float, ne_0: float, psi_0: Optional[float] = None
+        self,
+        poloidal_flux_zero_density: float,
+        ne_0: float,
+        psi_0: Optional[float] = None,
     ):
-        super().__init__(poloidal_flux_enter)
+        super().__init__(poloidal_flux_zero_density)
         self.ne_0 = ne_0
 
         if psi_0 is not None:
@@ -80,18 +84,20 @@ class QuadraticFit(DensityFit):
                 "'psi_0' argument to `QuadraticFit` is deprecated and can be removed",
                 DeprecationWarning,
             )
-            if psi_0 != poloidal_flux_enter:
+            if psi_0 != poloidal_flux_zero_density:
                 raise ValueError(
                     f"QuadraticFit: 'psi_0' ({psi_0}) doesn't agree with "
-                    f"'poloidal_flux_enter' ({poloidal_flux_enter})"
+                    f"'poloidal_flux_zero_density' ({poloidal_flux_zero_density})"
                 )
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
         poloidal_flux = np.asfarray(poloidal_flux)
-        return self.ne_0 - ((self.ne_0 / self.poloidal_flux_enter) * poloidal_flux**2)
+        return self.ne_0 - (
+            (self.ne_0 / self.poloidal_flux_zero_density) * poloidal_flux**2
+        )
 
     def __repr__(self):
-        return f"QuadraticFit({self.poloidal_flux_enter}, ne_0={self.ne_0})"
+        return f"QuadraticFit({self.poloidal_flux_zero_density}, ne_0={self.ne_0})"
 
 
 class TanhFit(DensityFit):
@@ -103,14 +109,14 @@ class TanhFit(DensityFit):
 
     Parameters
     ==========
-    poloidal_flux_enter:
+    poloidal_flux_zero_density:
         Poloidal flux where density goes to zero (:math:`\psi_0` above)
     ne_0:
         (Asymptotic) density at magnetic axis (:math:`n_{e0} \le n_e(\psi = 0)`)
     ne_1:
         Second fitting parameter
     psi_0:
-        If passed, this must be the same as ``poloidal_flux_enter``
+        If passed, this must be the same as ``poloidal_flux_zero_density``
 
         .. deprecated:: 2.4.0
            ``psi_0`` can be safely dropped
@@ -119,12 +125,12 @@ class TanhFit(DensityFit):
 
     def __init__(
         self,
-        poloidal_flux_enter: float,
+        poloidal_flux_zero_density: float,
         ne_0: float,
         ne_1: float,
         psi_0: Optional[float] = None,
     ):
-        super().__init__(poloidal_flux_enter)
+        super().__init__(poloidal_flux_zero_density)
         self.ne_0 = ne_0
         self.ne_1 = ne_1
 
@@ -133,22 +139,20 @@ class TanhFit(DensityFit):
                 "'psi_0' argument to `QuadraticFit` is deprecated and can be removed",
                 DeprecationWarning,
             )
-            if psi_0 != poloidal_flux_enter:
+            if psi_0 != poloidal_flux_zero_density:
                 raise ValueError(
                     f"QuadraticFit: 'psi_0' ({psi_0}) doesn't agree with "
-                    f"'poloidal_flux_enter' ({poloidal_flux_enter})"
+                    f"'poloidal_flux_zero_density' ({poloidal_flux_zero_density})"
                 )
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
         poloidal_flux = np.asfarray(poloidal_flux)
         return self.ne_0 * np.tanh(
-            self.ne_1 * (poloidal_flux - self.poloidal_flux_enter)
+            self.ne_1 * (poloidal_flux - self.poloidal_flux_zero_density)
         )
 
     def __repr__(self):
-        return (
-            f"TanhFit({self.poloidal_flux_enter}, ne_0={self.ne_0}, ne_1={self.ne_1})"
-        )
+        return f"TanhFit({self.poloidal_flux_zero_density}, ne_0={self.ne_0}, ne_1={self.ne_1})"
 
 
 class PolynomialFit(DensityFit):
@@ -162,15 +166,15 @@ class PolynomialFit(DensityFit):
 
     Parameters
     ==========
-    poloidal_flux_enter:
+    poloidal_flux_zero_density:
         Poloidal flux where solver starts and/or boundary conditions are applied; density has to be zero in the current implementation (:math:`\psi_0` above)
     coefficients:
         List of polynomial coefficients, from highest degree to the
         constant term
     """
 
-    def __init__(self, poloidal_flux_enter: float, *coefficients):
-        super().__init__(poloidal_flux_enter)
+    def __init__(self, poloidal_flux_zero_density: float, *coefficients):
+        super().__init__(poloidal_flux_zero_density)
         self.coefficients = coefficients
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
@@ -178,9 +182,7 @@ class PolynomialFit(DensityFit):
         return np.polyval(self.coefficients, poloidal_flux)
 
     def __repr__(self):
-        return (
-            f"PolynomialFit({self.poloidal_flux_enter}, {', '.join(self.coefficients)})"
-        )
+        return f"PolynomialFit({self.poloidal_flux_zero_density}, {', '.join(self.coefficients)})"
 
 
 class StefanikovaFit(DensityFit):
@@ -209,7 +211,7 @@ class StefanikovaFit(DensityFit):
 
     def __init__(
         self,
-        poloidal_flux_enter: float,
+        poloidal_flux_zero_density: float,
         a_height: float,
         a_width: float,
         a_exp: float,
@@ -219,7 +221,7 @@ class StefanikovaFit(DensityFit):
         b_slope: float,
         b_pos: float,
     ):
-        super().__init__(poloidal_flux_enter)
+        super().__init__(poloidal_flux_zero_density)
         self.a_height = a_height
         self.a_width = a_width
         self.a_exp = a_exp
@@ -248,7 +250,7 @@ class StefanikovaFit(DensityFit):
 
     def __repr__(self):
         return (
-            f"StefanikovaFit({self.poloidal_flux_enter}, "
+            f"StefanikovaFit({self.poloidal_flux_zero_density}, "
             f"a_height={self.a_height}, "
             f"a_width={self.a_width}, "
             f"a_exp={self.a_exp}, "
@@ -265,13 +267,13 @@ class SmoothingSplineFit(DensityFit):
 
     def __init__(
         self,
-        poloidal_flux_enter: float,
+        poloidal_flux_zero_density: float,
         poloidal_flux: ArrayLike,
         density: ArrayLike,
         order: int = 5,
         smoothing: Optional[float] = None,
     ):
-        super().__init__(poloidal_flux_enter)
+        super().__init__(poloidal_flux_zero_density)
         self.spline = UnivariateSpline(
             poloidal_flux,
             density,
@@ -286,7 +288,7 @@ class SmoothingSplineFit(DensityFit):
     @classmethod
     def from_dat_file(
         cls,
-        poloidal_flux_enter: float,
+        poloidal_flux_zero_density: float,
         filename: PathLike,
         order: int = 5,
         smoothing: Optional[float] = None,
@@ -320,7 +322,11 @@ class SmoothingSplineFit(DensityFit):
         poloidal_flux_array = radialcoord_array**2
 
         return cls(
-            poloidal_flux_enter, poloidal_flux_array, density_array, order, smoothing
+            poloidal_flux_zero_density,
+            poloidal_flux_array,
+            density_array,
+            order,
+            smoothing,
         )
 
     def _fit_impl(self, poloidal_flux):
@@ -368,7 +374,7 @@ def _guess_density_fit_method(
 
 def density_fit(
     method: Optional[str],
-    poloidal_flux_enter: float,
+    poloidal_flux_zero_density: float,
     parameters: Sequence,
     filename: Optional[PathLike] = None,
 ) -> DensityFit:
@@ -378,7 +384,7 @@ def density_fit(
     ==========
     method:
         Name of density fit parameterisation
-    poloidal_flux_enter:
+    poloidal_flux_zero_density:
         Poloidal flux label where density goes to zero
     parameters:
         List of parameters passed to density fit
@@ -409,4 +415,4 @@ def density_fit(
             f"Expected one of {DENSITY_FIT_METHODS.keys()}"
         )
 
-    return fit_method(poloidal_flux_enter, *parameters)
+    return fit_method(poloidal_flux_zero_density, *parameters)

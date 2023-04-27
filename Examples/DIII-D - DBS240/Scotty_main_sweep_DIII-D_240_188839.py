@@ -39,7 +39,7 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
                 shot=188839,
                 user="Valerian_desktop",
             )
-
+            
             kwargs_dict["poloidal_launch_angle_Torbeam"] = pol_launch_angle
             kwargs_dict["toroidal_launch_angle_Torbeam"] = tor_launch_angle
             kwargs_dict["mode_flag"] = -1
@@ -85,7 +85,7 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
 
             counter = counter + 1
             print("simulation ", counter, "of", total_simulations)
-
+            os.exit()
             an_output = (
                 kwargs_dict["output_path"]
                 + "data_output"

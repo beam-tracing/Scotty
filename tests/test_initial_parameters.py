@@ -7,14 +7,14 @@ import pytest
 
 def test_ne_settings():
     # Odd sort of golden answer test: check we can recover known values
-    fit_param, fit_time, poloidal_flux_enter = ne_settings(
+    fit_param, fit_time, poloidal_flux_zero_density = ne_settings(
         "DBS_NSTX_MAST", 29908, 0.170, "poly3"
     )
     assert fit_time == 0.170
     nt.assert_array_equal(
         fit_param.coefficients, [-3.31670147, 2.24970438, -0.46971473, 2.47113803]
     )
-    assert poloidal_flux_enter == 1.13336773
+    assert poloidal_flux_zero_density == 1.13336773
 
 
 def test_bad_ne_settings():
@@ -74,15 +74,15 @@ def test_parameters_DBS_NSTX_MAST():
         "launch_beam_width": 0.03629814335,
         "launch_beam_curvature": -0.7714837802263125,
         "launch_position": np.array([2.43521, 0.0, 0.0]),
-        "Psi_BC_flag": True,
+        "Psi_BC_flag": "continuous",
         "figure_flag": True,
         "vacuum_propagation_flag": True,
         "vacuumLaunch_flag": True,
     }
     assert sorted(expected.keys()) == sorted(parameters.keys())
     for key, value in expected.items():
-        if isinstance(value, (bool, type(None))):
-            assert parameters[key] is value, key
+        if isinstance(value, (bool, type(None), str)):
+            assert parameters[key] == value, key
         else:
             assert np.allclose(parameters[key], value), key
 
@@ -100,7 +100,7 @@ def test_parameters_DBS_UCLA_DIII_D_240():
         "launch_beam_width": 0.02173742019305591,
         "launch_beam_curvature": -1.2659055507320647,
         "launch_position": np.array([2.587, 0.0, -0.0157]),
-        "Psi_BC_flag": True,
+        "Psi_BC_flag": "continuous",
         "figure_flag": True,
         "vacuum_propagation_flag": True,
         "vacuumLaunch_flag": True,
@@ -108,7 +108,7 @@ def test_parameters_DBS_UCLA_DIII_D_240():
     assert sorted(expected.keys()) == sorted(parameters.keys())
     for key, value in expected.items():
         print(key, value, parameters[key])
-        if isinstance(value, (bool, type(None))):
-            assert parameters[key] is value, key
+        if isinstance(value, (bool, type(None), str)):
+            assert parameters[key] == value, key
         else:
             assert np.allclose(parameters[key], value), key

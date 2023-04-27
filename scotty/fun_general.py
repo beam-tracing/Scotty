@@ -398,10 +398,11 @@ def find_Psi_3D_lab_Cartesian(Psi_3D_lab, q_R, q_zeta, K_R, K_zeta):
 
 # Functions (beam tracing 1)
 def find_normalised_plasma_freq(electron_density, launch_angular_frequency):
-    #    if electron_density < 0:
-    #        print(electron_density)
-    #        electron_density=0
+    # if electron_density < 0:
+    #     print(electron_density)
+    #     electron_density=0
     # Electron density in units of 10^19 m-3
+
     normalised_plasma_freq = (
         constants.e
         * np.sqrt(electron_density * 10**19 / (constants.epsilon_0 * constants.m_e))
@@ -546,29 +547,118 @@ def find_H_numba(
 
 # Functions (interface)
 # For going from vacuum to plasma (Will one day implement going from plasma to vacuum)
-def find_d_poloidal_flux_dR(q_R, q_Z, delta_R, interp_poloidal_flux):
-    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
-    poloidal_flux_1 = interp_poloidal_flux(q_R + delta_R, q_Z)
-    poloidal_flux_2 = interp_poloidal_flux(q_R + 2 * delta_R, q_Z)
-    d_poloidal_flux_dR = (
-        (-3 / 2) * poloidal_flux_0 + (2) * poloidal_flux_1 + (-1 / 2) * poloidal_flux_2
-    ) / (delta_R)
+def find_d_poloidal_flux_dR(q_R, q_Z, delta_R, interp_poloidal_flux, method="CFD4"):
+    """
+    If poloidal flux is continuous at the boundary, use CFD.
+    If discontinuous, use FFD
+    """
+    if method == "FFD":
+        poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
+        poloidal_flux_1 = interp_poloidal_flux(q_R + delta_R, q_Z)
+        poloidal_flux_2 = interp_poloidal_flux(q_R + 2 * delta_R, q_Z)
+        d_poloidal_flux_dR = (
+            (-3 / 2) * poloidal_flux_0
+            + (2) * poloidal_flux_1
+            + (-1 / 2) * poloidal_flux_2
+        ) / (delta_R)
+    elif method == "CFD":
+        ## Accurate to second order
+        poloidal_flux_p = interp_poloidal_flux(q_R + delta_R, q_Z)
+        poloidal_flux_m = interp_poloidal_flux(q_R - delta_R, q_Z)
+        d_poloidal_flux_dR = (poloidal_flux_p - poloidal_flux_m) / (2 * delta_R)
+    elif method == "CFD4":
+        ## Accurate to fourth order
+        poloidal_flux_p2 = interp_poloidal_flux(q_R + 2 * delta_R, q_Z)
+        poloidal_flux_p1 = interp_poloidal_flux(q_R + delta_R, q_Z)
+        poloidal_flux_m1 = interp_poloidal_flux(q_R - delta_R, q_Z)
+        poloidal_flux_m2 = interp_poloidal_flux(q_R - 2 * delta_R, q_Z)
+        d_poloidal_flux_dR = (
+            -(1 / 12) * poloidal_flux_p2
+            + (2 / 3) * poloidal_flux_p1
+            - (2 / 3) * poloidal_flux_m1
+            + (1 / 12) * poloidal_flux_m2
+        ) / (delta_R)
+    else:
+        print("Invalid finite difference method for find_d_poloidal_flux_dR")
 
     return d_poloidal_flux_dR
 
 
-def find_d_poloidal_flux_dZ(q_R, q_Z, delta_Z, interp_poloidal_flux):
-    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
-    poloidal_flux_1 = interp_poloidal_flux(q_R, q_Z + delta_Z)
-    poloidal_flux_2 = interp_poloidal_flux(q_R, q_Z + 2 * delta_Z)
-    d_poloidal_flux_dZ = (
-        (-3 / 2) * poloidal_flux_0 + (2) * poloidal_flux_1 + (-1 / 2) * poloidal_flux_2
-    ) / (delta_Z)
+def find_d_poloidal_flux_dZ(q_R, q_Z, delta_Z, interp_poloidal_flux, method="CFD4"):
+    """
+    If poloidal flux is continuous at the boundary, use CFD.
+    If discontinuous, use FFD
+    """
+    if method == "FFD":
+        poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
+        poloidal_flux_1 = interp_poloidal_flux(q_R, q_Z + delta_Z)
+        poloidal_flux_2 = interp_poloidal_flux(q_R, q_Z + 2 * delta_Z)
+        d_poloidal_flux_dZ = (
+            (-3 / 2) * poloidal_flux_0
+            + (2) * poloidal_flux_1
+            + (-1 / 2) * poloidal_flux_2
+        ) / (delta_Z)
+    elif method == "CFD":
+        ## Accurate to second order
+        poloidal_flux_p = interp_poloidal_flux(q_R, q_Z + delta_Z)
+        poloidal_flux_m = interp_poloidal_flux(q_R, q_Z - delta_Z)
+        d_poloidal_flux_dZ = (poloidal_flux_p - poloidal_flux_m) / (2 * delta_Z)
+    elif method == "CFD4":
+        ## Accurate to fourth order
+        poloidal_flux_p2 = interp_poloidal_flux(q_R, q_Z + 2 * delta_Z)
+        poloidal_flux_p1 = interp_poloidal_flux(q_R, q_Z + delta_Z)
+        poloidal_flux_m1 = interp_poloidal_flux(q_R, q_Z - delta_Z)
+        poloidal_flux_m2 = interp_poloidal_flux(q_R, q_Z - 2 * delta_Z)
+        d_poloidal_flux_dZ = (
+            -(1 / 12) * poloidal_flux_p2
+            + (2 / 3) * poloidal_flux_p1
+            - (2 / 3) * poloidal_flux_m1
+            + (1 / 12) * poloidal_flux_m2
+        ) / (delta_Z)
+    else:
+        print("Invalid finite difference method for find_d_poloidal_flux_dZ")
 
     return d_poloidal_flux_dZ
 
 
-def find_Psi_3D_plasma(
+def find_d2_poloidal_flux_dR2(q_R, q_Z, delta_R, interp_poloidal_flux):
+    poloidal_flux_p = interp_poloidal_flux(q_R + delta_R, q_Z)
+    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
+    poloidal_flux_m = interp_poloidal_flux(q_R - delta_R, q_Z)
+    d2_poloidal_flux_dR2 = (poloidal_flux_p - 2 * poloidal_flux_0 + poloidal_flux_m) / (
+        delta_R**2
+    )
+
+    return d2_poloidal_flux_dR2
+
+
+def find_d2_poloidal_flux_dZ2(q_R, q_Z, delta_Z, interp_poloidal_flux):
+    poloidal_flux_p = interp_poloidal_flux(q_R, q_Z + delta_Z)
+    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
+    poloidal_flux_m = interp_poloidal_flux(q_R, q_Z - delta_Z)
+    d2_poloidal_flux_dZ2 = (poloidal_flux_p - 2 * poloidal_flux_0 + poloidal_flux_m) / (
+        delta_Z**2
+    )
+
+    return d2_poloidal_flux_dZ2
+
+
+def find_d2_poloidal_flux_dRdZ(q_R, q_Z, delta_R, delta_Z, interp_poloidal_flux):
+    poloidal_flux_pR_pZ = interp_poloidal_flux(q_R + delta_R, q_Z + delta_Z)
+    poloidal_flux_mR_pZ = interp_poloidal_flux(q_R - delta_R, q_Z + delta_Z)
+    poloidal_flux_pR_mZ = interp_poloidal_flux(q_R + delta_R, q_Z - delta_Z)
+    poloidal_flux_mR_mZ = interp_poloidal_flux(q_R - delta_R, q_Z - delta_Z)
+    d2_poloidal_flux_dRdZ = (
+        poloidal_flux_pR_pZ
+        - poloidal_flux_mR_pZ
+        - poloidal_flux_pR_mZ
+        + poloidal_flux_mR_mZ
+    ) / (4 * delta_R * delta_Z)
+
+    return d2_poloidal_flux_dRdZ
+
+
+def find_Psi_3D_plasma_continuous(
     Psi_vacuum_3D,
     dH_dKR,
     dH_dKzeta,
@@ -578,6 +668,21 @@ def find_Psi_3D_plasma(
     d_poloidal_flux_d_R,
     d_poloidal_flux_d_Z,
 ):
+    ## For continuous ne across the plasma-vacuum boundary
+    ## Potential future improvement: write wrapper function to wrap find_Psi_3D_plasma_continuous and find_Psi_3D_plasma_discontinuous
+
+    # Gradients are the plasma-vacuum boundary can be finnicky and it's good to check
+    if np.isnan(dH_dKR):
+        raise ValueError("Error, dH_dKR is NaN in find_Psi_3D_plasma_continuous")
+    elif np.isnan(dH_dKzeta):
+        raise ValueError("Error, dH_dKzeta is NaN in find_Psi_3D_plasma_continuous")
+    elif np.isnan(dH_dKZ):
+        raise ValueError("Error, dH_dKZ is NaN in find_Psi_3D_plasma_continuous")
+    elif np.isnan(dH_dR):
+        raise ValueError("Error, dH_dR is NaN in find_Psi_3D_plasma_continuous")
+    elif np.isnan(dH_dZ):
+        raise ValueError("Error, dH_dZ is NaN in find_Psi_3D_plasma_continuous")
+
     # When beam is entering plasma from vacuum
     Psi_v_R_R = Psi_vacuum_3D[0, 0]
     Psi_v_zeta_zeta = Psi_vacuum_3D[1, 1]
@@ -640,6 +745,346 @@ def find_Psi_3D_plasma(
     Psi_3D_plasma[2, 1] = Psi_3D_plasma[1, 2]
 
     return Psi_3D_plasma
+
+
+def find_K_plasma(
+    q_R,
+    K_v_R,
+    K_v_zeta,
+    K_v_Z,
+    launch_angular_frequency,
+    mode_flag,
+    B_R,
+    B_T,
+    B_Z,
+    electron_density_p,  # in the plasma
+    dpolflux_dR,
+    dpolflux_dZ,
+):
+    ## Finds
+
+    ## Checks the plasma density
+    plasma_freq = find_normalised_plasma_freq(
+        electron_density_p, launch_angular_frequency
+    )
+    if plasma_freq >= launch_angular_frequency:
+        print("Error")
+
+    ## Get components of the Booker quartic
+    B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
+    K_v_mag = np.sqrt(K_v_R**2 + (K_v_zeta / q_R) ** 2 + K_v_Z**2)
+    sin_theta_m_vac = (B_R * K_v_R + B_T * K_v_zeta / q_R + B_Z * K_v_Z) / (
+        B_Total * K_v_mag
+    )  # B \cdot K / (abs (B) abs(K))
+    sin_theta_m_sq = sin_theta_m_vac**2
+
+    Booker_alpha = find_Booker_alpha(
+        electron_density_p, B_Total, sin_theta_m_sq, launch_angular_frequency
+    )
+    Booker_beta = find_Booker_beta(
+        electron_density_p, B_Total, sin_theta_m_sq, launch_angular_frequency
+    )
+    Booker_gamma = find_Booker_gamma(
+        electron_density_p, B_Total, launch_angular_frequency
+    )
+
+    ## Calculate wavevector in plasma
+    K_p_zeta = K_v_zeta
+
+    K_v_pol = (-K_v_R * dpolflux_dZ + K_v_Z * dpolflux_dR) / np.sqrt(
+        dpolflux_dR**2 + dpolflux_dZ**2
+    )
+    K_p_pol = K_v_pol
+
+    ## TODO
+    ## This only works if the mismatch angle is continuous. It is not
+    ## I need to implement an iterative solver for this
+    K_p_rad = -np.sqrt(
+        abs(
+            K_v_mag**2
+            * (
+                -Booker_beta
+                + mode_flag
+                * np.sqrt(Booker_beta**2 - 4 * Booker_alpha * Booker_gamma)
+            )
+            / (2 * Booker_alpha)
+            - (K_p_zeta / q_R) ** 2
+            - K_p_pol**2
+        )
+    )
+
+    [
+        K_p_R,
+        K_p_Z,
+    ] = np.matmul(
+        np.linalg.inv([[-dpolflux_dZ, dpolflux_dR], [dpolflux_dR, dpolflux_dZ]])
+        * np.sqrt(dpolflux_dR**2 + dpolflux_dZ**2),
+        [
+            K_p_pol,
+            K_p_rad,
+        ],
+    )
+
+    ## For checking
+    H_bar = (K_p_R**2 + (K_p_zeta / q_R) ** 2 + K_p_Z**2) / (K_v_mag) ** 2 - (
+        (
+            -Booker_beta
+            + mode_flag * np.sqrt(Booker_beta**2 - 4 * Booker_alpha * Booker_gamma)
+        )
+        / (2 * Booker_alpha)
+    )
+    tol = 1e-3
+    if abs(H_bar) > tol:
+        print("find_K_plasma not working properly")
+
+    return K_p_R, K_p_zeta, K_p_Z
+
+
+def find_Psi_3D_plasma_discontinuous(
+    Psi_vacuum_3D,
+    K_v_R,
+    K_v_zeta,
+    K_v_Z,
+    K_p_R,
+    K_p_zeta,
+    K_p_Z,
+    dH_dKR,  # In the plasma
+    dH_dKzeta,  # In the plasma
+    dH_dKZ,  # In the plasma
+    dH_dR,  # In the plasma
+    dH_dZ,  # In the plasma
+    dpolflux_dR,  # Continuous
+    dpolflux_dZ,  # Continuous
+    d2polflux_dR2,  # Continuous
+    d2polflux_dZ2,  # Continuous
+    d2polflux_dRdZ,  # Continuous
+):
+    ## For discontinuous ne
+
+    eta = (
+        -0.5
+        * (
+            d2polflux_dR2 * dpolflux_dZ**2
+            + 2 * d2polflux_dRdZ * dpolflux_dR * dpolflux_dZ
+            + d2polflux_dZ2 * dpolflux_dR**2
+        )
+        / (dpolflux_dR**2 + dpolflux_dZ**2)
+    )
+
+    # When beam is entering plasma from vacuum
+    Psi_v_R_R = Psi_vacuum_3D[0, 0]
+    Psi_v_zeta_zeta = Psi_vacuum_3D[1, 1]
+    Psi_v_Z_Z = Psi_vacuum_3D[2, 2]
+    Psi_v_R_zeta = Psi_vacuum_3D[0, 1]
+    Psi_v_R_Z = Psi_vacuum_3D[0, 2]
+    Psi_v_zeta_Z = Psi_vacuum_3D[1, 2]
+
+    interface_matrix = np.zeros([6, 6])
+    interface_matrix[0][5] = 1
+    interface_matrix[1][0] = dpolflux_dZ**2
+    interface_matrix[1][1] = -2 * dpolflux_dR * dpolflux_dZ
+    interface_matrix[1][3] = dpolflux_dR**2
+    interface_matrix[2][2] = -dpolflux_dZ
+    interface_matrix[2][4] = dpolflux_dR
+    interface_matrix[3][0] = dH_dKR
+    interface_matrix[3][1] = dH_dKZ
+    interface_matrix[3][2] = dH_dKzeta
+    interface_matrix[4][1] = dH_dKR
+    interface_matrix[4][3] = dH_dKZ
+    interface_matrix[4][4] = dH_dKzeta
+    interface_matrix[5][2] = dH_dKR
+    interface_matrix[5][4] = dH_dKZ
+    interface_matrix[5][5] = dH_dKzeta
+
+    # interface_matrix will be singular if one tries to transition while still in vacuum (and there's no plasma at all)
+    # at least that's what happens, in my experience
+    interface_matrix_inverse = np.linalg.inv(interface_matrix)
+
+    [
+        Psi_p_R_R,
+        Psi_p_R_Z,
+        Psi_p_R_zeta,
+        Psi_p_Z_Z,
+        Psi_p_Z_zeta,
+        Psi_p_zeta_zeta,
+    ] = np.matmul(
+        interface_matrix_inverse,
+        [
+            Psi_v_zeta_zeta,
+            Psi_v_R_R * dpolflux_dZ**2
+            - 2 * Psi_v_R_Z * dpolflux_dR * dpolflux_dZ
+            + Psi_v_Z_Z * dpolflux_dR**2,
+            -Psi_v_R_zeta * dpolflux_dZ
+            + Psi_v_zeta_Z * dpolflux_dR
+            + 2 * (K_v_R - K_p_R) * dpolflux_dR * eta
+            + 2 * (K_v_Z - K_p_Z) * dpolflux_dZ * eta,
+            -dH_dR,
+            -dH_dZ,
+            0,
+        ],
+    )
+
+    Psi_3D_plasma = np.zeros([3, 3], dtype="complex128")
+    Psi_3D_plasma[0, 0] = Psi_p_R_R
+    Psi_3D_plasma[1, 1] = Psi_p_zeta_zeta
+    Psi_3D_plasma[2, 2] = Psi_p_Z_Z
+    Psi_3D_plasma[0, 1] = Psi_p_R_zeta
+    Psi_3D_plasma[1, 0] = Psi_3D_plasma[0, 1]
+    Psi_3D_plasma[0, 2] = Psi_p_R_Z
+    Psi_3D_plasma[2, 0] = Psi_3D_plasma[0, 2]
+    Psi_3D_plasma[1, 2] = Psi_p_Z_zeta
+    Psi_3D_plasma[2, 1] = Psi_3D_plasma[1, 2]
+
+    return Psi_3D_plasma
+
+
+def apply_discontinuous_BC(
+    q_R,
+    q_Z,
+    Psi_vacuum_3D,
+    K_v_R,
+    K_v_zeta,
+    K_v_Z,
+    launch_angular_frequency,
+    mode_flag,
+    delta_R,
+    delta_Z,
+    field,  # Field object
+    hamiltonian,  # Hamiltonian object
+):
+    d_poloidal_flux_dR_boundary = find_d_poloidal_flux_dR(
+        q_R,
+        q_Z,
+        delta_R,
+        field.poloidal_flux,
+    )
+    d_poloidal_flux_dZ_boundary = find_d_poloidal_flux_dZ(
+        q_R,
+        q_Z,
+        delta_Z,
+        field.poloidal_flux,
+    )
+    d2_poloidal_flux_dR2_boundary = find_d2_poloidal_flux_dR2(
+        q_R,
+        q_Z,
+        delta_R,
+        field.poloidal_flux,
+    )
+    d2_poloidal_flux_dZ2_boundary = find_d2_poloidal_flux_dZ2(
+        q_R,
+        q_Z,
+        delta_Z,
+        field.poloidal_flux,
+    )
+    d2_poloidal_flux_dRdZ_boundary = find_d2_poloidal_flux_dRdZ(
+        q_R,
+        q_Z,
+        delta_R,
+        delta_Z,
+        field.poloidal_flux,
+    )
+
+    poloidal_flux_boundary = field.poloidal_flux(q_R, q_Z)
+
+    K_plasma = find_K_plasma(
+        q_R,
+        K_v_R,
+        K_v_zeta,
+        K_v_Z,
+        launch_angular_frequency,
+        mode_flag,
+        field.B_R(q_R, q_Z),
+        field.B_T(q_R, q_Z),
+        field.B_Z(q_R, q_Z),
+        hamiltonian.density(poloidal_flux_boundary),  # in the plasma
+        d_poloidal_flux_dR_boundary,
+        d_poloidal_flux_dZ_boundary,
+    )
+
+    dH = hamiltonian.derivatives(
+        q_R,
+        q_Z,
+        K_plasma[0],
+        K_plasma[1],
+        K_plasma[2],
+    )
+
+    Psi_3D_plasma = find_Psi_3D_plasma_discontinuous(
+        Psi_vacuum_3D,
+        K_v_R,
+        K_v_zeta,
+        K_v_Z,
+        K_plasma[0],
+        K_plasma[1],
+        K_plasma[2],
+        dH["dH_dKR"],  # In the plasma
+        dH["dH_dKzeta"],  # In the plasma
+        dH["dH_dKZ"],  # In the plasma
+        dH["dH_dR"],  # In the plasma
+        dH["dH_dZ"],  # In the plasma
+        d_poloidal_flux_dR_boundary,  # Continuous
+        d_poloidal_flux_dZ_boundary,  # Continuous
+        d2_poloidal_flux_dR2_boundary,  # Continuous
+        d2_poloidal_flux_dZ2_boundary,  # Continuous
+        d2_poloidal_flux_dRdZ_boundary,  # Continuous
+    )
+
+    return K_plasma, Psi_3D_plasma
+
+
+def apply_continuous_BC(
+    q_R,
+    q_Z,
+    Psi_vacuum_3D,
+    K_v_R,
+    K_v_zeta,
+    K_v_Z,
+    delta_R,
+    delta_Z,
+    field,  # Field object
+    hamiltonian,  # Hamiltonian object
+):
+    ## When the equilibrium is continuous, the wavevector is continuous
+    K_plasma = [K_v_R, K_v_zeta, K_v_Z]
+
+    dH = hamiltonian.derivatives(
+        q_R,
+        q_Z,
+        K_plasma[0],
+        K_plasma[1],
+        K_plasma[2],
+    )
+
+    dH_dR_initial = dH["dH_dR"]
+    dH_dZ_initial = dH["dH_dZ"]
+    dH_dKR_initial = dH["dH_dKR"]
+    dH_dKzeta_initial = dH["dH_dKzeta"]
+    dH_dKZ_initial = dH["dH_dKZ"]
+    d_poloidal_flux_d_R_boundary = find_d_poloidal_flux_dR(
+        q_R,
+        q_Z,
+        delta_R,
+        field.poloidal_flux,
+    )
+    d_poloidal_flux_d_Z_boundary = find_d_poloidal_flux_dZ(
+        q_R,
+        q_Z,
+        delta_Z,
+        field.poloidal_flux,
+    )
+
+    Psi_3D_plasma = find_Psi_3D_plasma_continuous(
+        Psi_vacuum_3D,
+        dH_dKR_initial,
+        dH_dKzeta_initial,
+        dH_dKZ_initial,
+        dH_dR_initial,
+        dH_dZ_initial,
+        d_poloidal_flux_d_R_boundary,
+        d_poloidal_flux_d_Z_boundary,
+    )
+
+    return K_plasma, Psi_3D_plasma
 
 
 # -----------------
@@ -856,7 +1301,6 @@ def find_ST_terms(
         g_magnitude_Cardano / g_magnitude_output
     )  # d tau_Booker / d tau_Cardano
 
-    cutoff_idx = np.argmin(K_magnitude_array)
     theta_m_min_idx = np.argmin(abs(theta_m_output))
     # delta_kperp1_ST = k_perp_1_bs - k_perp_1_bs[theta_m_min_idx]
 
@@ -1003,7 +1447,39 @@ def propagate_beam(Psi_w_initial_cartesian, propagation_distance, freq_GHz):
     return Psi_w_final_cartesian
 
 
-def find_widths_and_curvatures(Psi_xx, Psi_xy, Psi_yy, K_magnitude):
+def find_widths_and_curvatures(Psi_xx, Psi_xy, Psi_yy, K_magnitude, theta_m, theta):
+    """
+    Calculates beam widths and curvatures from components of Psi_w
+
+    Equations (15) and (16) of VH Hall-Chen et al., PPCF (2022) https://doi.org/10.1088/1361-6587/ac57a1
+
+    Parameters
+    ----------
+    Psi_xx : TYPE
+        DESCRIPTION.
+    Psi_xy : TYPE
+        DESCRIPTION.
+    Psi_yy : TYPE
+        DESCRIPTION.
+    K_magnitude : TYPE
+        DESCRIPTION.
+    theta_m : TYPE
+        Mismatch angle, in radians. Equation (109) of the above paper
+    theta : TYPE
+        Equation (107) of the above paper.
+
+    Returns
+    -------
+    widths : TYPE
+        DESCRIPTION.
+    Psi_w_imag_eigvecs : TYPE
+        DESCRIPTION.
+    curvatures : TYPE
+        DESCRIPTION.
+    Psi_w_real_eigvecs : TYPE
+        DESCRIPTION.
+
+    """
     Psi_w_real = np.array(np.real([[Psi_xx, Psi_xy], [Psi_xy, Psi_yy]]))
     Psi_w_imag = np.array(np.imag([[Psi_xx, Psi_xy], [Psi_xy, Psi_yy]]))
 
@@ -1012,7 +1488,8 @@ def find_widths_and_curvatures(Psi_xx, Psi_xy, Psi_yy, K_magnitude):
     # The normalized (unit “length”) eigenvectors, such that the column v[:,i] is the eigenvector corresponding to the eigenvalue w[i]
 
     widths = np.sqrt(2 / Psi_w_imag_eigvals)
-    curvatures = Psi_w_real_eigvals / K_magnitude  # curvature = 1/radius_of_curvature
+    # curvature = 1/radius_of_curvature
+    curvatures = Psi_w_real_eigvals / K_magnitude * (np.cos(theta_m + theta)) ** 2
 
     return widths, Psi_w_imag_eigvecs, curvatures, Psi_w_real_eigvecs
 

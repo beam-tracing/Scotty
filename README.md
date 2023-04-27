@@ -28,6 +28,12 @@ or from a local clone:
 pip install .
 ```
 
+when developing, use:
+
+```
+pip install -e .
+```
+
 Documentation
 -------
 https://scotty.readthedocs.io/

@@ -38,4 +38,8 @@ def check_input(
     field: MagneticField,
 ) -> None:
     check_mode_flag(mode_flag)
-    check_launch_position(poloidal_flux_enter, launch_position, field)
+
+    # Temporarily removing this function as the behaviour it checks for
+    # is allowed in the new version which has poloidal_flux_enter and poloidal_zero_density
+    # as separate input arguments
+    # check_launch_position(poloidal_flux_enter, launch_position, field)

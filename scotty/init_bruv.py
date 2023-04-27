@@ -150,7 +150,9 @@ def get_parameters_for_Scotty(
 
         density_fit = ne_settings(diagnostic, shot, equil_time, find_ne_method)
         parameters["density_fit_method"] = density_fit.fit
-        parameters["poloidal_flux_enter"] = density_fit.poloidal_flux_enter
+        parameters[
+            "poloidal_flux_zero_density"
+        ] = density_fit.poloidal_flux_zero_density
 
     # MAST and MAST-U specific B-field and poloidal flux settings
     if find_B_method == "UDA":
@@ -224,7 +226,7 @@ class DensityFitParameters(NamedTuple):
     """Fit parameterisation"""
     time_ms: Optional[float]
     """Actual shot time (in milliseconds) that parameters correspond to"""
-    poloidal_flux_enter: Optional[float]
+    poloidal_flux_zero_density: Optional[float]
     """Poloidal flux surface label where the density goes to zero"""
 
 
@@ -273,7 +275,7 @@ def ne_settings(
     ne_fit_time = ne_fit_times[nearest_time_idx]
     print("Nearest ne fit time:", ne_fit_time)
 
-    return DensityFitParameters(ne_fit, ne_fit_time, ne_fit.poloidal_flux_enter)
+    return DensityFitParameters(ne_fit, ne_fit_time, ne_fit.poloidal_flux_zero_density)
 
 
 def user_settings(diagnostic, user, shot):
@@ -363,7 +365,7 @@ def parameters_DBS_NSTX_MAST(launch_freq_GHz: float) -> dict:
         "launch_position": np.array([2.43521, 0, 0]),
         "launch_beam_width": launch_beam.width,
         "launch_beam_curvature": launch_beam.curvature,
-        "Psi_BC_flag": True,
+        "Psi_BC_flag": "continuous",
         "figure_flag": True,
         "vacuum_propagation_flag": True,
         "vacuumLaunch_flag": True,
@@ -381,7 +383,7 @@ def parameters_DBS_UCLA_MAST_U(launch_freq_GHz: float) -> dict:
         "launch_position": np.array([2.278, 0, -0.01]),
         "launch_beam_width": launch_beam.width,
         "launch_beam_curvature": launch_beam.curvature,
-        "Psi_BC_flag": True,
+        "Psi_BC_flag": "continuous",
         "figure_flag": True,
         "vacuum_propagation_flag": True,
         "vacuumLaunch_flag": True,
@@ -401,7 +403,7 @@ def parameters_DBS_SWIP_MAST_U(launch_freq_GHz: float) -> dict:
         "launch_beam_curvature": launch_beam.curvature,
         # I'm checking what this actually is from Peng. Currently using the
         # MAST UCLA DBS as a guide
-        "Psi_BC_flag": True,
+        "Psi_BC_flag": "continuous",
         "figure_flag": True,
         "vacuum_propagation_flag": True,
         "vacuumLaunch_flag": True,
@@ -417,7 +419,7 @@ def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
         "launch_position": np.array([2.587, 0, -0.0157]),
         "launch_beam_width": launch_beam.width,
         "launch_beam_curvature": launch_beam.curvature,
-        "Psi_BC_flag": True,
+        "Psi_BC_flag": "continuous",
         "figure_flag": True,
         "vacuum_propagation_flag": True,
         "vacuumLaunch_flag": True,
@@ -425,8 +427,8 @@ def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
 
 
 def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
-    poloidal_flux_enter = 1.0
-    ne_fit = QuadraticFit(poloidal_flux_enter, 4.0)
+    poloidal_flux_zero_density = 1.0
+    ne_fit = QuadraticFit(poloidal_flux_zero_density, 4.0)
     return {
         "poloidal_launch_angle_Torbeam": 6.0,
         "toroidal_launch_angle_Torbeam": 0.0,
@@ -438,11 +440,12 @@ def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
         "launch_position": np.array([2.587, 0, -0.0157]),
         "density_fit_method": ne_fit,
         "find_B_method": "analytical",
-        "Psi_BC_flag": True,
+        "Psi_BC_flag": "continuous",
         "figure_flag": False,
         "vacuum_propagation_flag": True,
         "vacuumLaunch_flag": True,
-        "poloidal_flux_enter": poloidal_flux_enter,
+        "poloidal_flux_zero_density": poloidal_flux_zero_density,
+        "poloidal_flux_enter": 1.0,
         "B_T_axis": 1.0,
         "B_p_a": 0.1,
         "R_axis": 1.5,
