@@ -17,7 +17,7 @@ from scotty.hamiltonian import Hamiltonian
 from scotty.typing import FloatArray
 from scotty.geometry import MagneticField
 
-from typing import Optional
+from typing import Union
 import warnings
 
 import sys
@@ -37,7 +37,7 @@ def launch_beam(
     hamiltonian: Hamiltonian,
     vacuumLaunch_flag: bool = True,
     vacuum_propagation_flag: bool = True,
-    Psi_BC_flag: bool = True,
+    Psi_BC_flag: Union[bool, str, None] = True,
     poloidal_flux_enter: float = 1.0,
     delta_R: float = -1e-4,
     delta_Z: float = 1e-4,

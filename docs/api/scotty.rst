@@ -22,7 +22,7 @@ Submodules
    scotty.check_output
    scotty.compare_plot
    scotty.density_fit
-   scotty.fun_CFD
+   scotty.derivatives
    scotty.fun_evolution
    scotty.fun_general
    scotty.geometry

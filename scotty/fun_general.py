@@ -547,115 +547,6 @@ def find_H_numba(
 
 # Functions (interface)
 # For going from vacuum to plasma (Will one day implement going from plasma to vacuum)
-def find_d_poloidal_flux_dR(q_R, q_Z, delta_R, interp_poloidal_flux, method="CFD4"):
-    """
-    If poloidal flux is continuous at the boundary, use CFD.
-    If discontinuous, use FFD
-    """
-    if method == "FFD":
-        poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
-        poloidal_flux_1 = interp_poloidal_flux(q_R + delta_R, q_Z)
-        poloidal_flux_2 = interp_poloidal_flux(q_R + 2 * delta_R, q_Z)
-        d_poloidal_flux_dR = (
-            (-3 / 2) * poloidal_flux_0
-            + (2) * poloidal_flux_1
-            + (-1 / 2) * poloidal_flux_2
-        ) / (delta_R)
-    elif method == "CFD":
-        ## Accurate to second order
-        poloidal_flux_p = interp_poloidal_flux(q_R + delta_R, q_Z)
-        poloidal_flux_m = interp_poloidal_flux(q_R - delta_R, q_Z)
-        d_poloidal_flux_dR = (poloidal_flux_p - poloidal_flux_m) / (2 * delta_R)
-    elif method == "CFD4":
-        ## Accurate to fourth order
-        poloidal_flux_p2 = interp_poloidal_flux(q_R + 2 * delta_R, q_Z)
-        poloidal_flux_p1 = interp_poloidal_flux(q_R + delta_R, q_Z)
-        poloidal_flux_m1 = interp_poloidal_flux(q_R - delta_R, q_Z)
-        poloidal_flux_m2 = interp_poloidal_flux(q_R - 2 * delta_R, q_Z)
-        d_poloidal_flux_dR = (
-            -(1 / 12) * poloidal_flux_p2
-            + (2 / 3) * poloidal_flux_p1
-            - (2 / 3) * poloidal_flux_m1
-            + (1 / 12) * poloidal_flux_m2
-        ) / (delta_R)
-    else:
-        print("Invalid finite difference method for find_d_poloidal_flux_dR")
-
-    return d_poloidal_flux_dR
-
-
-def find_d_poloidal_flux_dZ(q_R, q_Z, delta_Z, interp_poloidal_flux, method="CFD4"):
-    """
-    If poloidal flux is continuous at the boundary, use CFD.
-    If discontinuous, use FFD
-    """
-    if method == "FFD":
-        poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
-        poloidal_flux_1 = interp_poloidal_flux(q_R, q_Z + delta_Z)
-        poloidal_flux_2 = interp_poloidal_flux(q_R, q_Z + 2 * delta_Z)
-        d_poloidal_flux_dZ = (
-            (-3 / 2) * poloidal_flux_0
-            + (2) * poloidal_flux_1
-            + (-1 / 2) * poloidal_flux_2
-        ) / (delta_Z)
-    elif method == "CFD":
-        ## Accurate to second order
-        poloidal_flux_p = interp_poloidal_flux(q_R, q_Z + delta_Z)
-        poloidal_flux_m = interp_poloidal_flux(q_R, q_Z - delta_Z)
-        d_poloidal_flux_dZ = (poloidal_flux_p - poloidal_flux_m) / (2 * delta_Z)
-    elif method == "CFD4":
-        ## Accurate to fourth order
-        poloidal_flux_p2 = interp_poloidal_flux(q_R, q_Z + 2 * delta_Z)
-        poloidal_flux_p1 = interp_poloidal_flux(q_R, q_Z + delta_Z)
-        poloidal_flux_m1 = interp_poloidal_flux(q_R, q_Z - delta_Z)
-        poloidal_flux_m2 = interp_poloidal_flux(q_R, q_Z - 2 * delta_Z)
-        d_poloidal_flux_dZ = (
-            -(1 / 12) * poloidal_flux_p2
-            + (2 / 3) * poloidal_flux_p1
-            - (2 / 3) * poloidal_flux_m1
-            + (1 / 12) * poloidal_flux_m2
-        ) / (delta_Z)
-    else:
-        print("Invalid finite difference method for find_d_poloidal_flux_dZ")
-
-    return d_poloidal_flux_dZ
-
-
-def find_d2_poloidal_flux_dR2(q_R, q_Z, delta_R, interp_poloidal_flux):
-    poloidal_flux_p = interp_poloidal_flux(q_R + delta_R, q_Z)
-    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
-    poloidal_flux_m = interp_poloidal_flux(q_R - delta_R, q_Z)
-    d2_poloidal_flux_dR2 = (poloidal_flux_p - 2 * poloidal_flux_0 + poloidal_flux_m) / (
-        delta_R**2
-    )
-
-    return d2_poloidal_flux_dR2
-
-
-def find_d2_poloidal_flux_dZ2(q_R, q_Z, delta_Z, interp_poloidal_flux):
-    poloidal_flux_p = interp_poloidal_flux(q_R, q_Z + delta_Z)
-    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
-    poloidal_flux_m = interp_poloidal_flux(q_R, q_Z - delta_Z)
-    d2_poloidal_flux_dZ2 = (poloidal_flux_p - 2 * poloidal_flux_0 + poloidal_flux_m) / (
-        delta_Z**2
-    )
-
-    return d2_poloidal_flux_dZ2
-
-
-def find_d2_poloidal_flux_dRdZ(q_R, q_Z, delta_R, delta_Z, interp_poloidal_flux):
-    poloidal_flux_pR_pZ = interp_poloidal_flux(q_R + delta_R, q_Z + delta_Z)
-    poloidal_flux_mR_pZ = interp_poloidal_flux(q_R - delta_R, q_Z + delta_Z)
-    poloidal_flux_pR_mZ = interp_poloidal_flux(q_R + delta_R, q_Z - delta_Z)
-    poloidal_flux_mR_mZ = interp_poloidal_flux(q_R - delta_R, q_Z - delta_Z)
-    d2_poloidal_flux_dRdZ = (
-        poloidal_flux_pR_pZ
-        - poloidal_flux_mR_pZ
-        - poloidal_flux_pR_mZ
-        + poloidal_flux_mR_mZ
-    ) / (4 * delta_R * delta_Z)
-
-    return d2_poloidal_flux_dRdZ
 
 
 def find_Psi_3D_plasma_continuous(
@@ -952,36 +843,12 @@ def apply_discontinuous_BC(
     field,  # Field object
     hamiltonian,  # Hamiltonian object
 ):
-    d_poloidal_flux_dR_boundary = find_d_poloidal_flux_dR(
-        q_R,
-        q_Z,
-        delta_R,
-        field.poloidal_flux,
-    )
-    d_poloidal_flux_dZ_boundary = find_d_poloidal_flux_dZ(
-        q_R,
-        q_Z,
-        delta_Z,
-        field.poloidal_flux,
-    )
-    d2_poloidal_flux_dR2_boundary = find_d2_poloidal_flux_dR2(
-        q_R,
-        q_Z,
-        delta_R,
-        field.poloidal_flux,
-    )
-    d2_poloidal_flux_dZ2_boundary = find_d2_poloidal_flux_dZ2(
-        q_R,
-        q_Z,
-        delta_Z,
-        field.poloidal_flux,
-    )
-    d2_poloidal_flux_dRdZ_boundary = find_d2_poloidal_flux_dRdZ(
-        q_R,
-        q_Z,
-        delta_R,
-        delta_Z,
-        field.poloidal_flux,
+    d_poloidal_flux_dR_boundary = field.d_poloidal_flux_dR(q_R, q_Z, delta_R)
+    d_poloidal_flux_dZ_boundary = field.d_poloidal_flux_dZ(q_R, q_Z, delta_Z)
+    d2_poloidal_flux_dR2_boundary = field.d2_poloidal_flux_dR2(q_R, q_Z, delta_R)
+    d2_poloidal_flux_dZ2_boundary = field.d2_poloidal_flux_dZ2(q_R, q_Z, delta_Z)
+    d2_poloidal_flux_dRdZ_boundary = field.d2_poloidal_flux_dRdZ(
+        q_R, q_Z, delta_R, delta_Z
     )
 
     poloidal_flux_boundary = field.poloidal_flux(q_R, q_Z)
@@ -1060,18 +927,6 @@ def apply_continuous_BC(
     dH_dKR_initial = dH["dH_dKR"]
     dH_dKzeta_initial = dH["dH_dKzeta"]
     dH_dKZ_initial = dH["dH_dKZ"]
-    d_poloidal_flux_d_R_boundary = find_d_poloidal_flux_dR(
-        q_R,
-        q_Z,
-        delta_R,
-        field.poloidal_flux,
-    )
-    d_poloidal_flux_d_Z_boundary = find_d_poloidal_flux_dZ(
-        q_R,
-        q_Z,
-        delta_Z,
-        field.poloidal_flux,
-    )
 
     Psi_3D_plasma = find_Psi_3D_plasma_continuous(
         Psi_vacuum_3D,
@@ -1080,8 +935,8 @@ def apply_continuous_BC(
         dH_dKZ_initial,
         dH_dR_initial,
         dH_dZ_initial,
-        d_poloidal_flux_d_R_boundary,
-        d_poloidal_flux_d_Z_boundary,
+        field.d_poloidal_flux_dR(q_R, q_Z, delta_R),
+        field.d_poloidal_flux_dZ(q_R, q_Z, delta_Z),
     )
 
     return K_plasma, Psi_3D_plasma
@@ -1742,36 +1597,6 @@ def find_d2B_dR_dZ_FFD(q_R, q_Z, delta_R, delta_Z, find_B_R, find_B_T, find_B_Z)
     d2B_dR_dZ = ((-3 / 2) * dB_dZ_0 + (2) * dB_dZ_1 + (-1 / 2) * dB_dZ_2) / (delta_R)
 
     return d2B_dR_dZ
-
-
-def find_d2_poloidal_flux_dR2(q_R, q_Z, delta_R, interp_poloidal_flux):
-    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
-    poloidal_flux_1 = interp_poloidal_flux(q_R + delta_R, q_Z)
-    poloidal_flux_2 = interp_poloidal_flux(q_R + 2 * delta_R, q_Z)
-    poloidal_flux_3 = interp_poloidal_flux(q_R + 3 * delta_R, q_Z)
-    d2_poloidal_flux_dR2 = (
-        (2) * poloidal_flux_0
-        + (-5) * poloidal_flux_1
-        + (4) * poloidal_flux_2
-        + (-1) * poloidal_flux_3
-    ) / (delta_R**2)
-
-    return d2_poloidal_flux_dR2
-
-
-def find_d2_poloidal_flux_dZ2(q_R, q_Z, delta_Z, interp_poloidal_flux):
-    poloidal_flux_0 = interp_poloidal_flux(q_R, q_Z)
-    poloidal_flux_1 = interp_poloidal_flux(q_R, q_Z + delta_Z)
-    poloidal_flux_2 = interp_poloidal_flux(q_R, q_Z + 2 * delta_Z)
-    poloidal_flux_3 = interp_poloidal_flux(q_R, q_Z + 3 * delta_Z)
-    d2_poloidal_flux_dZ2 = (
-        (2) * poloidal_flux_0
-        + (-5) * poloidal_flux_1
-        + (4) * poloidal_flux_2
-        + (-1) * poloidal_flux_3
-    ) / (delta_Z**2)
-
-    return d2_poloidal_flux_dZ2
 
 
 # ----------------------------------
