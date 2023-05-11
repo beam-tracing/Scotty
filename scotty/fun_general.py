@@ -10,13 +10,12 @@ from scipy import constants as constants
 from scipy import interpolate as interpolate
 from scipy import integrate as integrate
 from typing import TextIO, List, Any, Tuple
-from numpy.typing import NDArray
-from scotty.typing import ArrayLike
+from scotty.typing import ArrayLike, FloatArray
 
 from .typing import ArrayLike
 
 
-def read_floats_into_list_until(terminator: str, lines: TextIO) -> NDArray[np.float64]:
+def read_floats_into_list_until(terminator: str, lines: TextIO) -> FloatArray:
     """Reads the lines of a file until the string (terminator) is read.
 
     Currently used to read topfile.
@@ -37,7 +36,7 @@ def read_floats_into_list_until(terminator: str, lines: TextIO) -> NDArray[np.fl
     return np.asarray(lst)
 
 
-def find_nearest(array: NDArray, value: Any) -> int:
+def find_nearest(array: ArrayLike, value: Any) -> int:
     """Returns the index of the first element in ``array`` closest in
     absolute value to ``value``
 
@@ -47,7 +46,7 @@ def find_nearest(array: NDArray, value: Any) -> int:
     return int(idx)
 
 
-def contract_special(arg_a: NDArray, arg_b: NDArray) -> NDArray:
+def contract_special(arg_a: FloatArray, arg_b: FloatArray) -> FloatArray:
     """Dot product of arrays of vectors or matrices.
 
     Covers the case that matmul and dot don't do very elegantly, and
