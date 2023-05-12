@@ -20,9 +20,18 @@ from scotty.geometry import MagneticField
 from typing import Union
 import warnings
 
-import sys
 import numpy as np
-from scipy.optimize import direct, root_scalar
+
+try:
+    from scipy.optimize import direct as minimise, root_scalar
+except ImportError:
+    # For SciPy < 1.9, `direct` isn't available, so we use a different
+    # global optimiser, but make a shim to ignore `direct`-specific
+    # arguments
+    from scipy.optimize import shgo, root_scalar
+
+    def minimise(func, bounds, **kwargs):
+        return shgo(func, bounds, sampling_method="sobol")
 
 
 def launch_beam(
@@ -366,11 +375,11 @@ def find_entry_point(
     # care about the closest, so use the first result as a bound for
     # the second. If there isn't a second, this will just find the
     # first again
-    first_min = direct(
+    first_min = minimise(
         poloidal_flux_boundary_along_line, bounds=((0, 1),), len_tol=1e-3
     )
-    minimum = direct(
-        poloidal_flux_boundary_along_line, bounds=((0, first_min.x),), len_tol=1e-3
+    minimum = minimise(
+        poloidal_flux_boundary_along_line, bounds=((0, first_min.x[0]),), len_tol=1e-3
     )
     # If the closest minimum is positive, then the beam never actually
     # enters the plasma, and we should abort
