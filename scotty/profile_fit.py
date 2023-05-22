@@ -133,7 +133,9 @@ class QuadraticFit(ProfileFit):
         )
 
     def __repr__(self):
-        return f"QuadraticFit({self.poloidal_flux_zero_profile}, core_val={self.core_val})"
+        return (
+            f"QuadraticFit({self.poloidal_flux_zero_profile}, core_val={self.core_val})"
+        )
 
 
 class TanhFit(ProfileFit):
