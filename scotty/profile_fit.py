@@ -95,12 +95,12 @@ class QuadraticFit(ProfileFit):
 
     Parameters
     ==========
-    poloidal_flux_zero_density:
-        Poloidal flux where density goes to zero (:math:`\psi_0` above)
-    ne_0:
-        Density at magnetic axis (:math:`n_{e0} \equiv n_e(\psi = 0)`)
+    poloidal_flux_zero_profile:
+        Poloidal flux where profile goes to zero (:math:`\psi_0` above)
+    core_val:
+        Profile value at magnetic axis (:math:`n_{e0} \equiv n_e(\psi = 0)`)
     psi_0:
-        If passed, this must be the same as ``poloidal_flux_zero_density``
+        If passed, this must be the same as ``poloidal_flux_zero_profile``
 
         .. deprecated:: 2.4.0
            ``psi_0`` can be safely dropped
@@ -108,32 +108,32 @@ class QuadraticFit(ProfileFit):
 
     def __init__(
         self,
-        poloidal_flux_zero_density: float,
-        ne_0: float,
+        poloidal_flux_zero_profile: float,
+        core_val: float,
         psi_0: Optional[float] = None,
     ):
-        super().__init__(poloidal_flux_zero_density)
-        self.ne_0 = ne_0
+        super().__init__(poloidal_flux_zero_profile)
+        self.core_val = core_val
 
         if psi_0 is not None:
             warn(
                 "'psi_0' argument to `QuadraticFit` is deprecated and can be removed",
                 DeprecationWarning,
             )
-            if psi_0 != poloidal_flux_zero_density:
+            if psi_0 != poloidal_flux_zero_profile:
                 raise ValueError(
                     f"QuadraticFit: 'psi_0' ({psi_0}) doesn't agree with "
-                    f"'poloidal_flux_zero_density' ({poloidal_flux_zero_density})"
+                    f"'poloidal_flux_zero_profile' ({poloidal_flux_zero_profile})"
                 )
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
         poloidal_flux = np.asfarray(poloidal_flux)
-        return self.ne_0 - (
-            (self.ne_0 / self.poloidal_flux_zero_density) * poloidal_flux**2
+        return self.core_val - (
+            (self.core_val / self.poloidal_flux_zero_profile) * poloidal_flux**2
         )
 
     def __repr__(self):
-        return f"QuadraticFit({self.poloidal_flux_zero_density}, ne_0={self.ne_0})"
+        return f"QuadraticFit({self.poloidal_flux_zero_profile}, core_val={self.core_val})"
 
 
 class TanhFit(ProfileFit):
@@ -145,14 +145,14 @@ class TanhFit(ProfileFit):
 
     Parameters
     ==========
-    poloidal_flux_zero_density:
-        Poloidal flux where density goes to zero (:math:`\psi_0` above)
+    poloidal_flux_zero_profile:
+        Poloidal flux where profile goes to zero (:math:`\psi_0` above)
     ne_0:
         (Asymptotic) density at magnetic axis (:math:`n_{e0} \le n_e(\psi = 0)`)
     ne_1:
         Second fitting parameter
     psi_0:
-        If passed, this must be the same as ``poloidal_flux_zero_density``
+        If passed, this must be the same as ``poloidal_flux_zero_profile``
 
         .. deprecated:: 2.4.0
            ``psi_0`` can be safely dropped
@@ -161,12 +161,12 @@ class TanhFit(ProfileFit):
 
     def __init__(
         self,
-        poloidal_flux_zero_density: float,
+        poloidal_flux_zero_profile: float,
         ne_0: float,
         ne_1: float,
         psi_0: Optional[float] = None,
     ):
-        super().__init__(poloidal_flux_zero_density)
+        super().__init__(poloidal_flux_zero_profile)
         self.ne_0 = ne_0
         self.ne_1 = ne_1
 
@@ -175,20 +175,20 @@ class TanhFit(ProfileFit):
                 "'psi_0' argument to `QuadraticFit` is deprecated and can be removed",
                 DeprecationWarning,
             )
-            if psi_0 != poloidal_flux_zero_density:
+            if psi_0 != poloidal_flux_zero_profile:
                 raise ValueError(
                     f"QuadraticFit: 'psi_0' ({psi_0}) doesn't agree with "
-                    f"'poloidal_flux_zero_density' ({poloidal_flux_zero_density})"
+                    f"'poloidal_flux_zero_profile' ({poloidal_flux_zero_profile})"
                 )
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
         poloidal_flux = np.asfarray(poloidal_flux)
         return self.ne_0 * np.tanh(
-            self.ne_1 * (poloidal_flux - self.poloidal_flux_zero_density)
+            self.ne_1 * (poloidal_flux - self.poloidal_flux_zero_profile)
         )
 
     def __repr__(self):
-        return f"TanhFit({self.poloidal_flux_zero_density}, ne_0={self.ne_0}, ne_1={self.ne_1})"
+        return f"TanhFit({self.poloidal_flux_zero_profile}, ne_0={self.ne_0}, ne_1={self.ne_1})"
 
 
 class PolynomialFit(ProfileFit):
@@ -202,15 +202,15 @@ class PolynomialFit(ProfileFit):
 
     Parameters
     ==========
-    poloidal_flux_zero_density:
+    poloidal_flux_zero_profile:
         Poloidal flux where solver starts and/or boundary conditions are applied; density has to be zero in the current implementation (:math:`\psi_0` above)
     coefficients:
         List of polynomial coefficients, from highest degree to the
         constant term
     """
 
-    def __init__(self, poloidal_flux_zero_density: float, *coefficients):
-        super().__init__(poloidal_flux_zero_density)
+    def __init__(self, poloidal_flux_zero_profile: float, *coefficients):
+        super().__init__(poloidal_flux_zero_profile)
         self.coefficients = coefficients
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
@@ -218,7 +218,7 @@ class PolynomialFit(ProfileFit):
         return np.polyval(self.coefficients, poloidal_flux)
 
     def __repr__(self):
-        return f"PolynomialFit({self.poloidal_flux_zero_density}, {', '.join(self.coefficients)})"
+        return f"PolynomialFit({self.poloidal_flux_zero_profile}, {', '.join(self.coefficients)})"
 
 
 class StefanikovaFit(ProfileFit):
@@ -247,7 +247,7 @@ class StefanikovaFit(ProfileFit):
 
     def __init__(
         self,
-        poloidal_flux_zero_density: float,
+        poloidal_flux_zero_profile: float,
         a_height: float,
         a_width: float,
         a_exp: float,
@@ -257,7 +257,7 @@ class StefanikovaFit(ProfileFit):
         b_slope: float,
         b_pos: float,
     ):
-        super().__init__(poloidal_flux_zero_density)
+        super().__init__(poloidal_flux_zero_profile)
         self.a_height = a_height
         self.a_width = a_width
         self.a_exp = a_exp
@@ -286,7 +286,7 @@ class StefanikovaFit(ProfileFit):
 
     def __repr__(self):
         return (
-            f"StefanikovaFit({self.poloidal_flux_zero_density}, "
+            f"StefanikovaFit({self.poloidal_flux_zero_profile}, "
             f"a_height={self.a_height}, "
             f"a_width={self.a_width}, "
             f"a_exp={self.a_exp}, "
