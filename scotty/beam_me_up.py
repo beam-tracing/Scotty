@@ -77,7 +77,11 @@ from scotty.fun_general import (
     find_Psi_3D_lab,
 )
 from scotty.fun_general import find_q_lab_Cartesian, find_Psi_3D_lab_Cartesian
-from scotty.fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq, find_electron_mass
+from scotty.fun_general import (
+    find_normalised_plasma_freq,
+    find_normalised_gyro_freq,
+    find_electron_mass,
+)
 from scotty.fun_general import find_epsilon_para, find_epsilon_perp, find_epsilon_g
 from scotty.fun_general import find_dbhat_dR, find_dbhat_dZ
 from scotty.fun_general import find_H_Cardano, find_D
@@ -122,7 +126,7 @@ def beam_me_up(
     launch_position: FloatArray,
     # keyword arguments begin
     vacuumLaunch_flag: bool = True,
-    relativistic_flag: bool = False, # includes relativistic corrections to electron mass when set to True
+    relativistic_flag: bool = False,  # includes relativistic corrections to electron mass when set to True
     find_B_method: Union[str, MagneticField] = "torbeam",
     density_fit_parameters: Optional[Sequence] = None,
     temperature_fit_parameters: Optional[Sequence] = None,
@@ -132,9 +136,7 @@ def beam_me_up(
     Psi_BC_flag: Union[bool, str, None] = None,
     poloidal_flux_enter: float = 1.0,
     poloidal_flux_zero_density: float = 1.0,  ## When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
-    
-    poloidal_flux_zero_temperature: float = 1.0, ## Not sure if this is needed or appropriate
-    
+    poloidal_flux_zero_temperature: float = 1.0,  ## Not sure if this is needed or appropriate
     # Finite-difference and solver parameters
     delta_R: float = -0.0001,  # in the same units as data_R_coord
     delta_Z: float = 0.0001,  # in the same units as data_Z_coord
@@ -181,7 +183,7 @@ def beam_me_up(
         - tanh
         - quadratic
        See `profile_fit` for more details
-    2. If relativistic_flag enabled, initialise temperature 
+    2. If relativistic_flag enabled, initialise temperature
        fit parameters. Not yet fully implemented. One of:
         - spline with data from file
         - linear
@@ -363,28 +365,32 @@ def beam_me_up(
         density_fit_parameters,
         ne_filename,
     )
-    
+
     # Run section if relativistic flag is set to True, and checks for whether the required temperature
     # data files are stored in path. If it does not exist, set relativistic flag to false and print
-    # a warning, but run the rest of the code. 
-    
+    # a warning, but run the rest of the code.
+
     Te_filename = None
     if relativistic_flag:
         if temperature_fit_parameters is None and (
-            temperature_fit_method in [None, "smoothing-spline-file"] # To modify later based on exact format of Te.dat
+            temperature_fit_method
+            in [
+                None,
+                "smoothing-spline-file",
+            ]  # To modify later based on exact format of Te.dat
         ):
-            Te_filename = Te_data_path / f"Te{input_filename_suffix}.dat" 
+            Te_filename = Te_data_path / f"Te{input_filename_suffix}.dat"
             temperature_fit_parameters = [Te_filename, interp_order, interp_smoothing]
 
             # Modify to test for whether files exist in path, and assign None value to Te_filename if no such files exist.
-            
+
             # FIXME: Read data so it can be saved later
-            #Te_data = np.fromfile(Te_filename, dtype=float, sep="   ")
-            #Te_data_density_array = Te_data[2::2]
-            #Te_data_radialcoord_array = Te_data[1::2]
-    
+            # Te_data = np.fromfile(Te_filename, dtype=float, sep="   ")
+            # Te_data_density_array = Te_data[2::2]
+            # Te_data_radialcoord_array = Te_data[1::2]
+
     if relativistic_flag:
-        find_temperature_1D = make_temperature_fit(  
+        find_temperature_1D = make_temperature_fit(
             temperature_fit_method,
             poloidal_flux_zero_temperature,
             temperature_fit_parameters,
@@ -410,7 +416,7 @@ def beam_me_up(
     )
 
     # Modify to take in an optional find_temp_1D argument
-    hamiltonian = Hamiltonian( 
+    hamiltonian = Hamiltonian(
         field,
         launch_angular_frequency,
         mode_flag,
@@ -420,11 +426,17 @@ def beam_me_up(
         delta_K_R,
         delta_K_zeta,
         delta_K_Z,
-        find_temperature_1D
+        find_temperature_1D,
     )
 
     # Checking input data
-    check_input(mode_flag, poloidal_flux_enter, launch_position, field, poloidal_flux_zero_density)
+    check_input(
+        mode_flag,
+        poloidal_flux_enter,
+        launch_position,
+        field,
+        poloidal_flux_zero_density,
+    )
 
     # -------------------
     # Launch parameters
@@ -662,10 +674,16 @@ def beam_me_up(
         electron_density_output, launch_angular_frequency, electron_mass_output
     )
     epsilon_perp_output = find_epsilon_perp(
-        electron_density_output, B_magnitude, launch_angular_frequency, electron_mass_output
+        electron_density_output,
+        B_magnitude,
+        launch_angular_frequency,
+        electron_mass_output,
     )
     epsilon_g_output = find_epsilon_g(
-        electron_density_output, B_magnitude, launch_angular_frequency, electron_mass_output
+        electron_density_output,
+        B_magnitude,
+        launch_angular_frequency,
+        electron_mass_output,
     )
 
     # Plasma and cyclotron frequencies
@@ -2013,12 +2031,15 @@ def make_density_fit(
 
     return profile_fit(method, poloidal_flux_zero_density, parameters, filename)
 
+
 def make_temperature_fit(
     method: Optional[Union[str, ProfileFitLike]],
     poloidal_flux_zero_temperature: float,
     parameters: Optional[Sequence],
     filename: Optional[PathLike],
-) -> ProfileFitLike: #Temporary measure to check if DensityFit is compatible with temp data
+) -> (
+    ProfileFitLike
+):  # Temporary measure to check if DensityFit is compatible with temp data
     """Either construct a `DensityFit` instance, or return ``method``
     if it's already suitable. Suitable methods are callables that take
     an array of poloidal fluxes and return an array of temperatures.

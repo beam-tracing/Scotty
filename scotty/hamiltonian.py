@@ -69,9 +69,14 @@ class DielectricTensor:
     ):
         electron_mass = find_electron_mass(temperature)
         _plasma_freq_2 = (
-            find_normalised_plasma_freq(electron_density, angular_frequency, electron_mass) ** 2
+            find_normalised_plasma_freq(
+                electron_density, angular_frequency, electron_mass
+            )
+            ** 2
         )
-        _gyro_freq = find_normalised_gyro_freq(B_total, angular_frequency, electron_mass)
+        _gyro_freq = find_normalised_gyro_freq(
+            B_total, angular_frequency, electron_mass
+        )
         _gyro_freq_2 = _gyro_freq**2
 
         self._epsilon_bb = 1 - _plasma_freq_2
@@ -201,12 +206,12 @@ class Hamiltonian:
         K_magnitude = np.sqrt(K_R**2 + (K_zeta / q_R) ** 2 + K_Z**2)
         poloidal_flux = self.field.poloidal_flux(q_R, q_Z)
         electron_density = self.density(poloidal_flux)
-        
+
         if self.temperature:
             temperature = self.temperature(poloidal_flux)
         else:
             temperature = None
-            
+
         B_R = np.squeeze(self.field.B_R(q_R, q_Z))
         B_T = np.squeeze(self.field.B_T(q_R, q_Z))
         B_Z = np.squeeze(self.field.B_Z(q_R, q_Z))
@@ -223,7 +228,9 @@ class Hamiltonian:
             K_hat = K_hat.T
             sin_theta_m_sq = contract_special(b_hat, K_hat) ** 2
 
-        epsilon = DielectricTensor(electron_density, self.angular_frequency, B_total, temperature)
+        epsilon = DielectricTensor(
+            electron_density, self.angular_frequency, B_total, temperature
+        )
 
         Booker_alpha = (epsilon.e_bb * sin_theta_m_sq) + epsilon.e_11 * (
             1 - sin_theta_m_sq
