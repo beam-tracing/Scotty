@@ -11,42 +11,78 @@ import numpy as np
 from scipy.interpolate import UnivariateSpline
 
 
-DensityFitLike = Callable[[ArrayLike], ArrayLike]
+ProfileFitLike = Callable[[ArrayLike], ArrayLike]
 """A callable that can parameterise density in 1D"""
 
 
-class DensityFit:
-    """Base class for density parameterisations.
+class ProfileFit:
+    """Base class for parameterisation of density/temperature profiles.
 
     Subclasses should implement ``_fit_impl`` which takes a 1D array
-    of the poloidal flux and returns the density at those points. This
-    base class will handle setting the density to zero outside the
+    of the poloidal flux and returns the density or temperature at those points. This
+    base class will handle setting the profile to zero outside the
     plasma.
 
     Parameters
     ==========
-    poloidal_flux_zero_density:
-        Flux at edge of plasma. Density is zero outside this flux label
+    poloidal_flux_zero_profile:
+        Flux at edge of plasma. Profile is zero outside this flux label.
 
     """
 
-    def __init__(self, poloidal_flux_zero_density: float):
-        self.poloidal_flux_zero_density = poloidal_flux_zero_density
+    def __init__(self, poloidal_flux_zero_profile: float):
+        self.poloidal_flux_zero_profile = poloidal_flux_zero_profile
 
     def __call__(self, poloidal_flux: ArrayLike) -> ArrayLike:
-        """Returns the interpolated density at ``poloidal_flux`` points."""
+        """Returns the interpolated profile at ``poloidal_flux`` points."""
 
         poloidal_flux = np.asfarray(poloidal_flux)
-        density = np.asfarray(self._fit_impl(poloidal_flux))
+        profile = np.asfarray(self._fit_impl(poloidal_flux))
         # Mask density inside plasma
-        is_inside = poloidal_flux <= self.poloidal_flux_zero_density
-        return is_inside * density
+        is_inside = poloidal_flux <= self.poloidal_flux_zero_profile
+        return is_inside * profile
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
         raise NotImplementedError
 
+class LinearFit(ProfileFit):
+    r""""Linear fit
+    
+    Currently implemented as a test profile for temperature.
+    """
 
-class QuadraticFit(DensityFit):
+    def __init__(
+        self,
+        poloidal_flux_zero_profile: float,
+        core_val: float, # Core temperature/density
+        psi_0: Optional[float] = None,
+    ):
+        super().__init__(poloidal_flux_zero_profile)
+        self.core_val = core_val
+
+        if psi_0 is not None:
+            warn(
+                "'psi_0' argument to `LinearFit` is deprecated and can be removed",
+                DeprecationWarning,
+            )
+            if psi_0 != poloidal_flux_zero_profile:
+                raise ValueError(
+                    f"LinearFit: 'psi_0' ({psi_0}) doesn't agree with "
+                    f"'poloidal_flux_zero_(density or temperature)' ({poloidal_flux_zero_profile})"
+                )
+
+    def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
+        poloidal_flux = np.asfarray(poloidal_flux)
+        return self.core_val - (
+            (self.core_val / self.poloidal_flux_zero_profile) * poloidal_flux
+        )
+
+    def __repr__(self):
+        return f"LinearFit({self.poloidal_flux_zero_profile}, core_val={self.core_val})"
+
+
+
+class QuadraticFit(ProfileFit):
     r"""Quadratic fit
 
     Given the density on the magnetic axis, :math:`n_{e0}`, and the
@@ -100,7 +136,7 @@ class QuadraticFit(DensityFit):
         return f"QuadraticFit({self.poloidal_flux_zero_density}, ne_0={self.ne_0})"
 
 
-class TanhFit(DensityFit):
+class TanhFit(ProfileFit):
     r"""Fit using :math:`\tanh`:
 
     .. math::
@@ -155,7 +191,7 @@ class TanhFit(DensityFit):
         return f"TanhFit({self.poloidal_flux_zero_density}, ne_0={self.ne_0}, ne_1={self.ne_1})"
 
 
-class PolynomialFit(DensityFit):
+class PolynomialFit(ProfileFit):
     r"""Fit using a :math:`m`-th order polynomial:
 
     .. math::
@@ -185,7 +221,7 @@ class PolynomialFit(DensityFit):
         return f"PolynomialFit({self.poloidal_flux_zero_density}, {', '.join(self.coefficients)})"
 
 
-class StefanikovaFit(DensityFit):
+class StefanikovaFit(ProfileFit):
     r"""Fit according to Stefanikova et al (2016) [1]_
 
     .. math::
@@ -262,21 +298,21 @@ class StefanikovaFit(DensityFit):
         )
 
 
-class SmoothingSplineFit(DensityFit):
+class SmoothingSplineFit(ProfileFit):
     """1D smoothing spline using `scipy.interpolate.UnivariateSpline`"""
 
     def __init__(
         self,
-        poloidal_flux_zero_density: float,
+        poloidal_flux_zero_profile: float,
         poloidal_flux: ArrayLike,
-        density: ArrayLike,
+        fitting_data: ArrayLike,
         order: int = 5,
         smoothing: Optional[float] = None,
     ):
-        super().__init__(poloidal_flux_zero_density)
+        super().__init__(poloidal_flux_zero_profile)
         self.spline = UnivariateSpline(
             poloidal_flux,
-            density,
+            fitting_data,
             w=None,
             bbox=[None, None],
             k=order,
@@ -288,7 +324,7 @@ class SmoothingSplineFit(DensityFit):
     @classmethod
     def from_dat_file(
         cls,
-        poloidal_flux_zero_density: float,
+        poloidal_flux_zero_profile: float,
         filename: PathLike,
         order: int = 5,
         smoothing: Optional[float] = None,
@@ -296,13 +332,13 @@ class SmoothingSplineFit(DensityFit):
         r"""Create a `SmoothingSplineFit` using parameters from text
         file.
 
-        File should contain electron density as a function of poloidal
+        File should contain electron density/temperature as a function of poloidal
         flux label in units of :math:`10^{19} \mathrm{m}^{-3}`.
 
         The first line is ignored, the rest of the file is expected to
         be in two columns: the first should contain the radial
         coordinate (:math:`\sqrt(\psi)`), the second the electron
-        density. The columns should be separated by whitespace.
+        density/temperature. The columns should be separated by whitespace.
 
         .. code-block:: text
 
@@ -314,17 +350,17 @@ class SmoothingSplineFit(DensityFit):
 
         """
 
-        ne_data = np.fromfile(filename, dtype=float, sep="   ")
-        radialcoord_array = ne_data[1::2]
-        density_array = ne_data[2::2]
+        fitting_data = np.fromfile(filename, dtype=float, sep="   ")
+        radialcoord_array = fitting_data[1::2]
+        fitting_array = fitting_data[2::2]
         # Loading radial coord for now, makes it easier to benchmark
         # with Torbeam. Hence, have to convert to poloidal flux
         poloidal_flux_array = radialcoord_array**2
 
         return cls(
-            poloidal_flux_zero_density,
+            poloidal_flux_zero_profile,
             poloidal_flux_array,
-            density_array,
+            fitting_array,
             order,
             smoothing,
         )
@@ -336,7 +372,7 @@ class SmoothingSplineFit(DensityFit):
 ##################################################
 
 
-DENSITY_FIT_METHODS: Dict[str, Union[type, Callable]] = {
+PROFILE_FIT_METHODS: Dict[str, Union[type, Callable]] = {
     "smoothing-spline": SmoothingSplineFit,
     "smoothing-spline-file": SmoothingSplineFit.from_dat_file,
     "stefanikova": StefanikovaFit,
@@ -344,10 +380,11 @@ DENSITY_FIT_METHODS: Dict[str, Union[type, Callable]] = {
     "polynomial": PolynomialFit,
     "tanh": TanhFit,
     "quadratic": QuadraticFit,
+    "linear": LinearFit
 }
 
 
-def _guess_density_fit_method(
+def _guess_profile_fit_method(
     parameters: Sequence, filename: Optional[PathLike]
 ) -> str:
     if filename is not None:
@@ -372,29 +409,29 @@ def _guess_density_fit_method(
         )
 
 
-def density_fit(
+def profile_fit(
     method: Optional[str],
-    poloidal_flux_zero_density: float,
+    poloidal_flux_zero_profile: float,
     parameters: Sequence,
     filename: Optional[PathLike] = None,
-) -> DensityFit:
-    """Create a density profile parameterisation
+) -> ProfileFit:
+    """Create a density/temperature profile parameterisation
 
     Parameters
     ==========
     method:
-        Name of density fit parameterisation
-    poloidal_flux_zero_density:
-        Poloidal flux label where density goes to zero
+        Name of profile fit parameterisation
+    poloidal_flux_zero_profile:
+        Poloidal flux label where density/temperature goes to zero
     parameters:
-        List of parameters passed to density fit
+        List of parameters passed to profile fit
     filename:
 
 
     """
 
     if method is None:
-        method = _guess_density_fit_method(parameters, filename)
+        method = _guess_profile_fit_method(parameters, filename)
         warn(
             "Creating a density fit without specifying a method is deprecated. "
             f"Guessing method '{method}' from parameters.\n"
@@ -408,11 +445,11 @@ def density_fit(
         )
 
     try:
-        fit_method = DENSITY_FIT_METHODS[method]
+        fit_method = PROFILE_FIT_METHODS[method]
     except KeyError:
         raise ValueError(
             f"Unknown density fitting method '{method}'. "
-            f"Expected one of {DENSITY_FIT_METHODS.keys()}"
+            f"Expected one of {PROFILE_FIT_METHODS.keys()}"
         )
 
-    return fit_method(poloidal_flux_zero_density, *parameters)
+    return fit_method(poloidal_flux_zero_profile, *parameters)

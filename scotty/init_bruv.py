@@ -28,7 +28,7 @@ from .fun_general import (
     genray_angles_from_mirror_angles,
     freq_GHz_to_wavenumber,
 )
-from .density_fit import QuadraticFit, TanhFit, PolynomialFit, DensityFit
+from .profile_fit import QuadraticFit, TanhFit, PolynomialFit, ProfileFit
 
 
 def get_parameters_for_Scotty(
@@ -686,7 +686,7 @@ LAUNCH_BEAM_METHODS: Dict[str, Dict[str, Callable[[float], LaunchBeamParameters]
 """Functions that return launch beam parameters for the corresponding diagnostic"""
 
 
-fit_dtype = [("time_ms", np.float64), ("fit", DensityFit)]
+fit_dtype = [("time_ms", np.float64), ("fit", ProfileFit)]
 
 DENSITY_FIT_PARAMETERS = {
     "DBS_NSTX_MAST": {

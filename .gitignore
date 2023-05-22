@@ -231,3 +231,4 @@ cython_debug/
 
 # Generated version file
 scotty/_version.py
+*.json

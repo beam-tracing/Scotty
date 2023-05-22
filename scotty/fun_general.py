@@ -13,6 +13,7 @@ from typing import TextIO, List, Any, Tuple
 from scotty.typing import ArrayLike, FloatArray
 
 from .typing import ArrayLike
+from typing import Optional, Union
 
 
 def read_floats_into_list_until(terminator: str, lines: TextIO) -> FloatArray:
@@ -396,7 +397,18 @@ def find_Psi_3D_lab_Cartesian(Psi_3D_lab, q_R, q_zeta, K_R, K_zeta):
 
 
 # Functions (beam tracing 1)
-def find_normalised_plasma_freq(electron_density, launch_angular_frequency):
+
+def find_electron_mass(temperature=None): # Implements first-order relativistic corrections
+    # to electron mass. Temperature needs to be in units of KeV, returns an array.
+    if temperature is not None:
+        electron_mass = constants.m_e * (1 + temperature * 4.892 * (10 ** (-3)))
+        #print('electron_mass used is: ' + str(electron_mass))
+        return electron_mass
+    else:
+        #print('electron_mass used is standard value.')
+        return constants.m_e
+
+def find_normalised_plasma_freq(electron_density, launch_angular_frequency, electron_mass = constants.m_e):
     # if electron_density < 0:
     #     print(electron_density)
     #     electron_density=0
@@ -404,51 +416,51 @@ def find_normalised_plasma_freq(electron_density, launch_angular_frequency):
 
     normalised_plasma_freq = (
         constants.e
-        * np.sqrt(electron_density * 10**19 / (constants.epsilon_0 * constants.m_e))
+        * np.sqrt(electron_density * 10**19 / (constants.epsilon_0 * electron_mass))
     ) / launch_angular_frequency
     # normalised_plasma_freq = np.sqrt(electron_density*10**19 * 3187.042702) / launch_angular_frequency # Torbeam's implementation
 
     return normalised_plasma_freq
 
 
-def find_normalised_gyro_freq(B_Total, launch_angular_frequency):
+def find_normalised_gyro_freq(B_Total, launch_angular_frequency, electron_mass = constants.m_e):
     normalised_gyro_freq = (
-        constants.e * B_Total / (constants.m_e * launch_angular_frequency)
+        constants.e * B_Total / (electron_mass * launch_angular_frequency)
     )
 
     return normalised_gyro_freq
 
 
-def find_epsilon_para(electron_density, launch_angular_frequency):
+def find_epsilon_para(electron_density, launch_angular_frequency, electron_mass = constants.m_e): 
     # also called epsilon_bb in my paper
 
     normalised_plasma_freq = find_normalised_plasma_freq(
-        electron_density, launch_angular_frequency
+        electron_density, launch_angular_frequency, electron_mass
     )
     epsilon_para = 1 - normalised_plasma_freq**2
 
     return epsilon_para
 
 
-def find_epsilon_perp(electron_density, B_Total, launch_angular_frequency):
+def find_epsilon_perp(electron_density, B_Total, launch_angular_frequency, electron_mass = constants.m_e):
     # also called epsilon_11 in my paper
 
     normalised_plasma_freq = find_normalised_plasma_freq(
-        electron_density, launch_angular_frequency
+        electron_density, launch_angular_frequency, electron_mass
     )
-    normalised_gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
+    normalised_gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency, electron_mass)
     epsilon_perp = 1 - normalised_plasma_freq**2 / (1 - normalised_gyro_freq**2)
 
     return epsilon_perp
 
 
-def find_epsilon_g(electron_density, B_Total, launch_angular_frequency):
+def find_epsilon_g(electron_density, B_Total, launch_angular_frequency, electron_mass = constants.m_e):
     # also called epsilon_12 in my paper
 
     normalised_plasma_freq = find_normalised_plasma_freq(
-        electron_density, launch_angular_frequency
+        electron_density, launch_angular_frequency, electron_mass
     )
-    normalised_gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
+    normalised_gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency, electron_mass)
     epsilon_g = (
         (normalised_plasma_freq**2)
         * normalised_gyro_freq
@@ -459,11 +471,11 @@ def find_epsilon_g(electron_density, B_Total, launch_angular_frequency):
 
 
 def find_Booker_alpha(
-    electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency
+    electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency, electron_mass = constants.m_e
 ):
-    epsilon_para = find_epsilon_para(electron_density, launch_angular_frequency)
+    epsilon_para = find_epsilon_para(electron_density, launch_angular_frequency, electron_mass)
     epsilon_perp = find_epsilon_perp(
-        electron_density, B_Total, launch_angular_frequency
+        electron_density, B_Total, launch_angular_frequency, electron_mass
     )
     Booker_alpha = epsilon_para * sin_theta_m_sq + epsilon_perp * (1 - sin_theta_m_sq)
 
@@ -471,13 +483,13 @@ def find_Booker_alpha(
 
 
 def find_Booker_beta(
-    electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency
+    electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency, electron_mass = constants.m_e
 ):
     epsilon_perp = find_epsilon_perp(
-        electron_density, B_Total, launch_angular_frequency
+        electron_density, B_Total, launch_angular_frequency, electron_mass
     )
-    epsilon_para = find_epsilon_para(electron_density, launch_angular_frequency)
-    epsilon_g = find_epsilon_g(electron_density, B_Total, launch_angular_frequency)
+    epsilon_para = find_epsilon_para(electron_density, launch_angular_frequency, electron_mass)
+    epsilon_g = find_epsilon_g(electron_density, B_Total, launch_angular_frequency, electron_mass)
     Booker_beta = -epsilon_perp * epsilon_para * (1 + sin_theta_m_sq) - (
         epsilon_perp**2 - epsilon_g**2
     ) * (1 - sin_theta_m_sq)
@@ -485,12 +497,12 @@ def find_Booker_beta(
     return Booker_beta
 
 
-def find_Booker_gamma(electron_density, B_Total, launch_angular_frequency):
+def find_Booker_gamma(electron_density, B_Total, launch_angular_frequency, electron_mass = constants.m_e):
     epsilon_perp = find_epsilon_perp(
-        electron_density, B_Total, launch_angular_frequency
+        electron_density, B_Total, launch_angular_frequency, electron_mass
     )
-    epsilon_para = find_epsilon_para(electron_density, launch_angular_frequency)
-    epsilon_g = find_epsilon_g(electron_density, B_Total, launch_angular_frequency)
+    epsilon_para = find_epsilon_para(electron_density, launch_angular_frequency, electron_mass)
+    epsilon_g = find_epsilon_g(electron_density, B_Total, launch_angular_frequency, electron_mass)
     Booker_gamma = epsilon_para * (epsilon_perp**2 - epsilon_g**2)
 
     return Booker_gamma
@@ -506,6 +518,7 @@ def find_H_numba(
     sin_theta_m_sq,
     launch_angular_frequency,
     mode_flag,
+    electron_mass = constants.m_e
 ):
     # For use with the numba package (parallelisation)
     # As such, doesn't take any functions as arguments
@@ -514,13 +527,13 @@ def find_H_numba(
     wavenumber_K0 = launch_angular_frequency / constants.c
 
     Booker_alpha = find_Booker_alpha(
-        electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency
+        electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency, electron_mass
     )
     Booker_beta = find_Booker_beta(
-        electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency
+        electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency, electron_mass
     )
     Booker_gamma = find_Booker_gamma(
-        electron_density, B_Total, launch_angular_frequency
+        electron_density, B_Total, launch_angular_frequency, electron_mass
     )
 
     # Due to numerical errors, sometimes H_discriminant ends up being a very small negative number
