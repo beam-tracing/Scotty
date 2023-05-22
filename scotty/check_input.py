@@ -33,13 +33,13 @@ def check_launch_position(
 
 def check_poloidal_flux_arguments(
     poloidal_flux_enter: float,
-    poloidal_flux_zero_density: float,    
+    poloidal_flux_zero_density: float,
 ) -> None:
-    
     if poloidal_flux_zero_density < poloidal_flux_enter:
         raise ValueError(
             f"Poloidal_flux_zero_density is less than Poloidal_flux_enter!"
         )
+
 
 def check_input(
     mode_flag: int,

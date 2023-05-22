@@ -45,16 +45,17 @@ class ProfileFit:
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
         raise NotImplementedError
 
+
 class LinearFit(ProfileFit):
-    r""""Linear fit
-    
+    r""" "Linear fit
+
     Currently implemented as a test profile for temperature.
     """
 
     def __init__(
         self,
         poloidal_flux_zero_profile: float,
-        core_val: float, # Core temperature/density
+        core_val: float,  # Core temperature/density
         psi_0: Optional[float] = None,
     ):
         super().__init__(poloidal_flux_zero_profile)
@@ -79,7 +80,6 @@ class LinearFit(ProfileFit):
 
     def __repr__(self):
         return f"LinearFit({self.poloidal_flux_zero_profile}, core_val={self.core_val})"
-
 
 
 class QuadraticFit(ProfileFit):
@@ -380,7 +380,7 @@ PROFILE_FIT_METHODS: Dict[str, Union[type, Callable]] = {
     "polynomial": PolynomialFit,
     "tanh": TanhFit,
     "quadratic": QuadraticFit,
-    "linear": LinearFit
+    "linear": LinearFit,
 }
 
 
