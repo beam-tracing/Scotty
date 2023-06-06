@@ -657,11 +657,28 @@ def find_K_plasma(
     plasma_freq = find_normalised_plasma_freq(
         electron_density_p, launch_angular_frequency
     )
-    if plasma_freq >= launch_angular_frequency:
-        print("Error")
+    
+    B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
+    gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
+    omega_R = 0.5 *( gyro_freq + np.sqrt(gyro_freq**2 + 4*plasma_freq**2) )
+    omega_L = 0.5 *(-gyro_freq + np.sqrt(gyro_freq**2 + 4*plasma_freq**2) )
+    omega_UH = np.sqrt(plasma_freq**2 + gyro_freq**2)
+    
+    if mode_flag == 1:
+        ## O-mode
+        if plasma_freq >= 1.0:
+            ## That is, if the (normalised) cutoff frequency is higher than the launch beam frequency inside the plasma
+            raise ValueError("Error: cut-off freq higher than beam freq on plasma side of plasma-vac boundary")
+            
+    elif mode_flag == -1:
+        ## X-mode
+        if (omega_R >= 1) and (omega_UH <=1):
+            raise ValueError("Error: cut-off freq higher than beam freq on plasma side of plasma-vac boundary")
+        if (omega_L >= 1):
+            raise ValueError("Error: cut-off freq higher than beam freq on plasma side of plasma-vac boundary")
+    ##
 
     ## Get components of the Booker quartic
-    B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
     K_v_mag = np.sqrt(K_v_R**2 + (K_v_zeta / q_R) ** 2 + K_v_Z**2)
     sin_theta_m_vac = (B_R * K_v_R + B_T * K_v_zeta / q_R + B_Z * K_v_Z) / (
         B_Total * K_v_mag
@@ -724,8 +741,11 @@ def find_K_plasma(
         / (2 * Booker_alpha)
     )
     tol = 1e-3
+
     if abs(H_bar) > tol:
         print("find_K_plasma not working properly")
+        print("H_bar =", H_bar)
+        
 
     return K_p_R, K_p_zeta, K_p_Z
 
@@ -850,7 +870,7 @@ def apply_discontinuous_BC(
         q_R, q_Z, delta_R, delta_Z
     )
 
-    poloidal_flux_boundary = field.poloidal_flux(q_R, q_Z)
+    poloidal_flux_boundary = field.poloidal_flux(q_R, q_Z)    
 
     K_plasma = find_K_plasma(
         q_R,

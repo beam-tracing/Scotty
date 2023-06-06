@@ -1,0 +1,24 @@
+Hi Valerian,
+
+No worries -- `unittest` is the built-in Python testing module, but we use `pytest`. You can either install it directly with pip, or with:
+
+# from your local scotty directory that contains pyproject.toml:
+pip install .[tests]
+
+The bit in brackets is an optional dependency. You can see the list of them in the `[project.optional-dependencies]` section in pyproject.toml.
+
+Some useful pytest options:
+
+# run everything
+pytest
+# run just the tests with "general" in the name:
+pytest -k general
+# run just the tests that failed last time:
+pytest --last-failed
+# drop into a python debugger if a test fails:
+pytest --pdb
+
+That last one is super useful for printing local variables, etc if a test fails.
+
+Cheers,
+Peter

@@ -6,7 +6,6 @@ from scotty.fun_general import (
     find_Psi_3D_lab,
     apply_discontinuous_BC,
     apply_continuous_BC,
-    find_K_plasma,
     find_inverse_2D,
     find_K_lab_Cartesian,
     find_q_lab_Cartesian,
