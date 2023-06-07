@@ -289,6 +289,7 @@ def grad_B_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
         q_R (array): radius R of position q
         q_zeta (array): angle zeta of position q
         q_Z (array): height Z of position q
+        delta (float): increment over which to calculate gradient
     Output:
         grad_B_xyz array of B field in X, Y, Z coordinates, with coordinate dimensions as last dimension
     """
@@ -350,6 +351,7 @@ def grad_bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
         q_R (array): radius R of position q
         q_zeta (array): angle zeta of position q
         q_Z (array): height Z of position q
+        delta (float): increment over which to calculate gradient
     Output:
         grad_bhat_xyz array of B field in X, Y, Z coordinates, with coordinate dimensions as last dimension
     """
@@ -376,6 +378,7 @@ def compare_grad_B(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
         q_R (array): radius R of position q
         q_zeta (array): angle zeta of position q
         q_Z (array): height Z of position q
+        delta (float): increment over which to calculate gradient
     Output:
         compare_grad_B array of B field in CARTESIAN (X, Y, Z) coordinates, with coordinate dimensions as last dimension
     """
@@ -395,6 +398,7 @@ def compare_grad_bhat(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
         q_R (array): radius R of position q
         q_zeta (array): angle zeta of position q
         q_Z (array): height Z of position q
+        delta (float): increment over which to calculate gradient
     Output:
         compare_grad_bhat array of B field in CARTESIAN (X, Y, Z) coordinates, with coordinate dimensions as last dimension
     """
