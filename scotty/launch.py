@@ -50,6 +50,7 @@ def launch_beam(
     poloidal_flux_enter: float = 1.0,
     delta_R: float = -1e-4,
     delta_Z: float = 1e-4,
+    temperature=None,
 ):
     r"""
     Propagate the beam from its initial position at the antenna to
@@ -268,6 +269,7 @@ def launch_beam(
             delta_Z,
             field,  # Field object
             hamiltonian,  # Hamiltonian object
+            temperature,
         )
     elif Psi_BC_flag == "continuous":
         K_initial, Psi_3D_lab_initial = apply_continuous_BC(

@@ -652,7 +652,6 @@ def beam_me_up(
         temperature_output = np.asfarray(find_temperature_1D(poloidal_flux_output))
     else:
         temperature_output = None
-    electron_mass_output = find_electron_mass(temperature_output)
 
     dH = hamiltonian.derivatives(
         q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, second_order=True
@@ -703,27 +702,27 @@ def beam_me_up(
 
     # Components of the dielectric tensor
     epsilon_para_output = find_epsilon_para(
-        electron_density_output, launch_angular_frequency, electron_mass_output
+        electron_density_output, launch_angular_frequency, temperature_output
     )
     epsilon_perp_output = find_epsilon_perp(
         electron_density_output,
         B_magnitude,
         launch_angular_frequency,
-        electron_mass_output,
+        temperature_output,
     )
     epsilon_g_output = find_epsilon_g(
         electron_density_output,
         B_magnitude,
         launch_angular_frequency,
-        electron_mass_output,
+        temperature_output,
     )
 
     # Plasma and cyclotron frequencies
     normalised_plasma_freqs = find_normalised_plasma_freq(
-        electron_density_output, launch_angular_frequency, electron_mass_output
+        electron_density_output, launch_angular_frequency, temperature_output
     )
     normalised_gyro_freqs = find_normalised_gyro_freq(
-        B_magnitude, launch_angular_frequency, electron_mass_output
+        B_magnitude, launch_angular_frequency, temperature_output
     )
 
     # -------------------
@@ -755,6 +754,12 @@ def beam_me_up(
     # The rest of the data is save further down, after the analysis generates them.
     # Just in case the analysis fails to run, at least one can get the data from the main loop
     # -------------------
+    
+    # Set **save_kwargs for saving temperature
+    save_kwargs = {}
+    if temperature_output is not None:
+        save_kwargs['temperature_output'] = temperature_output
+        
     if vacuumLaunch_flag:
         np.savez(
             output_path / f"data_output{output_filename_suffix}",
@@ -791,12 +796,12 @@ def beam_me_up(
             epsilon_perp_output=epsilon_perp_output,
             epsilon_g_output=epsilon_g_output,
             electron_density_output=electron_density_output,
-            temperature_output=temperature_output,
             normalised_plasma_freqs=normalised_plasma_freqs,
             normalised_gyro_freqs=normalised_gyro_freqs,
             H_output=H_output,
             H_other=H_other,
-            poloidal_flux_output=poloidal_flux_output
+            poloidal_flux_output=poloidal_flux_output,
+            **save_kwargs
             # dB_dR_FFD_debugging=dB_dR_FFD_debugging,dB_dZ_FFD_debugging=dB_dZ_FFD_debugging,
             # d2B_dR2_FFD_debugging=d2B_dR2_FFD_debugging,d2B_dZ2_FFD_debugging=d2B_dZ2_FFD_debugging,d2B_dR_dZ_FFD_debugging=d2B_dR_dZ_FFD_debugging,
             # poloidal_flux_debugging_1R=poloidal_flux_debugging_1R,
@@ -1393,7 +1398,7 @@ def beam_me_up(
     loc_p = (
         launch_angular_frequency**2
         * constants.epsilon_0
-        * electron_mass_output
+        * find_electron_mass(temperature_output)
         / constants.e**2
     ) ** 2 * loc_p_unnormalised
     # Note that loc_p is called varepsilon in my paper

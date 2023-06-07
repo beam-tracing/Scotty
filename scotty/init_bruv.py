@@ -222,7 +222,7 @@ def beam_settings(
 class DensityFitParameters(NamedTuple):
     """Parameterised density"""
 
-    fit: Optional[DensityFit]
+    fit: Optional[ProfileFit]
     """Fit parameterisation"""
     time_ms: Optional[float]
     """Actual shot time (in milliseconds) that parameters correspond to"""
@@ -275,7 +275,7 @@ def ne_settings(
     ne_fit_time = ne_fit_times[nearest_time_idx]
     print("Nearest ne fit time:", ne_fit_time)
 
-    return DensityFitParameters(ne_fit, ne_fit_time, ne_fit.poloidal_flux_zero_density)
+    return DensityFitParameters(ne_fit, ne_fit_time, ne_fit.poloidal_flux_zero_profile)
 
 
 def user_settings(diagnostic, user, shot):
