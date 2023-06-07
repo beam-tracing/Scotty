@@ -4,6 +4,10 @@
 Created on Thu Apr 20 22:50:00 2023
 
 @author: yvonne
+Yvonne Ban
+yban@hmc.edu
+
+carttest (this file) is a file with methods to compute B field and bhat in Cartesian and cylindrical coordinates, and compare them respectively.
 """
 import numpy as np
 from scipy import constants
