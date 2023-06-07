@@ -171,8 +171,8 @@ def beam_me_up(
     R_axis=None,
     minor_radius_a=None,
     # For flipping signs to maintain forward difference
-    auto_delta_sign_Z = 1,
-    auto_delta_sign_R = 1,
+    auto_delta_sign_Z=1,
+    auto_delta_sign_R=1,
 ):
     r"""Run the beam tracer
 
@@ -321,13 +321,13 @@ def beam_me_up(
         If true, then run only the ray tracer and get an analytic
         estimate of the :math:`K` cut-off location
     auto_delta_sign_Z:
-        A sign variable that takes on +1/-1. Ensures that forward 
-        differebce is always in negative poloidal flux gradient 
+        A sign variable that takes on +1/-1. Ensures that forward
+        differebce is always in negative poloidal flux gradient
         direction (into the plasma).
-        Current implementation is flawed because the MagneticField 
-        has to be constructed in order to determine the intersection 
-        point and corresponding sign. Sign flip is thus subsequently 
-        applied throughout the code except for the already constructed 
+        Current implementation is flawed because the MagneticField
+        has to be constructed in order to determine the intersection
+        point and corresponding sign. Sign flip is thus subsequently
+        applied throughout the code except for the already constructed
         field.
     auto_delta_sign_R:
         Similar to auto_delta_sign_Z but for the R coordinate
@@ -428,22 +428,33 @@ def beam_me_up(
         delta_R,
         delta_Z,
     )
-    
+
     # Flips the sign of delta_Z depending on the orientation of the poloidal flux surface at the point which the ray enters the plasma.
     # This is to ensure a forward difference across the plasma boundary. We expect poloidal flux to decrease in the direction of the plasma.
-        
-    entry_coords = find_entry_point(launch_position, np.deg2rad(poloidal_launch_angle_Torbeam), np.deg2rad(toroidal_launch_angle_Torbeam), poloidal_flux_enter, field)
+
+    entry_coords = find_entry_point(
+        launch_position,
+        np.deg2rad(poloidal_launch_angle_Torbeam),
+        np.deg2rad(toroidal_launch_angle_Torbeam),
+        poloidal_flux_enter,
+        field,
+    )
     entry_R, entry_zeta, entry_Z = entry_coords
-    
-    Z_gradient = (field.poloidal_flux(entry_R, entry_Z + delta_Z) - field.poloidal_flux(entry_R, entry_Z - delta_Z))/abs(delta_Z)
-    R_gradient = (field.poloidal_flux(entry_R + delta_R, entry_Z) - field.poloidal_flux(entry_R - delta_R, entry_Z))/abs(delta_R)
-    print('Gradients at entry point for Z: ', Z_gradient, ', R: ', R_gradient)
-    
+
+    Z_gradient = (
+        field.poloidal_flux(entry_R, entry_Z + delta_Z)
+        - field.poloidal_flux(entry_R, entry_Z - delta_Z)
+    ) / abs(delta_Z)
+    R_gradient = (
+        field.poloidal_flux(entry_R + delta_R, entry_Z)
+        - field.poloidal_flux(entry_R - delta_R, entry_Z)
+    ) / abs(delta_R)
+    print("Gradients at entry point for Z: ", Z_gradient, ", R: ", R_gradient)
+
     if Z_gradient > 0:
         auto_delta_sign_Z = -1
     if R_gradient > 0:
         auto_delta_sign_R = -1
-    
 
     # Modify to take in an optional find_temp_1D argument
     hamiltonian = Hamiltonian(
@@ -451,8 +462,8 @@ def beam_me_up(
         launch_angular_frequency,
         mode_flag,
         find_density_1D,
-        auto_delta_sign_R*delta_R,
-        auto_delta_sign_Z*delta_Z,
+        auto_delta_sign_R * delta_R,
+        auto_delta_sign_Z * delta_Z,
         delta_K_R,
         delta_K_zeta,
         delta_K_Z,
@@ -495,8 +506,8 @@ def beam_me_up(
             vacuum_propagation_flag=vacuum_propagation_flag,
             Psi_BC_flag=Psi_BC_flag,
             poloidal_flux_enter=poloidal_flux_enter,
-            delta_R=auto_delta_sign_R*delta_R,
-            delta_Z=auto_delta_sign_Z*delta_Z,
+            delta_R=auto_delta_sign_R * delta_R,
+            delta_Z=auto_delta_sign_Z * delta_Z,
         )
     else:
         print("Beam launched from inside the plasma")
@@ -685,10 +696,20 @@ def beam_me_up(
 
     grad_bhat_output = np.zeros([numberOfDataPoints, 3, 3])
     dbhat_dR = find_dbhat_dR(
-        q_R_array, q_Z_array, auto_delta_sign_R*delta_R, field.B_R, field.B_T, field.B_Z
+        q_R_array,
+        q_Z_array,
+        auto_delta_sign_R * delta_R,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )
     dbhat_dZ = find_dbhat_dZ(
-        q_R_array, q_Z_array, auto_delta_sign_Z*delta_Z, field.B_R, field.B_T, field.B_Z
+        q_R_array,
+        q_Z_array,
+        auto_delta_sign_Z * delta_Z,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )
     # Transpose dbhat_dR so that it has the right shape
     grad_bhat_output[:, 0, :] = dbhat_dR.T
@@ -737,16 +758,20 @@ def beam_me_up(
         launch_angular_frequency,
         -mode_flag,
         find_density_1D,
-        auto_delta_sign_R*delta_R,
-        auto_delta_sign_Z*delta_Z,
+        auto_delta_sign_R * delta_R,
+        auto_delta_sign_Z * delta_Z,
         delta_K_R,
         delta_K_zeta,
         delta_K_Z,
     )(q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array)
 
     # Gradients of poloidal flux along the ray
-    dpolflux_dR_debugging = field.d_poloidal_flux_dR(q_R_array, q_Z_array, auto_delta_sign_R*delta_R)
-    dpolflux_dZ_debugging = field.d_poloidal_flux_dZ(q_R_array, q_Z_array, auto_delta_sign_Z*delta_Z)
+    dpolflux_dR_debugging = field.d_poloidal_flux_dR(
+        q_R_array, q_Z_array, auto_delta_sign_R * delta_R
+    )
+    dpolflux_dZ_debugging = field.d_poloidal_flux_dZ(
+        q_R_array, q_Z_array, auto_delta_sign_Z * delta_Z
+    )
 
     # -------------------
     # This saves the data generated by the main loop and the input data
@@ -754,12 +779,12 @@ def beam_me_up(
     # The rest of the data is save further down, after the analysis generates them.
     # Just in case the analysis fails to run, at least one can get the data from the main loop
     # -------------------
-    
+
     # Set **save_kwargs for saving temperature
     save_kwargs = {}
     if temperature_output is not None:
-        save_kwargs['temperature_output'] = temperature_output
-        
+        save_kwargs["temperature_output"] = temperature_output
+
     if vacuumLaunch_flag:
         np.savez(
             output_path / f"data_output{output_filename_suffix}",
