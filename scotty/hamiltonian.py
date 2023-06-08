@@ -72,9 +72,7 @@ class DielectricTensor:
             )
             ** 2
         )
-        _gyro_freq = find_normalised_gyro_freq(
-            B_total, angular_frequency, temperature
-        )
+        _gyro_freq = find_normalised_gyro_freq(B_total, angular_frequency, temperature)
         _gyro_freq_2 = _gyro_freq**2
 
         self._epsilon_bb = 1 - _plasma_freq_2
