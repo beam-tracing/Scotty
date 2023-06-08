@@ -8,7 +8,6 @@ from scotty.fun_general import (
     angular_frequency_to_wavenumber,
     find_normalised_gyro_freq,
     find_normalised_plasma_freq,
-    find_electron_mass,
     contract_special,
 )
 from scotty.typing import ArrayLike, FloatArray
@@ -67,15 +66,14 @@ class DielectricTensor:
         B_total: ArrayLike,
         temperature: Optional[ArrayLike] = None,
     ):
-        electron_mass = find_electron_mass(temperature)
         _plasma_freq_2 = (
             find_normalised_plasma_freq(
-                electron_density, angular_frequency, electron_mass
+                electron_density, angular_frequency, temperature
             )
             ** 2
         )
         _gyro_freq = find_normalised_gyro_freq(
-            B_total, angular_frequency, electron_mass
+            B_total, angular_frequency, temperature
         )
         _gyro_freq_2 = _gyro_freq**2
 

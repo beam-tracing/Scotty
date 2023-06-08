@@ -117,6 +117,7 @@ def make_solver_events(
     def event_cross_resonance(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
         # Currently only works when crossing resonance.
         # To implement crossing of higher harmonics as well
+        # Not implemented for relativistic temperatures
         delta_gyro_freq = 0.01
 
         q_R, q_Z, _, _ = ray_parameters_2D
