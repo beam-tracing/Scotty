@@ -62,6 +62,8 @@ class outplot(object):
         self.electron_density_output = loadfile["electron_density_output"]
         self.poloidal_flux_output = loadfile["poloidal_flux_output"]
         self.H_output = loadfile["H_output"]
+        self.normalised_plasma_freqs = loadfile["normalised_plasma_freqs"]
+        self.normalised_gyro_freqs = loadfile["normalised_gyro_freqs"]
 
         if "temperature_output" in loadfile:
             self.relativistic_flag = True
@@ -120,6 +122,7 @@ class outplot(object):
             np.array([self.q_R_array, self.q_zeta_array, self.q_Z_array])
         )
         self.out_index = np.size(self.q_R_array)  # numberOfDataPoints
+        self.launch_angular_frequency = 2e9 * np.pi * self.launch_freq_GHz
 
     # def __del__(self, *args, **kwargs):
     # pass
@@ -140,7 +143,7 @@ class outplot(object):
             Plot saved to output_path, .jpg file (only for option=1 or 2, included when option=0)
         """
         if option == 0:
-            for opt in range(1, 17):
+            for opt in range(1, 18):
                 self.plotout(option=opt)
 
         elif option == 1:
@@ -644,10 +647,30 @@ class outplot(object):
                 # plt.gca().set_aspect("equal", adjustable="box")
                 plt.savefig(self.output_path + "temperature_output.jpg", dpi=200)
 
+        elif option == 17:
+            gyro_frequency = self.normalised_gyro_freqs * self.launch_angular_frequency
+            plasma_frequency = self.normalised_plasma_freqs * self.launch_angular_frequency
+            right_cutoff = 0.5*(gyro_frequency + np.sqrt(gyro_frequency**2 + 4*plasma_frequency**2))
+            left_cutoff = 0.5*(-gyro_frequency + np.sqrt(gyro_frequency**2 + 4*plasma_frequency**2))
+
+            plt.figure()
+            plt.plot(self.l_lc, np.full_like(self.l_lc, self.launch_angular_frequency), label='launch freq')
+            plt.plot(self.l_lc, gyro_frequency, label='$f_{ce}$')
+            plt.plot(self.l_lc, plasma_frequency, label='$f_{pe}$')
+            plt.plot(self.l_lc, right_cutoff, label='$f_{rh}$')
+            plt.plot(self.l_lc, left_cutoff, label='$f_{lh}$')
+
+            plt.xlabel("l - lc")
+            plt.ylabel("angular frequency")
+            plt.legend()
+            plt.savefig(self.output_path + "frequencies.jpg", dpi=200)
+            
+
         else:
             raise ValueError(
-                "Plot option must be 0 (generate all plots) or integer from 1-16"
+                "Plot option must be 0 (generate all plots) or integer from 1-17"
             )
+        
 
 
 def compare_plots(
