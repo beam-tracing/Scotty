@@ -217,6 +217,7 @@ def beam_me_up(
         If ``None``, do no special treatment at plasma-vacuum boundary
         If ``continuous``, apply BCs for continuous ne but discontinuous gradient of ne
         If ``discontinuous``, apply BCs for discontinuous ne
+        Using ``True`` or ``False`` is now deprecated
     poloidal_flux_enter: float
         Normalised poloidal flux label of plasma boundary.
         If vacuum_propagation_flag, then this is where the solver begins.
