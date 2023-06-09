@@ -207,6 +207,9 @@ def freq_GHz_to_angular_frequency(freq_GHz: float) -> float:
     """Convert frequency in GHz to angular frequency"""
     return 2 * np.pi * 1e9 * freq_GHz
 
+def angular_frequency_to_freq_GHZ(angular_frequency: float) -> float:
+    """Convert angular frequency to frequency in GHz"""
+    return angular_frequency / (2 * np.pi * 1e9)
 
 def angular_frequency_to_wavenumber(angular_frequency: float) -> float:
     """Convert angular frequency to wavenumber"""
