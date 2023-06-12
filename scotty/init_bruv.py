@@ -428,6 +428,7 @@ def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
 
 def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
     poloidal_flux_zero_density = 1.0
+    poloidal_flux_zero_temperature = 1.0
     ne_fit = QuadraticFit(poloidal_flux_zero_density, 4.0)
     return {
         "poloidal_launch_angle_Torbeam": 6.0,
@@ -450,6 +451,10 @@ def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
         "B_p_a": 0.1,
         "R_axis": 1.5,
         "minor_radius_a": 0.5,
+        # Arguments for testing relativistic corrections
+        "relativistic_flag": False,
+        "poloidal_flux_zero_temperature": poloidal_flux_zero_temperature,
+        "temperature_fit_method": None,
     }
 
 

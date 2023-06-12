@@ -12,7 +12,7 @@ from scipy.interpolate import UnivariateSpline
 
 
 ProfileFitLike = Callable[[ArrayLike], ArrayLike]
-"""A callable that can parameterise density in 1D"""
+"""A callable that can parameterise density/temperature in 1D"""
 
 
 class ProfileFit:
@@ -50,16 +50,19 @@ class LinearFit(ProfileFit):
     r""" "Linear fit
 
     Currently implemented as a test profile for temperature.
+
+    For the sake of convenience, the variable ne_0 is named for electron
+    density but the class works for electron temperature as well.
     """
 
     def __init__(
         self,
         poloidal_flux_zero_profile: float,
-        core_val: float,  # Core temperature/density
+        ne_0: float,  # Core temperature/density
         psi_0: Optional[float] = None,
     ):
         super().__init__(poloidal_flux_zero_profile)
-        self.core_val = core_val
+        self.ne_0 = ne_0
 
         if psi_0 is not None:
             warn(
@@ -74,18 +77,18 @@ class LinearFit(ProfileFit):
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
         poloidal_flux = np.asfarray(poloidal_flux)
-        return self.core_val - (
-            (self.core_val / self.poloidal_flux_zero_profile) * poloidal_flux
+        return self.ne_0 - (
+            (self.ne_0 / self.poloidal_flux_zero_profile) * poloidal_flux
         )
 
     def __repr__(self):
-        return f"LinearFit({self.poloidal_flux_zero_profile}, core_val={self.core_val})"
+        return f"LinearFit({self.poloidal_flux_zero_profile}, core_val={self.ne_0})"
 
 
 class QuadraticFit(ProfileFit):
     r"""Quadratic fit
 
-    Given the density on the magnetic axis, :math:`n_{e0}`, and the
+    Given the densit on the magnetic axis, :math:`n_{e0}`, and the
     poloidal flux where the density goes to zero, :math:`\psi_0`, the
     density is given by:
 
@@ -93,12 +96,15 @@ class QuadraticFit(ProfileFit):
 
         n_e(\psi) = n_{e0} - \frac{n_{e0}}{\psi_0}\psi^2
 
+    For the sake of convenience, the variable ne_0 is named for electron
+    density but the class works for electron temperature as well.
+
     Parameters
     ==========
     poloidal_flux_zero_profile:
         Poloidal flux where profile goes to zero (:math:`\psi_0` above)
-    core_val:
-        Profile value at magnetic axis (:math:`n_{e0} \equiv n_e(\psi = 0)`)
+    ne_0:
+        Profile value at magnetic axis (e.g. for density, :math:`n_{e0} \equiv n_e(\psi = 0)`)
     psi_0:
         If passed, this must be the same as ``poloidal_flux_zero_profile``
 
@@ -109,11 +115,11 @@ class QuadraticFit(ProfileFit):
     def __init__(
         self,
         poloidal_flux_zero_profile: float,
-        core_val: float,
+        ne_0: float,
         psi_0: Optional[float] = None,
     ):
         super().__init__(poloidal_flux_zero_profile)
-        self.core_val = core_val
+        self.ne_0 = ne_0
 
         if psi_0 is not None:
             warn(
@@ -128,13 +134,13 @@ class QuadraticFit(ProfileFit):
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
         poloidal_flux = np.asfarray(poloidal_flux)
-        return self.core_val - (
-            (self.core_val / self.poloidal_flux_zero_profile) * poloidal_flux**2
+        return self.ne_0 - (
+            (self.ne_0 / self.poloidal_flux_zero_profile) * poloidal_flux**2
         )
 
     def __repr__(self):
         return (
-            f"QuadraticFit({self.poloidal_flux_zero_profile}, core_val={self.core_val})"
+            f"QuadraticFit({self.poloidal_flux_zero_profile}, core_val={self.ne_0})"
         )
 
 
@@ -207,8 +213,7 @@ class PolynomialFit(ProfileFit):
     poloidal_flux_zero_profile:
         Poloidal flux where solver starts and/or boundary conditions are applied; density has to be zero in the current implementation (:math:`\psi_0` above)
     coefficients:
-        List of polynomial coefficients, from highest degree to the
-        constant term
+        List of polynomial coefficients, from highest degree to the constant term
     """
 
     def __init__(self, poloidal_flux_zero_profile: float, *coefficients):

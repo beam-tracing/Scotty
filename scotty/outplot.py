@@ -654,8 +654,9 @@ def compare_plots(
     plotobject_1: outplot, plotobject_2: outplot, name_tuple: Tuple[str, ...], option=2
 ):
     """
+    [WIP]
     Plotting function for simultaneously plotting two outplot objects, mainly used for comparing
-    relativistically-corrected outputs vs nonrelativistic outputs. Currently WIP.
+    relativistically-corrected outputs vs nonrelativistic outputs.
     1st plotobject treated as the main object for referencing grid points and output path.
     """
 

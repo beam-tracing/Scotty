@@ -10,6 +10,7 @@ from scotty.fun_general import (
     freq_GHz_to_angular_frequency,
     angular_frequency_to_wavenumber,
 )
+from scotty.profile_fit import QuadraticFit, TanhFit, PolynomialFit, ProfileFit
 from scotty.hamiltonian import Hamiltonian
 from scotty.launch import find_entry_point, launch_beam
 
@@ -21,6 +22,8 @@ import pytest
 
 # Print more of arrays in failed tests
 np.set_printoptions(linewidth=120, threshold=100)
+
+# Expected values for nonrelativistic simple golden
 
 CUTOFF_INDEX = 5
 
@@ -209,6 +212,202 @@ EXPECTED = {
             0.83771518,
             0.7590454,
             0.59751663,
+        ]
+    ),
+}
+
+# Expected values for relativistic version of the test
+# Note: expected values are based on a tentative version
+# of the relativistic code and are not yet rigorously 
+# cross-validated. May be subject to changes in the future.
+
+CUTOFF_INDEX_REL = 5
+
+PSI_START_EXPECTED_REL = np.array(
+    [
+        [
+            -2.47380536e+03 + 1.19564545e+01j,
+            -1.70148132e-15 - 2.21090894e-15j,
+            3.40499803e+02 - 1.13758066e+02j,
+        ],
+        [
+            -1.70148132e-15 - 2.21090894e-15j,
+            4.24588292e+03 + 4.35038716e+03j,
+            1.61885134e-14 + 2.10353935e-14j,
+        ],
+        [
+            3.40499803e+02 - 1.13758066e+02j,
+            1.61885134e-14 + 2.10353935e-14j,
+            4.25752614e+02 + 1.08233570e+03j,
+        ],
+    ]
+)
+PSI_CUTOFF_EXPECTED_REL = np.array( # Not yet modified
+    [
+        [
+            -2.74095960e+03 + 3.58127405e+02j,
+            -2.65492476e+02 - 1.41323059e+02j,
+            3.88466862e+02 - 3.48400619e+02j,
+        ],
+        [
+            -2.65492476e+02 - 1.41323059e+02j,
+            3.90471855e+03 + 2.58339866e+03j,
+            -5.91261562e+01 - 7.33060225e+01j,
+        ],
+        [
+            3.88466862e+02 - 3.48400619e+02j,
+            -5.91261562e+01 - 7.33060225e+01j,
+            2.02222919e+03 + 3.57401128e+02j,
+        ],
+    ]
+)
+PSI_FINAL_EXPECTED_REL = np.array(
+    [
+        [
+            -3.71494845e+03 + 3.81425685e+03j,
+            -4.42926587e+02 + 2.66468589e+01j,
+            1.57646260e+02 - 7.14883020e+02j,
+        ],
+        [
+            -4.42926587e+02 + 2.66468589e+01j,
+            3.44023583e+03 + 1.78008390e+03j,
+            4.19741443e+01 - 2.61204714e+01j,
+        ],
+        [
+            1.57646260e+02 - 7.14883020e+02j,
+            4.19741443e+01 - 2.61204714e+01j,
+            2.35535115e+03 + 1.34097969e+02j,
+        ],
+    ]
+)
+
+
+EXPECTED_REL = {
+    "q_R_array": np.array(
+        [
+            1.99387217,
+            1.89478605,
+            1.81608475,
+            1.75333963,
+            1.70332833,
+            1.68236306,
+            1.66365248,
+            1.63245724,
+            1.6081207,
+            1.58926036,
+        ]
+    ),
+    "q_Z_array": np.array(
+        [
+            -0.07804025,
+            -0.09178393,
+            -0.11014496,
+            -0.13409806,
+            -0.16497459,
+            -0.18346808,
+            -0.20440327,
+            -0.25422772,
+            -0.31682193,
+            -0.39541607,
+        ]
+    ),
+    "q_zeta_array": np.array(
+        [   
+            3.64302241e-17,
+            -4.34557216e-04,
+            -1.75458750e-03,
+            -3.94757309e-03,
+            -6.87025031e-03,
+            -8.48770015e-03,
+            -1.01300439e-02,
+            -1.31890816e-02,
+            -1.56082400e-02,
+            -1.71395528e-02,
+        ]
+    ),
+    "K_R_array": np.array(
+        [
+            -1146.40007,
+            -907.90136177,
+            -722.04856355,
+            -575.25018894,
+            -458.16628298,
+            -408.60089775,
+            -363.80900807,
+            -287.14391725,
+            -224.28323101,
+            -172.04458472,
+        ]
+    ),
+    "K_Z_array": np.array(
+        [
+            -120.49150267,
+            -166.27151556,
+            -219.69675587,
+            -283.52247217,
+            -360.9422406,
+            -405.84935937,
+            -455.91708955,
+            -573.53506261,
+            -720.72904123,
+            -906.95011315,
+        ]
+    ),
+    "K_zeta_initial": np.array(-0.0),
+    "tau_array": np.array(
+        [
+            0.0,
+            64.39979252,
+            128.79958503,
+            193.19937755,
+            257.59917007,
+            289.73242526,
+            321.99896258,
+            386.3987551,
+            450.79854762,
+            515.19834013
+        ]
+    ),
+    "B_magnitude": np.array(
+        [
+            0.75896269,
+            0.79865196,
+            0.8332621,
+            0.86308127,
+            0.88842214,
+            0.89949347,
+            0.9096098,
+            0.92699187,
+            0.94102053,
+            0.95218797,
+        ]
+    ),
+    "normalised_gyro_freqs": np.array(
+        [
+            0.38627737,
+            0.39977178,
+            0.41294464,
+            0.42530111,
+            0.43666288,
+            0.44196733,
+            0.44707702,
+            0.45679554,
+            0.46634932,
+            0.47662924,
+        ]
+    ),
+    "normalised_plasma_freqs": np.array(
+        [
+            -0.0,
+            0.59956615,
+            0.756831,
+            0.83240653,
+            0.86437198,
+            0.86814015,
+            0.86436323,
+            0.83237437,
+            0.75676491,
+            0.59942523,
         ]
     ),
 }
@@ -468,6 +667,111 @@ def test_integrated(tmp_path, generator):
         output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED, rtol=1.8e-2, atol=0.1
     )
 
+@pytest.mark.parametrize(
+    "generator_rel",
+    [
+        pytest.param(simple, id="simple"),
+        pytest.param(ne_dat_file, id="density-fit-file"),
+        pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
+        # Following methods have errors of 30%, despite field being
+        # idential to 1%, needs investigating
+        # pytest.param(UDA_saved, id="UDA-saved-file"),
+    ],
+)
+def test_relativistic(tmp_path, generator_rel):
+    """Golden answer test to check relativistic corrections."""
+    Te_fit = QuadraticFit(1.0, 10.0)
+
+    kwargs_dict = generator_rel(tmp_path)
+    kwargs_dict["output_filename_suffix"] = "_Bpa1.10"
+    kwargs_dict["figure_flag"] = False
+    kwargs_dict["len_tau"] = 10
+    kwargs_dict["output_path"] = tmp_path
+    kwargs_dict['relativistic_flag'] = True
+    kwargs_dict["temperature_fit_method"] = Te_fit
+
+    number_of_existing_npz_files = len(list(tmp_path.glob("*.npz")))
+
+    beam_me_up(**kwargs_dict)
+
+    assert len(list(tmp_path.glob("*.npz"))) == 4 + number_of_existing_npz_files
+
+    with np.load(tmp_path / "data_output_Bpa1.10.npz") as f:
+        output = dict(f)
+
+    for key, value in EXPECTED_REL.items():
+        assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
+
+    K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
+    assert K_magnitude.argmin() == CUTOFF_INDEX_REL
+
+    assert_allclose(
+        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_REL, rtol=1e-2, atol=0.1
+    )
+    assert_allclose(
+        output["Psi_3D_output"][CUTOFF_INDEX_REL, ...],
+        PSI_CUTOFF_EXPECTED_REL,
+        rtol=1e-2,
+        atol=0.1,
+    )
+    assert_allclose(
+        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_REL, rtol=1.8e-2, atol=0.1
+    )
+
+@pytest.mark.parametrize(
+    "generator_nullrel",
+    [
+        pytest.param(simple, id="simple"),
+        pytest.param(ne_dat_file, id="density-fit-file"),
+        pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
+        # Following methods have errors of 30%, despite field being
+        # idential to 1%, needs investigating
+        # pytest.param(UDA_saved, id="UDA-saved-file"),
+    ],
+)
+def test_null_relativistic(tmp_path, generator_nullrel):
+    """Golden answer test to check relativistic corrections with zero temperature array.
+    Output should be identical to nonrelativistic outputs."""
+
+    Te_fit = QuadraticFit(1.0, 0.0)
+
+    kwargs_dict = generator_nullrel(tmp_path)
+    kwargs_dict["output_filename_suffix"] = "_Bpa2.10"
+    kwargs_dict["figure_flag"] = False
+    kwargs_dict["len_tau"] = 10
+    kwargs_dict["output_path"] = tmp_path
+    kwargs_dict["relativistic_flag"] = True
+    kwargs_dict["temperature_fit_method"] = Te_fit
+
+    number_of_existing_npz_files = len(list(tmp_path.glob("*.npz")))
+
+    beam_me_up(**kwargs_dict)
+
+    assert len(list(tmp_path.glob("*.npz"))) == 4 + number_of_existing_npz_files
+
+    with np.load(tmp_path / "data_output_Bpa2.10.npz") as f:
+        output = dict(f)
+
+    for key, value in EXPECTED.items():
+        assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
+
+    K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
+    assert K_magnitude.argmin() == CUTOFF_INDEX
+
+    assert_allclose(
+        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED, rtol=1e-2, atol=0.1
+    )
+    assert_allclose(
+        output["Psi_3D_output"][CUTOFF_INDEX, ...],
+        PSI_CUTOFF_EXPECTED,
+        rtol=1e-2,
+        atol=0.1,
+    )
+    assert_allclose(
+        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED, rtol=1.8e-2, atol=0.1
+    )
 
 @pytest.mark.parametrize(
     "generator",
