@@ -23,11 +23,11 @@ import pytest
 # Print more of arrays in failed tests
 np.set_printoptions(linewidth=120, threshold=100)
 
-# Expected values for nonrelativistic simple golden
+# Expected values for nonrelativistic simple golden, mode_flag = 1
 
-CUTOFF_INDEX = 5
+CUTOFF_INDEX_1 = 5
 
-PSI_START_EXPECTED = np.array(
+PSI_START_EXPECTED_1 = np.array(
     [
         [
             -2.47357794e03 + 1.19557806e01j,
@@ -46,7 +46,7 @@ PSI_START_EXPECTED = np.array(
         ],
     ]
 )
-PSI_CUTOFF_EXPECTED = np.array(
+PSI_CUTOFF_EXPECTED_1 = np.array(
     [
         [
             -3415.07623355 + 445.31992622j,
@@ -65,7 +65,7 @@ PSI_CUTOFF_EXPECTED = np.array(
         ],
     ]
 )
-PSI_FINAL_EXPECTED = np.array(
+PSI_FINAL_EXPECTED_1 = np.array(
     [
         [
             -759.55423192 + 13243.111223j,
@@ -86,7 +86,7 @@ PSI_FINAL_EXPECTED = np.array(
 )
 
 
-EXPECTED = {
+EXPECTED_1 = {
     "q_R_array": np.array(
         [
             1.99382564,
@@ -216,14 +216,209 @@ EXPECTED = {
     ),
 }
 
+# Expected values for nonrelativistic simple golden, mode_flag = -1
+
+CUTOFF_INDEX_NEG1 = 5
+
+PSI_START_EXPECTED_NEG1 = np.array(
+    [
+        [
+            -2.91536252e+03 + 1.19564545e+01j, 
+            -1.70148132e-15 - 2.21090894e-15j,
+            4.10273717e+02 -1.13758066e+02j,
+        ],
+        [
+            -1.70148132e-15 - 2.21090894e-15j,
+            4.24588292e+03 + 4.35038716e+03j,
+            1.61885134e-14 + 2.10353935e-14j,
+        ],
+        [
+            4.10273717e+02 - 1.13758066e+02j,
+            1.61885134e-14 + 2.10353935e-14j,
+            4.14727090e+02 + 1.08233570e+03j,
+            ]
+    ]
+)
+PSI_CUTOFF_EXPECTED_NEG1 = np.array(
+    [
+        [
+            -7.73550781e+04 + 1.34722684e+04j,
+            9.39057362e+02 + 2.50803785e+02j,
+            1.46623251e+04 - 5.02535302e+03j,
+        ],
+        [
+            9.39057362e+02 + 2.50803785e+02j, 
+            3.56049986e+03 + 1.93889334e+03j,
+            -1.18904163e+02 + 3.27447497e+01j,
+        ],
+        [
+            1.46623251e+04 - 5.02535302e+03j,
+            -1.18904163e+02 + 3.27447497e+01j,
+            -1.47350536e+02 + 1.88270173e+03j,
+        ]
+    ]
+)
+PSI_FINAL_EXPECTED_NEG1 = np.array(
+    [
+        [
+            5.02917079e+03 + 1.35480590e+02j,
+            2.34748730e+01 + 1.58346740e+01j,
+            1.93577117e+02 + 1.11821703e+02j,
+        ],
+        [
+            2.34748730e+01 + 1.58346740e+01j,
+            2.87217332e+03 + 1.11883142e+03j,
+            4.20742523e+01 + 2.19936124e+01j,
+        ],
+        [
+            1.93577117e+02 + 1.11821703e+02j,
+            4.20742523e+01 + 2.19936124e+01j,
+            2.59750859e+03 + 9.26939766e+01j,
+        ]
+    ]
+)
+
+
+EXPECTED_NEG1 = {
+    "q_R_array": np.array(
+        [
+            1.99387217,
+            1.93805575,
+            1.89170709,
+            1.85602899,
+            1.83317026,
+            1.82688086,
+            1.82498201,
+            1.83126083,
+            1.84988849,
+            1.87844182,
+        ]
+    ),
+    "q_Z_array": np.array(
+        [
+            -0.07804025,
+            -0.08519773,
+            -0.09424295,
+            -0.10582153,
+            -0.12098197,
+            -0.13112771,
+            -0.14102312,
+            -0.16698944,
+            -0.19882757,
+            -0.23601108,
+        ]
+    ),
+    "q_zeta_array": np.array(
+        [
+            3.64302241e-17,
+            1.56090264e-04,
+            6.50453332e-04,
+            1.51093011e-03,
+            2.69111683e-03,
+            3.39990235e-03,
+            3.99935338e-03,
+            5.16680571e-03,
+            6.00991893e-03,
+            6.49247319e-03,
+        ]
+    ),
+    "K_R_array": np.array(
+        [
+            -1146.40007,
+            -971.90930973,
+            -784.6638796,
+            -564.7722809,
+            -299.43104475,
+            -143.44677255,
+            -11.7005995,
+            248.24017306,
+            456.45793455,
+            626.21158363,
+        ]
+    ),
+    "K_Z_array": np.array(
+        [
+            -120.49150267,
+            -150.83839501,
+            -190.26794372,
+            -246.4010787,
+            -328.33628241,
+            -383.74064007,
+            -434.87555229,
+            -548.7379687,
+            -654.86418912,
+            -753.33397823,
+        ]
+    ),
+    "K_zeta_initial": np.array(-0.0),
+    "tau_array": np.array(
+        [
+            0.0,
+            35.00328799,
+            70.00657599,
+            105.00986398,
+            140.01315198,
+            158.93919148,
+            175.01643997,
+            210.01972796,
+            245.02301596,
+            280.02630395,
+        ]
+    ),
+    "B_magnitude": np.array(
+        [
+            0.75896269,
+            0.78082098,
+            0.79995185,
+            0.81532918,
+            0.82549594,
+            0.82833787,
+            0.82919973,
+            0.82635667,
+            0.81803557,
+            0.80560099,
+        ]
+    ),
+    "normalised_gyro_freqs": np.array(
+        [
+            0.38627737,
+            0.39740224,
+            0.40713899,
+            0.41496534,
+            0.42013976,
+            0.42158617,
+            0.42202482,
+            0.42057783,
+            0.41634277,
+            0.41001414,
+        ]
+    ),
+    "normalised_plasma_freqs": np.array(
+        [
+            -0.,
+            0.46563763,
+            0.61146091,
+            0.69120285,
+            0.72820049,
+            0.73285099,
+            0.72860508,
+            0.69223732,
+            0.61272118,
+            0.4666989,
+        ]
+    ),
+}
+
 # Expected values for relativistic version of the test
 # Note: expected values are based on a tentative version
 # of the relativistic code and are not yet rigorously
 # cross-validated. May be subject to changes in the future.
 
-CUTOFF_INDEX_REL = 5
+# For mode_flag = 1:
 
-PSI_START_EXPECTED_REL = np.array(
+CUTOFF_INDEX_REL_1 = 5
+
+PSI_START_EXPECTED_REL_1 = np.array(
     [
         [
             -2.47380536e03 + 1.19564545e01j,
@@ -242,7 +437,7 @@ PSI_START_EXPECTED_REL = np.array(
         ],
     ]
 )
-PSI_CUTOFF_EXPECTED_REL = np.array(  # Not yet modified
+PSI_CUTOFF_EXPECTED_REL_1 = np.array(  # Not yet modified
     [
         [
             -2.74095960e03 + 3.58127405e02j,
@@ -261,7 +456,7 @@ PSI_CUTOFF_EXPECTED_REL = np.array(  # Not yet modified
         ],
     ]
 )
-PSI_FINAL_EXPECTED_REL = np.array(
+PSI_FINAL_EXPECTED_REL_1 = np.array(
     [
         [
             -3.71494845e03 + 3.81425685e03j,
@@ -282,7 +477,7 @@ PSI_FINAL_EXPECTED_REL = np.array(
 )
 
 
-EXPECTED_REL = {
+EXPECTED_REL_1 = {
     "q_R_array": np.array(
         [
             1.99387217,
@@ -408,6 +603,197 @@ EXPECTED_REL = {
             0.83237437,
             0.75676491,
             0.59942523,
+        ]
+    ),
+}
+
+# For mode_flag = -1:
+
+CUTOFF_INDEX_REL_NEG1 = 5
+
+PSI_START_EXPECTED_REL_NEG1 = np.array(
+    [
+        [
+            -2.91536253e+03 + 1.19564545e+01j,
+            -1.70148132e-15 - 2.21090894e-15j,
+            4.10273883e+02 - 1.13758066e+02j,
+        ],
+        [
+            -1.70148132e-15 - 2.21090894e-15j,
+            4.24588292e+03 + 4.35038716e+03j,
+            1.61885134e-14 + 2.10353935e-14j,
+        ],
+        [
+            4.10273883e+02 - 1.13758066e+02j,
+            1.61885134e-14 + 2.10353935e-14j,
+            4.14727038e+02 + 1.08233570e+03j,
+        ]
+    ]
+)
+PSI_CUTOFF_EXPECTED_REL_NEG1 = np.array(  # Not yet modified
+    [
+        [
+            -6.16175436e+04 + 1.03713923e+04j,
+            8.12739539e+02 + 2.10348335e+02j,
+            1.16247793e+04 - 4.06046898e+03j,
+        ],
+        [
+            8.12739539e+02 + 2.10348335e+02j,
+            3.49517564e+03 + 1.84058019e+03j,
+            -8.99870324e+01 + 3.81172348e+01j,
+        ],
+        [
+            1.16247793e+04 - 4.06046898e+03j,
+            -8.99870324e+01 + 3.81172348e+01j,
+            3.94919303e+02 + 1.59793834e+03j,
+        ]
+    ]
+)
+PSI_FINAL_EXPECTED_REL_NEG1 = np.array(
+    [
+        [
+            5.00629634e+03 + 1.41790111e+02j,
+            2.37427524e+01 + 1.53467963e+01j,
+            1.32572176e+02 + 1.06636090e+02j,
+        ],
+        [
+            2.37427524e+01 + 1.53467963e+01j,
+            2.77833196e+03 + 1.03516633e+03j,
+            4.05478764e+01 + 2.00937539e+01j,
+        ],
+        [
+            1.32572176e+02 + 1.06636090e+02j,
+            4.05478764e+01 + 2.00937539e+01j,
+            2.54989309e+03 + 8.20268367e+01j,
+        ]
+    ]
+)
+
+
+EXPECTED_REL_NEG1 = {
+    "q_R_array": np.array(
+        [
+            1.99387217,
+            1.93488909,
+            1.88624692,
+            1.84893205,
+            1.8248492,
+            1.81789931,
+            1.81557836,
+            1.82087145,
+            1.83880461,
+            1.86713704,
+        ]
+    ),
+    "q_Z_array": np.array(
+        [
+            -0.07804025,
+            -0.08568082,
+            -0.09540517,
+            -0.10787861,
+            -0.12417613,
+            -0.13522058,
+            -0.14563565,
+            -0.17340041,
+            -0.20758102,
+            -0.24778288,
+        ]
+    ),
+    "q_zeta_array": np.array(
+        [
+            3.64302241e-17,
+            1.74299842e-04,
+            7.21552511e-04,
+            1.66291745e-03,
+            2.94204754e-03,
+            3.71818533e-03,
+            4.35401195e-03,
+            5.61994726e-03,
+            6.54366208e-03,
+            7.07804388e-03,
+        ]
+    ),
+    "K_R_array": np.array(
+        [
+           -1146.40007,
+           -964.15226622,
+           -774.08556804,
+           -557.08686451,
+           -302.27204486,
+           -152.32308785,
+           -29.81061679,
+           218.50784263,
+           421.85750003,
+           591.35208292,
+        ]
+    ),
+    "K_Z_array": np.array(
+        [
+           -120.49150267,
+           -152.3625245,
+           -193.08753826,
+           -250.12943991,
+           -332.07564378,
+           -388.04439146,-438.25600862,-553.79684312,
+           -664.74415576,
+           -770.67097607,
+        ]
+    ),
+    "K_zeta_initial": np.array(-0.0),
+    "tau_array": np.array(
+        [
+            0.0,
+            37.14107905,
+            74.2821581,
+            111.42323715,
+            148.5643162,
+            168.93919,
+            185.70539526,
+            222.84647431,
+            259.98755336,
+            297.12863241,
+        ]
+    ),
+    "B_magnitude": np.array(
+        [
+            0.75896269,
+            0.78209888,
+            0.8022675,
+            0.81845874,
+            0.82926008,
+            0.83243037,
+            0.83349451,
+            0.83107162,
+            0.8229665,
+            0.81047859,
+        ]
+    ),
+    "normalised_gyro_freqs": np.array(
+        [
+            0.38627737,
+            0.39392634,
+            0.40111904,
+            0.40726518,
+            0.41165983,
+            0.4131073,
+            0.41375025,
+            0.41351246,
+            0.41143571,
+            0.40819815,
+        ]
+    ),
+    "normalised_plasma_freqs": np.array(
+        [
+            -0.0,
+            0.47527609,
+            0.61980874,
+            0.69722851,
+            0.73261861,
+            0.73703945,
+            0.7330262,
+            0.698295,
+            0.62116946,
+            0.47652103,
         ]
     ),
 }
@@ -629,9 +1015,9 @@ def UDA_saved_MAST_U(path: pathlib.Path):
         # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
-def test_integrated(tmp_path, generator):
+def test_integrated_1(tmp_path, generator):
     """Golden answer test to check basic functionality using circular
-    flux surfaces."""
+    flux surfaces, mode flag set to -1."""
 
     kwargs_dict = generator(tmp_path)
     kwargs_dict["output_filename_suffix"] = "_Bpa0.10"
@@ -648,23 +1034,74 @@ def test_integrated(tmp_path, generator):
     with np.load(tmp_path / "data_output_Bpa0.10.npz") as f:
         output = dict(f)
 
-    for key, value in EXPECTED.items():
+    for key, value in EXPECTED_1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
     K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
-    assert K_magnitude.argmin() == CUTOFF_INDEX
+    assert K_magnitude.argmin() == CUTOFF_INDEX_1
 
     assert_allclose(
-        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED, rtol=1e-2, atol=0.1
+        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_1, rtol=1e-2, atol=0.1
     )
     assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX, ...],
-        PSI_CUTOFF_EXPECTED,
+        output["Psi_3D_output"][CUTOFF_INDEX_1, ...],
+        PSI_CUTOFF_EXPECTED_1,
         rtol=1e-2,
         atol=0.1,
     )
     assert_allclose(
-        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED, rtol=1.8e-2, atol=0.1
+        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_1, rtol=1.8e-2, atol=0.1
+    )
+# tests cannot run without assigning a unique generator to each test for reasons I don't understand - KR
+@pytest.mark.parametrize(
+    "generatorneg",
+    [
+        pytest.param(simple, id="simple"),
+        pytest.param(ne_dat_file, id="density-fit-file"),
+        pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
+        # Following methods have errors of 30%, despite field being
+        # idential to 1%, needs investigating
+        # pytest.param(UDA_saved, id="UDA-saved-file"),
+    ],
+)
+def test_integrated_neg1(tmp_path, generatorneg):
+    """Golden answer test to check basic functionality using circular
+    flux surfaces, mode flag set to -1."""
+
+    kwargs_dict = generatorneg(tmp_path)
+    kwargs_dict["output_filename_suffix"] = "_Bpa0.11"
+    kwargs_dict["figure_flag"] = False
+    kwargs_dict["len_tau"] = 10
+    kwargs_dict["output_path"] = tmp_path
+    kwargs_dict["mode_flag"] = -1
+
+    number_of_existing_npz_files = len(list(tmp_path.glob("*.npz")))
+
+    beam_me_up(**kwargs_dict)
+
+    assert len(list(tmp_path.glob("*.npz"))) == 4 + number_of_existing_npz_files
+
+    with np.load(tmp_path / "data_output_Bpa0.11.npz") as f:
+        output = dict(f)
+
+    for key, value in EXPECTED_NEG1.items():
+        assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
+
+    K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
+    assert K_magnitude.argmin() == CUTOFF_INDEX_NEG1
+
+    assert_allclose(
+        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_NEG1, rtol=1e-2, atol=0.1
+    )
+    assert_allclose(
+        output["Psi_3D_output"][CUTOFF_INDEX_NEG1, ...],
+        PSI_CUTOFF_EXPECTED_NEG1,
+        rtol=1e-2,
+        atol=0.1,
+    )
+    assert_allclose(
+        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_NEG1, rtol=1.8e-2, atol=0.1
     )
 
 
@@ -680,7 +1117,7 @@ def test_integrated(tmp_path, generator):
         # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
-def test_relativistic(tmp_path, generator_rel):
+def test_relativistic_1(tmp_path, generator_rel):
     """Golden answer test to check relativistic corrections."""
     Te_fit = QuadraticFit(1.0, 10.0)
 
@@ -693,7 +1130,7 @@ def test_relativistic(tmp_path, generator_rel):
     kwargs_dict["temperature_fit_method"] = Te_fit
 
     number_of_existing_npz_files = len(list(tmp_path.glob("*.npz")))
-
+    print(kwargs_dict)
     beam_me_up(**kwargs_dict)
 
     assert len(list(tmp_path.glob("*.npz"))) == 4 + number_of_existing_npz_files
@@ -701,25 +1138,77 @@ def test_relativistic(tmp_path, generator_rel):
     with np.load(tmp_path / "data_output_Bpa1.10.npz") as f:
         output = dict(f)
 
-    for key, value in EXPECTED_REL.items():
+    for key, value in EXPECTED_REL_1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
     K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
-    assert K_magnitude.argmin() == CUTOFF_INDEX_REL
+    assert K_magnitude.argmin() == CUTOFF_INDEX_REL_1
 
     assert_allclose(
-        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_REL, rtol=1e-2, atol=0.1
+        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_REL_1, rtol=1e-2, atol=0.1
     )
     assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX_REL, ...],
-        PSI_CUTOFF_EXPECTED_REL,
+        output["Psi_3D_output"][CUTOFF_INDEX_REL_1, ...],
+        PSI_CUTOFF_EXPECTED_REL_1,
         rtol=1e-2,
         atol=0.1,
     )
     assert_allclose(
-        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_REL, rtol=1.8e-2, atol=0.1
+        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_REL_1, rtol=1.8e-2, atol=0.1
     )
 
+@pytest.mark.parametrize(
+    "generator_relneg",
+    [
+        pytest.param(simple, id="simple"),
+        pytest.param(ne_dat_file, id="density-fit-file"),
+        pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
+        # Following methods have errors of 30%, despite field being
+        # idential to 1%, needs investigating
+        # pytest.param(UDA_saved, id="UDA-saved-file"),
+    ],
+)
+def test_relativistic_neg1(tmp_path, generator_relneg):
+    """Golden answer test to check relativistic corrections."""
+    Te_fit = QuadraticFit(1.0, 10.0)
+
+    kwargs_dict = generator_relneg(tmp_path)
+    kwargs_dict["output_filename_suffix"] = "_Bpa1.11"
+    kwargs_dict["figure_flag"] = False
+    kwargs_dict["len_tau"] = 10
+    kwargs_dict["output_path"] = tmp_path
+    kwargs_dict["relativistic_flag"] = True
+    kwargs_dict["temperature_fit_method"] = Te_fit
+    kwargs_dict["mode_flag"] = -1
+
+    number_of_existing_npz_files = len(list(tmp_path.glob("*.npz")))
+    print(kwargs_dict)
+    beam_me_up(**kwargs_dict)
+
+    assert len(list(tmp_path.glob("*.npz"))) == 4 + number_of_existing_npz_files
+
+    with np.load(tmp_path / "data_output_Bpa1.11.npz") as f:
+        output = dict(f)
+
+    for key, value in EXPECTED_REL_NEG1.items():
+        assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
+
+    K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
+    assert K_magnitude.argmin() == CUTOFF_INDEX_REL_NEG1
+
+    assert_allclose(
+        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_REL_NEG1, rtol=1e-2, atol=0.1
+    )
+    assert_allclose(
+        output["Psi_3D_output"][CUTOFF_INDEX_REL_NEG1, ...],
+        PSI_CUTOFF_EXPECTED_REL_NEG1,
+        rtol=1e-2,
+        atol=0.1,
+    )
+    assert_allclose(
+        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_REL_NEG1, rtol=1.8e-2, atol=0.1
+    )
 
 @pytest.mark.parametrize(
     "generator_nullrel",
@@ -733,9 +1222,9 @@ def test_relativistic(tmp_path, generator_rel):
         # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
-def test_null_relativistic(tmp_path, generator_nullrel):
+def test_null_relativistic_1(tmp_path, generator_nullrel):
     """Golden answer test to check relativistic corrections with zero temperature array.
-    Output should be identical to nonrelativistic outputs."""
+    Output should be identical to nonrelativistic outputs. Mode_flag = 1."""
 
     Te_fit = QuadraticFit(1.0, 0.0)
 
@@ -756,25 +1245,79 @@ def test_null_relativistic(tmp_path, generator_nullrel):
     with np.load(tmp_path / "data_output_Bpa2.10.npz") as f:
         output = dict(f)
 
-    for key, value in EXPECTED.items():
+    for key, value in EXPECTED_1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
     K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
-    assert K_magnitude.argmin() == CUTOFF_INDEX
+    assert K_magnitude.argmin() == CUTOFF_INDEX_1
 
     assert_allclose(
-        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED, rtol=1e-2, atol=0.1
+        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_1, rtol=1e-2, atol=0.1
     )
     assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX, ...],
-        PSI_CUTOFF_EXPECTED,
+        output["Psi_3D_output"][CUTOFF_INDEX_1, ...],
+        PSI_CUTOFF_EXPECTED_1,
         rtol=1e-2,
         atol=0.1,
     )
     assert_allclose(
-        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED, rtol=1.8e-2, atol=0.1
+        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_1, rtol=1.8e-2, atol=0.1
     )
 
+@pytest.mark.parametrize(
+    "generator_nullrelneg",
+    [
+        pytest.param(simple, id="simple"),
+        pytest.param(ne_dat_file, id="density-fit-file"),
+        pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
+        # Following methods have errors of 30%, despite field being
+        # idential to 1%, needs investigating
+        # pytest.param(UDA_saved, id="UDA-saved-file"),
+    ],
+)
+def test_null_relativistic_neg1(tmp_path, generator_nullrelneg):
+    """Golden answer test to check relativistic corrections with zero temperature array.
+    Output should be identical to nonrelativistic outputs. Mode_flag = -1."""
+
+    Te_fit = QuadraticFit(1.0, 0.0)
+
+    kwargs_dict = generator_nullrelneg(tmp_path)
+    kwargs_dict["output_filename_suffix"] = "_Bpa2.11"
+    kwargs_dict["figure_flag"] = False
+    kwargs_dict["len_tau"] = 10
+    kwargs_dict["output_path"] = tmp_path
+    kwargs_dict["relativistic_flag"] = True
+    kwargs_dict["temperature_fit_method"] = Te_fit
+    kwargs_dict["mode_flag"] = -1
+
+    number_of_existing_npz_files = len(list(tmp_path.glob("*.npz")))
+
+    beam_me_up(**kwargs_dict)
+
+    assert len(list(tmp_path.glob("*.npz"))) == 4 + number_of_existing_npz_files
+
+    with np.load(tmp_path / "data_output_Bpa2.11.npz") as f:
+        output = dict(f)
+
+    for key, value in EXPECTED_NEG1.items():
+        assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
+
+    K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
+    assert K_magnitude.argmin() == CUTOFF_INDEX_NEG1
+
+    assert_allclose(
+        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_NEG1, rtol=1e-2, atol=0.1
+    )
+    assert_allclose(
+        output["Psi_3D_output"][CUTOFF_INDEX_NEG1, ...],
+        PSI_CUTOFF_EXPECTED_NEG1,
+        rtol=1e-2,
+        atol=0.1,
+    )
+    assert_allclose(
+        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_NEG1, rtol=1.8e-2, atol=0.1
+    )
 
 @pytest.mark.parametrize(
     "generator",
