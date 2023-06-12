@@ -406,8 +406,15 @@ def find_Psi_3D_lab_Cartesian(Psi_3D_lab, q_R, q_zeta, K_R, K_zeta):
 
 def find_electron_mass(
     temperature=None,
-):  # Implements first-order relativistic corrections
-    # to electron mass. Temperature needs to be in units of KeV, returns an array.
+):
+    r"""Implements first-order relativistic corrections to electron mass.
+    Tmperature is an optional argument. If no argument is passed, returns
+    standard electron mass as a scalar. When passed an array of temperatures,
+    returns an array of relativistically-corrected electron masses.
+
+    Temperature needs to be in units of KeV.
+    """
+
     if temperature is None:
         # print('electron_mass used is standard value.')
         return constants.m_e

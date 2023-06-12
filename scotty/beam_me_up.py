@@ -50,6 +50,7 @@ Units
 - SI units
 - Distance in m
 - Angles in rad
+- Temperature in KeV
 - electron cyclotron frequency positive
 - K normalised such that K = 1 in vacuum. (Not implemented yet)
 - Distance not normalised yet, should give it thought
@@ -136,7 +137,7 @@ def beam_me_up(
     Psi_BC_flag: Union[bool, str, None] = None,
     poloidal_flux_enter: float = 1.0,
     poloidal_flux_zero_density: float = 1.0,  ## When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
-    poloidal_flux_zero_temperature: float = 1.0,  ## Not sure if this is needed or appropriate
+    poloidal_flux_zero_temperature: float = 1.0,  ## temperature analogue of poloidal_flux_zero_density
     # Finite-difference and solver parameters
     delta_R: float = -0.0001,  # in the same units as data_R_coord
     delta_Z: float = 0.0001,  # in the same units as data_Z_coord
@@ -230,6 +231,10 @@ def beam_me_up(
     vacuum_propagation_flag: bool
         If ``True``, run solver from the launch position, and don't
         use analytical vacuum propagation
+    relativistic_flag: bool
+        If ``True``, generates a temperature profile from given data
+        or parameters and applies relativistic corrections to electron
+        mass.
     Psi_BC_flag: String
         If ``None``, do no special treatment at plasma-vacuum boundary
         If ``continuous``, apply BCs for continuous ne but discontinuous gradient of ne
@@ -240,6 +245,9 @@ def beam_me_up(
         If Psi_BC_flag, then this is where the plasma-vacuum BCs are applied
     poloidal_flux_zero_density: float
         At and above this normalised poloidal flux label, Scotty sets the electron density to zero
+    poloidal_flux_zero_temperature: float
+        At and above this normalised poloidal flux label, Scotty sets the electron temperature to zero.
+        This effectively negates any relativistic mass corrections.
     plasmaLaunch_Psi_3D_lab_Cartesian: FloatArray
         :math:`\Psi` of beam in lab Cartesian coordinates. Required if
         ``vacuumLaunch_flag`` is ``False``
@@ -284,7 +292,7 @@ def beam_me_up(
            ``poloidal_flux_zero_density``
     density_fit_method:
         Parameterisation of the density profile. Either a callable
-        (see `DensityFit`), or one of the following options:
+        (see `ProfileFit`), or one of the following options:
 
         - ``"smoothing-spline"``: 1D smoothing spline
           (`SmoothingSplineFit`)
@@ -311,6 +319,10 @@ def beam_me_up(
            guessed from the length of ``density_fit_parameters``. In
            this case, ``quadratic`` and ``tanh`` parameters _should_
            include ``poloidal_flux_zero_density`` as the last value.
+    temperature_fit_method:
+        Parameterisation of the temperature profile. Leverages the
+        same ProfileFit class used for density. See density_fit_method
+        for details.
     len_tau: int
         Number of output ``tau`` points
     rtol: float

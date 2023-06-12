@@ -56,7 +56,8 @@ class DielectricTensor:
     B_total:
         Magnitude of the magnetic field
     temperature:
-        Temperature profile [optional]
+        Temperature profile [optional]. Used to calculate relativistic corrections 
+        to electron mass, which affects :math:`\Omega_{pe}` and :math: `\Omega_{ce}`.
     """
 
     def __init__(
