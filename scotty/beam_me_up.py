@@ -391,7 +391,7 @@ def beam_me_up(
             in [
                 None,
                 "smoothing-spline-file",
-            ]  
+            ]
         ):
             Te_filename = Te_data_path / f"Te{input_filename_suffix}.dat"
             temperature_fit_parameters = [Te_filename, interp_order, interp_smoothing]
