@@ -246,7 +246,7 @@ def beam_me_up(
     poloidal_flux_zero_density: float
         At and above this normalised poloidal flux label, Scotty sets the electron density to zero
     poloidal_flux_zero_temperature: float
-        At and above this normalised poloidal flux label, Scotty sets the electron temperature to zero. 
+        At and above this normalised poloidal flux label, Scotty sets the electron temperature to zero.
         This effectively negates any relativistic mass corrections.
     plasmaLaunch_Psi_3D_lab_Cartesian: FloatArray
         :math:`\Psi` of beam in lab Cartesian coordinates. Required if
@@ -320,9 +320,9 @@ def beam_me_up(
            this case, ``quadratic`` and ``tanh`` parameters _should_
            include ``poloidal_flux_zero_density`` as the last value.
     temperature_fit_method:
-        Parameterisation of the temperature profile. Leverages the 
+        Parameterisation of the temperature profile. Leverages the
         same ProfileFit class used for density. See density_fit_method
-        for details. 
+        for details.
     len_tau: int
         Number of output ``tau`` points
     rtol: float

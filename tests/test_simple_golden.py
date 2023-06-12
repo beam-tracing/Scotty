@@ -218,7 +218,7 @@ EXPECTED = {
 
 # Expected values for relativistic version of the test
 # Note: expected values are based on a tentative version
-# of the relativistic code and are not yet rigorously 
+# of the relativistic code and are not yet rigorously
 # cross-validated. May be subject to changes in the future.
 
 CUTOFF_INDEX_REL = 5
@@ -226,57 +226,57 @@ CUTOFF_INDEX_REL = 5
 PSI_START_EXPECTED_REL = np.array(
     [
         [
-            -2.47380536e+03 + 1.19564545e+01j,
+            -2.47380536e03 + 1.19564545e01j,
             -1.70148132e-15 - 2.21090894e-15j,
-            3.40499803e+02 - 1.13758066e+02j,
+            3.40499803e02 - 1.13758066e02j,
         ],
         [
             -1.70148132e-15 - 2.21090894e-15j,
-            4.24588292e+03 + 4.35038716e+03j,
+            4.24588292e03 + 4.35038716e03j,
             1.61885134e-14 + 2.10353935e-14j,
         ],
         [
-            3.40499803e+02 - 1.13758066e+02j,
+            3.40499803e02 - 1.13758066e02j,
             1.61885134e-14 + 2.10353935e-14j,
-            4.25752614e+02 + 1.08233570e+03j,
+            4.25752614e02 + 1.08233570e03j,
         ],
     ]
 )
-PSI_CUTOFF_EXPECTED_REL = np.array( # Not yet modified
+PSI_CUTOFF_EXPECTED_REL = np.array(  # Not yet modified
     [
         [
-            -2.74095960e+03 + 3.58127405e+02j,
-            -2.65492476e+02 - 1.41323059e+02j,
-            3.88466862e+02 - 3.48400619e+02j,
+            -2.74095960e03 + 3.58127405e02j,
+            -2.65492476e02 - 1.41323059e02j,
+            3.88466862e02 - 3.48400619e02j,
         ],
         [
-            -2.65492476e+02 - 1.41323059e+02j,
-            3.90471855e+03 + 2.58339866e+03j,
-            -5.91261562e+01 - 7.33060225e+01j,
+            -2.65492476e02 - 1.41323059e02j,
+            3.90471855e03 + 2.58339866e03j,
+            -5.91261562e01 - 7.33060225e01j,
         ],
         [
-            3.88466862e+02 - 3.48400619e+02j,
-            -5.91261562e+01 - 7.33060225e+01j,
-            2.02222919e+03 + 3.57401128e+02j,
+            3.88466862e02 - 3.48400619e02j,
+            -5.91261562e01 - 7.33060225e01j,
+            2.02222919e03 + 3.57401128e02j,
         ],
     ]
 )
 PSI_FINAL_EXPECTED_REL = np.array(
     [
         [
-            -3.71494845e+03 + 3.81425685e+03j,
-            -4.42926587e+02 + 2.66468589e+01j,
-            1.57646260e+02 - 7.14883020e+02j,
+            -3.71494845e03 + 3.81425685e03j,
+            -4.42926587e02 + 2.66468589e01j,
+            1.57646260e02 - 7.14883020e02j,
         ],
         [
-            -4.42926587e+02 + 2.66468589e+01j,
-            3.44023583e+03 + 1.78008390e+03j,
-            4.19741443e+01 - 2.61204714e+01j,
+            -4.42926587e02 + 2.66468589e01j,
+            3.44023583e03 + 1.78008390e03j,
+            4.19741443e01 - 2.61204714e01j,
         ],
         [
-            1.57646260e+02 - 7.14883020e+02j,
-            4.19741443e+01 - 2.61204714e+01j,
-            2.35535115e+03 + 1.34097969e+02j,
+            1.57646260e02 - 7.14883020e02j,
+            4.19741443e01 - 2.61204714e01j,
+            2.35535115e03 + 1.34097969e02j,
         ],
     ]
 )
@@ -312,7 +312,7 @@ EXPECTED_REL = {
         ]
     ),
     "q_zeta_array": np.array(
-        [   
+        [
             3.64302241e-17,
             -4.34557216e-04,
             -1.75458750e-03,
@@ -365,7 +365,7 @@ EXPECTED_REL = {
             321.99896258,
             386.3987551,
             450.79854762,
-            515.19834013
+            515.19834013,
         ]
     ),
     "B_magnitude": np.array(
@@ -667,6 +667,7 @@ def test_integrated(tmp_path, generator):
         output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED, rtol=1.8e-2, atol=0.1
     )
 
+
 @pytest.mark.parametrize(
     "generator_rel",
     [
@@ -688,7 +689,7 @@ def test_relativistic(tmp_path, generator_rel):
     kwargs_dict["figure_flag"] = False
     kwargs_dict["len_tau"] = 10
     kwargs_dict["output_path"] = tmp_path
-    kwargs_dict['relativistic_flag'] = True
+    kwargs_dict["relativistic_flag"] = True
     kwargs_dict["temperature_fit_method"] = Te_fit
 
     number_of_existing_npz_files = len(list(tmp_path.glob("*.npz")))
@@ -718,6 +719,7 @@ def test_relativistic(tmp_path, generator_rel):
     assert_allclose(
         output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_REL, rtol=1.8e-2, atol=0.1
     )
+
 
 @pytest.mark.parametrize(
     "generator_nullrel",
@@ -772,6 +774,7 @@ def test_null_relativistic(tmp_path, generator_nullrel):
     assert_allclose(
         output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED, rtol=1.8e-2, atol=0.1
     )
+
 
 @pytest.mark.parametrize(
     "generator",
