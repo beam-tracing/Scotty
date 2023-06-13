@@ -9,6 +9,8 @@ yban@hmc.edu
 
 carttest (this file) is a file with methods to compute B field and bhat in Cartesian and cylindrical coordinates, and compare them respectively.
 """
+#%%
+
 import numpy as np
 from scipy import constants
 import json
@@ -283,7 +285,7 @@ def B_xyz(mag_field_obj, q_R, q_zeta, q_Z):
     B_Z = mag_field_obj.B_Z(q_R, q_Z)
     #B_mag = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
     
-    return np.stack(B_R*np.cos(q_zeta) - B_T*np.sin(q_zeta), B_R*np.sin(q_zeta) + B_T*np.cos(q_zeta), B_Z, axis=-1)
+    return np.stack((B_R*np.cos(q_zeta) - B_T*np.sin(q_zeta), B_R*np.sin(q_zeta) + B_T*np.cos(q_zeta), B_Z), axis=-1)
 
 def grad_B_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
     """
@@ -310,7 +312,7 @@ def grad_B_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
     B_zplus = B_xyz(mag_field_obj, q_R, q_zeta, q_Z +delta)[:,:,2]
     B_zminus = B_xyz(mag_field_obj, q_R, q_zeta, q_Z -delta)[:,:,2]
     
-    return 0.5*np.stack(B_xplus - B_xminus, B_yplus - B_yminus, B_zplus - B_zminus, axis=-1)/delta
+    return 0.5*np.stack((B_xplus - B_xminus, B_yplus - B_yminus, B_zplus - B_zminus), axis=-1)/delta
 
 def bhat(mag_field_obj, q_R, q_Z):
     """
@@ -327,7 +329,7 @@ def bhat(mag_field_obj, q_R, q_Z):
     B_Z = mag_field_obj.B_Z(q_R, q_Z)
     B_mag = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
     
-    return np.stack(B_R, B_T, B_Z, axis=-1)/B_mag
+    return np.stack((B_R/B_mag, B_T/B_mag, B_Z/B_mag), axis=-1)
 
 def bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z):
     """
@@ -345,7 +347,7 @@ def bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z):
     B_Z = mag_field_obj.B_Z(q_R, q_Z)
     B_mag = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
     
-    return np.stack(B_R*np.cos(q_zeta) - B_T*np.sin(q_zeta), B_R*np.sin(q_zeta) + B_T*np.cos(q_zeta), B_Z, axis=-1)/B_mag
+    return np.stack(((B_R*np.cos(q_zeta) - B_T*np.sin(q_zeta))/B_mag, (B_R*np.sin(q_zeta) + B_T*np.cos(q_zeta))/B_mag, B_Z/B_mag), axis=-1)
 
 def grad_bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
     """
@@ -372,7 +374,7 @@ def grad_bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
     bhat_zplus = bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z +delta)[:,:,2]
     bhat_zminus = bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z -delta)[:,:,2]
     
-    return 0.5*np.stack(bhat_xplus - bhat_xminus, bhat_yplus - bhat_yminus, bhat_zplus - bhat_zminus, axis=-1)/delta
+    return 0.5*np.stack((bhat_xplus - bhat_xminus, bhat_yplus - bhat_yminus, bhat_zplus - bhat_zminus), axis=-1)/delta
 
 def compare_grad_B(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
     """
@@ -392,7 +394,7 @@ def compare_grad_B(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
     #grad_B_T_array = 0#.5*(mag_field_obj.B_Z(q_R, q_Z) - mag_field_obj.B_Z(q_R, q_Z))/delta
     grad_B_Z_array = 0.5*(mag_field_obj.B_Z(q_R, q_Z +delta) - mag_field_obj.B_Z(q_R, q_Z -delta))/delta
     
-    return grad_B_xyz_array - np.stack(grad_B_R_array*np.cos(q_zeta), grad_B_R_array*np.sin(q_zeta), grad_B_Z_array, axis=-1)
+    return grad_B_xyz_array - np.stack((grad_B_R_array*np.cos(q_zeta), grad_B_R_array*np.sin(q_zeta), grad_B_Z_array), axis=-1)
 
 def compare_grad_bhat(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
     """
@@ -412,4 +414,80 @@ def compare_grad_bhat(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
     #grad_bhat_T_array = 0#.5*(bhat(mag_field_obj, q_R, q_Z) - bhat(mag_field_obj, q_R, q_Z))[:,:,1]/delta
     grad_bhat_Z_array = 0.5*(bhat(mag_field_obj, q_R, q_Z +delta) - bhat(mag_field_obj, q_R, q_Z -delta))[:,:,2]/delta
     
-    return grad_bhat_xyz_array - np.stack(grad_bhat_R_array*np.cos(q_zeta), grad_bhat_R_array*np.sin(q_zeta), grad_bhat_Z_array, axis=-1)
+    return grad_bhat_xyz_array - np.stack((grad_bhat_R_array*np.cos(q_zeta), grad_bhat_R_array*np.sin(q_zeta), grad_bhat_Z_array), axis=-1)
+
+#%%
+
+analysis_output = np.load('analysis_output.npz')
+data_output = np.load('data_output.npz')
+data_input = np.load('data_input.npz')
+solver_output = np.load('solver_output.npz')
+
+field = create_magnetic_geometry(
+    "torbeam",#find_B_method,
+    magnetic_data_path = "/Users/yvonne/Documents/GitHub/Scotty/data/",
+    input_filename_suffix = "_188839_1900ms",
+    interp_order = data_input['interp_order'],
+    interp_smoothing = data_input['interp_smoothing'],
+    B_T_axis = None,
+    R_axis = None,
+    minor_radius_a = None,
+    B_p_a = None,
+    shot = None,
+    equil_time = data_input['equil_time'],
+    delta_R = data_input['delta_R'],
+    delta_Z = data_input['delta_Z'],
+)
+
+#%%
+# Compare values for B computed in Cartesian and cylindrical coordinates
+
+#T_coord = np.linspace(0, 2*constants.pi)
+#R_array, T_array, Z_array = np.meshgrid(field.R_coord, T_coord, field.Z_coord)
+
+B_test = B_xyz(field, data_output['q_R_array'], data_output['q_zeta_array'], data_output['q_Z_array']) - np.stack((data_output['B_R_output']*np.cos(data_output['q_zeta_array']) - data_output['B_T_output']*np.sin(data_output['q_zeta_array']), data_output['B_R_output']*np.sin(data_output['q_zeta_array']) + data_output['B_T_output']*np.cos(data_output['q_zeta_array']), data_output['B_Z_output']), axis=-1)
+
+print(np.max(B_test), np.min(B_test), np.sum(B_test))
+
+#%%
+# Compare values for bhat computed in Cartesian and cylindrical coordinates
+
+bhat_test = bhat(field, data_output['q_R_array'], data_output['q_Z_array']) - np.stack((data_output['B_R_output']/data_output['B_magnitude'], data_output['B_T_output']/data_output['B_magnitude'], data_output['B_Z_output']/data_output['B_magnitude']), axis=-1)
+
+print(np.max(bhat_test), np.min(bhat_test), np.sum(bhat_test))
+
+bhat_xyz_test = bhat_xyz(field, data_output['q_R_array'], data_output['q_zeta_array'], data_output['q_Z_array']) - np.stack(((data_output['B_R_output']*np.cos(data_output['q_zeta_array']) - data_output['B_T_output']*np.sin(data_output['q_zeta_array']))/data_output['B_magnitude'], (data_output['B_R_output']*np.sin(data_output['q_zeta_array']) + data_output['B_T_output']*np.cos(data_output['q_zeta_array']))/data_output['B_magnitude'], data_output['B_Z_output']/data_output['B_magnitude']), axis=-1)
+
+print(np.max(bhat_xyz_test), np.min(bhat_xyz_test), np.sum(bhat_xyz_test))
+
+#%%
+# Compare values for grad_B computed in Cartesian and cylindrical coordinates
+
+#grad_B_test = compare_grad_B(field, data_output['q_R_array'], data_output['q_zeta_array'], data_output['q_Z_array'], delta=data_input['delta_R'])
+
+delta = data_input['delta_R']
+dr_x = delta/np.cos(data_output['q_zeta_array'])
+dr_y = delta/np.sin(data_output['q_zeta_array'])
+dzeta_x = -delta/np.sin(data_output['q_zeta_array'])
+dzeta_y = dr_x#delta/np.cos(q_zeta)
+
+B_xplus = B_xyz(field, data_output['q_R_array'] +dr_x, data_output['q_zeta_array'] +dzeta_x, data_output['q_Z_array'])[:,0]
+B_xminus = B_xyz(field, data_output['q_R_array'] -dr_x, data_output['q_zeta_array'] -dzeta_x, data_output['q_Z_array'])[:,0]
+B_yplus = B_xyz(field, data_output['q_R_array'] +dr_y, data_output['q_zeta_array'] +dzeta_y, data_output['q_Z_array'])[:,1]
+B_yminus = B_xyz(field, data_output['q_R_array'] -dr_y, data_output['q_zeta_array'] -dzeta_y, data_output['q_Z_array'])[:,1]
+B_zplus = B_xyz(field, data_output['q_R_array'], data_output['q_zeta_array'], data_output['q_Z_array'] +delta)[:,2]
+B_zminus = B_xyz(field, data_output['q_R_array'], data_output['q_zeta_array'], data_output['q_Z_array'] -delta)[:,2]
+
+grad_B_xyz_array = 0.5*np.stack((B_xplus - B_xminus, B_yplus - B_yminus, B_zplus - B_zminus), axis=-1)/delta
+
+grad_B_R_array = 0.5*(field.B_R(data_output['q_R_array'] +delta, data_output['q_Z_array']) - field.B_R(data_output['q_R_array'] -delta, data_output['q_Z_array']))/delta
+#grad_B_T_array = 0#.5*(field.B_Z(data_output['q_R_array'], data_output['q_Z_array']) - field.B_Z(data_output['q_R_array'], data_output['q_Z_array']))/delta
+grad_B_Z_array = 0.5*(field.B_Z(data_output['q_R_array'], data_output['q_Z_array'] +delta) - field.B_Z(data_output['q_R_array'], data_output['q_Z_array'] -delta))/delta
+
+grad_B_test = grad_B_xyz_array - np.stack((grad_B_R_array*np.cos(data_output['q_zeta_array']), grad_B_R_array*np.sin(data_output['q_zeta_array']), grad_B_Z_array), axis=-1)
+
+#%%
+# Compare values for grad_B computed in Cartesian and cylindrical coordinates
+
+#grad_B_test = compare_grad_B(field, data_output['q_R_array'], data_output['q_zeta_array'], data_output['q_Z_array'], delta=data_input['delta_R'])
+
