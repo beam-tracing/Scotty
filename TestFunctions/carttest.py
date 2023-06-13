@@ -418,10 +418,14 @@ def compare_grad_bhat(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
 
 #%%
 
-analysis_output = np.load('analysis_output.npz')
-data_output = np.load('data_output.npz')
-data_input = np.load('data_input.npz')
-solver_output = np.load('solver_output.npz')
+data_path = '/Users/yvonne/Documents/GitHub/Scotty/results/'
+plot_path = data_path
+
+
+analysis_output = np.load(data_path + 'analysis_output.npz')
+data_output = np.load(data_path + 'data_output.npz')
+data_input = np.load(data_path + 'data_input.npz')
+solver_output = np.load(data_path + 'solver_output.npz')
 
 field = create_magnetic_geometry(
     "torbeam",#find_B_method,
@@ -485,6 +489,18 @@ grad_B_R_array = 0.5*(field.B_R(data_output['q_R_array'] +delta, data_output['q_
 grad_B_Z_array = 0.5*(field.B_Z(data_output['q_R_array'], data_output['q_Z_array'] +delta) - field.B_Z(data_output['q_R_array'], data_output['q_Z_array'] -delta))/delta
 
 grad_B_test = grad_B_xyz_array - np.stack((grad_B_R_array*np.cos(data_output['q_zeta_array']), grad_B_R_array*np.sin(data_output['q_zeta_array']), grad_B_Z_array), axis=-1)
+
+#%%
+# Plotting grad_B_test for clarity
+
+import matplotlib.pyplot as plt
+
+plt.plot(grad_B_test[:,0],',', label='x')
+plt.plot(grad_B_test[:,1],',', label='y')
+plt.plot(grad_B_test[:,2],',', label='z')
+plt.legend()
+plt.title('Difference between grad_B_xyz and grad_B in cyl')
+plt.savefig(plot_path + 'grad_B_test.png', bbox_inches='tight')
 
 #%%
 # Compare values for grad_B computed in Cartesian and cylindrical coordinates
