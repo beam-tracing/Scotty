@@ -25,7 +25,7 @@ np.set_printoptions(linewidth=120, threshold=100)
 
 # For circular flux surfaces, O-mode mode_flag=1, X-mode mode_flag=-1
 
-# Expected values for nonrelativistic simple golden, mode_flag = 1 
+# Expected values for nonrelativistic simple golden, mode_flag = 1
 
 CUTOFF_INDEX_1 = 5
 
