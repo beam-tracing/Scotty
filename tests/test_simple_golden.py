@@ -23,7 +23,9 @@ import pytest
 # Print more of arrays in failed tests
 np.set_printoptions(linewidth=120, threshold=100)
 
-# Expected values for nonrelativistic simple golden, mode_flag = 1
+# For circular flux surfaces, O-mode mode_flag=1, X-mode mode_flag=-1
+
+# Expected values for nonrelativistic simple golden, mode_flag = 1 
 
 CUTOFF_INDEX_1 = 5
 
@@ -1017,9 +1019,9 @@ def UDA_saved_MAST_U(path: pathlib.Path):
         # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
-def test_integrated_1(tmp_path, generator):
+def test_integrated_O_mode(tmp_path, generator):
     """Golden answer test to check basic functionality using circular
-    flux surfaces, mode flag set to -1."""
+    flux surfaces, mode flag set to 1."""
 
     kwargs_dict = generator(tmp_path)
     kwargs_dict["output_filename_suffix"] = "_Bpa0.10"
@@ -1069,7 +1071,7 @@ def test_integrated_1(tmp_path, generator):
         # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
-def test_integrated_neg1(tmp_path, generatorneg):
+def test_integrated_X_mode(tmp_path, generatorneg):
     """Golden answer test to check basic functionality using circular
     flux surfaces, mode flag set to -1."""
 
@@ -1121,8 +1123,8 @@ def test_integrated_neg1(tmp_path, generatorneg):
         # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
-def test_relativistic_1(tmp_path, generator_rel):
-    """Golden answer test to check relativistic corrections."""
+def test_relativistic_O_mode(tmp_path, generator_rel):
+    """Golden answer test to check relativistic corrections. Mode flag = 1"""
     Te_fit = QuadraticFit(1.0, 10.0)
 
     kwargs_dict = generator_rel(tmp_path)
@@ -1177,8 +1179,8 @@ def test_relativistic_1(tmp_path, generator_rel):
         # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
-def test_relativistic_neg1(tmp_path, generator_relneg):
-    """Golden answer test to check relativistic corrections."""
+def test_relativistic_X_mode(tmp_path, generator_relneg):
+    """Golden answer test to check relativistic corrections.Mode flag = -1"""
     Te_fit = QuadraticFit(1.0, 10.0)
 
     kwargs_dict = generator_relneg(tmp_path)
@@ -1237,7 +1239,7 @@ def test_relativistic_neg1(tmp_path, generator_relneg):
         # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
-def test_null_relativistic_1(tmp_path, generator_nullrel):
+def test_null_relativistic_O_mode(tmp_path, generator_nullrel):
     """Golden answer test to check relativistic corrections with zero temperature array.
     Output should be identical to nonrelativistic outputs. Mode_flag = 1."""
 
@@ -1292,7 +1294,7 @@ def test_null_relativistic_1(tmp_path, generator_nullrel):
         # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
-def test_null_relativistic_neg1(tmp_path, generator_nullrelneg):
+def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
     """Golden answer test to check relativistic corrections with zero temperature array.
     Output should be identical to nonrelativistic outputs. Mode_flag = -1."""
 
