@@ -13,6 +13,7 @@ carttest (this file) is a file with methods to compute B field and bhat in Carte
 
 import numpy as np
 from scipy import constants
+import matplotlib.pyplot as plt
 import json
 import pathlib
 from typing import Optional, Union, Sequence, cast
@@ -269,6 +270,7 @@ field = create_magnetic_geometry(
     delta_Z = 0.0001,
 )
 
+#%%
 def B_xyz(mag_field_obj, q_R, q_zeta, q_Z):
     """
     Finds B-field in Cartesian (X, Y, Z) coordinates from MagneticField object.
@@ -300,17 +302,23 @@ def grad_B_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
         grad_B_xyz array of B field in X, Y, Z coordinates, with coordinate dimensions as last dimension
     """
     #delta = 1e-3
-    dr_x = delta/np.cos(q_zeta)
-    dr_y = delta/np.sin(q_zeta)
-    dzeta_x = -delta/np.sin(q_zeta)
-    dzeta_y = dr_x#delta/np.cos(q_zeta)
+    dx = delta
+    dy = delta
+    dz = delta
+    
+    zeta_x = np.arccos((q_R*np.cos(q_Z) + dx)/np.sqrt(q_R**2 + dx**2 + 2*dx*q_R*np.cos(q_zeta)))
+    zeta_y = np.arcsin((q_R*np.sin(q_Z) + dy)/np.sqrt(q_R**2 + dy**2 + 2*dy*q_R*np.sin(q_zeta)))
+    dzeta_x = zeta_x - q_zeta
+    dzeta_y = zeta_y - q_zeta
+    dr_x = dx*np.cos(zeta_x)
+    dr_y = dy*np.sin(zeta_y)
     
     B_xplus = B_xyz(mag_field_obj, q_R +dr_x, q_zeta +dzeta_x, q_Z)[:,:,0]
     B_xminus = B_xyz(mag_field_obj, q_R -dr_x, q_zeta -dzeta_x, q_Z)[:,:,0]
     B_yplus = B_xyz(mag_field_obj, q_R +dr_y, q_zeta +dzeta_y, q_Z)[:,:,1]
     B_yminus = B_xyz(mag_field_obj, q_R -dr_y, q_zeta -dzeta_y, q_Z)[:,:,1]
-    B_zplus = B_xyz(mag_field_obj, q_R, q_zeta, q_Z +delta)[:,:,2]
-    B_zminus = B_xyz(mag_field_obj, q_R, q_zeta, q_Z -delta)[:,:,2]
+    B_zplus = B_xyz(mag_field_obj, q_R, q_zeta, q_Z +dz)[:,:,2]
+    B_zminus = B_xyz(mag_field_obj, q_R, q_zeta, q_Z -dz)[:,:,2]
     
     return 0.5*np.stack((B_xplus - B_xminus, B_yplus - B_yminus, B_zplus - B_zminus), axis=-1)/delta
 
@@ -362,17 +370,23 @@ def grad_bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
         grad_bhat_xyz array of B field in X, Y, Z coordinates, with coordinate dimensions as last dimension
     """
     #delta = 1e-3
-    dr_x = delta/np.cos(q_zeta)
-    dr_y = delta/np.sin(q_zeta)
-    dzeta_x = -delta/np.sin(q_zeta)
-    dzeta_y = dr_x#delta/np.cos(q_zeta)
+    dx = delta
+    dy = delta
+    dz = delta
+    
+    zeta_x = np.arccos((q_R*np.cos(q_Z) + dx)/np.sqrt(q_R**2 + dx**2 + 2*dx*q_R*np.cos(q_zeta)))
+    zeta_y = np.arcsin((q_R*np.sin(q_Z) + dy)/np.sqrt(q_R**2 + dy**2 + 2*dy*q_R*np.sin(q_zeta)))
+    dzeta_x = zeta_x - q_zeta
+    dzeta_y = zeta_y - q_zeta
+    dr_x = dx*np.cos(zeta_x)
+    dr_y = dy*np.sin(zeta_y)
     
     bhat_xplus = bhat_xyz(mag_field_obj, q_R +dr_x, q_zeta +dzeta_x, q_Z)[:,:,0]
     bhat_xminus = bhat_xyz(mag_field_obj, q_R -dr_x, q_zeta -dzeta_x, q_Z)[:,:,0]
     bhat_yplus = bhat_xyz(mag_field_obj, q_R +dr_y, q_zeta +dzeta_y, q_Z)[:,:,1]
     bhat_yminus = bhat_xyz(mag_field_obj, q_R -dr_y, q_zeta -dzeta_y, q_Z)[:,:,1]
-    bhat_zplus = bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z +delta)[:,:,2]
-    bhat_zminus = bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z -delta)[:,:,2]
+    bhat_zplus = bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z +dz)[:,:,2]
+    bhat_zminus = bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z -dz)[:,:,2]
     
     return 0.5*np.stack((bhat_xplus - bhat_xminus, bhat_yplus - bhat_yminus, bhat_zplus - bhat_zminus), axis=-1)/delta
 
@@ -420,7 +434,6 @@ def compare_grad_bhat(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
 
 data_path = '/Users/yvonne/Documents/GitHub/Scotty/results/'
 plot_path = data_path
-
 
 analysis_output = np.load(data_path + 'analysis_output.npz')
 data_output = np.load(data_path + 'data_output.npz')
@@ -470,10 +483,16 @@ print(np.max(bhat_xyz_test), np.min(bhat_xyz_test), np.sum(bhat_xyz_test))
 #grad_B_test = compare_grad_B(field, data_output['q_R_array'], data_output['q_zeta_array'], data_output['q_Z_array'], delta=data_input['delta_R'])
 
 delta = data_input['delta_R']
-dr_x = delta/np.cos(data_output['q_zeta_array'])
-dr_y = delta/np.sin(data_output['q_zeta_array'])
-dzeta_x = -delta/np.sin(data_output['q_zeta_array'])
-dzeta_y = dr_x#delta/np.cos(q_zeta)
+dx = delta
+dy = delta
+dz = delta
+
+zeta_x = np.arccos((data_output['q_R_array']*np.cos(data_output['q_zeta_array']) + dx)/np.sqrt(data_output['q_R_array']**2 + dx**2 + 2*dx*data_output['q_R_array']*np.cos(data_output['q_zeta_array'])))
+zeta_y = np.arcsin((data_output['q_R_array']*np.sin(data_output['q_zeta_array']) + dy)/np.sqrt(data_output['q_R_array']**2 + dy**2 + 2*dy*data_output['q_R_array']*np.sin(data_output['q_zeta_array'])))
+dzeta_x = zeta_x - data_output['q_zeta_array']
+dzeta_y = zeta_y - data_output['q_zeta_array']
+dr_x = dx*np.cos(zeta_x)
+dr_y = dy*np.sin(zeta_y)
 
 B_xplus = B_xyz(field, data_output['q_R_array'] +dr_x, data_output['q_zeta_array'] +dzeta_x, data_output['q_Z_array'])[:,0]
 B_xminus = B_xyz(field, data_output['q_R_array'] -dr_x, data_output['q_zeta_array'] -dzeta_x, data_output['q_Z_array'])[:,0]
@@ -493,14 +512,19 @@ grad_B_test = grad_B_xyz_array - np.stack((grad_B_R_array*np.cos(data_output['q_
 #%%
 # Plotting grad_B_test for clarity
 
-import matplotlib.pyplot as plt
-
 plt.plot(grad_B_test[:,0],',', label='x')
 plt.plot(grad_B_test[:,1],',', label='y')
 plt.plot(grad_B_test[:,2],',', label='z')
 plt.legend()
 plt.title('Difference between grad_B_xyz and grad_B in cyl')
 plt.savefig(plot_path + 'grad_B_test.png', bbox_inches='tight')
+
+plt.plot(grad_B_test[:,0]/grad_B_xyz_array[:,0],',', label='x')
+plt.plot(grad_B_test[:,1]/grad_B_xyz_array[:,1],',', label='y')
+plt.plot(grad_B_test[:,2]/grad_B_xyz_array[:,2],',', label='z')
+plt.legend()
+plt.title('Difference between grad_B_xyz and grad_B in cyl\n(normalised to B_xyz)')
+plt.savefig(plot_path + 'grad_B_test_norm.png', bbox_inches='tight')
 
 #%%
 # Compare values for grad_B computed in Cartesian and cylindrical coordinates
