@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 from scotty.geometry import MagneticField
-from scotty.density_fit import DensityFitLike
+from scotty.profile_fit import ProfileFitLike
 from scotty.derivatives import derivative
 from scotty.fun_general import (
     angular_frequency_to_wavenumber,
@@ -13,7 +13,7 @@ from scotty.fun_general import (
 from scotty.typing import ArrayLike, FloatArray
 
 import numpy as np
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional, Union
 
 
 class DielectricTensor:
@@ -55,7 +55,9 @@ class DielectricTensor:
         Angular frequency of the beam
     B_total:
         Magnitude of the magnetic field
-
+    temperature:
+        Temperature profile [optional]. Used to calculate relativistic corrections 
+        to electron mass, which affects :math:`\Omega_{pe}` and :math: `\Omega_{ce}`.
     """
 
     def __init__(
@@ -63,11 +65,15 @@ class DielectricTensor:
         electron_density: ArrayLike,
         angular_frequency: float,
         B_total: ArrayLike,
+        temperature: Optional[ArrayLike] = None,
     ):
         _plasma_freq_2 = (
-            find_normalised_plasma_freq(electron_density, angular_frequency) ** 2
+            find_normalised_plasma_freq(
+                electron_density, angular_frequency, temperature
+            )
+            ** 2
         )
-        _gyro_freq = find_normalised_gyro_freq(B_total, angular_frequency)
+        _gyro_freq = find_normalised_gyro_freq(B_total, angular_frequency, temperature)
         _gyro_freq_2 = _gyro_freq**2
 
         self._epsilon_bb = 1 - _plasma_freq_2
@@ -148,18 +154,20 @@ class Hamiltonian:
         field: MagneticField,
         launch_angular_frequency: float,
         mode_flag: int,
-        density_fit: DensityFitLike,
+        density_fit: ProfileFitLike,
         delta_R: float,
         delta_Z: float,
         delta_K_R: float,
         delta_K_zeta: float,
         delta_K_Z: float,
+        temperature_fit: Optional[ProfileFitLike] = None,
     ):
         self.field = field
         self.angular_frequency = launch_angular_frequency
         self.wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
         self.mode_flag = mode_flag
         self.density = density_fit
+        self.temperature = temperature_fit
         self.spacings = {
             "q_R": delta_R,
             "q_Z": delta_Z,
@@ -195,6 +203,12 @@ class Hamiltonian:
         K_magnitude = np.sqrt(K_R**2 + (K_zeta / q_R) ** 2 + K_Z**2)
         poloidal_flux = self.field.poloidal_flux(q_R, q_Z)
         electron_density = self.density(poloidal_flux)
+
+        if self.temperature:
+            temperature = self.temperature(poloidal_flux)
+        else:
+            temperature = None
+
         B_R = np.squeeze(self.field.B_R(q_R, q_Z))
         B_T = np.squeeze(self.field.B_T(q_R, q_Z))
         B_Z = np.squeeze(self.field.B_Z(q_R, q_Z))
@@ -211,7 +225,9 @@ class Hamiltonian:
             K_hat = K_hat.T
             sin_theta_m_sq = contract_special(b_hat, K_hat) ** 2
 
-        epsilon = DielectricTensor(electron_density, self.angular_frequency, B_total)
+        epsilon = DielectricTensor(
+            electron_density, self.angular_frequency, B_total, temperature
+        )
 
         Booker_alpha = (epsilon.e_bb * sin_theta_m_sq) + epsilon.e_11 * (
             1 - sin_theta_m_sq

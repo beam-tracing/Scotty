@@ -13,6 +13,7 @@ from typing import TextIO, List, Any, Tuple
 from scotty.typing import ArrayLike, FloatArray
 
 from .typing import ArrayLike
+from typing import Optional, Union
 
 
 def read_floats_into_list_until(terminator: str, lines: TextIO) -> FloatArray:
@@ -396,59 +397,96 @@ def find_Psi_3D_lab_Cartesian(Psi_3D_lab, q_R, q_zeta, K_R, K_zeta):
 
 
 # Functions (beam tracing 1)
-def find_normalised_plasma_freq(electron_density, launch_angular_frequency):
+
+
+def find_electron_mass(
+    temperature=None,
+):
+    r"""Implements first-order relativistic corrections to electron mass.
+    Tmperature is an optional argument. If no argument is passed, returns
+    standard electron mass as a scalar. When passed an array of temperatures,
+    returns an array of relativistically-corrected electron masses.
+
+    Temperature needs to be in units of KeV.
+    """
+
+    if temperature is None:
+        # print('electron_mass used is standard value.')
+        return constants.m_e
+
+    else:
+        mazzu = 1 + temperature * 4.892 * (10 ** (-3))
+        electron_mass = constants.m_e * mazzu
+        # print('electron_mass used is: ' + str(electron_mass))
+        return electron_mass
+
+
+def find_normalised_plasma_freq(
+    electron_density, launch_angular_frequency, temperature=None
+):
     # if electron_density < 0:
     #     print(electron_density)
     #     electron_density=0
     # Electron density in units of 10^19 m-3
 
+    electron_mass = find_electron_mass(temperature)
+    # print(electron_mass)
     normalised_plasma_freq = (
         constants.e
-        * np.sqrt(electron_density * 10**19 / (constants.epsilon_0 * constants.m_e))
+        * np.sqrt(electron_density * 10**19 / (constants.epsilon_0 * electron_mass))
     ) / launch_angular_frequency
     # normalised_plasma_freq = np.sqrt(electron_density*10**19 * 3187.042702) / launch_angular_frequency # Torbeam's implementation
 
     return normalised_plasma_freq
 
 
-def find_normalised_gyro_freq(B_Total, launch_angular_frequency):
+def find_normalised_gyro_freq(B_Total, launch_angular_frequency, temperature=None):
+    electron_mass = find_electron_mass(temperature)
     normalised_gyro_freq = (
-        constants.e * B_Total / (constants.m_e * launch_angular_frequency)
+        constants.e * B_Total / (electron_mass * launch_angular_frequency)
     )
 
     return normalised_gyro_freq
 
 
-def find_epsilon_para(electron_density, launch_angular_frequency):
+def find_epsilon_para(electron_density, launch_angular_frequency, temperature=None):
     # also called epsilon_bb in my paper
 
     normalised_plasma_freq = find_normalised_plasma_freq(
-        electron_density, launch_angular_frequency
+        electron_density, launch_angular_frequency, temperature
     )
     epsilon_para = 1 - normalised_plasma_freq**2
 
     return epsilon_para
 
 
-def find_epsilon_perp(electron_density, B_Total, launch_angular_frequency):
+def find_epsilon_perp(
+    electron_density, B_Total, launch_angular_frequency, temperature=None
+):
     # also called epsilon_11 in my paper
 
     normalised_plasma_freq = find_normalised_plasma_freq(
-        electron_density, launch_angular_frequency
+        electron_density, launch_angular_frequency, temperature
     )
-    normalised_gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
+    normalised_gyro_freq = find_normalised_gyro_freq(
+        B_Total, launch_angular_frequency, temperature
+    )
     epsilon_perp = 1 - normalised_plasma_freq**2 / (1 - normalised_gyro_freq**2)
 
     return epsilon_perp
 
 
-def find_epsilon_g(electron_density, B_Total, launch_angular_frequency):
+def find_epsilon_g(
+    electron_density, B_Total, launch_angular_frequency, temperature=None
+):
     # also called epsilon_12 in my paper
 
     normalised_plasma_freq = find_normalised_plasma_freq(
-        electron_density, launch_angular_frequency
+        electron_density, launch_angular_frequency, temperature
     )
-    normalised_gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
+    normalised_gyro_freq = find_normalised_gyro_freq(
+        B_Total, launch_angular_frequency, temperature
+    )
     epsilon_g = (
         (normalised_plasma_freq**2)
         * normalised_gyro_freq
@@ -459,11 +497,17 @@ def find_epsilon_g(electron_density, B_Total, launch_angular_frequency):
 
 
 def find_Booker_alpha(
-    electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency
+    electron_density,
+    B_Total,
+    sin_theta_m_sq,
+    launch_angular_frequency,
+    temperature=None,
 ):
-    epsilon_para = find_epsilon_para(electron_density, launch_angular_frequency)
+    epsilon_para = find_epsilon_para(
+        electron_density, launch_angular_frequency, temperature
+    )
     epsilon_perp = find_epsilon_perp(
-        electron_density, B_Total, launch_angular_frequency
+        electron_density, B_Total, launch_angular_frequency, temperature
     )
     Booker_alpha = epsilon_para * sin_theta_m_sq + epsilon_perp * (1 - sin_theta_m_sq)
 
@@ -471,13 +515,21 @@ def find_Booker_alpha(
 
 
 def find_Booker_beta(
-    electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency
+    electron_density,
+    B_Total,
+    sin_theta_m_sq,
+    launch_angular_frequency,
+    temperature=None,
 ):
     epsilon_perp = find_epsilon_perp(
-        electron_density, B_Total, launch_angular_frequency
+        electron_density, B_Total, launch_angular_frequency, temperature
     )
-    epsilon_para = find_epsilon_para(electron_density, launch_angular_frequency)
-    epsilon_g = find_epsilon_g(electron_density, B_Total, launch_angular_frequency)
+    epsilon_para = find_epsilon_para(
+        electron_density, launch_angular_frequency, temperature
+    )
+    epsilon_g = find_epsilon_g(
+        electron_density, B_Total, launch_angular_frequency, temperature
+    )
     Booker_beta = -epsilon_perp * epsilon_para * (1 + sin_theta_m_sq) - (
         epsilon_perp**2 - epsilon_g**2
     ) * (1 - sin_theta_m_sq)
@@ -485,12 +537,18 @@ def find_Booker_beta(
     return Booker_beta
 
 
-def find_Booker_gamma(electron_density, B_Total, launch_angular_frequency):
+def find_Booker_gamma(
+    electron_density, B_Total, launch_angular_frequency, temperature=None
+):
     epsilon_perp = find_epsilon_perp(
-        electron_density, B_Total, launch_angular_frequency
+        electron_density, B_Total, launch_angular_frequency, temperature
     )
-    epsilon_para = find_epsilon_para(electron_density, launch_angular_frequency)
-    epsilon_g = find_epsilon_g(electron_density, B_Total, launch_angular_frequency)
+    epsilon_para = find_epsilon_para(
+        electron_density, launch_angular_frequency, temperature
+    )
+    epsilon_g = find_epsilon_g(
+        electron_density, B_Total, launch_angular_frequency, temperature
+    )
     Booker_gamma = epsilon_para * (epsilon_perp**2 - epsilon_g**2)
 
     return Booker_gamma
@@ -506,6 +564,7 @@ def find_H_numba(
     sin_theta_m_sq,
     launch_angular_frequency,
     mode_flag,
+    temperature,
 ):
     # For use with the numba package (parallelisation)
     # As such, doesn't take any functions as arguments
@@ -514,13 +573,21 @@ def find_H_numba(
     wavenumber_K0 = launch_angular_frequency / constants.c
 
     Booker_alpha = find_Booker_alpha(
-        electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency
+        electron_density,
+        B_Total,
+        sin_theta_m_sq,
+        launch_angular_frequency,
+        temperature,
     )
     Booker_beta = find_Booker_beta(
-        electron_density, B_Total, sin_theta_m_sq, launch_angular_frequency
+        electron_density,
+        B_Total,
+        sin_theta_m_sq,
+        launch_angular_frequency,
+        temperature,
     )
     Booker_gamma = find_Booker_gamma(
-        electron_density, B_Total, launch_angular_frequency
+        electron_density, B_Total, launch_angular_frequency, temperature
     )
 
     # Due to numerical errors, sometimes H_discriminant ends up being a very small negative number
@@ -650,12 +717,13 @@ def find_K_plasma(
     electron_density_p,  # in the plasma
     dpolflux_dR,
     dpolflux_dZ,
+    temperature=None,
 ):
     ## Finds
 
     ## Checks the plasma density
     plasma_freq = find_normalised_plasma_freq(
-        electron_density_p, launch_angular_frequency
+        electron_density_p, launch_angular_frequency, temperature
     )
 
     B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
@@ -692,13 +760,21 @@ def find_K_plasma(
     sin_theta_m_sq = sin_theta_m_vac**2
 
     Booker_alpha = find_Booker_alpha(
-        electron_density_p, B_Total, sin_theta_m_sq, launch_angular_frequency
+        electron_density_p,
+        B_Total,
+        sin_theta_m_sq,
+        launch_angular_frequency,
+        temperature,
     )
     Booker_beta = find_Booker_beta(
-        electron_density_p, B_Total, sin_theta_m_sq, launch_angular_frequency
+        electron_density_p,
+        B_Total,
+        sin_theta_m_sq,
+        launch_angular_frequency,
+        temperature,
     )
     Booker_gamma = find_Booker_gamma(
-        electron_density_p, B_Total, launch_angular_frequency
+        electron_density_p, B_Total, launch_angular_frequency, temperature
     )
 
     ## Calculate wavevector in plasma
@@ -866,6 +942,11 @@ def apply_discontinuous_BC(
     delta_Z,
     field,  # Field object
     hamiltonian,  # Hamiltonian object
+    temperature=None,  # Currently an unused argument because downstream the H-booker functions
+    # have an optional temperature argument. However apply_discontinuous_BC is only called by
+    # launch_beam where the beam is propagating outside plasma currently, thus the temperature
+    # argument is irrelevant. For cases where the beam is launched inside the plasma, the
+    # temperature argument should be taken care of by the Hamiltonian (?).
 ):
     d_poloidal_flux_dR_boundary = field.d_poloidal_flux_dR(q_R, q_Z, delta_R)
     d_poloidal_flux_dZ_boundary = field.d_poloidal_flux_dZ(q_R, q_Z, delta_Z)
@@ -890,6 +971,7 @@ def apply_discontinuous_BC(
         hamiltonian.density(poloidal_flux_boundary),  # in the plasma
         d_poloidal_flux_dR_boundary,
         d_poloidal_flux_dZ_boundary,
+        temperature,
     )
 
     dH = hamiltonian.derivatives(

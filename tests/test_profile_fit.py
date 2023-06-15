@@ -1,17 +1,17 @@
-from scotty.density_fit import (
+from scotty.profile_fit import (
     QuadraticFit,
     TanhFit,
     PolynomialFit,
     StefanikovaFit,
     SmoothingSplineFit,
-    density_fit,
+    profile_fit,
 )
 
 import numpy as np
 
 import pytest
 
-# Parameters for density fits
+# Parameters for profile fits
 CENTRAL_DENSITY = 2.0
 LCFS = 1.0
 
@@ -49,7 +49,7 @@ def ne_dat(tmp_path_factory):
         ),
     ],
 )
-def test_density_fit(fit):
+def test_profile_fit(fit):
     # Not all fitting functions capture the density on the axis very well
     assert np.isclose(fit(0), CENTRAL_DENSITY, atol=0.1), "Axis"
     assert fit(LCFS + 0.1) == 0.0, "Outside"
@@ -65,13 +65,13 @@ def test_spline_fit_from_file(ne_dat):
 
 
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
-def test_make_density_fit(ne_dat):
-    fit = density_fit("quadratic", LCFS, [CENTRAL_DENSITY])
+def test_make_profile_fit(ne_dat):
+    fit = profile_fit("quadratic", LCFS, [CENTRAL_DENSITY])
     assert isinstance(fit, QuadraticFit)
 
-    fit = density_fit(None, LCFS, [CENTRAL_DENSITY, LCFS])
+    fit = profile_fit(None, LCFS, [CENTRAL_DENSITY, LCFS])
     assert isinstance(fit, QuadraticFit)
 
     _, _, filename = ne_dat
-    fit = density_fit(None, LCFS, [filename, 5, 0], filename=filename)
+    fit = profile_fit(None, LCFS, [filename, 5, 0], filename=filename)
     assert isinstance(fit, SmoothingSplineFit)

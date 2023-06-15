@@ -50,6 +50,7 @@ Units
 - SI units
 - Distance in m
 - Angles in rad
+- Temperature in KeV
 - electron cyclotron frequency positive
 - K normalised such that K = 1 in vacuum. (Not implemented yet)
 - Distance not normalised yet, should give it thought
@@ -77,7 +78,11 @@ from scotty.fun_general import (
     find_Psi_3D_lab,
 )
 from scotty.fun_general import find_q_lab_Cartesian, find_Psi_3D_lab_Cartesian
-from scotty.fun_general import find_normalised_plasma_freq, find_normalised_gyro_freq
+from scotty.fun_general import (
+    find_normalised_plasma_freq,
+    find_normalised_gyro_freq,
+    find_electron_mass,
+)
 from scotty.fun_general import find_epsilon_para, find_epsilon_perp, find_epsilon_g
 from scotty.fun_general import find_dbhat_dR, find_dbhat_dZ
 from scotty.fun_general import find_H_Cardano, find_D
@@ -88,7 +93,7 @@ from scotty.fun_evolution import (
 )
 
 # For find_B if using efit files directly
-from scotty.density_fit import density_fit, DensityFitLike
+from scotty.profile_fit import profile_fit, ProfileFitLike
 from scotty.geometry import (
     MagneticField,
     CircularCrossSectionField,
@@ -98,7 +103,7 @@ from scotty.geometry import (
     EFITField,
 )
 from scotty.hamiltonian import Hamiltonian, hessians
-from scotty.launch import launch_beam
+from scotty.launch import launch_beam, find_entry_point
 from scotty.torbeam import Torbeam
 from scotty.ray_solver import propagate_ray
 from scotty._version import __version__
@@ -122,14 +127,17 @@ def beam_me_up(
     launch_position: FloatArray,
     # keyword arguments begin
     vacuumLaunch_flag: bool = True,
+    relativistic_flag: bool = False,  # includes relativistic corrections to electron mass when set to True
     find_B_method: Union[str, MagneticField] = "torbeam",
     density_fit_parameters: Optional[Sequence] = None,
+    temperature_fit_parameters: Optional[Sequence] = None,
     shot=None,
     equil_time=None,
     vacuum_propagation_flag: bool = False,
     Psi_BC_flag: Union[bool, str, None] = None,
     poloidal_flux_enter: float = 1.0,
     poloidal_flux_zero_density: float = 1.0,  ## When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
+    poloidal_flux_zero_temperature: float = 1.0,  ## temperature analogue of poloidal_flux_zero_density
     # Finite-difference and solver parameters
     delta_R: float = -0.0001,  # in the same units as data_R_coord
     delta_Z: float = 0.0001,  # in the same units as data_Z_coord
@@ -144,6 +152,7 @@ def beam_me_up(
     # Input and output settings
     ne_data_path=pathlib.Path("."),
     magnetic_data_path=pathlib.Path("."),
+    Te_data_path=pathlib.Path("."),
     output_path=pathlib.Path("."),
     input_filename_suffix="",
     output_filename_suffix="",
@@ -155,12 +164,16 @@ def beam_me_up(
     # For launching within the plasma
     plasmaLaunch_K=np.zeros(3),
     plasmaLaunch_Psi_3D_lab_Cartesian=np.zeros([3, 3]),
-    density_fit_method: Optional[Union[str, DensityFitLike]] = None,
+    density_fit_method: Optional[Union[str, ProfileFitLike]] = None,
+    temperature_fit_method: Optional[Union[str, ProfileFitLike]] = None,
     # For circular flux surfaces
     B_T_axis=None,
     B_p_a=None,
     R_axis=None,
     minor_radius_a=None,
+    # For flipping signs to maintain forward difference
+    auto_delta_sign_Z=1,
+    auto_delta_sign_R=1,
 ):
     r"""Run the beam tracer
 
@@ -173,8 +186,13 @@ def beam_me_up(
         - O(3) polynomial
         - tanh
         - quadratic
-       See `density_fit` for more details
-    2. Initialise magnetic field method. One of:
+       See `profile_fit` for more details
+    2. If relativistic_flag enabled, initialise temperature
+       fit parameters. Not yet fully implemented. One of:
+        - spline with data from file
+        - linear
+        See 'profile_fit' for more details
+    3. Initialise magnetic field method. One of:
         - TORBEAM
         - OMFIT
         - analytical
@@ -183,13 +201,13 @@ def beam_me_up(
         - curvy slab
         - test/test_notime
        See `geometry` for more details
-    3. Initialise beam launch parameters (vacuum/plasma). See `launch`
+    4. Initialise beam launch parameters (vacuum/plasma). See `launch`
        for more details.
-    4. Propagate single ray with IVP solver to find point where beam
+    5. Propagate single ray with IVP solver to find point where beam
        leaves plasma. See `ray_solver` for more details
-    5. Propagate beam with IVP solver
-    6. Dump raw output
-    7. Analysis
+    6. Propagate beam with IVP solver
+    7. Dump raw output
+    8. Analysis
 
     Parameters
     ==========
@@ -213,6 +231,10 @@ def beam_me_up(
     vacuum_propagation_flag: bool
         If ``True``, run solver from the launch position, and don't
         use analytical vacuum propagation
+    relativistic_flag: bool
+        If ``True``, generates a temperature profile from given data
+        or parameters and applies relativistic corrections to electron
+        mass.
     Psi_BC_flag: String
         If ``None``, do no special treatment at plasma-vacuum boundary
         If ``continuous``, apply BCs for continuous ne but discontinuous gradient of ne
@@ -224,6 +246,9 @@ def beam_me_up(
         If Psi_BC_flag, then this is where the plasma-vacuum BCs are applied
     poloidal_flux_zero_density: float
         At and above this normalised poloidal flux label, Scotty sets the electron density to zero
+    poloidal_flux_zero_temperature: float
+        At and above this normalised poloidal flux label, Scotty sets the electron temperature to zero.
+        This effectively negates any relativistic mass corrections.
     plasmaLaunch_Psi_3D_lab_Cartesian: FloatArray
         :math:`\Psi` of beam in lab Cartesian coordinates. Required if
         ``vacuumLaunch_flag`` is ``False``
@@ -268,7 +293,7 @@ def beam_me_up(
            ``poloidal_flux_zero_density``
     density_fit_method:
         Parameterisation of the density profile. Either a callable
-        (see `DensityFit`), or one of the following options:
+        (see `ProfileFit`), or one of the following options:
 
         - ``"smoothing-spline"``: 1D smoothing spline
           (`SmoothingSplineFit`)
@@ -295,6 +320,10 @@ def beam_me_up(
            guessed from the length of ``density_fit_parameters``. In
            this case, ``quadratic`` and ``tanh`` parameters _should_
            include ``poloidal_flux_zero_density`` as the last value.
+    temperature_fit_method:
+        Parameterisation of the temperature profile. Leverages the
+        same ProfileFit class used for density. See density_fit_method
+        for details.
     len_tau: int
         Number of output ``tau`` points
     rtol: float
@@ -304,6 +333,17 @@ def beam_me_up(
     quick_run: bool
         If true, then run only the ray tracer and get an analytic
         estimate of the :math:`K` cut-off location
+    auto_delta_sign_Z:
+        A sign variable that takes on +1/-1. Ensures that forward
+        differebce is always in negative poloidal flux gradient
+        direction (into the plasma).
+        Current implementation is flawed because the MagneticField
+        has to be constructed in order to determine the intersection
+        point and corresponding sign. Sign flip is thus subsequently
+        applied throughout the code except for the already constructed
+        field.
+    auto_delta_sign_R:
+        Similar to auto_delta_sign_Z but for the R coordinate
 
     """
 
@@ -324,6 +364,7 @@ def beam_me_up(
     # Ensure paths are `pathlib.Path`
     ne_data_path = pathlib.Path(ne_data_path)
     magnetic_data_path = pathlib.Path(magnetic_data_path)
+    Te_data_path = pathlib.Path(Te_data_path)
     output_path = pathlib.Path(output_path)
 
     # Experimental Profile----------
@@ -352,6 +393,39 @@ def beam_me_up(
         ne_filename,
     )
 
+    # Run section if relativistic flag is set to True, and checks for whether the required temperature
+    # data files are stored in path. If it does not exist, set relativistic flag to false and print
+    # a warning, but run the rest of the code.
+
+    Te_filename = None
+    if relativistic_flag:
+        if temperature_fit_parameters is None and (
+            temperature_fit_method
+            in [
+                None,
+                "smoothing-spline-file",
+            ]
+        ):
+            Te_filename = Te_data_path / f"Te{input_filename_suffix}.dat"
+            temperature_fit_parameters = [Te_filename, interp_order, interp_smoothing]
+
+            # Modify to test for whether files exist in path, and assign None value to Te_filename if no such files exist.
+
+            # FIXME: Read data so it can be saved later
+            # Te_data = np.fromfile(Te_filename, dtype=float, sep="   ")
+            # Te_data_density_array = Te_data[2::2]
+            # Te_data_radialcoord_array = Te_data[1::2]
+
+    if relativistic_flag:
+        find_temperature_1D = make_temperature_fit(
+            temperature_fit_method,
+            poloidal_flux_zero_temperature,
+            temperature_fit_parameters,
+            Te_filename,
+        )
+    else:
+        find_temperature_1D = None
+
     field = create_magnetic_geometry(
         find_B_method,
         magnetic_data_path,
@@ -368,20 +442,55 @@ def beam_me_up(
         delta_Z,
     )
 
+    # Flips the sign of delta_Z depending on the orientation of the poloidal flux surface at the point which the ray enters the plasma.
+    # This is to ensure a forward difference across the plasma boundary. We expect poloidal flux to decrease in the direction of the plasma.
+
+    entry_coords = find_entry_point(
+        launch_position,
+        np.deg2rad(poloidal_launch_angle_Torbeam),
+        np.deg2rad(toroidal_launch_angle_Torbeam),
+        poloidal_flux_enter,
+        field,
+    )
+    entry_R, entry_zeta, entry_Z = entry_coords
+
+    Z_gradient = (
+        field.poloidal_flux(entry_R, entry_Z + delta_Z)
+        - field.poloidal_flux(entry_R, entry_Z - delta_Z)
+    ) / abs(delta_Z)
+    R_gradient = (
+        field.poloidal_flux(entry_R + delta_R, entry_Z)
+        - field.poloidal_flux(entry_R - delta_R, entry_Z)
+    ) / abs(delta_R)
+    print("Gradients at entry point for Z: ", Z_gradient, ", R: ", R_gradient)
+
+    if Z_gradient > 0:
+        auto_delta_sign_Z = -1
+    if R_gradient > 0:
+        auto_delta_sign_R = -1
+
+    # Modify to take in an optional find_temp_1D argument
     hamiltonian = Hamiltonian(
         field,
         launch_angular_frequency,
         mode_flag,
         find_density_1D,
-        delta_R,
-        delta_Z,
+        auto_delta_sign_R * delta_R,
+        auto_delta_sign_Z * delta_Z,
         delta_K_R,
         delta_K_zeta,
         delta_K_Z,
+        find_temperature_1D,
     )
 
     # Checking input data
-    check_input(mode_flag, poloidal_flux_enter, launch_position, field)
+    check_input(
+        mode_flag,
+        poloidal_flux_enter,
+        launch_position,
+        field,
+        poloidal_flux_zero_density,
+    )
 
     # -------------------
     # Launch parameters
@@ -410,8 +519,8 @@ def beam_me_up(
             vacuum_propagation_flag=vacuum_propagation_flag,
             Psi_BC_flag=Psi_BC_flag,
             poloidal_flux_enter=poloidal_flux_enter,
-            delta_R=delta_R,
-            delta_Z=delta_Z,
+            delta_R=auto_delta_sign_R * delta_R,
+            delta_Z=auto_delta_sign_Z * delta_Z,
         )
     else:
         print("Beam launched from inside the plasma")
@@ -536,6 +645,8 @@ def beam_me_up(
             delta_K_Z=delta_K_Z,
             interp_order=interp_order,
             interp_smoothing=interp_smoothing,
+            auto_delta_sign_Z=auto_delta_sign_Z,
+            auto_delt_sign_R=auto_delta_sign_R,
         )
         np.savez(
             output_path / f"solver_output{output_filename_suffix}",
@@ -561,6 +672,10 @@ def beam_me_up(
     # Calculate various properties along the ray
     poloidal_flux_output = field.poloidal_flux(q_R_array, q_Z_array)
     electron_density_output = np.asfarray(find_density_1D(poloidal_flux_output))
+    if relativistic_flag and find_temperature_1D:
+        temperature_output = np.asfarray(find_temperature_1D(poloidal_flux_output))
+    else:
+        temperature_output = None
 
     dH = hamiltonian.derivatives(
         q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, second_order=True
@@ -594,10 +709,20 @@ def beam_me_up(
 
     grad_bhat_output = np.zeros([numberOfDataPoints, 3, 3])
     dbhat_dR = find_dbhat_dR(
-        q_R_array, q_Z_array, delta_R, field.B_R, field.B_T, field.B_Z
+        q_R_array,
+        q_Z_array,
+        auto_delta_sign_R * delta_R,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )
     dbhat_dZ = find_dbhat_dZ(
-        q_R_array, q_Z_array, delta_Z, field.B_R, field.B_T, field.B_Z
+        q_R_array,
+        q_Z_array,
+        auto_delta_sign_Z * delta_Z,
+        field.B_R,
+        field.B_T,
+        field.B_Z,
     )
     # Transpose dbhat_dR so that it has the right shape
     grad_bhat_output[:, 0, :] = dbhat_dR.T
@@ -611,21 +736,27 @@ def beam_me_up(
 
     # Components of the dielectric tensor
     epsilon_para_output = find_epsilon_para(
-        electron_density_output, launch_angular_frequency
+        electron_density_output, launch_angular_frequency, temperature_output
     )
     epsilon_perp_output = find_epsilon_perp(
-        electron_density_output, B_magnitude, launch_angular_frequency
+        electron_density_output,
+        B_magnitude,
+        launch_angular_frequency,
+        temperature_output,
     )
     epsilon_g_output = find_epsilon_g(
-        electron_density_output, B_magnitude, launch_angular_frequency
+        electron_density_output,
+        B_magnitude,
+        launch_angular_frequency,
+        temperature_output,
     )
 
     # Plasma and cyclotron frequencies
     normalised_plasma_freqs = find_normalised_plasma_freq(
-        electron_density_output, launch_angular_frequency
+        electron_density_output, launch_angular_frequency, temperature_output
     )
     normalised_gyro_freqs = find_normalised_gyro_freq(
-        B_magnitude, launch_angular_frequency
+        B_magnitude, launch_angular_frequency, temperature_output
     )
 
     # -------------------
@@ -640,16 +771,20 @@ def beam_me_up(
         launch_angular_frequency,
         -mode_flag,
         find_density_1D,
-        delta_R,
-        delta_Z,
+        auto_delta_sign_R * delta_R,
+        auto_delta_sign_Z * delta_Z,
         delta_K_R,
         delta_K_zeta,
         delta_K_Z,
     )(q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array)
 
     # Gradients of poloidal flux along the ray
-    dpolflux_dR_debugging = field.d_poloidal_flux_dR(q_R_array, q_Z_array, delta_R)
-    dpolflux_dZ_debugging = field.d_poloidal_flux_dZ(q_R_array, q_Z_array, delta_Z)
+    dpolflux_dR_debugging = field.d_poloidal_flux_dR(
+        q_R_array, q_Z_array, auto_delta_sign_R * delta_R
+    )
+    dpolflux_dZ_debugging = field.d_poloidal_flux_dZ(
+        q_R_array, q_Z_array, auto_delta_sign_Z * delta_Z
+    )
 
     # -------------------
     # This saves the data generated by the main loop and the input data
@@ -657,6 +792,12 @@ def beam_me_up(
     # The rest of the data is save further down, after the analysis generates them.
     # Just in case the analysis fails to run, at least one can get the data from the main loop
     # -------------------
+
+    # Set **save_kwargs for saving temperature
+    save_kwargs = {}
+    if temperature_output is not None:
+        save_kwargs["temperature_output"] = temperature_output
+
     if vacuumLaunch_flag:
         np.savez(
             output_path / f"data_output{output_filename_suffix}",
@@ -697,7 +838,8 @@ def beam_me_up(
             normalised_gyro_freqs=normalised_gyro_freqs,
             H_output=H_output,
             H_other=H_other,
-            poloidal_flux_output=poloidal_flux_output
+            poloidal_flux_output=poloidal_flux_output,
+            **save_kwargs
             # dB_dR_FFD_debugging=dB_dR_FFD_debugging,dB_dZ_FFD_debugging=dB_dZ_FFD_debugging,
             # d2B_dR2_FFD_debugging=d2B_dR2_FFD_debugging,d2B_dZ2_FFD_debugging=d2B_dZ2_FFD_debugging,d2B_dR_dZ_FFD_debugging=d2B_dR_dZ_FFD_debugging,
             # poloidal_flux_debugging_1R=poloidal_flux_debugging_1R,
@@ -1294,7 +1436,7 @@ def beam_me_up(
     loc_p = (
         launch_angular_frequency**2
         * constants.epsilon_0
-        * constants.m_e
+        * find_electron_mass(temperature_output)
         / constants.e**2
     ) ** 2 * loc_p_unnormalised
     # Note that loc_p is called varepsilon in my paper
@@ -1939,12 +2081,12 @@ def beam_me_up(
 
 
 def make_density_fit(
-    method: Optional[Union[str, DensityFitLike]],
+    method: Optional[Union[str, ProfileFitLike]],
     poloidal_flux_zero_density: float,
     parameters: Optional[Sequence],
     filename: Optional[PathLike],
-) -> DensityFitLike:
-    """Either construct a `DensityFit` instance, or return ``method``
+) -> ProfileFitLike:
+    """Either construct a `ProfileFit` instance, or return ``method``
     if it's already suitable. Suitable methods are callables that take
     an array of poloidal fluxes and return an array of densities.
 
@@ -1962,7 +2104,36 @@ def make_density_fit(
             f"Passing `density_fit_method` ({method}) as string or None requires a list/array of parameters"
         )
 
-    return density_fit(method, poloidal_flux_zero_density, parameters, filename)
+    return profile_fit(method, poloidal_flux_zero_density, parameters, filename)
+
+
+def make_temperature_fit(
+    method: Optional[Union[str, ProfileFitLike]],
+    poloidal_flux_zero_temperature: float,
+    parameters: Optional[Sequence],
+    filename: Optional[PathLike],
+) -> (
+    ProfileFitLike
+):  # Temporary measure to check if DensityFit is compatible with temp data
+    """Either construct a `DensityFit` instance, or return ``method``
+    if it's already suitable. Suitable methods are callables that take
+    an array of poloidal fluxes and return an array of temperatures.
+
+    """
+    if callable(method):
+        return method
+
+    if not isinstance(method, (str, type(None))):
+        raise TypeError(
+            f"Unexpected method type, expected callable, str or None, got '{type(method)}'"
+        )
+
+    if parameters is None:
+        raise ValueError(
+            f"Passing `temperature_fit_method` ({method}) as string or None requires a list/array of parameters"
+        )
+
+    return profile_fit(method, poloidal_flux_zero_temperature, parameters, filename)
 
 
 def create_magnetic_geometry(

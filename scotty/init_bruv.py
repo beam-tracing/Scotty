@@ -28,7 +28,7 @@ from .fun_general import (
     genray_angles_from_mirror_angles,
     freq_GHz_to_wavenumber,
 )
-from .density_fit import QuadraticFit, TanhFit, PolynomialFit, DensityFit
+from .profile_fit import QuadraticFit, TanhFit, PolynomialFit, ProfileFit
 
 
 def get_parameters_for_Scotty(
@@ -222,7 +222,7 @@ def beam_settings(
 class DensityFitParameters(NamedTuple):
     """Parameterised density"""
 
-    fit: Optional[DensityFit]
+    fit: Optional[ProfileFit]
     """Fit parameterisation"""
     time_ms: Optional[float]
     """Actual shot time (in milliseconds) that parameters correspond to"""
@@ -275,7 +275,7 @@ def ne_settings(
     ne_fit_time = ne_fit_times[nearest_time_idx]
     print("Nearest ne fit time:", ne_fit_time)
 
-    return DensityFitParameters(ne_fit, ne_fit_time, ne_fit.poloidal_flux_zero_density)
+    return DensityFitParameters(ne_fit, ne_fit_time, ne_fit.poloidal_flux_zero_profile)
 
 
 def user_settings(diagnostic, user, shot):
@@ -428,6 +428,7 @@ def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
 
 def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
     poloidal_flux_zero_density = 1.0
+    poloidal_flux_zero_temperature = 1.0
     ne_fit = QuadraticFit(poloidal_flux_zero_density, 4.0)
     return {
         "poloidal_launch_angle_Torbeam": 6.0,
@@ -450,6 +451,10 @@ def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
         "B_p_a": 0.1,
         "R_axis": 1.5,
         "minor_radius_a": 0.5,
+        # Arguments for testing relativistic corrections
+        "relativistic_flag": False,
+        "poloidal_flux_zero_temperature": poloidal_flux_zero_temperature,
+        "temperature_fit_method": None,
     }
 
 
@@ -686,7 +691,7 @@ LAUNCH_BEAM_METHODS: Dict[str, Dict[str, Callable[[float], LaunchBeamParameters]
 """Functions that return launch beam parameters for the corresponding diagnostic"""
 
 
-fit_dtype = [("time_ms", np.float64), ("fit", DensityFit)]
+fit_dtype = [("time_ms", np.float64), ("fit", ProfileFit)]
 
 DENSITY_FIT_PARAMETERS = {
     "DBS_NSTX_MAST": {
