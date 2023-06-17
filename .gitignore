@@ -232,3 +232,4 @@ cython_debug/
 # Generated version file
 scotty/_version.py
 *.json
+tests/golden_generator.py

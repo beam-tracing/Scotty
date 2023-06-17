@@ -408,7 +408,7 @@ def find_electron_mass(
     temperature=None,
 ):
     r"""Implements first-order relativistic corrections to electron mass.
-    Tmperature is an optional argument. If no argument is passed, returns
+    Temperature is an optional argument. If no argument is passed, returns
     standard electron mass as a scalar. When passed an array of temperatures,
     returns an array of relativistically-corrected electron masses.
 
@@ -420,6 +420,11 @@ def find_electron_mass(
         return constants.m_e
 
     else:
+        # From Mazzucato 1992
+        '''
+        mu = 511/temperature
+        mazzu = np.sqrt(1 + 5/mu)
+        '''
         mazzu = 1 + temperature * 4.892 * (10 ** (-3))
         electron_mass = constants.m_e * mazzu
         # print('electron_mass used is: ' + str(electron_mass))
@@ -446,7 +451,7 @@ def find_normalised_plasma_freq(
 
 
 def find_normalised_gyro_freq(B_Total, launch_angular_frequency, temperature=None):
-    electron_mass = find_electron_mass(temperature)
+    electron_mass = find_electron_mass(temperature) # temporary test
     normalised_gyro_freq = (
         constants.e * B_Total / (electron_mass * launch_angular_frequency)
     )
