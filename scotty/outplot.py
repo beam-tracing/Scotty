@@ -185,15 +185,14 @@ class outplot(object):
 
             plt.xlim(self.data_R_coord[0], self.data_R_coord[-1])
             plt.ylim(self.data_Z_coord[0], self.data_Z_coord[-1])
-            #plt.xlim(1.2, 2.6)
-            #plt.ylim(-0.5, 0.5)
+            # plt.xlim(1.2, 2.6)
+            # plt.ylim(-0.5, 0.5)
 
             plt.xlabel("R / m")
             plt.ylabel("Z / m")
             plt.tight_layout(pad=1.08, h_pad=None, w_pad=None, rect=None)
             plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "ray_propagation_poloidal.jpg", dpi=200)
-
 
         elif option == -2:
             ## For plotting ray trajectory in the toroidal plane
@@ -276,7 +275,6 @@ class outplot(object):
             plt.ylabel("Y / m")
             plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "ray_propagation_toroidal.jpg", dpi=200)
-
 
         elif option == 1:
             ## For plotting the width in the RZ plane
@@ -781,47 +779,56 @@ class outplot(object):
 
         elif option == 17:
             gyro_frequency = self.normalised_gyro_freqs * self.launch_angular_frequency
-            plasma_frequency = self.normalised_plasma_freqs * self.launch_angular_frequency
-            right_cutoff = 0.5*(gyro_frequency + np.sqrt(gyro_frequency**2 + 4*plasma_frequency**2))
-            left_cutoff = 0.5*(-gyro_frequency + np.sqrt(gyro_frequency**2 + 4*plasma_frequency**2))
+            plasma_frequency = (
+                self.normalised_plasma_freqs * self.launch_angular_frequency
+            )
+            right_cutoff = 0.5 * (
+                gyro_frequency
+                + np.sqrt(gyro_frequency**2 + 4 * plasma_frequency**2)
+            )
+            left_cutoff = 0.5 * (
+                -gyro_frequency
+                + np.sqrt(gyro_frequency**2 + 4 * plasma_frequency**2)
+            )
 
             plt.figure()
-            plt.plot(self.l_lc, np.full_like(self.l_lc, self.launch_angular_frequency), label='launch freq')
-            plt.plot(self.l_lc, gyro_frequency, label='$f_{ce}$')
-            plt.plot(self.l_lc, plasma_frequency, label='$f_{pe}$')
-            plt.plot(self.l_lc, right_cutoff, label='$f_{rh}$')
-            plt.plot(self.l_lc, left_cutoff, label='$f_{lh}$')
+            plt.plot(
+                self.l_lc,
+                np.full_like(self.l_lc, self.launch_angular_frequency),
+                label="launch freq",
+            )
+            plt.plot(self.l_lc, gyro_frequency, label="$f_{ce}$")
+            plt.plot(self.l_lc, plasma_frequency, label="$f_{pe}$")
+            plt.plot(self.l_lc, right_cutoff, label="$f_{rh}$")
+            plt.plot(self.l_lc, left_cutoff, label="$f_{lh}$")
 
             plt.xlabel("l - lc")
             plt.ylabel("angular frequency")
             plt.legend()
             plt.savefig(self.output_path + "frequencies.jpg", dpi=200)
-            
 
         else:
             raise ValueError(
                 "Plot option must be 0 (generate all plots) or integer from 1-17"
             )
-        
 
 
 class genray_nc_outplot(outplot):
-    '''
+    """
     Class for loading data and plotting from genray.nc files.
-    Currently only used for plotting ray trajectories. 
+    Currently only used for plotting ray trajectories.
     Limited functionality as genray.nc files do not have similar
     analysis outputs as Scotty output npz files.
-    '''
+    """
 
     def __init__(self, input_path="", suffix="", output_path=""):
-
         self.input_path = input_path
         self.suffix = suffix
         self.output_path = output_path
         self.temperature_flag = False
 
         # Loading sequence from nc file
-        '''
+        """
         graph_file = open(self.input_path, 'rb')
         nc_data = graph_file.readlines()
         n_lines = len(nc_data)
@@ -829,38 +836,38 @@ class genray_nc_outplot(outplot):
             line = str(nc_data[i])
             line = line[:-1]
             dset = netCDF4.Dataset(line)
-        '''
+        """
 
-        dset = Dataset(self.input_path, 'r', format='NETCDF4')
+        dset = Dataset(self.input_path, "r", format="NETCDF4")
 
-        launch_freq_GHz = np.array(dset.variables['freqcy'])/(1e9)
+        launch_freq_GHz = np.array(dset.variables["freqcy"]) / (1e9)
         # Ray trajectory; units originally in cm
-        q_Z_array = np.array(dset.variables['wz'][0,:])/100
-        q_R_array = np.array(dset.variables['wr'][0,:])/100
-        q_zeta_array = np.array(dset.variables['wphi'][0,:])/100
+        q_Z_array = np.array(dset.variables["wz"][0, :]) / 100
+        q_R_array = np.array(dset.variables["wr"][0, :]) / 100
+        q_zeta_array = np.array(dset.variables["wphi"][0, :]) / 100
         # Plasma equilibrium
-        data_R_coord = np.array(dset.variables['eqdsk_r'][:])
-        data_Z_coord = np.array(dset.variables['eqdsk_z'][:])
-        poloidalFlux_grid = np.array(dset.variables['eqdsk_psi'][:])
+        data_R_coord = np.array(dset.variables["eqdsk_r"][:])
+        data_Z_coord = np.array(dset.variables["eqdsk_z"][:])
+        poloidalFlux_grid = np.array(dset.variables["eqdsk_psi"][:])
         # Launch positions
-        z_starting = float(dset.variables['z_starting'][0])
-        r_starting = float(dset.variables['r_starting'][0])
-        phi_starting = float(dset.variables['phi_starting'][0])
+        z_starting = float(dset.variables["z_starting"][0])
+        r_starting = float(dset.variables["r_starting"][0])
+        phi_starting = float(dset.variables["phi_starting"][0])
         # Uncertain
-        ws = np.array(dset.variables['ws'][0,:])
+        ws = np.array(dset.variables["ws"][0, :])
         # B-field along ray trajectory, units in Gauss
-        B_magnitude = np.array(dset.variables['sbtot'][0,:]) 
-        B_R = np.array(dset.variables['sb_r'][0,:])
-        B_Z = np.array(dset.variables['sb_z'][0,:])
-        B_zeta = np.array(dset.variables['sb_phi'][0,:])
-        temperature = np.array(dset.variables['ste'][0,:])
-        density = np.array(dset.variables['sene'][0,:])
+        B_magnitude = np.array(dset.variables["sbtot"][0, :])
+        B_R = np.array(dset.variables["sb_r"][0, :])
+        B_Z = np.array(dset.variables["sb_z"][0, :])
+        B_zeta = np.array(dset.variables["sb_phi"][0, :])
+        temperature = np.array(dset.variables["ste"][0, :])
+        density = np.array(dset.variables["sene"][0, :])
         # Refractive index, used to find turning point
-        wnper = np.array(dset.variables['wnper'][0,:])
-        wnpar = np.array(dset.variables['wnpar'][0,:])
-        # Dielectric tensor, complex, not sure if it follows the 
+        wnper = np.array(dset.variables["wnper"][0, :])
+        wnpar = np.array(dset.variables["wnpar"][0, :])
+        # Dielectric tensor, complex, not sure if it follows the
         # cold dispersion relation. Shape is (2, 1, no. path elements)
-        '''
+        """
         epsilon_11 = np.array(dset.variables['cweps11'])
         epsilon_12 = np.array(dset.variables['cweps12'])
         epsilon_13 = np.array(dset.variables['cweps13'])
@@ -870,10 +877,10 @@ class genray_nc_outplot(outplot):
         epsilon_31 = np.array(dset.variables['cweps31'])
         epsilon_32 = np.array(dset.variables['cweps32'])
         epsilon_33 = np.array(dset.variables['cweps33'])
-        '''
+        """
 
         # Attributes present in the base class
-        self.launch_position = np.array( (r_starting, phi_starting, z_starting) )
+        self.launch_position = np.array((r_starting, phi_starting, z_starting))
         self.q_Z_array = q_Z_array
         self.q_R_array = q_R_array
         self.q_zeta_array = q_zeta_array
@@ -882,7 +889,9 @@ class genray_nc_outplot(outplot):
         # Normalizing the poloidal flux grid
         maxval = poloidalFlux_grid.max()
         minval = poloidalFlux_grid.min()
-        self.poloidalFlux_grid = np.transpose((poloidalFlux_grid - minval)/(maxval-minval))
+        self.poloidalFlux_grid = np.transpose(
+            (poloidalFlux_grid - minval) / (maxval - minval)
+        )
         self.launch_freq_GHz = launch_freq_GHz
         self.B_magnitude = B_magnitude
         self.temperature_output = temperature
@@ -902,39 +911,36 @@ class genray_nc_outplot(outplot):
         self.out_index = np.size(self.q_R_array)
         self.launch_angular_frequency = 2e9 * np.pi * self.launch_freq_GHz
         self.R_midplane_points = np.linspace(data_R_coord[0], data_R_coord[-1], 1000)
-        
-        
+
         # Interpolate the poloidal flux; note that poloidal flux is not normalized
         # the same way as scotty code currently
         midplane_index = (np.where(data_Z_coord == 0))[0][0]
-        interp_poloidal_flux = UnivariateSpline(data_R_coord, self.poloidalFlux_grid[:,midplane_index])
+        interp_poloidal_flux = UnivariateSpline(
+            data_R_coord, self.poloidalFlux_grid[:, midplane_index]
+        )
         self.poloidal_flux_on_midplane = interp_poloidal_flux(self.R_midplane_points)
-        
+
         # Calculate cutoff index from minimum perpendicular refractive index
         wn_magnitude = np.hypot(wnper, wnpar)
-        self.K_magnitude_array = wn_magnitude # Not yet properly scaled
+        self.K_magnitude_array = wn_magnitude  # Not yet properly scaled
         self.cutoff_index = wn_magnitude.argmin()
 
         [self.q_X_array, self.q_Y_array, self.q_Z_array] = find_q_lab_Cartesian(
             np.array([self.q_R_array, self.q_zeta_array, self.q_Z_array])
         )
 
-
     def replace_eqdsk(self, file_path):
-        '''Replace equilibrium data with an omfit json file'''
+        """Replace equilibrium data with an omfit json file"""
         with open(file_path) as f:
             data = json.load(f)
-        
-        self.poloidalFlux_grid = np.transpose(np.array(data['pol_flux']))
-        self.data_R_coord = np.array(data['R'])
-        self.data_Z_coord = np.array(data['Z'])
+
+        self.poloidalFlux_grid = np.transpose(np.array(data["pol_flux"]))
+        self.data_R_coord = np.array(data["R"])
+        self.data_Z_coord = np.array(data["Z"])
 
         f.close()
 
-
-
     def plotout(self, option=0):
-        
         if option == 0:
             for i in range(-2, 0):
                 return super().plotout(option=i)
@@ -946,9 +952,6 @@ class genray_nc_outplot(outplot):
 
         else:
             return super().plotout(option)
-
-
-
 
 
 def compare_plots(
@@ -969,8 +972,8 @@ def compare_plots(
             compare_plots(plotobject_1, plotobject_2, name_tuple, option=opt)
 
     elif option == -1:
-    ## For plotting ray trajectories only, compatible with Genray data
-    
+        ## For plotting ray trajectories only, compatible with Genray data
+
         plt.figure(figsize=(5, 5))
         plt.title("Poloidal Plane")
         contour_levels = np.linspace(0, 1, 11)
@@ -998,12 +1001,12 @@ def compare_plots(
             plotobject = object_tup[i - 1]
 
             plt.plot(
-                    plotobject.q_R_array[: plotobject.out_index],
-                    plotobject.q_Z_array[: plotobject.out_index],
-                    label=name,
-                    c=colour,
-                    linewidth=0.5,
-                )
+                plotobject.q_R_array[: plotobject.out_index],
+                plotobject.q_Z_array[: plotobject.out_index],
+                label=name,
+                c=colour,
+                linewidth=0.5,
+            )
             plt.plot(
                 [plotobject.launch_position[0], plotobject.q_R_array[0]],
                 [plotobject.launch_position[2], plotobject.q_Z_array[0]],
@@ -1014,14 +1017,16 @@ def compare_plots(
 
         plt.xlim(plotobject_1.data_R_coord[0], plotobject_1.data_R_coord[-1])
         plt.ylim(plotobject_1.data_Z_coord[0], plotobject_1.data_Z_coord[-1])
-        #plt.xlim(1.2, 2.6)
-        #plt.ylim(-0.5, 0.5)
+        # plt.xlim(1.2, 2.6)
+        # plt.ylim(-0.5, 0.5)
         plt.xlabel("R / m")
         plt.ylabel("Z / m")
         plt.tight_layout(pad=1.08, h_pad=None, w_pad=None, rect=None)
         plt.legend()
         plt.gca().set_aspect("equal", adjustable="box")
-        plt.savefig(plotobject_1.output_path + "compare_ray_propagation_poloidal.jpg", dpi=400)
+        plt.savefig(
+            plotobject_1.output_path + "compare_ray_propagation_poloidal.jpg", dpi=400
+        )
 
     elif option == -2:
         ## For plotting ray trajectory in the toroidal plane
@@ -1037,7 +1042,8 @@ def compare_plots(
         )
         R_inboard = plotobject_1.R_midplane_points[
             find_nearest(
-                plotobject_1.poloidal_flux_on_midplane[index_local_polmax:index_polmin], 1
+                plotobject_1.poloidal_flux_on_midplane[index_local_polmax:index_polmin],
+                1,
             )
             + index_local_polmax
         ]
@@ -1081,14 +1087,20 @@ def compare_plots(
             name = name_tuple[i - 1]
             colour = colour_tup[i - 1]
             plotobject = object_tup[i - 1]
-            
+
             (
                 launch_position_X,
                 launch_position_Y,
                 launch_position_Z,
             ) = find_q_lab_Cartesian(plotobject.launch_position)
             entry_position_X, entry_position_Y, entry_position_Z = find_q_lab_Cartesian(
-                np.array([plotobject.q_R_array[0], plotobject.q_zeta_array[0], plotobject.q_Z_array[0]])
+                np.array(
+                    [
+                        plotobject.q_R_array[0],
+                        plotobject.q_zeta_array[0],
+                        plotobject.q_Z_array[0],
+                    ]
+                )
             )
             ##
 
@@ -1096,7 +1108,10 @@ def compare_plots(
             plt.plot(circle_polmin[:, 0], circle_polmin[:, 1], "#00003F")
             plt.plot(circle_inboard[:, 0], circle_inboard[:, 1], "orange")
             plt.plot(
-                plotobject.q_X_array[: plotobject.out_index], plotobject.q_Y_array[: plotobject.out_index], c=colour, label=name,
+                plotobject.q_X_array[: plotobject.out_index],
+                plotobject.q_Y_array[: plotobject.out_index],
+                c=colour,
+                label=name,
             )
             plt.plot(
                 [launch_position_X, entry_position_X],
@@ -1110,8 +1125,10 @@ def compare_plots(
         plt.xlabel("X / m")
         plt.ylabel("Y / m")
         plt.gca().set_aspect("equal", adjustable="box")
-        plt.savefig(plotobject_1.output_path + "compare_ray_propagation_toroidal.jpg", dpi=200)
-    
+        plt.savefig(
+            plotobject_1.output_path + "compare_ray_propagation_toroidal.jpg", dpi=200
+        )
+
     elif option == 1:
         ## For plotting the width in the RZ plane, plotobject_1
         W_vec_RZ_1 = np.cross(plotobject_1.g_hat_output, np.array([0, 1, 0]))
