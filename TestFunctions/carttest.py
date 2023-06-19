@@ -254,21 +254,21 @@ def create_magnetic_geometry(
 
     raise ValueError(f"Invalid find_B_method '{find_B_method}'")
 
-field = create_magnetic_geometry(
-    "torbeam",#find_B_method,
-    magnetic_data_path = "/Users/yvonne/Documents/GitHub/Scotty/data/",
-    input_filename_suffix = "_188839_1900ms",
-    interp_order = 5,
-    interp_smoothing = 0,
-    B_T_axis = None,
-    R_axis = None,
-    minor_radius_a = None,
-    B_p_a = None,
-    shot = None,
-    equil_time = None,
-    delta_R = -0.0001,
-    delta_Z = 0.0001,
-)
+#field = create_magnetic_geometry(
+#    "torbeam",#find_B_method,
+#    magnetic_data_path = "/Users/yvonne/Documents/GitHub/Scotty/data/",
+#    input_filename_suffix = "_188839_1900ms",
+#    interp_order = 5,
+#    interp_smoothing = 0,
+#    B_T_axis = None,
+#    R_axis = None,
+#    minor_radius_a = None,
+#    B_p_a = None,
+#    shot = None,
+#    equil_time = None,
+#    delta_R = -0.0001,
+#    delta_Z = 0.0001,
+#)
 
 #%%
 def B_xyz(mag_field_obj, q_R, q_zeta, q_Z):
@@ -442,18 +442,18 @@ solver_output = np.load(data_path + 'solver_output.npz')
 
 field = create_magnetic_geometry(
     "torbeam",#find_B_method,
-    magnetic_data_path = "/Users/yvonne/Documents/GitHub/Scotty/data/",
-    input_filename_suffix = "_188839_1900ms",
-    interp_order = data_input['interp_order'],
-    interp_smoothing = data_input['interp_smoothing'],
+    magnetic_data_path = data_path,
+    input_filename_suffix = '.json',
+    interp_order = 5,
+    interp_smoothing = None,
     B_T_axis = None,
     R_axis = None,
     minor_radius_a = None,
     B_p_a = None,
     shot = None,
-    equil_time = data_input['equil_time'],
-    delta_R = data_input['delta_R'],
-    delta_Z = data_input['delta_Z'],
+    equil_time = None,
+    delta_R = 1e-5,
+    delta_Z = 1e-5,
 )
 
 #%%
@@ -530,4 +530,31 @@ plt.savefig(plot_path + 'grad_B_test_norm.png', bbox_inches='tight')
 # Compare values for grad_B computed in Cartesian and cylindrical coordinates
 
 #grad_B_test = compare_grad_B(field, data_output['q_R_array'], data_output['q_zeta_array'], data_output['q_Z_array'], delta=data_input['delta_R'])
+
+#%%
+# Making synthetic data for tests
+
+R = np.linspace(0,10,51).tolist()#gEQDSK['AuxQuantities']['R'].tolist()
+Z = np.linspace(0,10,51).tolist()#gEQDSK['AuxQuantities']['Z'].tolist()
+Br = 0#gEQDSK['AuxQuantities']['Br'].tolist()
+Bt = 0#gEQDSK['AuxQuantities']['Bt'].tolist()
+Bz = 10#gEQDSK['AuxQuantities']['Bz'].tolist()
+Pol_Flux = 0
+
+# else: x_coord is psi_n
+#if x_type == "rho":
+#    printw("! x_type is 'rho' based on profiles, will set pol_flux=(RHORZ)^2")
+#    Pol_Flux = np.square(gEQDSK['AuxQuantities']['RHORZ']).tolist()
+#elif x_type == "psi_n":
+#    printw("! x_type is 'psi_n' based on profiles, will set pol_flux=PSIRZ_NORM")    Pol_Flux = gEQDSK['AuxQuantities']['PSIRZ_NORM'].tolist()
+#else:
+#    printe(f"! unknown x_type:{x_type} - ending")
+#    OMFITx.End()
+
+topfile_file = open(data_path+'topfile.json', 'w')
+topfile_dict = {'R': R, 'Z': Z, 'Br': Br, 'Bz': Bz, 'Bt': Bt, 'pol_flux': Pol_Flux}
+json = json.dumps(topfile_dict, indent=6)
+topfile_file.write(json)
+#root['INPUTS']['topfile'] = OMFITjson('topfile.json')
+topfile_file.close()
 
