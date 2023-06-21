@@ -61,7 +61,6 @@ Units
 from __future__ import annotations
 import numpy as np
 from scipy import integrate as integrate
-from scipy import constants as constants
 import matplotlib.pyplot as plt
 import time
 import json
@@ -72,23 +71,9 @@ import datatree
 from scotty.analysis import immediate_analysis, further_analysis
 from scotty.fun_general import (
     find_nearest,
-    contract_special,
-    make_unit_vector_from_cross_product,
-    find_x0,
-    find_waist,
     freq_GHz_to_angular_frequency,
-    angular_frequency_to_wavenumber,
     find_Psi_3D_lab,
 )
-from scotty.fun_general import find_q_lab_Cartesian, find_Psi_3D_lab_Cartesian
-from scotty.fun_general import (
-    find_normalised_plasma_freq,
-    find_normalised_gyro_freq,
-    find_electron_mass,
-)
-from scotty.fun_general import find_epsilon_para, find_epsilon_perp, find_epsilon_g
-from scotty.fun_general import find_dbhat_dR, find_dbhat_dZ
-from scotty.fun_general import find_H_Cardano, find_D
 from scotty.fun_evolution import (
     beam_evolution_fun,
     pack_beam_parameters,
@@ -105,7 +90,7 @@ from scotty.geometry import (
     CurvySlabField,
     EFITField,
 )
-from scotty.hamiltonian import Hamiltonian, hessians
+from scotty.hamiltonian import Hamiltonian
 from scotty.launch import launch_beam, find_entry_point
 from scotty.torbeam import Torbeam
 from scotty.ray_solver import propagate_ray
