@@ -1314,28 +1314,22 @@ def find_quick_output(ray_parameters_2D, K_zeta_initial, find_B_R, find_B_T, fin
 
 
 # Functions (circular Gaussian beam in vacuum)
-def find_Rayleigh_length(
-    waist, wavenumber
-):  # Finds the size of the waist (assumes vacuum propagation and circular beam)
-    Rayleigh_length = 0.5 * wavenumber * waist**2
-    return Rayleigh_length
+def find_Rayleigh_length(waist, wavenumber):
+    """Finds the size of the waist (assumes vacuum propagation and circular beam)"""
+    return 0.5 * wavenumber * waist**2
 
 
-def find_waist(
-    width, wavenumber, curvature
-):  # Finds the size of the waist (assumes vacuum propagation and circular beam)
-    waist = width / np.sqrt(1 + curvature**2 * width**4 * wavenumber**2 / 4)
-    return waist
+def find_waist(width, wavenumber, curvature):
+    """Finds the size of the waist (assumes vacuum propagation and circular beam)"""
+    return width / np.sqrt(1 + curvature**2 * width**4 * wavenumber**2 / 4)
 
 
-def find_distance_from_waist(
-    width, wavenumber, curvature
-):  # Finds how far you are from the waist (assumes vacuum propagation and circular beam)
-    waist = width / np.sqrt(1 + curvature**2 * width**4 * wavenumber**2 / 4)
-    distance_from_waist = np.sign(curvature) * np.sqrt(
-        (width**2 - waist**2) * waist**2 * wavenumber**2 / 4
+def find_distance_from_waist(width, wavenumber, curvature):
+    """Finds how far you are from the waist (assumes vacuum propagation and circular beam)"""
+    waist_sq = find_waist(width, wavenumber, curvature) ** 2
+    return np.sign(curvature) * np.sqrt(
+        (width**2 - waist_sq) * waist_sq * wavenumber**2 / 4
     )
-    return distance_from_waist
 
 
 # def propagate_circular_beam(distance,wavenumber,w0):
