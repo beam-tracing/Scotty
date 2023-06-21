@@ -93,8 +93,8 @@ class MagneticField(ABC):
         magnitude = self.magnitude(q_R, q_Z)
         unit_vector = np.array(
             [self.B_R(q_R, q_Z), self.B_T(q_R, q_Z), self.B_Z(q_R, q_Z)]
-        ).T
-        return unit_vector / magnitude
+        )
+        return (unit_vector / magnitude).T
 
 
 class CircularCrossSectionField(MagneticField):
