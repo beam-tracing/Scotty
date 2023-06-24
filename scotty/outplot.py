@@ -130,20 +130,21 @@ class outplot(object):
     # def __repr__(self, *args, **kwargs):
     # pass
 
-    def plotout(self, option=0):
+    def plotout(self, option='all'):
         """
         Function to make plots from Scotty_main output loaded into object instance.
         Input:
-            Plot option number, option (int)
+            Plot option, option (string)
         Output:
-            Plot(s) generated as determined by plot option number.
+            Plot(s) generated as determined by plot option.
             Plot saved to output_path, .jpg file (only for option=1 or 2, included when option=0)
         """
-        if option == 0:
-            for opt in range(1, 17):
-                self.plotout(option=opt)
 
-        elif option == 1:
+        if option == 'RZ trajectory' or 'all':
+            """
+            Plots the ray trajectory and projection of beam widths on the RZ plane
+            """
+            
             ## For plotting the width in the RZ plane
             W_vec_RZ = np.cross(self.g_hat_output, np.array([0, 1, 0]))
             W_vec_RZ_magnitude = np.linalg.norm(W_vec_RZ, axis=1)
@@ -214,7 +215,11 @@ class outplot(object):
             plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "propagation_poloidal.jpg", dpi=200)
 
-        elif option == 2:
+        elif option == 'XY trajectory' or 'all':
+            """
+            Plots the ray trajectory and projection of beam widths on the XY plane
+            """
+            
             ## For plotting the plasma in the toroidal plane
             index_polmin = find_nearest(self.poloidal_flux_on_midplane, 0)
             R_polmin = self.R_midplane_points[index_polmin]
@@ -330,19 +335,19 @@ class outplot(object):
             plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "propagation_toroidal.jpg", dpi=200)
 
-        elif option == 3:
+        elif option == 'polflux' or 'all':
             plt.figure()
             plt.plot(self.l_lc, self.poloidal_flux_output)
             plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "poloidal_flux_output.jpg", dpi=200)
 
-        elif option == 4:
+        elif option == 'ne' or 'all':
             plt.figure()
             plt.plot(self.l_lc, self.electron_density_output)
             # plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "electron_density_output.jpg", dpi=200)
 
-        elif option == 5:
+        elif option == 'K components' or 'all':
             plt.figure()
             plt.subplot(1, 3, 1)
             plt.plot(self.l_lc, self.K_R_array, "k")
@@ -353,7 +358,7 @@ class outplot(object):
             # plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "K_R K_Z K_Magnitude.jpg", dpi=200)
 
-        elif option == 6:
+        elif option == 'b_hat' or 'all':
             plt.figure()
             plt.subplot(1, 3, 1)
             plt.plot(self.l_lc, self.b_hat_output[:, 0] * self.B_magnitude, "k")
@@ -365,7 +370,7 @@ class outplot(object):
             # plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "B_output.jpg", dpi=200)
 
-        elif option == 7:
+        elif option == 'Psi_w and M_w' or 'all':
             plt.figure(figsize=(16, 5))
 
             plt.subplot(2, 3, 1)
@@ -406,7 +411,7 @@ class outplot(object):
             # plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "Option_7.jpg", dpi=200)
 
-        elif option == 8:
+        elif option == 'Backscattered turbulent k_perp' or 'all':
             plt.figure(figsize=(10, 5))
             plt.plot(self.l_lc, -2 * self.K_magnitude_array, label="Bragg")
             plt.plot(self.l_lc, self.k_perp_1_bs, label="Full Bragg")
@@ -415,7 +420,7 @@ class outplot(object):
             # plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "Bragg.jpg", dpi=200)
 
-        elif option == 9:
+        elif option == 'Ray curvature' or 'all':
             plt.figure()
 
             plt.subplot(1, 2, 1)
@@ -427,7 +432,7 @@ class outplot(object):
             plt.title(r"$\kappa \cdot \hat{y}$")
             plt.savefig(self.output_path + "kappa_output.jpg", dpi=200)
 
-        elif option == 10:
+        elif option == 'Contributions to M_w':
             plt.figure()
 
             plt.subplot(1, 2, 1)
@@ -492,7 +497,7 @@ class outplot(object):
             plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
             plt.savefig(self.output_path + "Option10.jpg", dpi=200)
 
-        elif option == 11:
+        elif option == 'localisation weights':
             loc_m = np.exp(-2 * (self.theta_m_output / self.delta_theta_m) ** 2)
 
             plt.figure()
@@ -533,53 +538,14 @@ class outplot(object):
             plt.legend()
             plt.savefig(self.output_path + "mismatch.jpg", dpi=200)
 
-        elif option == 12:
+        elif option == 'H_bar':
             plt.figure()
             plt.title("H (Booker quartic)")
             plt.plot(self.l_lc, self.H_output)
             plt.savefig(self.output_path + "H_Booker_Quartic.jpg", dpi=200)
 
-        elif option == 13:
-            plt.figure(figsize=(16, 5))
 
-            plt.subplot(2, 3, 1)
-            plt.plot(self.l_lc, np.real(self.Psi_xx_output), "k")
-            plt.plot(self.l_lc, np.real(self.M_xx_output), "r")
-            plt.title(r"Re$(\Psi_{xx})$ and Re$(M_{xx})$")
-            plt.xlabel(r"$l-l_c$")
-
-            plt.subplot(2, 3, 2)
-            plt.plot(self.l_lc, np.real(self.Psi_xy_output), "k")
-            plt.plot(self.l_lc, np.real(self.M_xy_output), "r")
-            plt.title(r"Re$(\Psi_{xy})$ and Re$(M_{xy})$")
-            plt.xlabel(r"$l-l_c$")
-
-            plt.subplot(2, 3, 3)
-            plt.plot(self.l_lc, np.real(self.Psi_yy_output), "k")
-            plt.title(r"Re$(\Psi_{yy})$")
-            plt.xlabel(r"$l-l_c$")
-
-            plt.subplot(2, 3, 4)
-            plt.plot(self.l_lc, np.imag(self.Psi_xx_output), "k")
-            plt.plot(self.l_lc, np.imag(self.M_xx_output), "r")
-            plt.title(r"Im$(\Psi_{xx})$ and Im$(M_{xx})$")
-            plt.xlabel(r"$l-l_c$")
-
-            plt.subplot(2, 3, 5)
-            plt.plot(self.l_lc, np.imag(self.Psi_xy_output), "k")
-            plt.plot(self.l_lc, np.imag(self.M_xy_output), "r")
-            plt.title(r"Im$(\Psi_{xy})$ and Im$(M_{xy})$")
-            plt.xlabel(r"$l-l_c$")
-
-            plt.subplot(2, 3, 6)
-            plt.plot(self.l_lc, np.imag(self.Psi_yy_output), "k")
-            plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
-            plt.title(r"Im$(\Psi_{yy})$")
-            plt.xlabel(r"$l-l_c$")
-
-            plt.savefig(self.output_path + "Option_11.jpg", dpi=200)
-
-        elif option == 14:
+        elif option == 'mismatch':
             plt.figure()
             plt.plot(self.l_lc, np.rad2deg(self.theta_output), label="theta")
             plt.plot(self.l_lc, np.rad2deg(self.theta_m_output), label="theta m")
@@ -589,55 +555,56 @@ class outplot(object):
             plt.ylabel("deg")
             plt.savefig(self.output_path + "theta_output.jpg", dpi=200)
 
-        elif option == 15:
-            factor = -1 - self.theta_output / self.theta_m_output
+        ## Very niche
+        # elif option == 15:
+        #     factor = -1 - self.theta_output / self.theta_m_output
 
-            launch_angular_frequency = 2e9 * np.pi * self.launch_freq_GHz
-            wavenumber_K0 = launch_angular_frequency / constants.c
+        #     launch_angular_frequency = 2e9 * np.pi * self.launch_freq_GHz
+        #     wavenumber_K0 = launch_angular_frequency / constants.c
 
-            om_pe_norm = find_normalised_plasma_freq(
-                self.electron_density_output, launch_angular_frequency
-            )
-            om_ce_norm = find_normalised_gyro_freq(
-                self.B_magnitude, launch_angular_frequency
-            )
+        #     om_pe_norm = find_normalised_plasma_freq(
+        #         self.electron_density_output, launch_angular_frequency
+        #     )
+        #     om_ce_norm = find_normalised_gyro_freq(
+        #         self.B_magnitude, launch_angular_frequency
+        #     )
 
-            # K_mag = self.K_magnitude_array
-            # eps_11 = self.epsilon_perp_output
-            # eps_12 = self.epsilon_g_output
-            # eps_bb = self.epsilon_para_output
-            N_sq = (self.K_magnitude_array / wavenumber_K0) ** 2
+        #     # K_mag = self.K_magnitude_array
+        #     # eps_11 = self.epsilon_perp_output
+        #     # eps_12 = self.epsilon_g_output
+        #     # eps_bb = self.epsilon_para_output
+        #     N_sq = (self.K_magnitude_array / wavenumber_K0) ** 2
 
-            factor2 = (
-                self.epsilon_perp_output**2
-                - self.epsilon_g_output**2
-                - self.epsilon_perp_output * self.epsilon_para_output
-                - self.epsilon_perp_output * N_sq
-                + self.epsilon_para_output * N_sq
-            ) / (
-                -(self.epsilon_perp_output**2)
-                + self.epsilon_g_output**2
-                - self.epsilon_perp_output * self.epsilon_para_output
-                + self.epsilon_perp_output * N_sq * 2
-            )
+        #     factor2 = (
+        #         self.epsilon_perp_output**2
+        #         - self.epsilon_g_output**2
+        #         - self.epsilon_perp_output * self.epsilon_para_output
+        #         - self.epsilon_perp_output * N_sq
+        #         + self.epsilon_para_output * N_sq
+        #     ) / (
+        #         -(self.epsilon_perp_output**2)
+        #         + self.epsilon_g_output**2
+        #         - self.epsilon_perp_output * self.epsilon_para_output
+        #         + self.epsilon_perp_output * N_sq * 2
+        #     )
 
-            factor_O = -(om_pe_norm**2)
+        #     factor_O = -(om_pe_norm**2)
 
-            factor_X = (om_pe_norm**2 * (1 - om_pe_norm**2)) / (
-                1 - om_pe_norm**2 - om_ce_norm**2
-            )
+        #     factor_X = (om_pe_norm**2 * (1 - om_pe_norm**2)) / (
+        #         1 - om_pe_norm**2 - om_ce_norm**2
+        #     )
 
-            plt.figure()
-            plt.plot(self.l_lc, factor, "ko", label="-1 - theta / theta_m")
-            plt.plot(self.l_lc, factor2, label="Either mode")
-            plt.plot(self.l_lc, factor_O, label="O mode")
-            plt.plot(self.l_lc, factor_X, label="X mode")
-            plt.legend()
-            plt.xlabel("l - l_c")
+        #     plt.figure()
+        #     plt.plot(self.l_lc, factor, "ko", label="-1 - theta / theta_m")
+        #     plt.plot(self.l_lc, factor2, label="Either mode")
+        #     plt.plot(self.l_lc, factor_O, label="O mode")
+        #     plt.plot(self.l_lc, factor_X, label="X mode")
+        #     plt.legend()
+        #     plt.xlabel("l - l_c")
 
-            plt.savefig(self.output_path + "OmodeXmode.jpg", dpi=200)
+        #     plt.savefig(self.output_path + "OmodeXmode.jpg", dpi=200)
 
-        elif option == 16:
+        elif 'Te':
             if self.relativistic_flag:
                 plt.figure()
                 plt.plot(self.l_lc, self.temperature_output)
@@ -649,7 +616,7 @@ class outplot(object):
                 "Plot option must be 0 (generate all plots) or integer from 1-16"
             )
 
-
+## TODO: This needs to be changed to work with the new names.
 def compare_plots(
     plotobject_1: outplot, plotobject_2: outplot, name_tuple: Tuple[str, ...], option=2
 ):
