@@ -27,7 +27,7 @@ from scotty.fun_general import (
 )
 from scotty.geometry import MagneticField
 from scotty.hamiltonian import DielectricTensor, Hamiltonian, hessians
-from scotty.typing import FloatArray
+from scotty.typing import ArrayLike, FloatArray
 
 
 def save_npz(filename: Path, df: xr.Dataset) -> None:
@@ -59,7 +59,7 @@ def immediate_analysis(
     vacuumLaunch_flag: bool,
     output_path: Path,
     output_filename_suffix: str,
-    dH: Dict[str, FloatArray],
+    dH: Dict[str, ArrayLike],
 ):
     q_R = solver_output.q_R
     q_Z = solver_output.q_Z
@@ -217,7 +217,7 @@ def further_analysis(
     output_filename_suffix: str,
     field: MagneticField,
     detailed_analysis_flag: bool,
-    dH: Dict[str, FloatArray],
+    dH: Dict[str, ArrayLike],
 ):
     # Calculates various useful stuff
     [q_X, q_Y, _] = find_q_lab_Cartesian([df.q_R, df.q_zeta, df.q_Z])

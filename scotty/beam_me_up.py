@@ -687,7 +687,7 @@ def beam_me_up(
     if verbose_output_flag:
         print("Saving data")
         # Drop 'None' values
-        output_data = {k: v if v is not None else [] for k, v in inputs.items()}
+        output_data = {str(k): v if v is not None else [] for k, v in inputs.items()}
         np.savez(output_path / f"data_input{output_filename_suffix}", **output_data)
         np.savez(
             output_path / f"solver_output{output_filename_suffix}",
