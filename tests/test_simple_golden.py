@@ -89,7 +89,7 @@ PSI_FINAL_EXPECTED_1 = np.array(
 
 
 EXPECTED_1 = {
-    "q_R_array": np.array(
+    "q_R": np.array(
         [
             1.99382564,
             1.8973136,
@@ -103,7 +103,7 @@ EXPECTED_1 = {
             1.61859347,
         ]
     ),
-    "q_Z_array": np.array(
+    "q_Z": np.array(
         [
             -0.07804514,
             -0.09137557,
@@ -117,7 +117,7 @@ EXPECTED_1 = {
             -0.3901351,
         ]
     ),
-    "q_zeta_array": np.array(
+    "q_zeta": np.array(
         [
             0.0,
             -0.00041565,
@@ -131,7 +131,7 @@ EXPECTED_1 = {
             -0.01641859,
         ]
     ),
-    "K_R_array": np.array(
+    "K_R": np.array(
         [
             -1146.40007,
             -909.7351259,
@@ -145,7 +145,7 @@ EXPECTED_1 = {
             -102.43869197,
         ]
     ),
-    "K_Z_array": np.array(
+    "K_Z": np.array(
         [
             -120.49150267,
             -165.72589293,
@@ -160,7 +160,7 @@ EXPECTED_1 = {
         ]
     ),
     "K_zeta_initial": np.array(-0.0),
-    "tau_array": np.array(
+    "tau": np.array(
         [
             0.0,
             62.6209717,
@@ -282,7 +282,7 @@ PSI_FINAL_EXPECTED_NEG1 = np.array(
 
 
 EXPECTED_NEG1 = {
-    "q_R_array": np.array(
+    "q_R": np.array(
         [
             1.99387217,
             1.93805575,
@@ -296,7 +296,7 @@ EXPECTED_NEG1 = {
             1.87844182,
         ]
     ),
-    "q_Z_array": np.array(
+    "q_Z": np.array(
         [
             -0.07804025,
             -0.08519773,
@@ -310,7 +310,7 @@ EXPECTED_NEG1 = {
             -0.23601108,
         ]
     ),
-    "q_zeta_array": np.array(
+    "q_zeta": np.array(
         [
             3.64302241e-17,
             1.56090264e-04,
@@ -324,7 +324,7 @@ EXPECTED_NEG1 = {
             6.49247319e-03,
         ]
     ),
-    "K_R_array": np.array(
+    "K_R": np.array(
         [
             -1146.40007,
             -971.90930973,
@@ -338,7 +338,7 @@ EXPECTED_NEG1 = {
             626.21158363,
         ]
     ),
-    "K_Z_array": np.array(
+    "K_Z": np.array(
         [
             -120.49150267,
             -150.83839501,
@@ -353,7 +353,7 @@ EXPECTED_NEG1 = {
         ]
     ),
     "K_zeta_initial": np.array(-0.0),
-    "tau_array": np.array(
+    "tau": np.array(
         [
             0.0,
             35.00328799,
@@ -480,7 +480,7 @@ PSI_FINAL_EXPECTED_REL_1 = np.array(
 
 
 EXPECTED_REL_1 = {
-    "q_R_array": np.array(
+    "q_R": np.array(
         [
             1.99387217,
             1.89478605,
@@ -494,7 +494,7 @@ EXPECTED_REL_1 = {
             1.58926036,
         ]
     ),
-    "q_Z_array": np.array(
+    "q_Z": np.array(
         [
             -0.07804025,
             -0.09178393,
@@ -508,7 +508,7 @@ EXPECTED_REL_1 = {
             -0.39541607,
         ]
     ),
-    "q_zeta_array": np.array(
+    "q_zeta": np.array(
         [
             3.64302241e-17,
             -4.34557216e-04,
@@ -522,7 +522,7 @@ EXPECTED_REL_1 = {
             -1.71395528e-02,
         ]
     ),
-    "K_R_array": np.array(
+    "K_R": np.array(
         [
             -1146.40007,
             -907.90136177,
@@ -536,7 +536,7 @@ EXPECTED_REL_1 = {
             -172.04458472,
         ]
     ),
-    "K_Z_array": np.array(
+    "K_Z": np.array(
         [
             -120.49150267,
             -166.27151556,
@@ -551,7 +551,7 @@ EXPECTED_REL_1 = {
         ]
     ),
     "K_zeta_initial": np.array(-0.0),
-    "tau_array": np.array(
+    "tau": np.array(
         [
             0.0,
             64.39979252,
@@ -673,7 +673,7 @@ PSI_FINAL_EXPECTED_REL_NEG1 = np.array(
 
 
 EXPECTED_REL_NEG1 = {
-    "q_R_array": np.array(
+    "q_R": np.array(
         [
             1.99387217,
             1.93488909,
@@ -687,7 +687,7 @@ EXPECTED_REL_NEG1 = {
             1.86713704,
         ]
     ),
-    "q_Z_array": np.array(
+    "q_Z": np.array(
         [
             -0.07804025,
             -0.08568082,
@@ -701,7 +701,7 @@ EXPECTED_REL_NEG1 = {
             -0.24778288,
         ]
     ),
-    "q_zeta_array": np.array(
+    "q_zeta": np.array(
         [
             3.64302241e-17,
             1.74299842e-04,
@@ -715,7 +715,7 @@ EXPECTED_REL_NEG1 = {
             7.07804388e-03,
         ]
     ),
-    "K_R_array": np.array(
+    "K_R": np.array(
         [
             -1146.40007,
             -964.15226622,
@@ -729,7 +729,7 @@ EXPECTED_REL_NEG1 = {
             591.35208292,
         ]
     ),
-    "K_Z_array": np.array(
+    "K_Z": np.array(
         [
             -120.49150267,
             -152.3625245,
@@ -744,7 +744,7 @@ EXPECTED_REL_NEG1 = {
         ]
     ),
     "K_zeta_initial": np.array(-0.0),
-    "tau_array": np.array(
+    "tau": np.array(
         [
             0.0,
             37.14107905,
@@ -1041,20 +1041,18 @@ def test_integrated_O_mode(tmp_path, generator):
     for key, value in EXPECTED_1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
-    K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
+    K_magnitude = np.hypot(output["K_R"], output["K_Z"])
     assert K_magnitude.argmin() == CUTOFF_INDEX_1
 
+    assert_allclose(output["Psi_3D"][0, ...], PSI_START_EXPECTED_1, rtol=1e-2, atol=0.1)
     assert_allclose(
-        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_1, rtol=1e-2, atol=0.1
-    )
-    assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX_1, ...],
+        output["Psi_3D"][CUTOFF_INDEX_1, ...],
         PSI_CUTOFF_EXPECTED_1,
         rtol=1e-2,
         atol=0.1,
     )
     assert_allclose(
-        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_1, rtol=1.8e-2, atol=0.1
+        output["Psi_3D"][-1, ...], PSI_FINAL_EXPECTED_1, rtol=1.8e-2, atol=0.1
     )
 
 
@@ -1094,20 +1092,20 @@ def test_integrated_X_mode(tmp_path, generatorneg):
     for key, value in EXPECTED_NEG1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
-    K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
+    K_magnitude = np.hypot(output["K_R"], output["K_Z"])
     assert K_magnitude.argmin() == CUTOFF_INDEX_NEG1
 
     assert_allclose(
-        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_NEG1, rtol=1e-2, atol=0.1
+        output["Psi_3D"][0, ...], PSI_START_EXPECTED_NEG1, rtol=1e-2, atol=0.1
     )
     assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX_NEG1, ...],
+        output["Psi_3D"][CUTOFF_INDEX_NEG1, ...],
         PSI_CUTOFF_EXPECTED_NEG1,
         rtol=1e-2,
         atol=0.1,
     )
     assert_allclose(
-        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_NEG1, rtol=1.8e-2, atol=0.1
+        output["Psi_3D"][-1, ...], PSI_FINAL_EXPECTED_NEG1, rtol=1.8e-2, atol=0.1
     )
 
 
@@ -1147,23 +1145,20 @@ def test_relativistic_O_mode(tmp_path, generator_rel):
     for key, value in EXPECTED_REL_1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
-    K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
+    K_magnitude = np.hypot(output["K_R"], output["K_Z"])
     assert K_magnitude.argmin() == CUTOFF_INDEX_REL_1
 
     assert_allclose(
-        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_REL_1, rtol=1e-2, atol=0.1
+        output["Psi_3D"][0, ...], PSI_START_EXPECTED_REL_1, rtol=1e-2, atol=0.1
     )
     assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX_REL_1, ...],
+        output["Psi_3D"][CUTOFF_INDEX_REL_1, ...],
         PSI_CUTOFF_EXPECTED_REL_1,
         rtol=1e-2,
         atol=0.1,
     )
     assert_allclose(
-        output["Psi_3D_output"][-1, ...],
-        PSI_FINAL_EXPECTED_REL_1,
-        rtol=1.8e-2,
-        atol=0.1,
+        output["Psi_3D"][-1, ...], PSI_FINAL_EXPECTED_REL_1, rtol=1.8e-2, atol=0.1
     )
 
 
@@ -1204,26 +1199,20 @@ def test_relativistic_X_mode(tmp_path, generator_relneg):
     for key, value in EXPECTED_REL_NEG1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
-    K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
+    K_magnitude = np.hypot(output["K_R"], output["K_Z"])
     assert K_magnitude.argmin() == CUTOFF_INDEX_REL_NEG1
 
     assert_allclose(
-        output["Psi_3D_output"][0, ...],
-        PSI_START_EXPECTED_REL_NEG1,
-        rtol=1e-2,
-        atol=0.1,
+        output["Psi_3D"][0, ...], PSI_START_EXPECTED_REL_NEG1, rtol=1e-2, atol=0.1
     )
     assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX_REL_NEG1, ...],
+        output["Psi_3D"][CUTOFF_INDEX_REL_NEG1, ...],
         PSI_CUTOFF_EXPECTED_REL_NEG1,
         rtol=1e-2,
         atol=0.1,
     )
     assert_allclose(
-        output["Psi_3D_output"][-1, ...],
-        PSI_FINAL_EXPECTED_REL_NEG1,
-        rtol=1.8e-2,
-        atol=0.1,
+        output["Psi_3D"][-1, ...], PSI_FINAL_EXPECTED_REL_NEG1, rtol=1.8e-2, atol=0.1
     )
 
 
@@ -1265,20 +1254,18 @@ def test_null_relativistic_O_mode(tmp_path, generator_nullrel):
     for key, value in EXPECTED_1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
-    K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
+    K_magnitude = np.hypot(output["K_R"], output["K_Z"])
     assert K_magnitude.argmin() == CUTOFF_INDEX_1
 
+    assert_allclose(output["Psi_3D"][0, ...], PSI_START_EXPECTED_1, rtol=1e-2, atol=0.1)
     assert_allclose(
-        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_1, rtol=1e-2, atol=0.1
-    )
-    assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX_1, ...],
+        output["Psi_3D"][CUTOFF_INDEX_1, ...],
         PSI_CUTOFF_EXPECTED_1,
         rtol=1e-2,
         atol=0.1,
     )
     assert_allclose(
-        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_1, rtol=1.8e-2, atol=0.1
+        output["Psi_3D"][-1, ...], PSI_FINAL_EXPECTED_1, rtol=1.8e-2, atol=0.1
     )
 
 
@@ -1321,20 +1308,20 @@ def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
     for key, value in EXPECTED_NEG1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
-    K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
+    K_magnitude = np.hypot(output["K_R"], output["K_Z"])
     assert K_magnitude.argmin() == CUTOFF_INDEX_NEG1
 
     assert_allclose(
-        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_NEG1, rtol=1e-2, atol=0.1
+        output["Psi_3D"][0, ...], PSI_START_EXPECTED_NEG1, rtol=1e-2, atol=0.1
     )
     assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX_NEG1, ...],
+        output["Psi_3D"][CUTOFF_INDEX_NEG1, ...],
         PSI_CUTOFF_EXPECTED_NEG1,
         rtol=1e-2,
         atol=0.1,
     )
     assert_allclose(
-        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_NEG1, rtol=1.8e-2, atol=0.1
+        output["Psi_3D"][-1, ...], PSI_FINAL_EXPECTED_NEG1, rtol=1.8e-2, atol=0.1
     )
 
 

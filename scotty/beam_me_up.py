@@ -660,13 +660,12 @@ def beam_me_up(
     solver_output = xr.Dataset(
         {
             "solver_status": solver_status,
-            "tau_array": (["tau"], tau_array),
-            "q_R_array": (["tau"], q_R_array),
-            "q_zeta_array": (["tau"], q_zeta_array),
-            "q_Z_array": (["tau"], q_Z_array),
-            "K_R_array": (["tau"], K_R_array),
-            "K_Z_array": (["tau"], K_Z_array),
-            "Psi_3D_output": (["tau", "e1", "e2"], Psi_3D_output),
+            "q_R": (["tau"], q_R_array),
+            "q_zeta": (["tau"], q_zeta_array),
+            "q_Z": (["tau"], q_Z_array),
+            "K_R": (["tau"], K_R_array),
+            "K_Z": (["tau"], K_Z_array),
+            "Psi_3D": (["tau", "e1", "e2"], Psi_3D_output),
         },
         coords={
             "tau": tau_array,
