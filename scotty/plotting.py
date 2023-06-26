@@ -11,6 +11,20 @@ from typing import Optional, Union, List
 from scotty.typing import FloatArray
 
 
+def maybe_make_axis(ax: Optional[plt.Axes], *args, **kwargs) -> plt.Axes:
+    if ax is None:
+        _, ax = plt.subplots(*args, **kwargs)
+    return ax
+
+
+def maybe_make_3D_axis(ax: Optional[plt.Axes], *args, **kwargs) -> plt.Axes:
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(projection="3d")
+
+    return ax
+
+
 def plot_bounding_box(field: MagneticField, ax: Optional[plt.Axes] = None) -> plt.Axes:
     """Plot the bounding box of the magnetic field1
 
@@ -29,8 +43,7 @@ def plot_bounding_box(field: MagneticField, ax: Optional[plt.Axes] = None) -> pl
 
     """
 
-    if ax is None:
-        _, ax = plt.subplots()
+    ax = maybe_make_axis(ax)
 
     R_min = np.min(field.R_coord)
     R_max = np.max(field.R_coord)
@@ -65,10 +78,7 @@ def plot_bounding_box_3D(
         Axes bounding box was added to
 
     """
-
-    if ax is None:
-        fig = plt.figure()
-        ax = fig.add_subplot(projection="3d")
+    ax = maybe_make_3D_axis(ax)
 
     R_max = np.max(field.R_coord)
     Z_min = np.min(field.Z_coord)
@@ -118,8 +128,7 @@ def plot_flux_surface(
 
     """
 
-    if ax is None:
-        _, ax = plt.subplots()
+    ax = maybe_make_axis(ax)
 
     style = {}
     if isinstance(surface, float):
@@ -168,10 +177,7 @@ def plot_flux_surface_3D(
         x=field.R_coord, y=field.Z_coord, z=field.poloidalFlux_grid.T
     )
 
-    if ax is None:
-        fig = plt.figure()
-        ax = fig.add_subplot(projection="3d")
-
+    ax = maybe_make_3D_axis(ax)
     R, Z = np.array(contour.lines(psi)[0]).T
     phi = np.linspace(0, 2 * np.pi)
 
@@ -194,10 +200,7 @@ def plot_all_the_things(
     poloidal_flux_enter: float,
     ax: Optional[plt.Axes] = None,
 ) -> plt.Axes:
-    if ax is None:
-        fig = plt.figure()
-        ax = fig.add_subplot(projection="3d")
-
+    ax = maybe_make_3D_axis(ax)
     plot_flux_surface_3D(field, 1.0, ax)
     plot_bounding_box_3D(field, ax)
 
