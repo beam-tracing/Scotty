@@ -749,7 +749,7 @@ def further_analysis(
         "loc_b_r": loc_b_r,
     }
 
-    df = df.assign_coords({"R_midplane": R_midplane_points})
+    df = df.assign_coords({"R_midplane": R_midplane_points, "l_lc": (["tau"], l_lc)})
     df.update(further_df)
 
     if detailed_analysis_flag and (cutoff_index + 1 != len(df.tau_array)):
