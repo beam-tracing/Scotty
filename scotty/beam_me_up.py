@@ -813,7 +813,7 @@ def beam_me_up(
         print("Figures have been saved")
     # -------------------
 
-    return None
+    return dt
 
 
 def make_density_fit(
