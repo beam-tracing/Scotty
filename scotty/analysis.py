@@ -143,25 +143,25 @@ def immediate_analysis(
             "K_R": K_R,
             "K_Z": K_Z,
             "K_zeta_initial": K_zeta_initial,
-            "Psi_3D_lab_launch": (["e1", "e2"], Psi_3D_lab_launch),
+            "Psi_3D_lab_launch": (["row", "col"], Psi_3D_lab_launch),
             "Psi_3D": solver_output.Psi_3D,
-            "b_hat": (["tau", "e1"], b_hat),
+            "b_hat": (["tau", "col"], b_hat),
             "dH_dKR": (["tau"], dH_dKR),
             "dH_dKZ": (["tau"], dH_dKZ),
             "dH_dKzeta": (["tau"], dH_dKzeta),
             "dH_dR": (["tau"], dH_dR),
             "dH_dZ": (["tau"], dH_dZ),
-            "g_hat": (["tau", "e1"], g_hat),
+            "g_hat": (["tau", "col"], g_hat),
             "g_magnitude": g_magnitude,
-            "grad_bhat": (["tau", "e1", "e2"], grad_bhat),
+            "grad_bhat": (["tau", "row", "col"], grad_bhat),
             "q_R": q_R,
             "q_Z": q_Z,
             "q_zeta": solver_output.q_zeta,
-            "x_hat": (["tau", "e1"], x_hat),
-            "y_hat": (["tau", "e1"], y_hat),
+            "x_hat": (["tau", "col"], x_hat),
+            "y_hat": (["tau", "col"], y_hat),
             "poloidal_flux": (["tau"], poloidal_flux),
         },
-        coords={"tau": tau, "e1": ["R", "zeta", "Z"], "e2": ["R", "zeta", "Z"]},
+        coords={"tau": tau, "row": ["R", "zeta", "Z"], "col": ["R", "zeta", "Z"]},
     )
 
     temperature = find_temperature_1D(poloidal_flux) if find_temperature_1D else None
@@ -183,7 +183,7 @@ def immediate_analysis(
         )
 
         vacuum_only = {
-            "Psi_3D_lab_entry": (["e1", "e2"], Psi_3D_lab_entry),
+            "Psi_3D_lab_entry": (["row", "col"], Psi_3D_lab_entry),
             "distance_from_launch_to_entry": distance_from_launch_to_entry,
             "dpolflux_dR_debugging": (
                 ["tau"],
@@ -242,9 +242,9 @@ def further_analysis(
     # Calcuating the angles theta and theta_m
     # B \cdot K / (abs (B) abs(K))
     sin_theta_m_analysis = (
-        df.b_hat.sel(e1="R") * df.K_R
-        + df.b_hat.sel(e1="zeta") * df.K_zeta_initial / df.q_R
-        + df.b_hat.sel(e1="Z") * df.K_Z
+        df.b_hat.sel(col="R") * df.K_R
+        + df.b_hat.sel(col="zeta") * df.K_zeta_initial / df.q_R
+        + df.b_hat.sel(col="Z") * df.K_Z
     ) / K_magnitude_array
 
     # Assumes the mismatch angle is never smaller than -90deg or bigger than 90deg
@@ -605,10 +605,10 @@ def further_analysis(
         "Psi_xx_entry": Psi_xx_entry,
         "Psi_xy_entry": Psi_xy_entry,
         "Psi_yy_entry": Psi_yy_entry,
-        "Psi_3D_Cartesian": (["tau", "e1", "e2"], Psi_3D_Cartesian),
-        "x_hat_Cartesian": (["tau", "e1"], x_hat_Cartesian),
-        "y_hat_Cartesian": (["tau", "e1"], y_hat_Cartesian),
-        "g_hat_Cartesian": (["tau", "e1"], g_hat_Cartesian),
+        "Psi_3D_Cartesian": (["tau", "row", "col"], Psi_3D_Cartesian),
+        "x_hat_Cartesian": (["tau", "col"], x_hat_Cartesian),
+        "y_hat_Cartesian": (["tau", "col"], y_hat_Cartesian),
+        "g_hat_Cartesian": (["tau", "col"], g_hat_Cartesian),
         "M_xx": M_xx,
         "M_xy": M_xy,
         "M_yy": M_yy,
@@ -621,9 +621,9 @@ def further_analysis(
         "yhat_dot_grad_bhat_dot_xhat": (["tau"], yhat_dot_grad_bhat_dot_xhat),
         "yhat_dot_grad_bhat_dot_yhat": (["tau"], yhat_dot_grad_bhat_dot_yhat),
         "yhat_dot_grad_bhat_dot_ghat": (["tau"], yhat_dot_grad_bhat_dot_ghat),
-        "grad_grad_H": (["tau", "e1", "e2"], grad_grad_H),
-        "gradK_grad_H": (["tau", "e1", "e2"], gradK_grad_H),
-        "gradK_gradK_H": (["tau", "e1", "e2"], gradK_gradK_H),
+        "grad_grad_H": (["tau", "row", "col"], grad_grad_H),
+        "gradK_grad_H": (["tau", "row", "col"], gradK_grad_H),
+        "gradK_gradK_H": (["tau", "row", "col"], gradK_gradK_H),
         "d_theta_d_tau": (["tau"], d_theta_d_tau),
         "d_xhat_d_tau_dot_yhat": (["tau"], d_xhat_d_tau_dot_yhat),
         "kappa_dot_xhat": (["tau"], kappa_dot_xhat),
@@ -642,13 +642,13 @@ def further_analysis(
         "y_hat": df.y_hat,
         "b_hat": df.b_hat,
         "g_hat": df.g_hat,
-        "e_hat": (["tau", "e1"], e_hat),
-        "H_eigvals": (["tau", "e1"], H_eigvals),
-        "e_eigvecs": (["tau", "e1", "e2"], e_eigvecs),
+        "e_hat": (["tau", "col"], e_hat),
+        "H_eigvals": (["tau", "col"], H_eigvals),
+        "e_eigvecs": (["tau", "row", "col"], e_eigvecs),
         "H_1_Cardano": (["tau"], H_1_Cardano),
         "H_2_Cardano": (["tau"], H_2_Cardano),
         "H_3_Cardano": (["tau"], H_3_Cardano),
-        "kperp1_hat": (["tau", "e1"], kperp1_hat),
+        "kperp1_hat": (["tau", "col"], kperp1_hat),
         "theta": (["tau"], theta),
         "g_magnitude_Cardano": g_magnitude_Cardano,
         "poloidal_flux_on_midplane": (["R_midplane"], poloidal_flux_on_midplane),

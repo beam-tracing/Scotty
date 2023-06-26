@@ -605,7 +605,7 @@ def beam_me_up(
         {
             "B_T_axis": B_T_axis,
             "B_p_a": B_p_a,
-            "K_initial": (["e1"], K_initial),
+            "K_initial": (["col"], K_initial),
             "Psi_BC_flag": Psi_BC_flag,
             "R_axis": R_axis,
             "atol": atol,
@@ -620,7 +620,7 @@ def beam_me_up(
             "equil_time": (equil_time),
             "figure_flag": figure_flag,
             "find_B_method": find_B_method,
-            "initial_position": (["e1"], initial_position),
+            "initial_position": (["col"], initial_position),
             "input_filename_suffix": input_filename_suffix,
             "interp_order": interp_order,
             "interp_smoothing": interp_smoothing,
@@ -641,7 +641,7 @@ def beam_me_up(
             "output_path": output_path,
             "plasmaLaunch_K": plasmaLaunch_K,
             "plasmaLaunch_Psi_3D_lab_Cartesian": (
-                ["e1", "e1"],
+                ["row", "col"],
                 plasmaLaunch_Psi_3D_lab_Cartesian,
             ),
             "poloidalFlux_grid": (["R", "Z"], field.poloidalFlux_grid),
@@ -655,7 +655,12 @@ def beam_me_up(
             "vacuum_propagation_flag": vacuum_propagation_flag,
             "verbose_output_flag": verbose_output_flag,
         },
-        coords={"R": field.R_coord, "Z": field.Z_coord, "e1": ["R", "zeta", "Z"]},
+        coords={
+            "R": field.R_coord,
+            "Z": field.Z_coord,
+            "row": ["R", "zeta", "Z"],
+            "col": ["R", "zeta", "Z"],
+        },
     )
     solver_output = xr.Dataset(
         {
@@ -665,12 +670,12 @@ def beam_me_up(
             "q_Z": (["tau"], q_Z_array),
             "K_R": (["tau"], K_R_array),
             "K_Z": (["tau"], K_Z_array),
-            "Psi_3D": (["tau", "e1", "e2"], Psi_3D_output),
+            "Psi_3D": (["tau", "row", "col"], Psi_3D_output),
         },
         coords={
             "tau": tau_array,
-            "e1": ["R", "zeta", "Z"],
-            "e2": ["R", "zeta", "Z"],
+            "row": ["R", "zeta", "Z"],
+            "col": ["R", "zeta", "Z"],
         },
     )
 
