@@ -415,7 +415,9 @@ def find_electron_mass(
         return constants.m_e
 
     else:
-        mazzu = 1 + temperature * 4.892 * (10 ** (-3)) # Mazzucato's relativistic correction
+        mazzu = 1 + temperature * 4.892 * (
+            10 ** (-3)
+        )  # Mazzucato's relativistic correction
         electron_mass = constants.m_e * mazzu
         # (5/2) / (constants.m_e * constants.c**2) * constants.e = 4.892 * (10 ** (-6))
         # But Te is in KeV not eV
