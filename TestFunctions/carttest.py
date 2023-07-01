@@ -126,7 +126,7 @@ def create_magnetic_geometry(
 
     elif find_B_method == "omfit":
         print("Using OMFIT JSON Torbeam file for B and poloidal flux")
-        topfile_filename = magnetic_data_path / f"topfile{input_filename_suffix}.json"
+        topfile_filename = magnetic_data_path + f"topfile{input_filename_suffix}.json"
 
         with open(topfile_filename) as f:
             data = json.load(f)
@@ -313,12 +313,12 @@ def grad_B_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
     dr_x = dx*np.cos(zeta_x)
     dr_y = dy*np.sin(zeta_y)
     
-    B_xplus = B_xyz(mag_field_obj, q_R +dr_x, q_zeta +dzeta_x, q_Z)[:,:,0]
-    B_xminus = B_xyz(mag_field_obj, q_R -dr_x, q_zeta -dzeta_x, q_Z)[:,:,0]
-    B_yplus = B_xyz(mag_field_obj, q_R +dr_y, q_zeta +dzeta_y, q_Z)[:,:,1]
-    B_yminus = B_xyz(mag_field_obj, q_R -dr_y, q_zeta -dzeta_y, q_Z)[:,:,1]
-    B_zplus = B_xyz(mag_field_obj, q_R, q_zeta, q_Z +dz)[:,:,2]
-    B_zminus = B_xyz(mag_field_obj, q_R, q_zeta, q_Z -dz)[:,:,2]
+    B_xplus = B_xyz(mag_field_obj, q_R +dr_x, q_zeta +dzeta_x, q_Z)[:,:,:,0]
+    B_xminus = B_xyz(mag_field_obj, q_R -dr_x, q_zeta -dzeta_x, q_Z)[:,:,:,0]
+    B_yplus = B_xyz(mag_field_obj, q_R +dr_y, q_zeta +dzeta_y, q_Z)[:,:,:,1]
+    B_yminus = B_xyz(mag_field_obj, q_R -dr_y, q_zeta -dzeta_y, q_Z)[:,:,:,1]
+    B_zplus = B_xyz(mag_field_obj, q_R, q_zeta, q_Z +dz)[:,:,:,2]
+    B_zminus = B_xyz(mag_field_obj, q_R, q_zeta, q_Z -dz)[:,:,:,2]
     
     return 0.5*np.stack((B_xplus - B_xminus, B_yplus - B_yminus, B_zplus - B_zminus), axis=-1)/delta
 
@@ -381,12 +381,12 @@ def grad_bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
     dr_x = dx*np.cos(zeta_x)
     dr_y = dy*np.sin(zeta_y)
     
-    bhat_xplus = bhat_xyz(mag_field_obj, q_R +dr_x, q_zeta +dzeta_x, q_Z)[:,:,0]
-    bhat_xminus = bhat_xyz(mag_field_obj, q_R -dr_x, q_zeta -dzeta_x, q_Z)[:,:,0]
-    bhat_yplus = bhat_xyz(mag_field_obj, q_R +dr_y, q_zeta +dzeta_y, q_Z)[:,:,1]
-    bhat_yminus = bhat_xyz(mag_field_obj, q_R -dr_y, q_zeta -dzeta_y, q_Z)[:,:,1]
-    bhat_zplus = bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z +dz)[:,:,2]
-    bhat_zminus = bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z -dz)[:,:,2]
+    bhat_xplus = bhat_xyz(mag_field_obj, q_R +dr_x, q_zeta +dzeta_x, q_Z)[:,:,:,0]
+    bhat_xminus = bhat_xyz(mag_field_obj, q_R -dr_x, q_zeta -dzeta_x, q_Z)[:,:,:,0]
+    bhat_yplus = bhat_xyz(mag_field_obj, q_R +dr_y, q_zeta +dzeta_y, q_Z)[:,:,:,1]
+    bhat_yminus = bhat_xyz(mag_field_obj, q_R -dr_y, q_zeta -dzeta_y, q_Z)[:,:,:,1]
+    bhat_zplus = bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z +dz)[:,:,:,2]
+    bhat_zminus = bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z -dz)[:,:,:,2]
     
     return 0.5*np.stack((bhat_xplus - bhat_xminus, bhat_yplus - bhat_yminus, bhat_zplus - bhat_zminus), axis=-1)/delta
 
@@ -424,9 +424,9 @@ def compare_grad_bhat(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
     """
     grad_bhat_xyz_array = grad_bhat_xyz(mag_field_obj, q_R, q_zeta, q_Z, delta=delta)
     
-    grad_bhat_R_array = 0.5*(bhat(mag_field_obj, q_R +delta, q_Z) - bhat(mag_field_obj, q_R -delta, q_Z))[:,:,0]/delta
-    #grad_bhat_T_array = 0#.5*(bhat(mag_field_obj, q_R, q_Z) - bhat(mag_field_obj, q_R, q_Z))[:,:,1]/delta
-    grad_bhat_Z_array = 0.5*(bhat(mag_field_obj, q_R, q_Z +delta) - bhat(mag_field_obj, q_R, q_Z -delta))[:,:,2]/delta
+    grad_bhat_R_array = 0.5*(bhat(mag_field_obj, q_R +delta, q_Z) - bhat(mag_field_obj, q_R -delta, q_Z))[:,:,:,0]/delta
+    #grad_bhat_T_array = 0#.5*(bhat(mag_field_obj, q_R, q_Z) - bhat(mag_field_obj, q_R, q_Z))[:,:,:,1]/delta
+    grad_bhat_Z_array = 0.5*(bhat(mag_field_obj, q_R, q_Z +delta) - bhat(mag_field_obj, q_R, q_Z -delta))[:,:,:,2]/delta
     
     return grad_bhat_xyz_array - np.stack((grad_bhat_R_array*np.cos(q_zeta), grad_bhat_R_array*np.sin(q_zeta), grad_bhat_Z_array), axis=-1)
 
@@ -435,15 +435,15 @@ def compare_grad_bhat(mag_field_obj, q_R, q_zeta, q_Z, delta=1e-3):
 data_path = '/Users/yvonne/Documents/GitHub/Scotty/results/'
 plot_path = data_path
 
-analysis_output = np.load(data_path + 'analysis_output.npz')
-data_output = np.load(data_path + 'data_output.npz')
-data_input = np.load(data_path + 'data_input.npz')
-solver_output = np.load(data_path + 'solver_output.npz')
+#analysis_output = np.load(data_path + 'analysis_output.npz')
+#data_output = np.load(data_path + 'data_output.npz')
+#data_input = np.load(data_path + 'data_input.npz')
+#solver_output = np.load(data_path + 'solver_output.npz')
 
 field = create_magnetic_geometry(
-    "torbeam",#find_B_method,
+    "omfit",#find_B_method,
     magnetic_data_path = data_path,
-    input_filename_suffix = '.json',
+    input_filename_suffix = '',
     interp_order = 5,
     interp_smoothing = None,
     B_T_axis = None,
@@ -534,12 +534,25 @@ plt.savefig(plot_path + 'grad_B_test_norm.png', bbox_inches='tight')
 #%%
 # Making synthetic data for tests
 
-R = np.linspace(0,10,51).tolist()#gEQDSK['AuxQuantities']['R'].tolist()
-Z = np.linspace(0,10,51).tolist()#gEQDSK['AuxQuantities']['Z'].tolist()
-Br = 0#gEQDSK['AuxQuantities']['Br'].tolist()
-Bt = 0#gEQDSK['AuxQuantities']['Bt'].tolist()
-Bz = 10#gEQDSK['AuxQuantities']['Bz'].tolist()
-Pol_Flux = 0
+rmin=0
+rmax=10
+rsize=51
+zmin=0
+zmax=10
+zsize=51
+tmin=0
+tmax=2*constants.pi
+tsize=31
+
+R = np.linspace(rmin,rmax,rsize)#gEQDSK['AuxQuantities']['R'].tolist()
+Z = np.linspace(zmin,zmax,zsize)#gEQDSK['AuxQuantities']['Z'].tolist()
+T = np.linspace(tmin,tmax,tsize)
+
+Br = np.zeros((rsize,zsize))#gEQDSK['AuxQuantities']['Br'].tolist()
+Bt = np.zeros((rsize,zsize))#gEQDSK['AuxQuantities']['Bt'].tolist()
+Bz = np.ones((rsize,zsize))#gEQDSK['AuxQuantities']['Bz'].tolist()
+Pol_Flux = np.zeros((rsize,zsize))
+
 
 # else: x_coord is psi_n
 #if x_type == "rho":
@@ -552,9 +565,39 @@ Pol_Flux = 0
 #    OMFITx.End()
 
 topfile_file = open(data_path+'topfile.json', 'w')
-topfile_dict = {'R': R, 'Z': Z, 'Br': Br, 'Bz': Bz, 'Bt': Bt, 'pol_flux': Pol_Flux}
-json = json.dumps(topfile_dict, indent=6)
-topfile_file.write(json)
-#root['INPUTS']['topfile'] = OMFITjson('topfile.json')
+topfile_dict = {'R': R.tolist(), 'Z': Z.tolist(), 'Br': Br.tolist(), 'Bz': Bz.tolist(), 'Bt': Bt.tolist(), 'pol_flux': Pol_Flux.tolist()}
+topfile_file.write(json.dumps(topfile_dict, indent=6))
 topfile_file.close()
+
+#%%
+# Tests using synthetic data
+
+Rarray, Zarray, Tarray = np.meshgrid(R,Z,T)
+
+B_R_array = field.B_R(Rarray,Zarray)
+B_T_array = field.B_T(Rarray,Zarray)
+B_Z_array = field.B_Z(Rarray,Zarray)
+B_mag_array = np.sqrt(B_R_array**2 + B_T_array**2 + B_Z_array**2)
+
+# Sanity test: B_xyz works
+B_test = B_xyz(field, Rarray, Tarray, Zarray) - np.stack((B_R_array*np.cos(Tarray) - B_T_array*np.sin(Tarray), B_R_array*np.sin(Tarray) + B_T_array*np.cos(Tarray), B_Z_array), axis=-1)
+
+print(np.max(B_test), np.min(B_test), np.sum(B_test))
+
+# Sanity test: bhat_xyz works
+bhat_test = bhat(field, Rarray, Zarray) - np.stack((B_R_array/B_mag_array, B_T_array/B_mag_array, B_Z_array/B_mag_array), axis=-1)
+
+print(np.max(bhat_test), np.min(bhat_test), np.sum(bhat_test))
+
+bhat_xyz_test = bhat_xyz(field, Rarray, Tarray, Zarray) - np.stack(((B_R_array*np.cos(Tarray) - B_T_array*np.sin(Tarray))/B_mag_array, (B_R_array*np.sin(Tarray) + B_T_array*np.cos(Tarray))/B_mag_array, B_Z_array/B_mag_array), axis=-1)
+
+print(np.max(bhat_xyz_test), np.min(bhat_xyz_test), np.sum(bhat_xyz_test))
+
+# Test grad_B_xyz using compare_grad_B
+grad_B_test = compare_grad_B(field, Rarray, Tarray, Zarray)
+print(np.nanmax(grad_B_test), np.nanmin(grad_B_test), np.nansum(grad_B_test))
+
+# Test grad_bhat_xyz using compare_grad_bhat
+grad_bhat_test = compare_grad_bhat(field, Rarray, Tarray, Zarray)
+print(np.nanmax(grad_bhat_test), np.nanmin(grad_bhat_test), np.nansum(grad_bhat_test))
 
