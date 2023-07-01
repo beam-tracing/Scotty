@@ -177,6 +177,18 @@ class SweepDataset:
 
     #### Class Methods ####
 
+    ## I/O
+    
+    def to_netcdf(self, folder = None, filename = 'SweepDataset'):
+        """Saves contents of Dataset into a netCDF4 file for easy read and writing.
+
+        Args:
+            folder (str, optional): Path to folder to save file to. Default is None.
+            filename (str, optional): Filename to save the nc file as. Default is 'SweepDataset'.
+        """
+        file_path = folder + '\\' + filename + '.nc'
+        self.dataset.to_netcdf(path=file_path)
+
     ## get methods
 
     def get_Dataset(self):
@@ -653,3 +665,13 @@ class SweepDataset:
     def plot_opt_tor_vs_freq(self, poloidal_angle):
         return
     """
+
+class FromNetCDF(SweepDataset):
+
+    def __init__(
+        path_string
+    ):  
+        with xr.open_dataset(path_string) as ds:
+            self.dataset = ds
+        
+
