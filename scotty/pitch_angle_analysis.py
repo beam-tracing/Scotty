@@ -53,8 +53,14 @@ class SweepDataset:
         Toroidal_Angles,
         filepath_format,
         Output_Types=("analysis_output", "data_input", "data_output", "solver_output"),
+        attrs_dict = None
     ):
         ds = xr.Dataset()
+        ds.attrs['class_type'] = 'SweepDataset'
+        ds.attrs['descriptor'] = None
+        for key, value in attrs_dict:
+            ds.attrs[key] = value
+            
         variables = [
             "distance_along_line",
             "delta_theta_m",
@@ -176,17 +182,34 @@ class SweepDataset:
         self.spline_memo = {}
 
     #### Class Methods ####
+    
+    def set_attrs(self, attribute, value):
+        self.dataset.attrs[attribute] = value
+        
+    def set_descriptor(self, descriptor):
+        """Used to set a unique descriptor to identify sweeps with different plasma
+        equilibrium.
+        """
+        self.set_attrs['descriptor'] = descriptor
 
     ## I/O
 
-    def to_netcdf(self, folder=None, filename="SweepDataset"):
+    def to_netcdf(self, folder="", filename=None, suffix=""):
         """Saves contents of Dataset into a netCDF4 file for easy read and writing.
 
         Args:
             folder (str, optional): Path to folder to save file to. Default is None.
-            filename (str, optional): Filename to save the nc file as. Default is 'SweepDataset'.
+            filename (str, optional): Filename to save the nc file as. Default is 'SweepDataset', or
+            the descriptor string if provided.
         """
-        file_path = folder + "\\" + filename + ".nc"
+        if not filename:
+            descriptor = self.dataset['descriptor']
+            if descriptor:
+                filename = descriptor
+            else:
+                filename = "SweepDataset"
+                
+        file_path = folder + filename + suffix + ".nc"
         self.dataset.to_netcdf(path=file_path)
 
     ## get methods
@@ -212,8 +235,8 @@ class SweepDataset:
     def print_KeysView(self):
         print(self.dataset.keys())
 
-    def get_Coordinate_array(self, variable, dimension):
-        data = self.dataset[variable]
+    def get_Coordinate_array(self, dimension):
+        data = self.dataset
         return data.coords[dimension].values
 
     ## Analysis sequences; output is saved as DataArrays in self.dataset but
@@ -272,7 +295,7 @@ class SweepDataset:
         """Finds the mismatch angle ('theta_m') and mismatch tolerance
         ('delta_theta_m') at the cutoff point and saves it with the
         keys 'cutoff_theta_m' and 'cutoff_delta_theta_m'.
-
+        
         Returns:
             Dataset: A Dataset of 2 DataArrays, one for 'cutoff_theta_m'
             and another for 'cutoff delta_theta_m', with frequency, poloidal
@@ -293,10 +316,15 @@ class SweepDataset:
             self.dataset["cutoff_delta_theta_m"] = cutoff_delta_theta_m
             return self.dataset[["cutoff_theta_m", "cutoff_delta_theta_m"]]
 
-    def generate_opt_tor(self):
+    def generate_opt_tor(self, mask_flag=True):
         """Uses scipy.optimize.newton on an interpolated spline to find
         the optimum toroidal steering with varying frequency and poloidal
         steering and saves it with the key 'opt_tor'.
+        
+        Args:
+            mask_flag (bool): Default True. Determines whether the optimum 
+            toroidal angle calculated will be reflected or not and saves the
+            result as a boolean mask DataArray 'opt_tor_mask'.
 
         Returns:
             DataArray: A 2-D DataArray of optimal toroidal steering angles (in degrees)
@@ -305,10 +333,9 @@ class SweepDataset:
             print("opt-tor already generated.")
             return self.dataset["opt_tor"]
         else:
-            Frequencies = self.get_Coordinate_array("cutoff_theta_m", "frequency")
-            Poloidal_Angles = self.get_Coordinate_array(
-                "cutoff_theta_m", "poloidal_angle"
-            )
+            Frequencies = self.get_Coordinate_array("frequency")
+            Poloidal_Angles = self.get_Coordinate_array("poloidal_angle")
+            Toroidal_Angles = self.get_Coordinate_array('toroidal_angle')
             opt_tor_array = xr.DataArray(
                 coords=[
                     ("frequency", Frequencies),
@@ -326,7 +353,18 @@ class SweepDataset:
                     )
                     root = newton(spline, x0=0, maxiter=50)
                     opt_tor_array.loc[coords_dict] = root
+                    
             self.dataset["opt_tor"] = opt_tor_array
+            
+            if mask_flag:
+                func = lambda x: find_nearest(Toroidal_Angles, x)
+                vfunc = np.vectorize(func)
+                
+                closest_tor_array = vfunc(opt_tor_array)
+                reflection_mask = self.generate_reflection_mask().transpose('frequency', 'poloidal_angle', 'toroidal_angle')
+                opt_tor_mask = reflection_mask.isel(toroidal_angle = closest_tor_array)
+                self.dataset['opt_tor_mask'] = opt_tor_mask
+                
             return opt_tor_array
 
     def generate_reflection_mask(self):
@@ -345,13 +383,9 @@ class SweepDataset:
             print("reflection_mask already generated")
             return self.dataset["reflection_mask"]
         else:
-            Frequencies = self.get_Coordinate_array("distance_along_line", "frequency")
-            Poloidal_Angles = self.get_Coordinate_array(
-                "distance_along_line", "poloidal_angle"
-            )
-            Toroidal_Angles = self.get_Coordinate_array(
-                "distance_along_line", "toroidal_angle"
-            )
+            Frequencies = self.get_Coordinate_array("frequency")
+            Poloidal_Angles = self.get_Coordinate_array("poloidal_angle")
+            Toroidal_Angles = self.get_Coordinate_array("toroidal_angle")
             reflection_mask = xr.DataArray(
                 coords=[
                     ("frequency", Frequencies),
@@ -470,7 +504,7 @@ class SweepDataset:
             return self.spline_memo[args]
         else:
             data = self.dataset[variable]
-            x_coordinates = self.get_Coordinate_array(variable, dimension)
+            x_coordinates = self.get_Coordinate_array(dimension)
             y_data = data.loc[coords_dict]
             y_values = y_data.values
             spline = UnivariateSpline(x=x_coordinates, y=y_values, s=0)
@@ -498,21 +532,41 @@ class SweepDataset:
             return self.spline_memo[args]
         else:
             data = self.dataset[variable]
-            x_coordinates = self.get_Coordinate_array(variable, xdimension)
-            y_coordinates = self.get_Coordinate_array(variable, ydimension)
+            x_coordinates = self.get_Coordinate_array(xdimension)
+            y_coordinates = self.get_Coordinate_array(ydimension)
             z_values = data.loc[coords_dict].transpose(xdimension, ydimension).values
             spline = RectBivariateSpline(
                 x=x_coordinates, y=y_coordinates, z=z_values, s=0
             )
             self.spline_memo[args] = spline
             return spline
-
-    def gaussian(self, theta_m, delta):
-        return np.exp(-((theta_m / delta) ** 2))
-
-    def noisy_gaussian(self, theta_m, delta, std=0.05):
-        mean = self.gaussian(theta_m, delta)
-        return mean + np.random.normal(mean, std, len(theta_m))
+    
+    def check_reflected(self, frequency, toroidal_angle, poloidal_angle):
+        """Checks whether a ray of an arbitrary frequency, toroidal and poloidal steering
+        will be reflected from the plasma based on nearest grid points.
+        """
+        
+        Frequencies = self.get_Coordinate_array("frequency")
+        Poloidal_Angles = self.get_Coordinate_array("poloidal_angle")
+        Toroidal_Angles = self.get_Coordinate_array("toroidal_angle")
+        
+        # Find nearest valid coordinate points
+        freq_coord = find_nearest(Frequencies, frequency)
+        tor_coord = find_nearest(Toroidal_Angles, toroidal_angle)
+        pol_coord = find_nearest(Poloidal_Angles, poloidal_angle)
+        
+        coords_dict = {
+            'frequency': freq_coord,
+            'toroidal_angle': tor_coord,
+            'poloidal_angle': pol_coord,
+        }
+        
+        reflection_mask = self.generate_reflection_mask()
+        invalid = reflection_mask[coords_dict]
+        if invalid:
+            return False
+        else:
+            return True
 
     # To be implemented
     """
@@ -586,7 +640,7 @@ class SweepDataset:
         else:
             raise ValueError("Provided measure is not 'rho' or 'm'.")
 
-        if const_angle not in self.get_Coordinate_array(variable, const_angle_str):
+        if const_angle not in self.get_Coordinate_array(const_angle_str):
             raise ValueError("Value of const_angle not in original coordinate array.")
 
         coords_dict = {const_angle_str: const_angle}
@@ -596,8 +650,8 @@ class SweepDataset:
             variable, xdimension, ydimension, coords_dict
         )
 
-        x_coordinates = self.get_Coordinate_array(variable, xdimension)
-        y_coordinates = self.get_Coordinate_array(variable, ydimension)
+        x_coordinates = self.get_Coordinate_array(xdimension)
+        y_coordinates = self.get_Coordinate_array(ydimension)
 
         if bounds == None:
             x_start = x_coordinates[0]
@@ -667,7 +721,136 @@ class SweepDataset:
     """
 
 
-class FromNetCDF(SweepDataset):
-    def __init__(path_string):
+class SweepFromNC(SweepDataset):
+    """Class for reading SweepDataset data written to a .nc file.
+    """
+    def __init__(self, path_string):
         with xr.open_dataset(path_string) as ds:
+            class_type = ds.attrs['class_type']
+            if  class_type != 'SweepDataset':
+                raise ValueError(".nc file does not have class_type = 'SweepDataset' attribute")
             self.dataset = ds
+
+
+
+
+
+
+
+
+            
+class PitchDiagnostic:
+    """Separate class for representing a particular pitch angle diagnostic design/setup. 
+    Analysis methods take in Scotty simulation data in a SweepDataset class, and saves the
+    output in a dictionary of datasets. Each dataset corresponds to a type of analysis
+    output with variables corresponding to different SweepDataset equilibriums. Datasets
+    are organized into NetCDF groups when reading and writing to file. 
+     
+    Note that attributes will be stored as global Dataset attributes rather than as python
+    class attributes for easy writing to a netCDF file.
+    
+    Args:
+        Poloidal_Angles (array): Poloidal steering positions for array of microwave antennae
+        Toroidal_Angles (array): Toroidal steering positions for array of microwave antennae
+        Frequencies (array): Discrete frequency coverage of microwave antennaes
+        poloidal_position (array, optional): (R, Z) coordinate launch positions of the antennae,
+        toroidal angle coordinate is not required due to symmetry. Default None assumes that
+        poloidal_position is identical to SweepDataset simulation parameters.
+        curvatures (float/array, optional): Beam curvature for launch beam, if array must be the 
+        same length as Frequencies. Default None assumes curvature is identical to SweepDataset
+        simulation parameters.
+    """
+    def __init__(
+        self,
+        Poloidal_Angles,
+        Toroidal_Angles,
+        Frequencies,
+        position=None,
+        curvatures=None,
+        ):
+        ds = xr.Dataset()
+        ds.attrs['class_type'] = 'PitchAngleDiagnostic'
+        ds.attrs['Poloidal_Angles'] = Poloidal_Angles
+        ds.attrs['Toroidal_Angles'] = Toroidal_Angles
+        ds.attrs['Frequencies'] = Frequencies
+        ds.attrs['position'] = position
+        ds.attrs['curvatures'] = curvatures
+        self.home = ds
+        self.ds_dict = {}
+        
+    # get attribute methods
+    
+    def get_Poloidal_Angles(self):
+        return self.home.attrs['Poloidal_Angles']
+    
+    def get_Toroidal_Angles(self):
+        return self.home.attrs['Toroidal_Angles']
+    
+    def get_Frequencies(self):
+        return self.home.attrs['Frequencies']
+    
+    def get_position(self):
+        return self.home.attrs['position']
+    
+    def get_curvatures(self):
+        return self.home.attrs['curvatures']
+    
+    # I/O
+    def to_netcdf(self, folder="", filename="PitchDiagnostic", suffix =""):
+        """Saves contents of Dataset into a netCDF4 file for easy read and writing.
+
+        Args:
+            folder (str, optional): Path to folder to save file to. Default is None.
+            filename (str, optional): Filename to save the nc file as. Default is 'SweepDataset'.
+        """
+        file_path = folder + filename + suffix + ".nc"
+        
+        # Save ds_dict into home
+        self.home["ds_list"] = list(self.ds_dict.keys())
+        self.home.to_netcdf(path=file_path, group="home")
+        for key in self.ds_dict.keys():
+            ds = self.ds_dict[key]
+            ds.to_netcdf(path=file_path, group=key, mode="a")
+        
+    # Simulation methods
+    
+    def simulate_measurements(self, SweepDataset, iterations=100):
+        """Simulates backscattered power received by antenna array through the frequency range
+        and stores it in a dataset, with the variable set by the SweepDataset descriptor.
+        """
+        return None
+    
+    
+class PitchFromNC(PitchDiagnostic):
+    """Class for reading PitchDiagnostic data written to a .nc file.
+    """
+    def __init__(self, path_string):
+        with xr.open_dataset(path_string, group="home") as ds:
+            class_type = ds.attrs['class_type']
+            if  class_type != 'PitchDiagnostic':
+                raise ValueError(".nc file does not have class_type = 'PitchDiagnostic' attribute")
+            self.dataset = ds
+        
+        self.ds_dict = {}
+        
+        for key in self.dataset["ds_dict"]:
+            with xr.open_dataset(path_string, group=key) as ds:
+                self.ds_dict[key] = ds
+            
+        
+        
+    
+# Helper functions
+
+def gaussian(self, theta_m, delta):
+    return np.exp(-((theta_m / delta) ** 2))
+
+def noisy_gaussian(self, theta_m, delta, std=0.05):
+    mean = self.gaussian(theta_m, delta)
+    return mean + np.random.normal(mean, std, len(theta_m))
+
+def find_nearest(array, value):
+    index = (array - value).argmin()
+    return array[index]
+
+# Function to call a Scotty sweep parallelized with multiprocessing
