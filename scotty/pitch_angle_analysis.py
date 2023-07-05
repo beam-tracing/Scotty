@@ -325,7 +325,7 @@ class SweepDataset:
         """
         return self.dataset.copy(deep=True)
 
-    def get_Coordinate_array(self, dimension):
+    def get_coordinate_array(self, dimension):
         data = self.dataset
         return data.coords[dimension].values
 
@@ -442,9 +442,9 @@ class SweepDataset:
             )
             self.generate_mismatch_at_cutoff()
 
-        frequencies = self.get_Coordinate_array("frequency")
-        poloidal_angles = self.get_Coordinate_array("poloidal_angle")
-        toroidal_angles = self.get_Coordinate_array("toroidal_angle")
+        frequencies = self.get_coordinate_array("frequency")
+        poloidal_angles = self.get_coordinate_array("poloidal_angle")
+        toroidal_angles = self.get_coordinate_array("toroidal_angle")
         opt_tor_array = xr.DataArray(
             coords=[
                 ("frequency", frequencies),
@@ -462,7 +462,7 @@ class SweepDataset:
                     "cutoff_theta_m", "toroidal_angle", coords_dict
                 )
                 try:
-                    root = newton(spline, x0=0, maxiter=50)
+                    root = newton(spline, x0=0, fprime=spline.derivative(), maxiter=100)
                     opt_tor_array.loc[coords_dict] = root
                 except RuntimeError as error:
                     print(
@@ -510,9 +510,9 @@ class SweepDataset:
             print("reflection_mask already generated")
             return self.dataset["reflection_mask"]
 
-        frequencies = self.get_Coordinate_array("frequency")
-        poloidal_angles = self.get_Coordinate_array("poloidal_angle")
-        toroidal_angles = self.get_Coordinate_array("toroidal_angle")
+        frequencies = self.get_coordinate_array("frequency")
+        poloidal_angles = self.get_coordinate_array("poloidal_angle")
+        toroidal_angles = self.get_coordinate_array("toroidal_angle")
 
         reflection_mask = xr.DataArray(
             coords=[
@@ -578,8 +578,7 @@ class SweepDataset:
         self,
         frequency,
         poloidal_angle,
-        noise_flag=True,
-        std=0.05,
+        std_noise=0.05,
     ):
         """Returns a profile function that describes the simulated backscattered power fraction
         as a function of toroidal steering. Defaults to random gaussian noise.
@@ -607,7 +606,7 @@ class SweepDataset:
             zdimension="toroidal_angle",
         )
 
-        def simulated_power_prof(toroidal_angle, noise_flag=noise_flag):
+        def simulated_power_prof(toroidal_angle, std=std_noise, noise_flag=True):
             delta = delta_spline((frequency, poloidal_angle, toroidal_angle))
             theta_m = theta_m_spline((frequency, poloidal_angle, toroidal_angle))
             if noise_flag:
@@ -641,7 +640,7 @@ class SweepDataset:
             return self.spline_memo[args]
         else:
             data = self.dataset[variable]
-            x_coordinates = self.get_Coordinate_array(dimension)
+            x_coordinates = self.get_coordinate_array(dimension)
             y_data = data.loc[coords_dict]
             y_values = y_data.values
             spline = UnivariateSpline(x=x_coordinates, y=y_values, s=0)
@@ -650,7 +649,7 @@ class SweepDataset:
 
     def create_2Dspline(self, variable, xdimension, ydimension, coords_dict={}):
         """Memoized function that interpolates splines for any variable along
-        two arbitrary axes with scipy.interpolate.RectBivariateSpline.
+        two arbitrary axes with linear interpolation (scipy RegularGridInterpolator).
 
         Args:
             variable (str): index the specific DataArray to fit the spline to
@@ -661,7 +660,7 @@ class SweepDataset:
             create_1Dspline for a similar method.
 
         Returns:
-            Callable: An interpolated RectBivariateSpline function.
+            Callable: A RegularGridInterpolator function.
         """
         coords_hashable = self._dict_to_hashable(coords_dict)
         args = (variable, xdimension, ydimension, coords_hashable)
@@ -669,11 +668,11 @@ class SweepDataset:
             return self.spline_memo[args]
         else:
             data = self.dataset[variable]
-            x_coordinates = self.get_Coordinate_array(xdimension)
-            y_coordinates = self.get_Coordinate_array(ydimension)
+            x_coordinates = self.get_coordinate_array(xdimension)
+            y_coordinates = self.get_coordinate_array(ydimension)
             z_values = data.loc[coords_dict].transpose(xdimension, ydimension).values
-            spline = RectBivariateSpline(
-                x=x_coordinates, y=y_coordinates, z=z_values, s=0
+            spline = RegularGridInterpolator(
+                (x_coordinates, y_coordinates), z_values, method="linear", #TODO: Change back to pchip once done
             )
             self.spline_memo[args] = spline
             return spline
@@ -683,6 +682,7 @@ class SweepDataset:
     ):
         """Memoized function that interpolates splines for any variable along
         two arbitrary axes with scipy.interpolate.RegularGridInterpolator.
+        Interpolation method is linear.
 
         Args:
             variable (str): index the specific DataArray to fit the spline to
@@ -694,7 +694,7 @@ class SweepDataset:
             create_1Dspline for a similar method.
 
         Returns:
-            Callable: An interpolated RegularGridInterpolator function.
+            Callable: An RegularGridInterpolator function.
         """
         coords_hashable = self._dict_to_hashable(coords_dict)
         args = (variable, xdimension, ydimension, coords_hashable)
@@ -702,9 +702,9 @@ class SweepDataset:
             return self.spline_memo[args]
         else:
             data = self.dataset[variable]
-            x_coordinates = self.get_Coordinate_array(xdimension)
-            y_coordinates = self.get_Coordinate_array(ydimension)
-            z_coordinates = self.get_Coordinate_array(zdimension)
+            x_coordinates = self.get_coordinate_array(xdimension)
+            y_coordinates = self.get_coordinate_array(ydimension)
+            z_coordinates = self.get_coordinate_array(zdimension)
             func_values = (
                 data.loc[coords_dict]
                 .transpose(xdimension, ydimension, zdimension)
@@ -713,7 +713,7 @@ class SweepDataset:
             spline = RegularGridInterpolator(
                 points=(x_coordinates, y_coordinates, z_coordinates),
                 values=func_values,
-                method="cubic",
+                method="linear",
             )
             self.spline_memo[args] = spline
             return spline
@@ -723,9 +723,9 @@ class SweepDataset:
         will be reflected from the plasma based on nearest grid points.
         """
 
-        frequencies = self.get_Coordinate_array("frequency")
-        poloidal_angles = self.get_Coordinate_array("poloidal_angle")
-        toroidal_angles = self.get_Coordinate_array("toroidal_angle")
+        frequencies = self.get_coordinate_array("frequency")
+        poloidal_angles = self.get_coordinate_array("poloidal_angle")
+        toroidal_angles = self.get_coordinate_array("toroidal_angle")
 
         # Find nearest valid coordinate points
         freq_coord = find_nearest(frequencies, frequency)
@@ -821,8 +821,9 @@ class SweepDataset:
         variable,
         xdimension,
         ydimension,
-        coords_dict,
+        coords_dict={},
         cmap="plasma_r",
+        **kwargs,
     ):
         """Visualizes a specified slice of the DataArray with plt.imshow.
 
@@ -833,6 +834,7 @@ class SweepDataset:
             coords_dict (dict): Dictionary of coordinate values of the other
             dimensions to be held constant
             cmap (str): Colormap to be used
+            kwargs (optional): Optional keyword arguments to pass to plt.imshow
         """
         data_slice = self.dataset[variable].loc[coords_dict]
         if len(data_slice.shape) != 2:
@@ -840,8 +842,8 @@ class SweepDataset:
         title_string = ""
         for key, value in coords_dict.items():
             title_string += f",{key}={value} "
-        x_coords = self.get_Coordinate_array(xdimension)
-        y_coords = self.get_Coordinate_array(ydimension)
+        x_coords = self.get_coordinate_array(xdimension)
+        y_coords = self.get_coordinate_array(ydimension)
         extent = [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
         data_slice = data_slice.transpose(ydimension, xdimension)
         fig, ax = plt.subplots()
@@ -849,7 +851,7 @@ class SweepDataset:
         ax.set_xlabel(f"{xdimension}")
         ax.set_ylabel(f"{ydimension}")
         im = ax.imshow(
-            data_slice, cmap=cmap, origin="lower", extent=extent, aspect="auto"
+            data_slice, cmap=cmap, origin="lower", extent=extent, aspect="auto", **kwargs
         )
         plt.colorbar(mappable=im)
         return fig, ax
@@ -905,7 +907,7 @@ class SweepDataset:
         else:
             raise ValueError("Provided measure is not 'rho' or 'm'.")
 
-        if const_angle not in self.get_Coordinate_array(const_angle_str):
+        if const_angle not in self.get_coordinate_array(const_angle_str):
             raise ValueError("Value of const_angle not in original coordinate array.")
 
         coords_dict = {const_angle_str: const_angle}
@@ -915,8 +917,8 @@ class SweepDataset:
             variable, xdimension, ydimension, coords_dict
         )
 
-        x_coordinates = self.get_Coordinate_array(xdimension)
-        y_coordinates = self.get_Coordinate_array(ydimension)
+        x_coordinates = self.get_coordinate_array(xdimension)
+        y_coordinates = self.get_coordinate_array(ydimension)
 
         if bounds == None:
             x_start = x_coordinates[0]
@@ -929,10 +931,10 @@ class SweepDataset:
             y_start = bounds[2]
             y_stop = bounds[3]
 
-        x_array = np.linspace(x_start, x_stop, num=30)
-        y_array = np.linspace(y_start, y_stop, num=30)
+        x_array = np.linspace(x_start, x_stop, num=500)
+        y_array = np.linspace(y_start, y_stop, num=500)
         Xgrid, Ygrid = np.meshgrid(x_array, y_array, indexing="ij")
-        Zgrid = spline_surface(x_array, y_array)
+        Zgrid = spline_surface((Xgrid, Ygrid))
 
         # Convert from poloidal flux to rho
         if measure == "rho":
@@ -956,18 +958,24 @@ class SweepDataset:
 
         fig, ax = plt.subplots()
         if mask_flag:
-            CS = ax.contour(
+            CS = ax.contourf(
                 Xgrid, Ygrid, Z_masked, levels=20, cmap="plasma_r", corner_mask=True
             )
+            CSgo = ax.contour(
+                Xgrid, Ygrid, Z_masked, levels=20, colors='w', corner_mask=True, linewidth=0.2
+            )
         else:
-            CS = ax.contour(
+            CS = ax.contourf(
                 Xgrid, Ygrid, Zgrid, levels=20, cmap="plasma_r", corner_mask=True
+            )
+            CSgo = ax.contour(
+                Xgrid, Ygrid, Z_grid, levels=20, colors='w', corner_mask=True, linewidth=0.2
             )
 
         fig.suptitle(f"Cutoff {title_label}, {const_angle_str}={const_angle}$^\circ$")
         ax.set_xlabel("frequency/GHz")
         ax.set_ylabel(f"{var_angle_str}/$^\circ$")
-        ax.clabel(CS, inline=True, fontsize=6)
+        ax.clabel(CSgo, inline=True, fontsize=6)
         fig.colorbar(CS)
 
         if save_path:
@@ -983,7 +991,40 @@ class SweepDataset:
     def plot_cutoff_angles(self, poloidal_angle):  # TODO: Implement this
         return
 
-    def plot_opt_tor_contours(self):
+    def plot_opt_tor_contour(self):
+        freq = self.get_coordinate_array('frequency')
+        pol = self.get_coordinate_array('poloidal_angle')
+        x = np.linspace(freq[0], freq[-1], 500)
+        y = np.linspace(pol[0], pol[-1], 500)
+        X, Y = np.meshgrid(x, y, indexing='ij')
+        spline = self.create_2Dspline(
+            variable='opt_tor', 
+            xdimension='frequency',
+            ydimension='poloidal_angle',
+            )
+        data = spline((X, Y))
+        mask_func = RegularGridInterpolator(
+            points=(freq,pol), 
+            values=self.dataset['opt_tor_mask'].transpose('frequency','poloidal_angle').values,
+            method='nearest',
+        )
+        data_masked = np.ma.array(data, mask=mask_func((X, Y)))
+        fig, ax = plt.subplots()
+
+        CS = ax.contourf(
+                X, Y, data_masked, levels=20, cmap="plasma_r", corner_mask=True
+            )
+        CSgo = ax.contour(
+                X, Y, data_masked, levels=20, colors="w", corner_mask=True, linewidth=0.2
+            )
+        fig.suptitle("Opt. toroidal angle contour")
+        ax.set_xlabel("frequency/GHz")
+        ax.set_ylabel("poloidal angle/$^\circ$")
+        ax.clabel(CSgo, inline=True, fontsize=6)
+        fig.colorbar(CS)
+        return fig, ax
+
+    def plot_delta_m_contour(self, poloidal_angle):
         return
 
     # To be implemented
@@ -1132,6 +1173,15 @@ class PitchDiagnostic:
         return
 
     ## Simulation methods
+    def set_rho_freq_relation(self, SweepDataset): #Assumed equilibrium relation for analysing all equilibria
+        # Use an array representation of a spline
+        # 2D spline contour averaged over toroidal range to gSet average relation
+        return
+
+    def get_rho_shift(self, SweepDataset): # Maybe merge as part of previous method?
+        return
+
+
     def get_opt_tor_delta(self, SweepDataset):
         descriptor = str(SweepDataset.descriptor)
         if descriptor in self.ds_dict:
@@ -1146,7 +1196,8 @@ class PitchDiagnostic:
             variable="opt_tor", xdimension="frequency", ydimension="poloidal_angle"
         )
         x, y = self.frequencies, self.poloidal_angles
-        opt_tor_array = opt_tor_spline(x, y)
+        x_grid, y_grid = np.meshgrid(x, y, indexing='ij')
+        opt_tor_array = opt_tor_spline((x_grid, y_grid))
         opt_tor_da = xr.DataArray(
             data=opt_tor_array,
             dims=("frequency", "poloidal_angle"),
@@ -1157,10 +1208,27 @@ class PitchDiagnostic:
         )
         self.ds_dict[descriptor]["opt_tor"] = opt_tor_da
 
-        # TODO: Get corresponding delta_m for each opt_tor
-        return opt_tor_da
+        delta_m_spline = SweepDataset.create_3Dspline(
+            variable='cutoff_delta_theta_m',
+            xdimension='frequency',
+            ydimension='poloidal_angle',
+            zdimension='toroidal_angle',
+        )
+        X, Y, Z = np.meshgrid(self.frequencies, self.poloidal_angles, self.toroidal_angles, indexing='ij')
+        delta_m_array = delta_m_spline((X, Y, Z))
+        delta_theta_m_da = xr.DataArray(
+            data = delta_m_array,
+            dims=("frequency", "poloidal_angle", "toroidal_angle"),
+            coords={
+                "frequency": self.frequencies,
+                "poloidal_angle": self.poloidal_angles,
+                "toroidal_angle": self.toroidal_angles
+            },
+        )
+        self.ds_dict[descriptor]["delta_theta_m"] = delta_theta_m_da
+        return opt_tor_da, delta_theta_m_da
 
-    def simulate_measurements(self, SweepDataset, iterations=500, std_noise=None):
+    def simulate_measurements(self, SweepDataset, iterations=500, std_noise=None, noise_flag=True):
         """Simulates backscattered power with noise received by antenna array through the
         frequency range and stores it in a dataset, with the variable set by the SweepDataset
         descriptor. Data is saved with the key 'simulated_measurements'.
@@ -1171,6 +1239,7 @@ class PitchDiagnostic:
             iterations (int): Number of iterated measurements
             std_noise (float): Standard deviation of gaussian noise. Default is 'std_noise' attribute
             initialized in the class.
+            noise_flag (bool): Turn noise on or off. True by default.
         """
         if not std_noise:
             std_noise = self.std_noise
@@ -1179,6 +1248,7 @@ class PitchDiagnostic:
         toroidal_angles = np.array(self.toroidal_angles)
         poloidal_angles = np.array(self.poloidal_angles)
         iter_array = np.arange(1, iterations + 1)
+        toroidal_range = np.linspace(toroidal_angles[0], toroidal_angles[-1], 500)
         descriptor = str(SweepDataset.descriptor)
 
         if descriptor in self.ds_dict:
@@ -1198,6 +1268,14 @@ class PitchDiagnostic:
                         "iteration": iter_array,
                     },
                 )
+                self.ds_dict[descriptor]["power_profile"] = xr.DataArray(
+                    dims=("frequency", "poloidal_angle", "toroidal_range"),
+                    coords={
+                        "frequency": frequencies,
+                        "poloidal_angle": poloidal_angles,
+                        "toroidal_range": toroidal_range,
+                    },
+                )
 
         else:
             sim_ds = xr.Dataset()
@@ -1210,14 +1288,23 @@ class PitchDiagnostic:
                     "iteration": iter_array,
                 },
             )
+            sim_ds["power_profile"] = xr.DataArray(
+                dims=("frequency", "poloidal_angle", "toroidal_range"),
+                coords={
+                    "frequency": frequencies,
+                    "poloidal_angle": poloidal_angles,
+                    "toroidal_range": toroidal_range,
+                },
+            )
             self.ds_dict[descriptor] = sim_ds
 
         da = self.ds_dict[descriptor]["simulated_measurements"]
+        db = self.ds_dict[descriptor]["power_profile"]
 
         for frequency in frequencies:
             for poloidal_angle in poloidal_angles:
                 simulated_power_prof = SweepDataset.get_simulated_power_prof(
-                    frequency, poloidal_angle, std=std_noise
+                    frequency, poloidal_angle, std_noise=std_noise,
                 )
                 input_array = np.repeat(
                     toroidal_angles[:, np.newaxis], repeats=iterations, axis=1
@@ -1234,6 +1321,8 @@ class PitchDiagnostic:
                 )
                 index = {"frequency": frequency, "poloidal_angle": poloidal_angle}
                 da.loc[index] = output_slice
+                power_prof = simulated_power_prof(toroidal_range, noise_flag=False)
+                db.loc[index] = power_prof
 
         self.ds_dict[descriptor]["simulated_measurements"] = da
 
@@ -1241,8 +1330,7 @@ class PitchDiagnostic:
 
     ## Analysis methods
     ## TODO: function to find range of shift in rho across a poloidal sweep
-    ## Get and plot the smooth toroidal response functions for set of frequencies to see overlap
-    ## of underlying signal
+    ## compare the delta rho to the radial position measured by set of frequencies
 
     def fit_measurement_gaussians(self, descriptor=None):
         if descriptor:
@@ -1293,12 +1381,112 @@ class PitchDiagnostic:
             self.ds_dict[descriptor]["std_delta_theta_m"] = std_opt_tor.isel(param=1)
 
     ## Plot methods
+    def plot_power_profile(self, descriptor):
+        data = self.ds_dict[descriptor]["power_profile"]
+        opt_tor = self.ds_dict[descriptor]["mean_opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
+        delta = self.ds_dict[descriptor]["mean_delta_theta_m"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
+        actual = self.ds_dict[descriptor]["opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
 
-    def plot_opt_tor(self):
-        return
+        toroidal_range = data.coords["toroidal_range"].values
+        colormap = plt.cm.gnuplot2
+        freq_count = len(self.frequencies)
+        cols = None
+        rows = None
+        for number in (2, 3, 4, 5):
+            if freq_count % number == 0:
+                cols = number
+                rows = freq_count // number
+                break
+        if not cols:
+            cols = 1
+            rows = freq_count
 
-    def plot_opt_tor_sim(self, descriptor):
-        # TODO: Fix this; not what we're looking for as a plot
+        combinations = list(product(range(rows), range(cols)))
+        counter = 0
+        fig, axes = plt.subplots(rows, cols, dpi=150, figsize=(5, 7), sharex=True, sharey=True)
+        fig.tight_layout()
+
+        for frequency in self.frequencies:
+            row, col = combinations[counter]
+            ax = axes[row, col]
+            color = 'k'
+
+            lin_data = data.loc[{'frequency':frequency, 'poloidal_angle':self.poloidal_angles[0]}]
+            opt_tor_val = opt_tor.loc[{'frequency':frequency}].values
+            delta_val = delta.loc[{'frequency':frequency}].values
+            gaussian_profile = fit_gaussian(toroidal_range, opt_tor_val, delta_val, 1.0)
+
+            ax.plot(toroidal_range, lin_data, alpha=0.5, color=color, label='profile')
+            ax.plot(toroidal_range, gaussian_profile, alpha=0.5, color='r', linestyle='--', label='gaussian fit')
+            ax.axvline(opt_tor_val, label='mean gaussian-fitted peak', color='r', linestyle='--')
+            ax.axvline(actual.loc[{'frequency':frequency}], label='predicted opt_tor', color=color)
+            ax.set_title(f"{frequency} GHz", fontsize=8)
+            ax.tick_params(axis='both', which='major', labelsize=5)
+
+            #ax.legend()
+            counter += 1
+
+        ax.legend(bbox_to_anchor=(1.05, 0), loc='lower left', borderaxespad=0., fontsize=8)
+        fig.suptitle("Power Profile vs. Toroidal Angle", fontsize=15)
+        plt.subplots_adjust(top=0.90)
+
+        # add a big axis, hide frame
+        fig.add_subplot(111, frameon=False)
+        # hide tick and tick label of the big axis
+        plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+        plt.xlabel('toroidal steering/deg')
+        plt.ylabel('normalized received power')
+        return fig, axes
+
+    def plot_delta_m(self, descriptor):
+        data = self.ds_dict[descriptor]["delta_theta_m"]
+        actual = self.ds_dict[descriptor]["opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
+
+        freq_count = len(self.frequencies)
+        cols = None
+        rows = None
+        for number in (2, 3, 4, 5):
+            if freq_count % number == 0:
+                cols = number
+                rows = freq_count // number
+                break
+        if not cols:
+            cols = 1
+            rows = freq_count
+
+        combinations = list(product(range(rows), range(cols)))
+        counter = 0
+        fig, axes = plt.subplots(rows, cols, dpi=150, figsize=(5, 7), sharex=True, sharey=True)
+        fig.tight_layout()
+
+        for frequency in self.frequencies:
+            row, col = combinations[counter]
+            ax = axes[row, col]
+            
+            ax.plot(self.toroidal_angles, data.loc[{'frequency':frequency, 'poloidal_angle':self.poloidal_angles[0]}], label='mismatch tolerance')
+            ax.axvline(actual.loc[{'frequency':frequency}], label='opt_tor', color='k')
+            ax.set_title(f"{frequency} GHz", fontsize=8)
+            ax.tick_params(axis='both', which='major', labelsize=5)
+
+            counter += 1
+
+        ax.legend(bbox_to_anchor=(1.05, 0), loc='lower left', borderaxespad=0., fontsize=8)
+        fig.suptitle("Mismatch tolerance vs. Toroidal Steering", fontsize=15)
+        plt.subplots_adjust(top=0.90)
+
+        # add a big axis, hide frame
+        fig.add_subplot(111, frameon=False)
+        # hide tick and tick label of the big axis
+        plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+        plt.xlabel('toroidal steering/deg')
+        plt.ylabel('normalized received power')
+        return fig, axes
+
+    def plot_opt_tor_hist(self, descriptor):
+
+        mean = self.ds_dict[descriptor]["mean_opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
+        actual = self.ds_dict[descriptor]["opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
+
         colormap = plt.cm.gnuplot2
 
         freq_count = len(self.frequencies)
@@ -1317,7 +1505,7 @@ class PitchDiagnostic:
         counter = 0
         combinations = list(product(range(rows), range(cols)))
 
-        fig, axes = plt.subplots(rows, cols, dpi=1000, figsize=(5, 7))
+        fig, axes = plt.subplots(rows, cols, dpi=150, figsize=(5, 7), sharex=True, sharey=True)
         fig.tight_layout()
         for frequency in self.frequencies:
             row, col = combinations[counter]
@@ -1326,17 +1514,45 @@ class PitchDiagnostic:
                 {"frequency": frequency, "poloidal_angle": self.poloidal_angles[0]}
             ]
             color = colormap(counter / freq_count)
-            ax.hist(data_slice, label="hist", alpha=0.5, color=color)
-            ax.set_title(f"{frequency} GHz")
-            # ax.set_xlabel('Measured optimum toroidal steering/deg')
-            # ax.set_ylabel('Number of measurements')
-            ax.legend()
+            ax.hist(data_slice, alpha=0.5, color=color)
+            ax.axvline(mean.loc[{'frequency':frequency}], label='mean', color='k')
+            ax.axvline(actual.loc[{'frequency':frequency}], label='predicted', color='r', linestyle='--')
+            ax.set_title(f"{frequency} GHz", fontsize=8)
+            ax.tick_params(axis='both', which='major', labelsize=5)
+            
+            #ax.legend()
             counter += 1
-        fig.suptitle("Simulated opt_tor measurements", fontsize=20)
+        ax.legend(bbox_to_anchor=(1.05, 0), loc='lower left', borderaxespad=0., fontsize=8)
+        fig.suptitle("noisy opt_tor fits", fontsize=15)
         plt.subplots_adjust(top=0.90)
+
+        # add a big axis, hide frame
+        fig.add_subplot(111, frameon=False)
+        # hide tick and tick label of the big axis
+        plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+        plt.xlabel('Measured optimum toroidal steering/deg')
+        plt.ylabel('Number of measurements')
 
         return fig, axes
 
+    def plot_opt_tor_vs_freq(self, descriptor): #TODO: Plot line + std error bars + actual measurements
+            mean = self.ds_dict[descriptor]["mean_opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
+            std = self.ds_dict[descriptor]["std_opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
+            actual = self.ds_dict[descriptor]["opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
+            x_coords = self.frequencies
+            plt.figure()
+            plt.title('Opt Tor vs. Probe Frequency')
+            plt.plot(x_coords, mean, label='mean', marker='+')
+            plt.fill_between(x_coords, mean-std, mean+std, label='1$\sigma$', alpha=0.3)
+            plt.plot(x_coords, actual, label='predicted', color='r', marker='+')
+            plt.xlabel('Frequency/GHz')
+            plt.ylabel('Opt. Toroidal Angle/Deg')
+            plt.legend()
+            return plt
+
+    def plot_opt_tor_vs_rho(self): #TODO: Plot against rho; need to separate rho-freq relation based
+        # on theoretical equilibrium (should be an attribute)
+            return
 
 # Helper functions
 
