@@ -109,11 +109,9 @@ class SweepDataset:
 
         input_attributes = [
             "launch_position",
-            "launch_curvature",
             "mode_flag",
             "data_R_coord",
             "data_Z_coord",
-            "poloidalFlux_grid",
             "ne_data_density_array",
             "ne_data_radialcoord_array",
         ]
@@ -130,7 +128,7 @@ class SweepDataset:
             )
 
         for combination in product(frequencies, toroidal_angles, poloidal_angles):
-            frequency, toroidal_angle, product = combination
+            frequency, toroidal_angle, poloidal_angle = combination
             index = {
                 "frequency": float(frequency),
                 "poloidal_angle": float(poloidal_angle),
@@ -220,50 +218,50 @@ class SweepDataset:
                 missing_indices.append(index)
                 continue
 
-            # Load flux geometry information from the first available scotty file
-            for combination in product(frequencies, toroidal_angles, poloidal_angles):
-                frequency, toroidal_angle, product = combination
-                index = {
-                    "frequency": float(frequency),
-                    "poloidal_angle": float(poloidal_angle),
-                    "toroidal_angle": float(toroidal_angle),
-                }
+        # Load flux geometry information from the first available scotty file
+        for combination in product(frequencies, toroidal_angles, poloidal_angles):
+            frequency, toroidal_angle, poloidal_angle = combination
+            index = {
+                "frequency": float(frequency),
+                "poloidal_angle": float(poloidal_angle),
+                "toroidal_angle": float(toroidal_angle),
+            }
 
-                path_analysis = input_path + filepath_format.format(
-                    frequency=frequency,
-                    poloidal_angle=poloidal_angle,
-                    toroidal_angle=toroidal_angle,
-                    output_type=output_types[0],
-                )
+            path_analysis = input_path + filepath_format.format(
+                frequency=frequency,
+                poloidal_angle=poloidal_angle,
+                toroidal_angle=toroidal_angle,
+                output_type=output_types[0],
+            )
 
-                path_input = input_path + filepath_format.format(
-                    frequency=frequency,
-                    poloidal_angle=poloidal_angle,
-                    toroidal_angle=toroidal_angle,
-                    output_type=output_types[1],
-                )
+            path_input = input_path + filepath_format.format(
+                frequency=frequency,
+                poloidal_angle=poloidal_angle,
+                toroidal_angle=toroidal_angle,
+                output_type=output_types[1],
+            )
 
-                try:
-                    with np.load(path_input) as input_file:
-                        for attribute in input_attributes:
-                            ds.attrs[attribute] = input_file[attribute]
+            try:
+                with np.load(path_input) as input_file:
+                    for attribute in input_attributes:
+                        ds.attrs[attribute] = input_file[attribute]
 
-                    with np.load(path_analysis) as analysis_file:
-                        ds.attrs["poloidal_flux_on_midplane"] = analysis_file[
-                            "poloidal_flux_on_midplane"
-                        ]
-                        ds.attrs["R_midplane_points"] = analysis_file[
-                            "R_midplane_points"
-                        ]
-                        index = ds.attrs["poloidal_flux_on_midplane"].argmin()
-                        R_coord = ds.attrs["R_midplane_points"][index]
-                        ds.attrs["magnetic_axis_RZ"] = np.array((R_coord, 0.0))
+                with np.load(path_analysis) as analysis_file:
+                    ds.attrs["poloidal_flux_on_midplane"] = analysis_file[
+                        "poloidal_flux_on_midplane"
+                    ]
+                    ds.attrs["R_midplane_points"] = analysis_file[
+                        "R_midplane_points"
+                    ]
+                    index = ds.attrs["poloidal_flux_on_midplane"].argmin()
+                    R_coord = ds.attrs["R_midplane_points"][index]
+                    ds.attrs["magnetic_axis_RZ"] = np.array((R_coord, 0.0))
 
-                    print(f"Input information read from {path_input}")
-                    break
+                print(f"Input information read from {path_input}")
+                break
 
-                except FileNotFoundError:
-                    continue
+            except FileNotFoundError:
+                continue
 
         print("File reading complete.")
 
@@ -377,24 +375,23 @@ class SweepDataset:
         self.dataset["cutoff_distance"] = cutoff_distance
         return cutoff_distance
 
-    def generate_cutoff_flux(self):
-        """Finds the poloidal cutoff flux of the beam. Poloidal flux analogue
-        to generate_cutoff_distance.
+    def generate_cutoff_rho(self):
+        """Finds the poloidal cutoff rho (sqrt flux) of the beam. 
 
         Returns:
             DataArray: A 3-D DataArray of cutoff distances with frequency,
             poloidal angle and toroidal angle as axes. Saves it with the
-            key 'cutoff_flux'.
+            key 'cutoff_rho'.
         """
         data = self.dataset
-        if "cutoff_flux" in self.variables:
-            print("cutoff-flux already generated.")
-            return data["cutoff_flux"]
+        if "cutoff_rho" in self.variables:
+            print("cutoff-rho already generated.")
+            return data["cutoff_rho"]
 
         CUTOFF_ARRAY = data["cutoff_index"]
         cutoff_flux = data["poloidal_flux_output"].isel(trajectory_step=CUTOFF_ARRAY)
-        self.dataset["cutoff_flux"] = cutoff_flux
-        return cutoff_flux
+        self.dataset["cutoff_rho"] = np.sqrt(cutoff_flux)
+        return self.dataset["cutoff_rho"]
 
     def generate_mismatch_at_cutoff(self):
         """Finds the mismatch angle ('theta_m') and mismatch tolerance
@@ -558,7 +555,7 @@ class SweepDataset:
         # or orthogonal (reflection)
         reflection_mask = inner_product_array > 0
         self.dataset["reflection_mask"] = (dimensions, reflection_mask)
-        return reflection_mask
+        return self.dataset["reflection_mask"]
 
     def generate_all(self):
         """Calls all analysis methods to generate and save analysis data.
@@ -566,7 +563,7 @@ class SweepDataset:
         can be indexed.
         """
         self.generate_cutoff_distance()
-        self.generate_cutoff_flux()
+        self.generate_cutoff_rho()
         self.generate_mismatch_at_cutoff()
         self.generate_opt_tor()
         self.generate_reflection_mask()
@@ -598,12 +595,14 @@ class SweepDataset:
             xdimension="frequency",
             ydimension="poloidal_angle",
             zdimension="toroidal_angle",
+            method="pchip",
         )
         delta_spline = self.create_3Dspline(
             variable="cutoff_delta_theta_m",
             xdimension="frequency",
             ydimension="poloidal_angle",
             zdimension="toroidal_angle",
+            method="pchip",
         )
 
         def simulated_power_prof(toroidal_angle, std=std_noise, noise_flag=True):
@@ -678,11 +677,11 @@ class SweepDataset:
             return spline
 
     def create_3Dspline(
-        self, variable, xdimension, ydimension, zdimension, coords_dict={}
+        self, variable, xdimension, ydimension, zdimension, coords_dict={}, method='linear'
     ):
         """Memoized function that interpolates splines for any variable along
         two arbitrary axes with scipy.interpolate.RegularGridInterpolator.
-        Interpolation method is linear.
+        Default interpolation method is linear.
 
         Args:
             variable (str): index the specific DataArray to fit the spline to
@@ -713,7 +712,7 @@ class SweepDataset:
             spline = RegularGridInterpolator(
                 points=(x_coordinates, y_coordinates, z_coordinates),
                 values=func_values,
-                method="linear",
+                method=method,
             )
             self.spline_memo[args] = spline
             return spline
@@ -745,8 +744,6 @@ class SweepDataset:
         """Checks for and interpolates problematic cutoff indices (negative integers that
         occur when casting np.NaN to int).
 
-        Does not interpolate if gap is larger than 3 data points to account for situations
-        where the simulation parameters go out of bounds.
         """
         cutoff_indices = self.dataset["cutoff_index"]
         # cast to float to work with np.NaN values
@@ -755,9 +752,10 @@ class SweepDataset:
         print(f"Number of problematic indices: {len(index_list)}")
         interp_indices = float_indices.where(float_indices >= 0)
         for dimension in ("toroidal_angle", "poloidal_angle", "frequency"):
+            print(f'trying {dimension}')
             try:
                 interp_indices = interp_indices.interpolate_na(
-                    dim=dimension, method="nearest", max_gap=3
+                    dim=dimension, method="nearest", 
                 )
             except Exception:
                 print(
@@ -776,8 +774,6 @@ class SweepDataset:
     def check_float_arrays(self, variable):
         """Checks for and interpolates any null array values.
 
-        Does not interpolate if gap is larger than 3 data points to account for situations
-        where the simulation parameters go out of bounds.
         """
         new_array = self.dataset[variable]
         print("Number of NaN entries:", len(np.argwhere(new_array.isnull().values)))
@@ -785,7 +781,7 @@ class SweepDataset:
         for dimension in ("toroidal_angle", "poloidal_angle", "frequency"):
             try:
                 new_array = new_array.interpolate_na(
-                    dim=dimension, method="cubic", max_gap=3
+                    dim=dimension, method="cubic", 
                 )
             except Exception:
                 print(
@@ -900,7 +896,7 @@ class SweepDataset:
 
         if measure == "rho":
             title_label = "rho"
-            variable = "cutoff_flux"
+            variable = "cutoff_rho"
         elif measure == "m":
             title_label = "dist"
             variable = "cutoff_distance"
@@ -935,10 +931,6 @@ class SweepDataset:
         y_array = np.linspace(y_start, y_stop, num=500)
         Xgrid, Ygrid = np.meshgrid(x_array, y_array, indexing="ij")
         Zgrid = spline_surface((Xgrid, Ygrid))
-
-        # Convert from poloidal flux to rho
-        if measure == "rho":
-            Zgrid = np.sqrt(Zgrid)
 
         # Interpolate and apply the reflection mask to remove inaccessible regions
         reflection_mask = (
@@ -1159,6 +1151,10 @@ class PitchDiagnostic:
     def std_noise(self):
         return self.home.attrs["std_noise"]
 
+    @property
+    def descriptors(self):
+        return list(self.ds_dict.keys()).remove('cutoff_data')
+
     ## get methods
 
     def get_keys(self):
@@ -1173,14 +1169,56 @@ class PitchDiagnostic:
         return
 
     ## Simulation methods
-    def set_rho_freq_relation(self, SweepDataset): #Assumed equilibrium relation for analysing all equilibria
+    def set_rho_freq_relation(self, SweepDataset): #TODO: Current task
+        #Assumed equilibrium relation for analysing all equilibria
         # Use an array representation of a spline
-        # 2D spline contour averaged over toroidal range to gSet average relation
-        return
+        # 2D spline contour averaged over toroidal range to get average relation
+        if 'cutoff_data' in self.ds_dict.keys():
+            rho_freq_spline = self.get_rho_freq_spline()
+            return rho_freq_spline
 
-    def get_rho_shift(self, SweepDataset): # Maybe merge as part of previous method?
-        return
+        frequency_range = np.linspace(self.frequencies[0], self.frequencies[-1], 500)
+        spline = SweepDataset.create_3Dspline(
+            variable='cutoff_rho', 
+            xdimension='frequency',
+            ydimension='poloidal_angle',
+            zdimension= 'toroidal_angle',
+            method='pchip',
+            )
+        X, Y, Z = np.meshgrid(frequency_range, self.poloidal_angles, self.toroidal_angles, indexing='ij')
+        cutoff_rho = spline((X, Y, Z))
+        ds = xr.Dataset()
+        ds['cutoff_rho'] = xr.DataArray(
+            data=cutoff_rho,
+            dims=('frequency_range', 'poloidal_angle', 'toroidal_angle'),
+            coords={
+                "frequency_range": frequency_range,
+                "poloidal_angle": self.poloidal_angles,
+                "toroidal_angle": self.toroidal_angles,
+            }
+        )
+        self.ds_dict['cutoff_data'] = ds
+        rho_freq_relation = ds['cutoff_rho'].mean(dim='toroidal_angle').squeeze()
+        self.ds_dict['cutoff_data']['rho_freq_relation'] = rho_freq_relation
+        rho_freq_spline = self.get_rho_freq_spline()
 
+        ## Calculate upper and lower ranges for rho for a given frequency
+        rho_upper = ds['cutoff_rho'].max(dim='toroidal_angle').squeeze() 
+        rho_lower = ds['cutoff_rho'].min(dim='toroidal_angle').squeeze()
+        self.ds_dict['cutoff_data']['rho_upper'] = rho_upper
+        self.ds_dict['cutoff_data']['rho_lower'] = rho_lower
+
+        return rho_freq_spline
+
+    def get_rho_freq_spline(self):
+        frequency_range = np.linspace(self.frequencies[0], self.frequencies[-1], 500)
+        return UnivariateSpline(frequency_range, self.ds_dict['cutoff_data']['rho_freq_relation'], s=0)
+    
+    def get_rho_delta_splines(self):
+        frequency_range = np.linspace(self.frequencies[0], self.frequencies[-1], 500)
+        upper_spline = UnivariateSpline(frequency_range, self.ds_dict['cutoff_data']['rho_upper'], s=0)
+        lower_spline = UnivariateSpline(frequency_range, self.ds_dict['cutoff_data']['rho_lower'], s=0)
+        return upper_spline, lower_spline
 
     def get_opt_tor_delta(self, SweepDataset):
         descriptor = str(SweepDataset.descriptor)
@@ -1336,8 +1374,8 @@ class PitchDiagnostic:
         if descriptor:
             descriptors = [descriptor]
         else:
-            descriptors = self.ds_dict.keys()
-
+            descriptors = self.descriptors
+        print(descriptors)
         for descriptor in descriptors:
             if "gaussian_fit_coeffs" in self.ds_dict[descriptor]:
                 print(f"Gaussian fits already generated for {descriptor}")
@@ -1363,9 +1401,9 @@ class PitchDiagnostic:
 
     def aggregate_fitted_gaussians(self, descriptor=None):
         if descriptor:
-            descriptor = [descriptor]
+            descriptors = [descriptor]
         else:
-            descriptors = self.ds_dict.keys()
+            descriptors = self.descriptors
 
         for descriptor in descriptors:
             if "mean_opt_tor" in self.ds_dict[descriptor]:
@@ -1540,7 +1578,7 @@ class PitchDiagnostic:
             std = self.ds_dict[descriptor]["std_opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
             actual = self.ds_dict[descriptor]["opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
             x_coords = self.frequencies
-            plt.figure()
+            fig = plt.figure()
             plt.title('Opt Tor vs. Probe Frequency')
             plt.plot(x_coords, mean, label='mean', marker='+')
             plt.fill_between(x_coords, mean-std, mean+std, label='1$\sigma$', alpha=0.3)
@@ -1548,11 +1586,28 @@ class PitchDiagnostic:
             plt.xlabel('Frequency/GHz')
             plt.ylabel('Opt. Toroidal Angle/Deg')
             plt.legend()
-            return plt
+            return fig
 
     def plot_opt_tor_vs_rho(self): #TODO: Plot against rho; need to separate rho-freq relation based
-        # on theoretical equilibrium (should be an attribute)
+        # on theoretical equilibrium 
             return
+
+    def plot_rho_freq_relation(self):
+        rho_freq = self.get_rho_freq_spline()
+        rho_upper, rho_lower = self.get_rho_delta_splines()
+        freq_range = np.linspace(self.frequencies[0], self.frequencies[-1], 500)
+
+        #X, Y = np.meshgrid()
+
+        fig = plt.figure()
+        plt.plot(freq_range, rho_freq(freq_range), label='mean rho', color='r', linewidth=0.1)
+        plt.fill_between(freq_range, rho_upper(freq_range), rho_lower(freq_range), label='delta rho', color='b', alpha=0.2 )
+        plt.xlabel('Frequency/GHz')
+        plt.ylabel('Cutoff Rho')
+        plt.legend()
+        return fig
+
+
 
 # Helper functions
 
