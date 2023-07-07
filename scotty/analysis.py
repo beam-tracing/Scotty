@@ -633,8 +633,6 @@ def further_analysis(
         "delta_k_perp_2": delta_k_perp_2,
         "delta_theta_m": delta_theta_m,
         "theta_m": theta_m,
-        "RZ_distance_along_line": (["tau"], RZ_distance_along_line),
-        "distance_along_line": (["tau"], distance_along_line),
         "k_perp_1_bs": k_perp_1_bs,
         "K_magnitude": (["tau"], K_magnitude_array),
         "cutoff_index": cutoff_index,
@@ -661,161 +659,133 @@ def further_analysis(
         "loc_b_r": loc_b_r,
     }
 
-    df = df.assign_coords({"R_midplane": R_midplane_points, "l_lc": (["tau"], l_lc)})
+    df = df.assign_coords(
+        {
+            "R_midplane": R_midplane_points,
+            "l_lc": (["tau"], l_lc),
+            "RZ_distance_along_line": (["tau"], RZ_distance_along_line),
+            "distance_along_line": (["tau"], distance_along_line),
+        }
+    )
     df.update(further_df)
 
     if detailed_analysis_flag and (cutoff_index + 1 != len(df.tau)):
-        detailed_df = detailed_analysis(
-            df, cutoff_index, loc_b_r.data, loc_b_r_s.data, l_lc.data, wavenumber_K0
-        )
-        df.update(detailed_df)
+        df.update(localisation_analysis(df, cutoff_index, wavenumber_K0))
 
     save_npz(output_path / f"analysis{output_filename_suffix}", df)
 
     return df
 
 
-def detailed_analysis(
-    df: xr.Dataset,
-    cutoff_index: int,
-    loc_b_r: FloatArray,
-    loc_b_r_s: FloatArray,
-    l_lc: FloatArray,
-    wavenumber_K0: float,
+def find_e2_width(
+    l_lc: xr.DataArray, array: xr.DataArray, k_perp: xr.DataArray, cutoff_index: int
 ):
+    r"""Estimate inter-:math:`e^2` range (analogous to interquartile range) in
+    :math:`l - l_c` and :math:`k_\perp`
+
+    Returns
+    -------
+    max_over_e2: float
+        :math:`1/e^2` value of ``array``
+    delta_l: FloatArray
+        inter-:math:`e^2` range in :math:`l - l_c` of ``array``
+    delta_kperp1: FloatArray
+        inter-:math:`e^2` range in :math:`k_\perp` of ``array``
+
+    """
+
+    max_over_e2 = (array.max() / (np.e**2)).data
+    delta_l_1 = find_x0(l_lc[:cutoff_index], array[:cutoff_index], max_over_e2)
+    delta_l_2 = find_x0(l_lc[cutoff_index:], array[cutoff_index:], max_over_e2)
+
+    # Estimates the inter-e2 range (analogous to interquartile range) in kperp1,
+    # from l-lc. Bear in mind that since abs(kperp1) is minimised at cutoff, one
+    # really has to use that in addition to these.
+    delta_kperp1_1 = find_x0(k_perp[:cutoff_index], l_lc[:cutoff_index], delta_l_1)
+    delta_kperp1_2 = find_x0(k_perp[cutoff_index:], l_lc[cutoff_index:], delta_l_2)
+    return (
+        max_over_e2,
+        np.array((delta_l_1, delta_l_2)),
+        np.array((delta_kperp1_1, delta_kperp1_2)),
+    )
+
+
+def cumulative_integrate(array: xr.DataArray) -> xr.DataArray:
+    """Cumulative integral of ``array`` along ``distance_along_line``, shifted
+    by half the maximum"""
+    cumint = array.cumulative_integrate("distance_along_line")
+    return cumint - cumint.max() / 2
+
+
+def max_l_lc(
+    distance_along_line: xr.DataArray, array: xr.DataArray, cutoff_index: int
+) -> xr.DataArray:
+    max_index = array.argmax()
+    return distance_along_line[max_index] - distance_along_line[cutoff_index]
+
+
+def mean_l_lc(
+    distance_along_line: xr.DataArray, array: xr.DataArray, cutoff_index: int
+) -> xr.DataArray:
+    return (
+        (array * distance_along_line).integrate("distance_along_line")
+        / array.integrate("distance_along_line")
+    ) - distance_along_line[cutoff_index]
+
+
+def mean_kperp(k_perp: xr.DataArray, array: xr.DataArray) -> xr.DataArray:
+    """Mean kperp1 for backscattering"""
+    return np.trapz(array * k_perp, k_perp) / np.trapz(array, k_perp)
+
+
+def localisation_analysis(df: xr.Dataset, cutoff_index: int, wavenumber_K0: float):
     """
     Now to do some more-complex analysis of the localisation.
     This part of the code fails in some situations, hence I'm making
     it possible to skip this section
     """
     # Finds the 1/e2 values (localisation)
-    loc_b_r_s_max_over_e2 = loc_b_r_s.max() / (np.e**2)
-    loc_b_r_max_over_e2 = loc_b_r.max() / (np.e**2)
-
-    # Gives the inter-e2 range (analogous to interquartile range) in l-lc
-    loc_b_r_s_delta_l_1 = find_x0(
-        l_lc[0:cutoff_index], loc_b_r_s[0:cutoff_index], loc_b_r_s_max_over_e2
+    loc_b_r_s_max_over_e2, loc_b_r_s_delta_l, loc_b_r_s_delta_kperp1 = find_e2_width(
+        df.l_lc, df.loc_b_r_s, df.k_perp_1_bs, cutoff_index
     )
-    loc_b_r_s_delta_l_2 = find_x0(
-        l_lc[cutoff_index:], loc_b_r_s[cutoff_index:], loc_b_r_s_max_over_e2
+    loc_b_r_max_over_e2, loc_b_r_delta_l, loc_b_r_delta_kperp1 = find_e2_width(
+        df.l_lc, df.loc_b_r, df.k_perp_1_bs, cutoff_index
     )
-    # The 1/e2 distances,  (l - l_c)
-    loc_b_r_s_delta_l = np.array([loc_b_r_s_delta_l_1, loc_b_r_s_delta_l_2])
-    loc_b_r_s_half_width_l = (loc_b_r_s_delta_l_2 - loc_b_r_s_delta_l_1) / 2
-    loc_b_r_delta_l_1 = find_x0(
-        l_lc[0:cutoff_index], loc_b_r[0:cutoff_index], loc_b_r_max_over_e2
-    )
-    loc_b_r_delta_l_2 = find_x0(
-        l_lc[cutoff_index:], loc_b_r[cutoff_index:], loc_b_r_max_over_e2
-    )
-    # The 1/e2 distances,  (l - l_c)
-    loc_b_r_delta_l = np.array([loc_b_r_delta_l_1, loc_b_r_delta_l_2])
-    loc_b_r_half_width_l = (loc_b_r_delta_l_1 - loc_b_r_delta_l_2) / 2
-
-    # Estimates the inter-e2 range (analogous to interquartile range) in kperp1, from l-lc
-    # Bear in mind that since abs(kperp1) is minimised at cutoff, one really has to use that in addition to these.
-    loc_b_r_s_delta_kperp1_1 = find_x0(
-        df.k_perp_1_bs[0:cutoff_index], l_lc[0:cutoff_index], loc_b_r_s_delta_l_1
-    )
-    loc_b_r_s_delta_kperp1_2 = find_x0(
-        df.k_perp_1_bs[cutoff_index:], l_lc[cutoff_index:], loc_b_r_s_delta_l_2
-    )
-    loc_b_r_s_delta_kperp1 = np.array(
-        [loc_b_r_s_delta_kperp1_1, loc_b_r_s_delta_kperp1_2]
-    )
-    loc_b_r_delta_kperp1_1 = find_x0(
-        df.k_perp_1_bs[0:cutoff_index], l_lc[0:cutoff_index], loc_b_r_delta_l_1
-    )
-    loc_b_r_delta_kperp1_2 = find_x0(
-        df.k_perp_1_bs[cutoff_index:], l_lc[cutoff_index:], loc_b_r_delta_l_2
-    )
-    loc_b_r_delta_kperp1 = np.array([loc_b_r_delta_kperp1_1, loc_b_r_delta_kperp1_2])
 
     # Calculate the cumulative integral of the localisation pieces
-    cum_loc_b_r_s = cumtrapz(loc_b_r_s, df.distance_along_line, initial=0)
-    cum_loc_b_r_s = cum_loc_b_r_s - max(cum_loc_b_r_s) / 2
-    cum_loc_b_r = cumtrapz(loc_b_r, df.distance_along_line, initial=0)
-    cum_loc_b_r = cum_loc_b_r - max(cum_loc_b_r) / 2
+    cum_loc_b_r_s = cumulative_integrate(df.loc_b_r_s)
+    cum_loc_b_r = cumulative_integrate(df.loc_b_r)
 
-    # Finds the 1/e2 values (cumulative integral of localisation)
-    cum_loc_b_r_s_max_over_e2 = cum_loc_b_r_s.max() * (1 - 1 / (np.e**2))
-    cum_loc_b_r_max_over_e2 = cum_loc_b_r.max() * (1 - 1 / (np.e**2))
-
-    # Gives the inter-e range (analogous to interquartile range) in l-lc
-    cum_loc_b_r_s_delta_l_1 = find_x0(l_lc, cum_loc_b_r_s, -cum_loc_b_r_s_max_over_e2)
-    cum_loc_b_r_s_delta_l_2 = find_x0(l_lc, cum_loc_b_r_s, cum_loc_b_r_s_max_over_e2)
-    cum_loc_b_r_s_delta_l = np.array([cum_loc_b_r_s_delta_l_1, cum_loc_b_r_s_delta_l_2])
-    cum_loc_b_r_s_half_width = (cum_loc_b_r_s_delta_l_2 - cum_loc_b_r_s_delta_l_1) / 2
-    cum_loc_b_r_delta_l_1 = find_x0(l_lc, cum_loc_b_r, -cum_loc_b_r_max_over_e2)
-    cum_loc_b_r_delta_l_2 = find_x0(l_lc, cum_loc_b_r, cum_loc_b_r_max_over_e2)
-    cum_loc_b_r_delta_l = np.array([cum_loc_b_r_delta_l_1, cum_loc_b_r_delta_l_2])
-    cum_loc_b_r_half_width = (cum_loc_b_r_delta_l_2 - cum_loc_b_r_delta_l_1) / 2
-
-    # Gives the inter-e2 range (analogous to interquartile range) in kperp1.
-    # Bear in mind that since abs(kperp1) is minimised at cutoff, one really has to use that in addition to these.
-    cum_loc_b_r_s_delta_kperp1_1 = find_x0(
-        df.k_perp_1_bs[0:cutoff_index],
-        cum_loc_b_r_s[0:cutoff_index],
-        -cum_loc_b_r_s_max_over_e2,
-    )
-    cum_loc_b_r_s_delta_kperp1_2 = find_x0(
-        df.k_perp_1_bs[cutoff_index::],
-        cum_loc_b_r_s[cutoff_index::],
+    (
         cum_loc_b_r_s_max_over_e2,
-    )
-    cum_loc_b_r_s_delta_kperp1 = np.array(
-        [cum_loc_b_r_s_delta_kperp1_1, cum_loc_b_r_s_delta_kperp1_2]
-    )
-    cum_loc_b_r_delta_kperp1_1 = find_x0(
-        df.k_perp_1_bs[0:cutoff_index],
-        cum_loc_b_r[0:cutoff_index],
-        -cum_loc_b_r_max_over_e2,
-    )
-    cum_loc_b_r_delta_kperp1_2 = find_x0(
-        df.k_perp_1_bs[cutoff_index::],
-        cum_loc_b_r[cutoff_index::],
+        cum_loc_b_r_s_delta_l,
+        cum_loc_b_r_s_delta_kperp1,
+    ) = find_e2_width(df.l_lc, cum_loc_b_r_s, df.k_perp_1_bs, cutoff_index)
+
+    (
         cum_loc_b_r_max_over_e2,
-    )
-    cum_loc_b_r_delta_kperp1 = np.array(
-        [cum_loc_b_r_delta_kperp1_1, cum_loc_b_r_delta_kperp1_2]
-    )
+        cum_loc_b_r_delta_l,
+        cum_loc_b_r_delta_kperp1,
+    ) = find_e2_width(df.l_lc, cum_loc_b_r, df.k_perp_1_bs, cutoff_index)
 
     # Gives the mode l-lc for backscattering
-    loc_b_r_s_max_index = find_nearest(loc_b_r_s, loc_b_r_s.max())
-    loc_b_r_s_max_l_lc = (
-        df.distance_along_line[loc_b_r_s_max_index]
-        - df.distance_along_line[cutoff_index]
-    )
-    loc_b_r_max_index = find_nearest(loc_b_r, loc_b_r.max())
-    loc_b_r_max_l_lc = (
-        df.distance_along_line[loc_b_r_max_index] - df.distance_along_line[cutoff_index]
-    )
+    loc_b_r_s_max_l_lc = max_l_lc(df.distance_along_line, df.loc_b_r_s, cutoff_index)
+    loc_b_r_max_l_lc = max_l_lc(df.distance_along_line, df.loc_b_r, cutoff_index)
 
     # Gives the mean l-lc for backscattering
-    cum_loc_b_r_s_mean_l_lc = (
-        np.trapz(loc_b_r_s * df.distance_along_line, df.distance_along_line)
-        / np.trapz(loc_b_r_s, df.distance_along_line)
-        - df.distance_along_line[cutoff_index]
+    cum_loc_b_r_s_mean_l_lc = mean_l_lc(
+        df.distance_along_line, df.loc_b_r_s, cutoff_index
     )
-    cum_loc_b_r_mean_l_lc = (
-        np.trapz(loc_b_r * df.distance_along_line, df.distance_along_line)
-        / np.trapz(loc_b_r, df.distance_along_line)
-        - df.distance_along_line[cutoff_index]
-    )
+    cum_loc_b_r_mean_l_lc = mean_l_lc(df.distance_along_line, df.loc_b_r, cutoff_index)
 
     # Gives the median l-lc for backscattering
-    cum_loc_b_r_s_delta_l_0 = find_x0(l_lc, cum_loc_b_r_s, 0)
-    cum_loc_b_r_delta_l_0 = find_x0(l_lc, cum_loc_b_r, 0)
+    cum_loc_b_r_s_delta_l_0 = find_x0(df.l_lc, cum_loc_b_r_s, 0)
+    cum_loc_b_r_delta_l_0 = find_x0(df.l_lc, cum_loc_b_r, 0)
 
     # Due to the divergency of the ray piece, the mode kperp1 for backscattering is exactly that at the cut-off
 
-    # Gives the mean kperp1 for backscattering
-    cum_loc_b_r_s_mean_kperp1 = np.trapz(
-        loc_b_r_s * df.k_perp_1_bs, df.k_perp_1_bs
-    ) / np.trapz(loc_b_r_s, df.k_perp_1_bs)
-    cum_loc_b_r_mean_kperp1 = np.trapz(
-        loc_b_r * df.k_perp_1_bs, df.k_perp_1_bs
-    ) / np.trapz(loc_b_r, df.k_perp_1_bs)
+    cum_loc_b_r_s_mean_kperp1 = mean_kperp(df.k_perp_1_bs, df.loc_b_r_s)
+    cum_loc_b_r_mean_kperp1 = mean_kperp(df.k_perp_1_bs, df.loc_b_r)
 
     # Gives the median kperp1 for backscattering
     cum_loc_b_r_s_delta_kperp1_0 = find_x0(df.k_perp_1_bs, cum_loc_b_r_s, 0)
@@ -824,19 +794,10 @@ def detailed_analysis(
         df.k_perp_1_bs[0:cutoff_index], cum_loc_b_r[0:cutoff_index], 0
     )
 
-    # To make the plots look nice
-    k_perp_1_bs_plot = np.append(-2 * wavenumber_K0, df.k_perp_1_bs)
-    k_perp_1_bs_plot = np.append(k_perp_1_bs_plot, -2 * wavenumber_K0)
-    cum_loc_b_r_s_plot = np.append(cum_loc_b_r_s[0], cum_loc_b_r_s)
-    cum_loc_b_r_s_plot = np.append(cum_loc_b_r_s_plot, cum_loc_b_r_s[-1])
-    cum_loc_b_r_plot = np.append(cum_loc_b_r[0], cum_loc_b_r)
-    cum_loc_b_r_plot = np.append(cum_loc_b_r_plot, cum_loc_b_r[-1])
-
-    # These will get added as "dimension coordinates", arrays with
+    # Some of these will get added as "dimension coordinates", arrays with
     # coordinates that have the same name, because we've not specified
-    # dimensions, which is perhaps not desired. What might be better
-    # would be to use e.g. loc_b_r_delta_l as the coordinate for
-    # loc_b_r_max_over_e2
+    # dimensions, which is perhaps not desired. What might be better would be to
+    # use e.g. loc_b_r_delta_l as the coordinate for loc_b_r_max_over_e2
     return {
         "loc_b_r_s_max_over_e2": loc_b_r_s_max_over_e2,
         "loc_b_r_max_over_e2": loc_b_r_max_over_e2,
@@ -848,9 +809,6 @@ def detailed_analysis(
         "loc_b_r_delta_kperp1": loc_b_r_delta_kperp1,
         "cum_loc_b_r_s": cum_loc_b_r_s,
         "cum_loc_b_r": cum_loc_b_r,
-        "k_perp_1_bs_plot": k_perp_1_bs_plot,
-        "cum_loc_b_r_s_plot": cum_loc_b_r_s_plot,
-        "cum_loc_b_r_plot": cum_loc_b_r_plot,
         "cum_loc_b_r_s_max_over_e2": cum_loc_b_r_s_max_over_e2,
         "cum_loc_b_r_max_over_e2": cum_loc_b_r_max_over_e2,
         "cum_loc_b_r_s_delta_l": cum_loc_b_r_s_delta_l,
