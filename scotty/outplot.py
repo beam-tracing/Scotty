@@ -17,9 +17,6 @@ from scotty.fun_general import (
 from scipy import constants
 from typing import Tuple
 
-data_path = "/Users/yvonne/Documents/GitHub/Scotty/results/"
-plot_path = data_path
-
 
 class outplot(object):
     """
