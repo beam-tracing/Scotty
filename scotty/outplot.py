@@ -28,11 +28,6 @@ class outplot(object):
         None
     """
 
-    # def __new__(cls):
-    # print ("__new__ magic method is called")
-    # inst = object.__new__(cls)
-    # return inst
-
     def __init__(self, input_path="", suffix="", output_path=""):
         # Path specifics
         self.input_path = input_path
@@ -116,15 +111,6 @@ class outplot(object):
             np.array([self.q_R_array, self.q_zeta_array, self.q_Z_array])
         )
         self.out_index = np.size(self.q_R_array)  # numberOfDataPoints
-
-    # def __del__(self, *args, **kwargs):
-    # pass
-
-    # def __str__(self, *args, **kwargs):
-    # pass
-
-    # def __repr__(self, *args, **kwargs):
-    # pass
 
     def plotout(self, option="all"):
         """
@@ -549,55 +535,6 @@ class outplot(object):
             plt.xlabel(r"$(l - l_c)$")
             plt.ylabel("deg")
             plt.savefig(self.output_path + "theta_output.jpg", dpi=200)
-
-        ## Very niche
-        # elif option == 15:
-        #     factor = -1 - self.theta_output / self.theta_m_output
-
-        #     launch_angular_frequency = 2e9 * np.pi * self.launch_freq_GHz
-        #     wavenumber_K0 = launch_angular_frequency / constants.c
-
-        #     om_pe_norm = find_normalised_plasma_freq(
-        #         self.electron_density_output, launch_angular_frequency
-        #     )
-        #     om_ce_norm = find_normalised_gyro_freq(
-        #         self.B_magnitude, launch_angular_frequency
-        #     )
-
-        #     # K_mag = self.K_magnitude_array
-        #     # eps_11 = self.epsilon_perp_output
-        #     # eps_12 = self.epsilon_g_output
-        #     # eps_bb = self.epsilon_para_output
-        #     N_sq = (self.K_magnitude_array / wavenumber_K0) ** 2
-
-        #     factor2 = (
-        #         self.epsilon_perp_output**2
-        #         - self.epsilon_g_output**2
-        #         - self.epsilon_perp_output * self.epsilon_para_output
-        #         - self.epsilon_perp_output * N_sq
-        #         + self.epsilon_para_output * N_sq
-        #     ) / (
-        #         -(self.epsilon_perp_output**2)
-        #         + self.epsilon_g_output**2
-        #         - self.epsilon_perp_output * self.epsilon_para_output
-        #         + self.epsilon_perp_output * N_sq * 2
-        #     )
-
-        #     factor_O = -(om_pe_norm**2)
-
-        #     factor_X = (om_pe_norm**2 * (1 - om_pe_norm**2)) / (
-        #         1 - om_pe_norm**2 - om_ce_norm**2
-        #     )
-
-        #     plt.figure()
-        #     plt.plot(self.l_lc, factor, "ko", label="-1 - theta / theta_m")
-        #     plt.plot(self.l_lc, factor2, label="Either mode")
-        #     plt.plot(self.l_lc, factor_O, label="O mode")
-        #     plt.plot(self.l_lc, factor_X, label="X mode")
-        #     plt.legend()
-        #     plt.xlabel("l - l_c")
-
-        #     plt.savefig(self.output_path + "OmodeXmode.jpg", dpi=200)
 
         elif "Te":
             if self.relativistic_flag:
