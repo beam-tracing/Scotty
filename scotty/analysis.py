@@ -134,6 +134,8 @@ def immediate_analysis(
     # -------------------
     check_output(H)
 
+    vector_components = ["R", "zeta", "Z"]
+
     df = xr.Dataset(
         {
             "B_R": (["tau"], B_R),
@@ -161,8 +163,11 @@ def immediate_analysis(
             "y_hat": (["tau", "col"], y_hat),
             "poloidal_flux": (["tau"], poloidal_flux),
         },
-        coords={"tau": tau, "row": ["R", "zeta", "Z"], "col": ["R", "zeta", "Z"]},
+        coords={"tau": tau, "row": vector_components, "col": vector_components},
     )
+    df.tau.attrs["long_name"] = "Parameterised distance along beam"
+    df.col.attrs["long_name"] = "Vector/matrix column component"
+    df.row.attrs["long_name"] = "Matrix row component"
 
     temperature = find_temperature_1D(poloidal_flux) if find_temperature_1D else None
     if temperature is not None:
