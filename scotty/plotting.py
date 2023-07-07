@@ -2,6 +2,7 @@ from contourpy import contour_generator
 import numpy as np
 import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
+import xarray as xr
 
 from .geometry import MagneticField
 from .fun_general import cylindrical_to_cartesian
@@ -218,5 +219,34 @@ def plot_all_the_things(
         *launch_position, marker="x", markersize=5, markeredgewidth=4, color="tab:red"
     )
     ax.plot(*zip(launch_position, entry_point), color="tab:red")
+
+    return ax
+
+
+def plot_dispersion_relation(
+    analysis: xr.Dataset, filename: Optional[str] = None, ax: Optional[plt.Axes] = None
+) -> plt.Axes:
+    """
+    Plots Cardano's and np.linalg's solutions to the actual dispersion relation
+    Useful to check whether the solution which = 0 along the path changes
+    """
+
+    ax = maybe_make_axis(ax)
+
+    np.abs(analysis.H_eigvals).plot(x="l_lc", hue="col", ax=ax)
+
+    ax.plot(
+        analysis.l_lc, abs(analysis.H_1_Cardano), linestyle="--", label="H_1_Cardano"
+    )
+    ax.plot(
+        analysis.l_lc, abs(analysis.H_2_Cardano), linestyle="--", label="H_2_Cardano"
+    )
+    ax.plot(
+        analysis.l_lc, abs(analysis.H_3_Cardano), linestyle="--", label="H_3_Cardano"
+    )
+    ax.set_title("Dispersion relation")
+
+    if filename:
+        plt.savefig(f"{filename}.png")
 
     return ax

@@ -94,6 +94,7 @@ from scotty.hamiltonian import Hamiltonian
 from scotty.launch import launch_beam, find_entry_point
 from scotty.torbeam import Torbeam
 from scotty.ray_solver import propagate_ray
+from scotty.plotting import plot_dispersion_relation
 from scotty._version import __version__
 
 # Checks
@@ -800,19 +801,7 @@ def beam_me_up(
         plt.savefig(output_path / f"Ray1_{output_figurename_suffix}")
         plt.close()
 
-        """
-        Plots Cardano's and np.linalg's solutions to the actual dispersion relation
-        Useful to check whether the solution which = 0 along the path changes
-        """
-        plt.figure()
-        plt.plot(l_lc, abs(H_eigvals[:, 0]), "ro")
-        plt.plot(l_lc, abs(H_eigvals[:, 1]), "go")
-        plt.plot(l_lc, abs(H_eigvals[:, 2]), "bo")
-        plt.plot(l_lc, abs(H_1_Cardano_array), "r")
-        plt.plot(l_lc, abs(H_2_Cardano_array), "g")
-        plt.plot(l_lc, abs(H_3_Cardano_array), "b")
-        plt.savefig(output_path / f"H_{output_figurename_suffix}")
-        plt.close()
+        plot_dispersion_relation(dt.analysis, filename=output_path / f"H_{output_figurename_suffix}")
 
         print("Figures have been saved")
     # -------------------
