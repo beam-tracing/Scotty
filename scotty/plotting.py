@@ -3,13 +3,14 @@ import numpy as np
 import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import xarray as xr
+from datatree import DataTree
 
 from .geometry import MagneticField
 from .fun_general import cylindrical_to_cartesian
 from .launch import find_entry_point
 
 from typing import Optional, Union, List
-from scotty.typing import FloatArray
+from scotty.typing import FloatArray, PathLike
 
 
 def maybe_make_axis(ax: Optional[plt.Axes], *args, **kwargs) -> plt.Axes:
@@ -51,8 +52,8 @@ def plot_bounding_box(field: MagneticField, ax: Optional[plt.Axes] = None) -> pl
     Z_min = np.min(field.Z_coord)
     Z_max = np.max(field.Z_coord)
 
-    ax.hlines([Z_min, Z_max], R_min, R_max)
-    ax.vlines([R_min, R_max], Z_min, Z_max)
+    ax.hlines([Z_min, Z_max], R_min, R_max, color="lightgrey", linestyle="dashed")
+    ax.vlines([R_min, R_max], Z_min, Z_max, color="lightgrey", linestyle="dashed")
     bounds = np.array((R_min, R_max, Z_min, Z_max))
     ax.axis(bounds * 1.1)
     ax.axis("equal")
@@ -144,29 +145,34 @@ def plot_flux_surface(
     return ax
 
 
-def plot_field(field: MagneticField):
-    ax = plot_bounding_box(field)
+def plot_field(
+    field: MagneticField, ax: Optional[plt.Axes] = None, highlight_LCFS: bool = True
+) -> plt.Axes:
+    ax = maybe_make_axis(ax)
+
+    plot_bounding_box(field, ax)
 
     cax = ax.contour(
         field.R_coord,
         field.Z_coord,
         field.poloidalFlux_grid.T,
-        levels=np.linspace(0, 1, 10, endpoint=False),
+        levels=np.linspace(0, 1, 10, endpoint=not highlight_LCFS),
+        cmap="plasma_r",
     )
     ax.clabel(cax, inline=True)
-    ax.contour(
-        field.R_coord,
-        field.Z_coord,
-        field.poloidalFlux_grid.T,
-        levels=[1.0],
-        colors="black",
-        linestyles="dashed",
-        linewidths=2,
-    )
-    dashed_line = mlines.Line2D(
-        [], [], color="black", linestyle="dashed", label=r"$\psi = 1$"
-    )
-    ax.legend(handles=[dashed_line])
+    if highlight_LCFS:
+        ax.contour(
+            field.R_coord,
+            field.Z_coord,
+            field.poloidalFlux_grid.T,
+            levels=[1.0],
+            colors="darkgrey",
+            linestyles="dashed",
+        )
+        dashed_line = mlines.Line2D(
+            [], [], color="black", linestyle="dashed", label=r"$\psi = 1$"
+        )
+        ax.legend(handles=[dashed_line])
 
     return ax
 
@@ -224,7 +230,9 @@ def plot_all_the_things(
 
 
 def plot_dispersion_relation(
-    analysis: xr.Dataset, filename: Optional[str] = None, ax: Optional[plt.Axes] = None
+    analysis: xr.Dataset,
+    filename: Optional[PathLike] = None,
+    ax: Optional[plt.Axes] = None,
 ) -> plt.Axes:
     """
     Plots Cardano's and np.linalg's solutions to the actual dispersion relation
@@ -245,6 +253,35 @@ def plot_dispersion_relation(
         analysis.l_lc, abs(analysis.H_3_Cardano), linestyle="--", label="H_3_Cardano"
     )
     ax.set_title("Dispersion relation")
+
+    if filename:
+        plt.savefig(f"{filename}.png")
+
+    return ax
+
+
+def plot_beam_path(
+    dt: DataTree,
+    field: MagneticField,
+    filename: Optional[PathLike] = None,
+    ax: Optional[plt.Axes] = None,
+) -> plt.Axes:
+    """Plots the beam path on the R Z plane"""
+
+    ax = maybe_make_axis(ax)
+
+    plot_field(field, ax=ax, highlight_LCFS=False)
+
+    ax.plot(
+        np.concatenate([[dt.inputs.launch_position.sel(col="R")], dt.analysis.q_R]),
+        np.concatenate([[dt.inputs.launch_position.sel(col="Z")], dt.analysis.q_Z]),
+        "--k",
+        label="Central (reference) ray",
+    )
+    ax.legend()
+    ax.set_title("Beam path")
+    ax.set_xlabel("R [m]")
+    ax.set_ylabel("Z [m]")
 
     if filename:
         plt.savefig(f"{filename}.png")

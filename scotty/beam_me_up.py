@@ -94,7 +94,7 @@ from scotty.hamiltonian import Hamiltonian
 from scotty.launch import launch_beam, find_entry_point
 from scotty.torbeam import Torbeam
 from scotty.ray_solver import propagate_ray
-from scotty.plotting import plot_dispersion_relation
+from scotty.plotting import plot_dispersion_relation, plot_beam_path
 from scotty._version import __version__
 
 # Checks
@@ -615,6 +615,7 @@ def beam_me_up(
             "delta_K_zeta": delta_K_zeta,
             "delta_R": delta_R,
             "delta_Z": delta_Z,
+            # FIXME: this is an object, needs to be serialisable
             "density_fit_method": density_fit_method,
             "density_fit_parameters": density_fit_parameters,
             "detailed_analysis_flag": detailed_analysis_flag,
@@ -666,9 +667,9 @@ def beam_me_up(
     solver_output = xr.Dataset(
         {
             "solver_status": solver_status,
-            "q_R": (["tau"], q_R_array),
-            "q_zeta": (["tau"], q_zeta_array),
-            "q_Z": (["tau"], q_Z_array),
+            "q_R": (["tau"], q_R_array, {"long_name": "R", "units": "m"}),
+            "q_zeta": (["tau"], q_zeta_array, {"long_name": "$\zeta$", "units": "m"}),
+            "q_Z": (["tau"], q_Z_array, {"long_name": "Z", "units": "m"}),
             "K_R": (["tau"], K_R_array),
             "K_Z": (["tau"], K_Z_array),
             "Psi_3D": (["tau", "row", "col"], Psi_3D_output),
@@ -759,54 +760,25 @@ def beam_me_up(
     )
     dt["analysis"] = datatree.DataTree(analysis)
     print("Analysis data saved")
-    # -------------------
 
-    # -------------------
-    # This saves some simple figures
-    # Allows one to quickly gain an insight into what transpired in the simulation
-    # -------------------
     if figure_flag:
-        print("Making figures")
-        output_figurename_suffix = output_filename_suffix + ".png"
+        default_plots(dt, field, output_path, output_filename_suffix)
 
-        """
-        Plots the beam path on the R Z plane
-        """
-        plt.figure()
-        plt.title("Rz")
-        plt.xlabel("R / m")  # x-direction
-        plt.ylabel("z / m")
+    return dt, field
 
-        contour_levels = np.linspace(0, 1.0, 11)
-        CS = plt.contour(
-            field.R_coord,
-            field.Z_coord,
-            np.transpose(field.poloidalFlux_grid),
-            contour_levels,
-            vmin=0,
-            vmax=1,
-            cmap="plasma_r",
-        )
-        plt.clabel(CS, inline=1, fontsize=10)  # Labels the flux surfaces
-        plt.plot(
-            np.concatenate([[launch_position[0], initial_position[0]], q_R_array]),
-            np.concatenate([[launch_position[2], initial_position[2]], q_Z_array]),
-            "--.k",
-        )  # Central (reference) ray
-        # cutoff_contour = plt.contour(x_grid, z_grid, normalised_plasma_freq_grid,
-        #                             levels=1,vmin=1,vmax=1,linewidths=5,colors='grey')
-        plt.xlim(field.R_coord[0], field.R_coord[-1])
-        plt.ylim(field.Z_coord[0], field.Z_coord[-1])
 
-        plt.savefig(output_path / f"Ray1_{output_figurename_suffix}")
-        plt.close()
+def default_plots(
+    dt: datatree.DataTree, field: MagneticField, output_path: pathlib.Path, suffix: str
+) -> None:
+    """Save some simple figures
 
-        plot_dispersion_relation(dt.analysis, filename=output_path / f"H_{output_figurename_suffix}")
+    Allows one to quickly gain an insight into what transpired in the simulation
+    """
 
-        print("Figures have been saved")
-    # -------------------
-
-    return dt
+    print("Making figures")
+    plot_beam_path(dt, field, filename=output_path / f"Ray1_{suffix}.png")
+    plot_dispersion_relation(dt.analysis, filename=output_path / f"H_{suffix}.png")
+    print("Figures have been saved")
 
 
 def make_density_fit(
