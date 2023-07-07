@@ -545,7 +545,7 @@ def further_analysis(
         ** 2,
         (df.electron_density * 1e19) ** 2,
         out=np.zeros_like(df.electron_density),
-        where=df.electron_density > 1e-6,
+        where=(df.electron_density > 1e-6).data,
     )
     loc_p = (
         inputs.launch_angular_frequency**2
