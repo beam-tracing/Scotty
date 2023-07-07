@@ -156,14 +156,18 @@ def immediate_analysis(
             "g_hat": (["tau", "col"], g_hat),
             "g_magnitude": g_magnitude,
             "grad_bhat": (["tau", "row", "col"], grad_bhat),
-            "q_R": q_R,
-            "q_Z": q_Z,
-            "q_zeta": solver_output.q_zeta,
             "x_hat": (["tau", "col"], x_hat),
             "y_hat": (["tau", "col"], y_hat),
             "poloidal_flux": (["tau"], poloidal_flux),
         },
-        coords={"tau": tau, "row": vector_components, "col": vector_components},
+        coords={
+            "tau": tau,
+            "row": vector_components,
+            "col": vector_components,
+            "q_R": q_R,
+            "q_Z": q_Z,
+            "q_zeta": solver_output.q_zeta,
+        },
     )
     df.tau.attrs["long_name"] = "Parameterised distance along beam"
     df.col.attrs["long_name"] = "Vector/matrix column component"

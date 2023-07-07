@@ -630,7 +630,7 @@ def beam_me_up(
             "launch_beam_curvature": launch_beam_curvature,
             "launch_beam_width": launch_beam_width,
             "launch_freq_GHz": launch_freq_GHz,
-            "launch_position": (launch_position),
+            "launch_position": (["col"], launch_position),
             "len_tau": len_tau,
             "magnetic_data_path": magnetic_data_path,
             "minor_radius_a": minor_radius_a,
