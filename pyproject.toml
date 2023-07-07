@@ -19,6 +19,8 @@ dependencies = [
     "matplotlib~=3.3",
     "netCDF4~=1.5",
     "freeqdsk==0.1.0",
+    "xarray>=2023.06.0",
+    "xarray-datatree",
 ]
 dynamic = ["version"]
 
