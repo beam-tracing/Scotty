@@ -433,6 +433,7 @@ def further_analysis(
     g_R_Cardano = grad_H_Cardano("K_R", inputs.delta_K_R)
     g_zeta_Cardano = grad_H_Cardano("K_zeta", inputs.delta_K_zeta)
     g_Z_Cardano = grad_H_Cardano("K_Z", inputs.delta_K_Z)
+    # This has maximum imaginary component of like 1e-16 -- should just be real?
     g_magnitude_Cardano = np.sqrt(
         g_R_Cardano**2 + g_zeta_Cardano**2 + g_Z_Cardano**2
     )
