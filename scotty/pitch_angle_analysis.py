@@ -105,6 +105,10 @@ class SweepDataset:
             "K_Z_array",
             "K_zeta_initial",
             "poloidal_flux_output",
+            "loc_m",
+            "loc_b",
+            "loc_p",
+            "loc_r",
         ]
 
         input_attributes = [
@@ -176,6 +180,10 @@ class SweepDataset:
                         "theta_m_output",
                         "theta_output",
                         "K_magnitude_array",
+                        "loc_m",
+                        "loc_b",
+                        "loc_p",
+                        "loc_r",
                     ):
                         current_ds = ds[key]
                         data = analysis_file[key]
@@ -349,6 +357,29 @@ class SweepDataset:
     def print_KeysView(self):
         print(self.dataset.keys())
 
+    def generate_variable_at_cutoff(self, variable):
+        """Finds the value of a given variable at cutoff and saves it with
+        the key 'cutoff_{variable name}'.
+
+        Args:
+            variable:
+
+        Returns:
+            DataArray: A 3-D DataArray of cutoff distances with frequency,
+            poloidal angle and toroidal angle as axes. Saves it with the
+            key 'cutoff_distance'.
+        """
+        data = self.dataset
+
+        if f"cutoff_{variable}" in self.variables:
+            print("cutoff_{variable} already generated.")
+            return data[f"cutoff_{variable}"]
+
+        CUTOFF_ARRAY = data["cutoff_index"]
+        cutoff_variable = data[variable].isel(trajectory_step=CUTOFF_ARRAY)
+        self.dataset[f"cutoff_{variable}"] = cutoff_variable
+        return cutoff_variable
+
     def generate_cutoff_distance(self):
         """Finds the poloidal cutoff distance of the beam from the
         magnetic axis. Saves a new 'poloidal_distance' 4-D DataArray for
@@ -360,15 +391,15 @@ class SweepDataset:
             key 'cutoff_distance'.
         """
 
-        # TODO: fix this to calculate poloidal distance from magnetic axis
         data = self.dataset
+        B_axis = data.attrs['magnetic_axis_RZ']
         if "cutoff_distance" in self.variables:
             print("cutoff_distance already generated.")
             return data["cutoff_index"]
 
         CUTOFF_ARRAY = data["cutoff_index"]
         # print(CUTOFF_ARRAY.shape)
-        poloidal_distance = np.hypot(data["q_R_array"], data["q_Z_array"])
+        poloidal_distance = np.hypot(data["q_R_array"] - B_axis[0], data["q_Z_array"] - B_axis[1])
         self.dataset["poloidal_distance"] = poloidal_distance
         # print(poloidal_distance.shape)
         cutoff_distance = poloidal_distance.isel(trajectory_step=CUTOFF_ARRAY)
@@ -557,6 +588,61 @@ class SweepDataset:
         self.dataset["reflection_mask"] = (dimensions, reflection_mask)
         return self.dataset["reflection_mask"]
 
+    def _path_integrate(self, int_array):
+        frequencies = self.get_coordinate_array("frequency")
+        poloidal_angles = self.get_coordinate_array("poloidal_angle")
+        toroidal_angles = self.get_coordinate_array("toroidal_angle")
+        output_da = xr.DataArray(
+            coords=[
+                ("frequency", frequencies),
+                ("poloidal_angle", poloidal_angles),
+                ("toroidal_angle", toroidal_angles),
+            ]
+        )
+        path_lengths = self.dataset['distance_along_line']
+        for combination in product(frequencies, poloidal_angles, toroidal_angles):
+            frequency, poloidal_angle, toroidal_angle = combination
+            index = {
+                "frequency": float(frequency),
+                "poloidal_angle": float(poloidal_angle),
+                "toroidal_angle": float(toroidal_angle),
+            }
+            int_path = int_array.loc[index]
+            path_length = path_lengths.loc[index]
+            try:
+                int_spline = UnivariateSpline(path_length, int_path, s=0)
+                int_value = int_spline.integral(path_length[0], path_length[-1])
+                output_da.loc[index] = int_value
+            except ValueError as error:
+                print(error)
+                print('Frequency, poloidal_angle, toroidal_angle is:', combination)
+        return output_da
+
+    def generate_mismatch_gaussian(self):
+        delta_m = self.dataset['cutoff_delta_theta_m']
+        theta_m = self.dataset['cutoff_theta_m']
+        gaussian = np.exp(
+            - (theta_m/delta_m)**2
+        )
+        self.dataset['mismatch_gaussian'] = gaussian
+        return gaussian
+
+    def integrate_loc_m(self):
+        loc_m = self.dataset['loc_m']
+        int_loc_m = self._path_integrate(loc_m)
+        self.dataset['int_loc_m'] = int_loc_m
+        return int_loc_m
+
+    def integrate_loc_product(self):
+        loc_m = self.dataset['loc_m']
+        loc_b = self.dataset['loc_b']
+        loc_p = self.dataset['loc_p']
+        loc_r = self.dataset['loc_r']
+        loc_product = loc_m * loc_b * loc_p * loc_r
+        int_loc_product = self._path_integrate(loc_product)
+        self.dataset['int_loc_product'] = int_loc_product
+        return int_loc_product
+
     def generate_all(self):
         """Calls all analysis methods to generate and save analysis data.
         Returns a list of variables including newly-generated ones that
@@ -565,6 +651,8 @@ class SweepDataset:
         self.generate_cutoff_distance()
         self.generate_cutoff_rho()
         self.generate_mismatch_at_cutoff()
+        for variable in ('K_magnitude_array',):
+            self.generate_variable_at_cutoff(variable)
         self.generate_opt_tor()
         self.generate_reflection_mask()
         return self.variables
@@ -852,6 +940,82 @@ class SweepDataset:
         plt.colorbar(mappable=im)
         return fig, ax
 
+    def plot_contour(
+        self,
+        variable,
+        xdimension,
+        ydimension,
+        coords_dict={},
+        cmap="plasma_r",
+        mask_flag=False,
+        levels=20,
+        **kwargs,
+    ):
+        """Make a contour plot of a specific slice of the DataArray.
+
+            Args:
+                variable(str): DataArray variable to visualize
+                xdimension (str): Dimension for the x-axis
+                ydimension (str): Dimension for the y-axis
+                coords_dict (dict): Dictionary of coordinate values of the other
+                dimensions to be held constant
+                cmap (str): Colormap to be used
+                mask_flag(bool): Whether or not to mask non-reflected rays. Only available
+                for dimensions 'frequency', 'poloidal_angle', 'toroidal_angle'.
+            """
+        data_spline = self.create_2Dspline(variable, xdimension, ydimension, coords_dict)
+
+        title_string = ""
+        for key, value in coords_dict.items():
+            title_string += f",{key}={value} "
+        x_coords = self.get_coordinate_array(xdimension)
+        y_coords = self.get_coordinate_array(ydimension)
+        x = np.linspace(x_coords[0], x_coords[-1], 500)
+        y = np.linspace(y_coords[0], y_coords[-1], 500)
+        X, Y = np.meshgrid(x_coords, y_coords, indexing='ij')
+
+        plot_array = data_spline((X, Y))
+
+        fig, ax = plt.subplots()
+        if mask_flag:
+
+            reflection_mask = (
+            self.dataset["reflection_mask"]
+            .loc[coords_dict]
+            .transpose(xdimension, ydimension)
+            .values
+            )
+            mask_function = RegularGridInterpolator(
+                (x_coords, y_coords),
+                reflection_mask,
+                method="nearest",
+                bounds_error=False,
+            )
+            interp_mask = mask_function((X, Y))
+            plot_masked = np.ma.array(plot_array, mask=interp_mask)
+            
+            CS = ax.contourf(
+                X, Y, plot_masked, levels=levels, cmap="plasma_r", corner_mask=True, **kwargs
+            )
+            CSgo = ax.contour(
+                X, Y, plot_masked, levels=levels, colors='k', corner_mask=True, linewidth=0.2, **kwargs
+            )
+
+        else:
+            CS = ax.contourf(
+                X, Y, plot_array, levels=levels, cmap="plasma_r", corner_mask=True, **kwargs
+            )
+            CSgo = ax.contour(
+                X, Y, plot_array, levels=levels, colors='k', corner_mask=True, linewidth=0.2, **kwargs
+            )
+        fig.suptitle(f"{variable}, " + title_string)
+        ax.set_xlabel(f"{xdimension}")
+        ax.set_ylabel(f"{ydimension}")
+        ax.clabel(CSgo, inline=True, fontsize=6)
+        fig.colorbar(CS)
+
+        return fig, ax
+
     def plot_cutoff_contour(
         self,
         const_angle_str,
@@ -860,7 +1024,6 @@ class SweepDataset:
         measure="rho",
         mask_flag=True,
         bounds=None,
-        return_artists=True,
     ):
         """Creates a contour plot of toroidal/poloidal steering vs. frequency, with
         contours of constant cutoff (either rho or metres). A bivariate spline is fitted
@@ -976,9 +1139,7 @@ class SweepDataset:
                 dpi=200,
             )
 
-        if return_artists:
-            return fig, ax
-        return (Xgrid, Ygrid, Zgrid, interp_mask)
+        return fig, ax
 
     def plot_cutoff_angles(self, poloidal_angle):  # TODO: Implement this
         return
@@ -1017,6 +1178,9 @@ class SweepDataset:
         return fig, ax
 
     def plot_delta_m_contour(self, poloidal_angle):
+        return
+
+    def plot_rho_freq_contours(self): # Plot rho against frequency, with contours of constant poloidal steering
         return
 
     # To be implemented
@@ -1153,7 +1317,11 @@ class PitchDiagnostic:
 
     @property
     def descriptors(self):
-        return list(self.ds_dict.keys()).remove('cutoff_data')
+        out = []
+        for key in self.ds_dict.keys():
+            if key != 'cutoff_data':
+                out.append(key)
+        return out
 
     ## get methods
 
@@ -1164,9 +1332,6 @@ class PitchDiagnostic:
             keys_dict[key] = tuple(values)
         print(keys)
         return keys_dict
-
-    def get_DataArray(self):
-        return
 
     ## Simulation methods
     def set_rho_freq_relation(self, SweepDataset): #TODO: Current task
@@ -1220,13 +1385,13 @@ class PitchDiagnostic:
         lower_spline = UnivariateSpline(frequency_range, self.ds_dict['cutoff_data']['rho_lower'], s=0)
         return upper_spline, lower_spline
 
-    def get_opt_tor_delta(self, SweepDataset):
+    def get_interp_variables(self, SweepDataset):
         descriptor = str(SweepDataset.descriptor)
         if descriptor in self.ds_dict:
             ds = self.ds_dict[descriptor]
-            if "opt_tor" in ds.keys():
-                print("opt_tor already retrieved!")
-                return ds["opt_tor"]
+            if {"opt_tor", "delta_theta_m", "K_magnitude"}.issubset(set(ds.keys())):
+                print(f"Variables already interpolated from {descriptor}!")
+                return None
         else:
             self.ds_dict[descriptor] = xr.Dataset()
 
@@ -1264,12 +1429,68 @@ class PitchDiagnostic:
             },
         )
         self.ds_dict[descriptor]["delta_theta_m"] = delta_theta_m_da
-        return opt_tor_da, delta_theta_m_da
+
+        K_magnitude_spline = SweepDataset.create_3Dspline(
+            variable='cutoff_K_magnitude_array',
+            xdimension='frequency',
+            ydimension='poloidal_angle',
+            zdimension='toroidal_angle',
+        )
+
+        K_magnitude_array = K_magnitude_spline((X, Y, Z))
+        K_magnitude_da = xr.DataArray(
+            data = K_magnitude_array,
+            dims=("frequency", "poloidal_angle", "toroidal_angle"),
+            coords={
+                "frequency": self.frequencies,
+                "poloidal_angle": self.poloidal_angles,
+                "toroidal_angle": self.toroidal_angles
+            },
+        )
+        self.ds_dict[descriptor]["K_magnitude"] = K_magnitude_da
+
+        int_loc_m_spline = SweepDataset.create_3Dspline(
+            variable='int_loc_m',
+            xdimension='frequency',
+            ydimension='poloidal_angle',
+            zdimension='toroidal_angle',
+        )
+        int_loc_m_array = int_loc_m_spline((X, Y, Z))
+        int_loc_m_da = xr.DataArray(
+            data = int_loc_m_array,
+            dims=("frequency", "poloidal_angle", "toroidal_angle"),
+            coords={
+                "frequency": self.frequencies,
+                "poloidal_angle": self.poloidal_angles,
+                "toroidal_angle": self.toroidal_angles
+            },
+        )
+        self.ds_dict[descriptor]["int_loc_m"] = int_loc_m_da
+
+        int_loc_product_spline = SweepDataset.create_3Dspline(
+            variable='int_loc_product',
+            xdimension='frequency',
+            ydimension='poloidal_angle',
+            zdimension='toroidal_angle',
+        )
+        int_loc_product_array = int_loc_product_spline((X, Y, Z))
+        int_loc_product_da = xr.DataArray(
+            data = int_loc_product_array,
+            dims=("frequency", "poloidal_angle", "toroidal_angle"),
+            coords={
+                "frequency": self.frequencies,
+                "poloidal_angle": self.poloidal_angles,
+                "toroidal_angle": self.toroidal_angles
+            },
+        )
+        self.ds_dict[descriptor]["int_loc_product"] = int_loc_product_da
+
+        return None
 
     def simulate_measurements(self, SweepDataset, iterations=500, std_noise=None, noise_flag=True):
-        """Simulates backscattered power with noise received by antenna array through the
-        frequency range and stores it in a dataset, with the variable set by the SweepDataset
-        descriptor. Data is saved with the key 'simulated_measurements'.
+        """Simulates backscattered power with noise received by antenna array based on the mismatch
+        angle and mismatch tolerance, and stores it in a dataset, with the index variable set by the 
+        SweepDataset descriptor. Data is saved with the key 'simulated_measurements'.
 
         Args:
             SweepDataset (SweepDataset): SweepDataset class object used to simulate power received
@@ -1367,22 +1588,19 @@ class PitchDiagnostic:
         return da
 
     ## Analysis methods
-    ## TODO: function to find range of shift in rho across a poloidal sweep
-    ## compare the delta rho to the radial position measured by set of frequencies
 
     def fit_measurement_gaussians(self, descriptor=None):
         if descriptor:
             descriptors = [descriptor]
         else:
             descriptors = self.descriptors
-        print(descriptors)
         for descriptor in descriptors:
             if "gaussian_fit_coeffs" in self.ds_dict[descriptor]:
                 print(f"Gaussian fits already generated for {descriptor}")
                 continue
 
             data = self.ds_dict[descriptor]["simulated_measurements"]
-            curvefit_results = data.curvefit(coords="toroidal_angle", func=fit_gaussian)
+            curvefit_results = data.curvefit(coords="toroidal_angle", func=fit_gaussian, p0={'opt_tor':0})
             curvefit_results["curvefit_coefficients"].attrs[
                 "method"
             ] = "PitchDiagnostic.fit_gaussians"
@@ -1424,7 +1642,9 @@ class PitchDiagnostic:
         opt_tor = self.ds_dict[descriptor]["mean_opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
         delta = self.ds_dict[descriptor]["mean_delta_theta_m"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
         actual = self.ds_dict[descriptor]["opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
-
+        int_loc_m = self.ds_dict[descriptor]["int_loc_m"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
+        int_loc_product = self.ds_dict[descriptor]["int_loc_product"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
+        
         toroidal_range = data.coords["toroidal_range"].values
         colormap = plt.cm.gnuplot2
         freq_count = len(self.frequencies)
@@ -1452,10 +1672,14 @@ class PitchDiagnostic:
             lin_data = data.loc[{'frequency':frequency, 'poloidal_angle':self.poloidal_angles[0]}]
             opt_tor_val = opt_tor.loc[{'frequency':frequency}].values
             delta_val = delta.loc[{'frequency':frequency}].values
-            gaussian_profile = fit_gaussian(toroidal_range, opt_tor_val, delta_val, 1.0)
+            gaussian_profile = fit_gaussian(toroidal_range, opt_tor_val, delta_val)
+            plot_loc_m = scale_array(int_loc_m.loc[{'frequency':frequency}].values)
+            plot_loc_product = scale_array(int_loc_product.loc[{'frequency':frequency}].values)
 
             ax.plot(toroidal_range, lin_data, alpha=0.5, color=color, label='profile')
             ax.plot(toroidal_range, gaussian_profile, alpha=0.5, color='r', linestyle='--', label='gaussian fit')
+            ax.plot(self.toroidal_angles, plot_loc_m, color='g', label='scaled int_loc_m')
+            ax.plot(self.toroidal_angles, plot_loc_product, color='c', label='scaled int_loc_product', linestyle='--')
             ax.axvline(opt_tor_val, label='mean gaussian-fitted peak', color='r', linestyle='--')
             ax.axvline(actual.loc[{'frequency':frequency}], label='predicted opt_tor', color=color)
             ax.set_title(f"{frequency} GHz", fontsize=8)
@@ -1476,8 +1700,8 @@ class PitchDiagnostic:
         plt.ylabel('normalized received power')
         return fig, axes
 
-    def plot_delta_m(self, descriptor):
-        data = self.ds_dict[descriptor]["delta_theta_m"]
+    def plot_variable_vs_tor(self, variable, descriptor):
+        data = self.ds_dict[descriptor][variable]
         actual = self.ds_dict[descriptor]["opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
 
         freq_count = len(self.frequencies)
@@ -1501,7 +1725,7 @@ class PitchDiagnostic:
             row, col = combinations[counter]
             ax = axes[row, col]
             
-            ax.plot(self.toroidal_angles, data.loc[{'frequency':frequency, 'poloidal_angle':self.poloidal_angles[0]}], label='mismatch tolerance')
+            ax.plot(self.toroidal_angles, data.loc[{'frequency':frequency, 'poloidal_angle':self.poloidal_angles[0]}], label=f'{variable}')
             ax.axvline(actual.loc[{'frequency':frequency}], label='opt_tor', color='k')
             ax.set_title(f"{frequency} GHz", fontsize=8)
             ax.tick_params(axis='both', which='major', labelsize=5)
@@ -1509,7 +1733,7 @@ class PitchDiagnostic:
             counter += 1
 
         ax.legend(bbox_to_anchor=(1.05, 0), loc='lower left', borderaxespad=0., fontsize=8)
-        fig.suptitle("Mismatch tolerance vs. Toroidal Steering", fontsize=15)
+        fig.suptitle(f"{variable} vs. Toroidal Steering", fontsize=15)
         plt.subplots_adjust(top=0.90)
 
         # add a big axis, hide frame
@@ -1517,7 +1741,7 @@ class PitchDiagnostic:
         # hide tick and tick label of the big axis
         plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
         plt.xlabel('toroidal steering/deg')
-        plt.ylabel('normalized received power')
+        plt.ylabel(f'{variable}')
         return fig, axes
 
     def plot_opt_tor_hist(self, descriptor):
@@ -1553,8 +1777,8 @@ class PitchDiagnostic:
             ]
             color = colormap(counter / freq_count)
             ax.hist(data_slice, alpha=0.5, color=color)
-            ax.axvline(mean.loc[{'frequency':frequency}], label='mean', color='k')
-            ax.axvline(actual.loc[{'frequency':frequency}], label='predicted', color='r', linestyle='--')
+            ax.axvline(mean.loc[{'frequency':frequency}], label='mean', color='r', linestyle='--')
+            ax.axvline(actual.loc[{'frequency':frequency}], label='predicted', color='k')
             ax.set_title(f"{frequency} GHz", fontsize=8)
             ax.tick_params(axis='both', which='major', labelsize=5)
             
@@ -1597,14 +1821,29 @@ class PitchDiagnostic:
         rho_upper, rho_lower = self.get_rho_delta_splines()
         freq_range = np.linspace(self.frequencies[0], self.frequencies[-1], 500)
 
+        colormap = plt.cm.gnuplot2
+        counter = 0
+
         #X, Y = np.meshgrid()
 
         fig = plt.figure()
-        plt.plot(freq_range, rho_freq(freq_range), label='mean rho', color='r', linewidth=0.1)
+        plt.plot(freq_range, rho_freq(freq_range), label='mean rho', color='r', linewidth=0.2)
         plt.fill_between(freq_range, rho_upper(freq_range), rho_lower(freq_range), label='delta rho', color='b', alpha=0.2 )
+        
+        for frequency in self.frequencies:
+            color = colormap(counter / len(self.frequencies))
+            plt.axvline(frequency, color=color, linewidth=0.2, linestyle='--')
+            upper_array = rho_upper(frequency)*np.ones_like(freq_range)
+            lower_array = rho_lower(frequency)*np.ones_like(freq_range)
+            delta = np.format_float_scientific(rho_upper(frequency) - rho_lower(frequency), precision=1)
+            plt.fill_between(freq_range, upper_array, lower_array, color=color, alpha=0.2,
+            label=f'{frequency}GHz $\Delta$rho = {delta}')
+            counter +=1
+
         plt.xlabel('Frequency/GHz')
         plt.ylabel('Cutoff Rho')
-        plt.legend()
+        plt.title('rho(f) and rho shift over toroidal sweep range')
+        plt.legend(bbox_to_anchor=(1.05, 0), loc='lower left', borderaxespad=0.)
         return fig
 
 
@@ -1612,8 +1851,8 @@ class PitchDiagnostic:
 # Helper functions
 
 
-def fit_gaussian(toroidal_angle, opt_tor, delta, amplitude):
-    return amplitude * np.exp(-(((toroidal_angle - opt_tor) / delta) ** 2))
+def fit_gaussian(toroidal_angle, opt_tor, delta):
+    return np.exp(-(((toroidal_angle - opt_tor) / delta) ** 2))
 
 
 def gaussian(theta_m, delta):
@@ -1622,9 +1861,13 @@ def gaussian(theta_m, delta):
 
 def noisy_gaussian(theta_m, delta, std=0.05):
     mean = gaussian(theta_m, delta)
-    return mean + np.random.normal(mean, std)
+    return mean + np.random.normal(0, std)
 
 
 def find_nearest(array, value):
     index = np.abs((array - value)).argmin()
     return array[index]
+
+def scale_array(array):
+    maxval = array.max()
+    return array/maxval
