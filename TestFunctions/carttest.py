@@ -440,22 +440,6 @@ plot_path = data_path
 #data_input = np.load(data_path + 'data_input.npz')
 #solver_output = np.load(data_path + 'solver_output.npz')
 
-field = create_magnetic_geometry(
-    "omfit",#find_B_method,
-    magnetic_data_path = data_path,
-    input_filename_suffix = '',
-    interp_order = 5,
-    interp_smoothing = None,
-    B_T_axis = None,
-    R_axis = None,
-    minor_radius_a = None,
-    B_p_a = None,
-    shot = None,
-    equil_time = None,
-    delta_R = 1e-5,
-    delta_Z = 1e-5,
-)
-
 #%%
 # Compare values for B computed in Cartesian and cylindrical coordinates
 
@@ -547,22 +531,25 @@ tsize=31
 R = np.linspace(rmin,rmax,rsize)#gEQDSK['AuxQuantities']['R'].tolist()
 Z = np.linspace(zmin,zmax,zsize)#gEQDSK['AuxQuantities']['Z'].tolist()
 T = np.linspace(tmin,tmax,tsize)
+Rarray, Zarray, Tarray = np.meshgrid(R,Z,T)
 
-Br = np.zeros((rsize,zsize))#gEQDSK['AuxQuantities']['Br'].tolist()
+# Only B_z
+#Br = np.zeros((rsize,zsize))#gEQDSK['AuxQuantities']['Br'].tolist()
+#Bt = np.zeros((rsize,zsize))#gEQDSK['AuxQuantities']['Bt'].tolist()
+#Bz = np.ones((rsize,zsize))#gEQDSK['AuxQuantities']['Bz'].tolist()
+#Pol_Flux = np.zeros((rsize,zsize))
+
+# Only B_r
+Br = np.ones((rsize,zsize))#gEQDSK['AuxQuantities']['Br'].tolist()
 Bt = np.zeros((rsize,zsize))#gEQDSK['AuxQuantities']['Bt'].tolist()
-Bz = np.ones((rsize,zsize))#gEQDSK['AuxQuantities']['Bz'].tolist()
+Bz = np.zeros((rsize,zsize))#gEQDSK['AuxQuantities']['Bz'].tolist()
 Pol_Flux = np.zeros((rsize,zsize))
 
-
-# else: x_coord is psi_n
-#if x_type == "rho":
-#    printw("! x_type is 'rho' based on profiles, will set pol_flux=(RHORZ)^2")
-#    Pol_Flux = np.square(gEQDSK['AuxQuantities']['RHORZ']).tolist()
-#elif x_type == "psi_n":
-#    printw("! x_type is 'psi_n' based on profiles, will set pol_flux=PSIRZ_NORM")    Pol_Flux = gEQDSK['AuxQuantities']['PSIRZ_NORM'].tolist()
-#else:
-#    printe(f"! unknown x_type:{x_type} - ending")
-#    OMFITx.End()
+# Only B_t
+Br = np.zeros((rsize,zsize))#gEQDSK['AuxQuantities']['Br'].tolist()
+Bt = np.ones((rsize,zsize))#gEQDSK['AuxQuantities']['Bt'].tolist()
+Bz = np.zeros((rsize,zsize))#gEQDSK['AuxQuantities']['Bz'].tolist()
+Pol_Flux = np.zeros((rsize,zsize))
 
 topfile_file = open(data_path+'topfile.json', 'w')
 topfile_dict = {'R': R.tolist(), 'Z': Z.tolist(), 'Br': Br.tolist(), 'Bz': Bz.tolist(), 'Bt': Bt.tolist(), 'pol_flux': Pol_Flux.tolist()}
@@ -572,7 +559,21 @@ topfile_file.close()
 #%%
 # Tests using synthetic data
 
-Rarray, Zarray, Tarray = np.meshgrid(R,Z,T)
+field = create_magnetic_geometry(
+    "omfit",#find_B_method,
+    magnetic_data_path = data_path,
+    input_filename_suffix = '',
+    interp_order = 5,
+    interp_smoothing = None,
+    B_T_axis = None,
+    R_axis = None,
+    minor_radius_a = None,
+    B_p_a = None,
+    shot = None,
+    equil_time = None,
+    delta_R = 1e-5,
+    delta_Z = 1e-5,
+)
 
 B_R_array = field.B_R(Rarray,Zarray)
 B_T_array = field.B_T(Rarray,Zarray)
@@ -600,4 +601,3 @@ print(np.nanmax(grad_B_test), np.nanmin(grad_B_test), np.nansum(grad_B_test))
 # Test grad_bhat_xyz using compare_grad_bhat
 grad_bhat_test = compare_grad_bhat(field, Rarray, Tarray, Zarray)
 print(np.nanmax(grad_bhat_test), np.nanmin(grad_bhat_test), np.nansum(grad_bhat_test))
-
