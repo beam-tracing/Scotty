@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 from scotty.fun_general import find_q_lab_Cartesian
 from itertools import product
 
+
 class SweepDataset:
     """Stores an xarray Dataset of Scotty output data with dimensions 'frequency',
     'poloidal_angle' and 'toroidal_angle'. Contains class methods for analysing
@@ -257,9 +258,7 @@ class SweepDataset:
                     ds.attrs["poloidal_flux_on_midplane"] = analysis_file[
                         "poloidal_flux_on_midplane"
                     ]
-                    ds.attrs["R_midplane_points"] = analysis_file[
-                        "R_midplane_points"
-                    ]
+                    ds.attrs["R_midplane_points"] = analysis_file["R_midplane_points"]
                     index = ds.attrs["poloidal_flux_on_midplane"].argmin()
                     R_coord = ds.attrs["R_midplane_points"][index]
                     ds.attrs["magnetic_axis_RZ"] = np.array((R_coord, 0.0))
@@ -391,14 +390,16 @@ class SweepDataset:
         """
 
         data = self.dataset
-        B_axis = data.attrs['magnetic_axis_RZ']
+        B_axis = data.attrs["magnetic_axis_RZ"]
         if "cutoff_distance" in self.variables:
             print("cutoff_distance already generated.")
             return data["cutoff_index"]
 
         CUTOFF_ARRAY = data["cutoff_index"]
         # print(CUTOFF_ARRAY.shape)
-        poloidal_distance = np.hypot(data["q_R_array"] - B_axis[0], data["q_Z_array"] - B_axis[1])
+        poloidal_distance = np.hypot(
+            data["q_R_array"] - B_axis[0], data["q_Z_array"] - B_axis[1]
+        )
         self.dataset["poloidal_distance"] = poloidal_distance
         # print(poloidal_distance.shape)
         cutoff_distance = poloidal_distance.isel(trajectory_step=CUTOFF_ARRAY)
@@ -406,7 +407,7 @@ class SweepDataset:
         return cutoff_distance
 
     def generate_cutoff_rho(self):
-        """Finds the poloidal cutoff rho (sqrt flux) of the beam. 
+        """Finds the poloidal cutoff rho (sqrt flux) of the beam.
 
         Returns:
             DataArray: A 3-D DataArray of cutoff distances with frequency,
@@ -598,7 +599,7 @@ class SweepDataset:
                 ("toroidal_angle", toroidal_angles),
             ]
         )
-        path_lengths = self.dataset['distance_along_line']
+        path_lengths = self.dataset["distance_along_line"]
         for combination in product(frequencies, poloidal_angles, toroidal_angles):
             frequency, poloidal_angle, toroidal_angle = combination
             index = {
@@ -614,32 +615,30 @@ class SweepDataset:
                 output_da.loc[index] = int_value
             except ValueError as error:
                 print(error)
-                print('Frequency, poloidal_angle, toroidal_angle is:', combination)
+                print("Frequency, poloidal_angle, toroidal_angle is:", combination)
         return output_da
 
     def generate_mismatch_gaussian(self):
-        delta_m = self.dataset['cutoff_delta_theta_m']
-        theta_m = self.dataset['cutoff_theta_m']
-        gaussian = np.exp(
-            - (theta_m/delta_m)**2
-        )
-        self.dataset['mismatch_gaussian'] = gaussian
+        delta_m = self.dataset["cutoff_delta_theta_m"]
+        theta_m = self.dataset["cutoff_theta_m"]
+        gaussian = np.exp(-((theta_m / delta_m) ** 2))
+        self.dataset["mismatch_gaussian"] = gaussian
         return gaussian
 
     def integrate_loc_m(self):
-        loc_m = self.dataset['loc_m']
+        loc_m = self.dataset["loc_m"]
         int_loc_m = self._path_integrate(loc_m)
-        self.dataset['int_loc_m'] = int_loc_m
+        self.dataset["int_loc_m"] = int_loc_m
         return int_loc_m
 
     def integrate_loc_product(self):
-        loc_m = self.dataset['loc_m']
-        loc_b = self.dataset['loc_b']
-        loc_p = self.dataset['loc_p']
-        loc_r = self.dataset['loc_r']
+        loc_m = self.dataset["loc_m"]
+        loc_b = self.dataset["loc_b"]
+        loc_p = self.dataset["loc_p"]
+        loc_r = self.dataset["loc_r"]
         loc_product = loc_m * loc_b * loc_p * loc_r
         int_loc_product = self._path_integrate(loc_product)
-        self.dataset['int_loc_product'] = int_loc_product
+        self.dataset["int_loc_product"] = int_loc_product
         return int_loc_product
 
     def generate_all(self):
@@ -650,7 +649,7 @@ class SweepDataset:
         self.generate_cutoff_distance()
         self.generate_cutoff_rho()
         self.generate_mismatch_at_cutoff()
-        for variable in ('K_magnitude_array',):
+        for variable in ("K_magnitude_array",):
             self.generate_variable_at_cutoff(variable)
         self.generate_opt_tor()
         self.generate_reflection_mask()
@@ -758,13 +757,21 @@ class SweepDataset:
             y_coordinates = self.get_coordinate_array(ydimension)
             z_values = data.loc[coords_dict].transpose(xdimension, ydimension).values
             spline = RegularGridInterpolator(
-                (x_coordinates, y_coordinates), z_values, method="linear", #TODO: Change back to pchip once done
+                (x_coordinates, y_coordinates),
+                z_values,
+                method="linear",  # TODO: Change back to pchip once done
             )
             self.spline_memo[args] = spline
             return spline
 
     def create_3Dspline(
-        self, variable, xdimension, ydimension, zdimension, coords_dict={}, method='linear'
+        self,
+        variable,
+        xdimension,
+        ydimension,
+        zdimension,
+        coords_dict={},
+        method="linear",
     ):
         """Memoized function that interpolates splines for any variable along
         two arbitrary axes with scipy.interpolate.RegularGridInterpolator.
@@ -839,10 +846,11 @@ class SweepDataset:
         print(f"Number of problematic indices: {len(index_list)}")
         interp_indices = float_indices.where(float_indices >= 0)
         for dimension in ("toroidal_angle", "poloidal_angle", "frequency"):
-            print(f'trying {dimension}')
+            print(f"trying {dimension}")
             try:
                 interp_indices = interp_indices.interpolate_na(
-                    dim=dimension, method="nearest", 
+                    dim=dimension,
+                    method="nearest",
                 )
             except Exception:
                 print(
@@ -859,16 +867,15 @@ class SweepDataset:
             return new_list
 
     def check_float_arrays(self, variable):
-        """Checks for and interpolates any null array values.
-
-        """
+        """Checks for and interpolates any null array values."""
         new_array = self.dataset[variable]
         print("Number of NaN entries:", len(np.argwhere(new_array.isnull().values)))
         # Try multiple dimensions as interpolating in one axis may not eliminate all gaps
         for dimension in ("toroidal_angle", "poloidal_angle", "frequency"):
             try:
                 new_array = new_array.interpolate_na(
-                    dim=dimension, method="cubic", 
+                    dim=dimension,
+                    method="cubic",
                 )
             except Exception:
                 print(
@@ -934,7 +941,12 @@ class SweepDataset:
         ax.set_xlabel(f"{xdimension}")
         ax.set_ylabel(f"{ydimension}")
         im = ax.imshow(
-            data_slice, cmap=cmap, origin="lower", extent=extent, aspect="auto", **kwargs
+            data_slice,
+            cmap=cmap,
+            origin="lower",
+            extent=extent,
+            aspect="auto",
+            **kwargs,
         )
         plt.colorbar(mappable=im)
         return fig, ax
@@ -952,17 +964,19 @@ class SweepDataset:
     ):
         """Make a contour plot of a specific slice of the DataArray.
 
-            Args:
-                variable(str): DataArray variable to visualize
-                xdimension (str): Dimension for the x-axis
-                ydimension (str): Dimension for the y-axis
-                coords_dict (dict): Dictionary of coordinate values of the other
-                dimensions to be held constant
-                cmap (str): Colormap to be used
-                mask_flag(bool): Whether or not to mask non-reflected rays. Only available
-                for dimensions 'frequency', 'poloidal_angle', 'toroidal_angle'.
-            """
-        data_spline = self.create_2Dspline(variable, xdimension, ydimension, coords_dict)
+        Args:
+            variable(str): DataArray variable to visualize
+            xdimension (str): Dimension for the x-axis
+            ydimension (str): Dimension for the y-axis
+            coords_dict (dict): Dictionary of coordinate values of the other
+            dimensions to be held constant
+            cmap (str): Colormap to be used
+            mask_flag(bool): Whether or not to mask non-reflected rays. Only available
+            for dimensions 'frequency', 'poloidal_angle', 'toroidal_angle'.
+        """
+        data_spline = self.create_2Dspline(
+            variable, xdimension, ydimension, coords_dict
+        )
 
         title_string = ""
         for key, value in coords_dict.items():
@@ -971,18 +985,17 @@ class SweepDataset:
         y_coords = self.get_coordinate_array(ydimension)
         x = np.linspace(x_coords[0], x_coords[-1], 500)
         y = np.linspace(y_coords[0], y_coords[-1], 500)
-        X, Y = np.meshgrid(x_coords, y_coords, indexing='ij')
+        X, Y = np.meshgrid(x_coords, y_coords, indexing="ij")
 
         plot_array = data_spline((X, Y))
 
         fig, ax = plt.subplots()
         if mask_flag:
-
             reflection_mask = (
-            self.dataset["reflection_mask"]
-            .loc[coords_dict]
-            .transpose(xdimension, ydimension)
-            .values
+                self.dataset["reflection_mask"]
+                .loc[coords_dict]
+                .transpose(xdimension, ydimension)
+                .values
             )
             mask_function = RegularGridInterpolator(
                 (x_coords, y_coords),
@@ -992,20 +1005,46 @@ class SweepDataset:
             )
             interp_mask = mask_function((X, Y))
             plot_masked = np.ma.array(plot_array, mask=interp_mask)
-            
+
             CS = ax.contourf(
-                X, Y, plot_masked, levels=levels, cmap="plasma_r", corner_mask=True, **kwargs
+                X,
+                Y,
+                plot_masked,
+                levels=levels,
+                cmap="plasma_r",
+                corner_mask=True,
+                **kwargs,
             )
             CSgo = ax.contour(
-                X, Y, plot_masked, levels=levels, colors='k', corner_mask=True, linewidth=0.2, **kwargs
+                X,
+                Y,
+                plot_masked,
+                levels=levels,
+                colors="k",
+                corner_mask=True,
+                linewidth=0.2,
+                **kwargs,
             )
 
         else:
             CS = ax.contourf(
-                X, Y, plot_array, levels=levels, cmap="plasma_r", corner_mask=True, **kwargs
+                X,
+                Y,
+                plot_array,
+                levels=levels,
+                cmap="plasma_r",
+                corner_mask=True,
+                **kwargs,
             )
             CSgo = ax.contour(
-                X, Y, plot_array, levels=levels, colors='k', corner_mask=True, linewidth=0.2, **kwargs
+                X,
+                Y,
+                plot_array,
+                levels=levels,
+                colors="k",
+                corner_mask=True,
+                linewidth=0.2,
+                **kwargs,
             )
         fig.suptitle(f"{variable}, " + title_string)
         ax.set_xlabel(f"{xdimension}")
@@ -1116,14 +1155,26 @@ class SweepDataset:
                 Xgrid, Ygrid, Z_masked, levels=20, cmap="plasma_r", corner_mask=True
             )
             CSgo = ax.contour(
-                Xgrid, Ygrid, Z_masked, levels=20, colors='w', corner_mask=True, linewidth=0.2
+                Xgrid,
+                Ygrid,
+                Z_masked,
+                levels=20,
+                colors="w",
+                corner_mask=True,
+                linewidth=0.2,
             )
         else:
             CS = ax.contourf(
                 Xgrid, Ygrid, Zgrid, levels=20, cmap="plasma_r", corner_mask=True
             )
             CSgo = ax.contour(
-                Xgrid, Ygrid, Z_grid, levels=20, colors='w', corner_mask=True, linewidth=0.2
+                Xgrid,
+                Ygrid,
+                Z_grid,
+                levels=20,
+                colors="w",
+                corner_mask=True,
+                linewidth=0.2,
             )
 
         fig.suptitle(f"Cutoff {title_label}, {const_angle_str}={const_angle}$^\circ$")
@@ -1144,31 +1195,33 @@ class SweepDataset:
         return
 
     def plot_opt_tor_contour(self):
-        freq = self.get_coordinate_array('frequency')
-        pol = self.get_coordinate_array('poloidal_angle')
+        freq = self.get_coordinate_array("frequency")
+        pol = self.get_coordinate_array("poloidal_angle")
         x = np.linspace(freq[0], freq[-1], 500)
         y = np.linspace(pol[0], pol[-1], 500)
-        X, Y = np.meshgrid(x, y, indexing='ij')
+        X, Y = np.meshgrid(x, y, indexing="ij")
         spline = self.create_2Dspline(
-            variable='opt_tor', 
-            xdimension='frequency',
-            ydimension='poloidal_angle',
-            )
+            variable="opt_tor",
+            xdimension="frequency",
+            ydimension="poloidal_angle",
+        )
         data = spline((X, Y))
         mask_func = RegularGridInterpolator(
-            points=(freq,pol), 
-            values=self.dataset['opt_tor_mask'].transpose('frequency','poloidal_angle').values,
-            method='nearest',
+            points=(freq, pol),
+            values=self.dataset["opt_tor_mask"]
+            .transpose("frequency", "poloidal_angle")
+            .values,
+            method="nearest",
         )
         data_masked = np.ma.array(data, mask=mask_func((X, Y)))
         fig, ax = plt.subplots()
 
         CS = ax.contourf(
-                X, Y, data_masked, levels=20, cmap="plasma_r", corner_mask=True
-            )
+            X, Y, data_masked, levels=20, cmap="plasma_r", corner_mask=True
+        )
         CSgo = ax.contour(
-                X, Y, data_masked, levels=20, colors="w", corner_mask=True, linewidth=0.2
-            )
+            X, Y, data_masked, levels=20, colors="w", corner_mask=True, linewidth=0.2
+        )
         fig.suptitle("Opt. toroidal angle contour")
         ax.set_xlabel("frequency/GHz")
         ax.set_ylabel("poloidal angle/$^\circ$")
@@ -1179,7 +1232,9 @@ class SweepDataset:
     def plot_delta_m_contour(self, poloidal_angle):
         return
 
-    def plot_rho_freq_contours(self): # Plot rho against frequency, with contours of constant poloidal steering
+    def plot_rho_freq_contours(
+        self,
+    ):  # Plot rho against frequency, with contours of constant poloidal steering
         return
 
     # To be implemented
@@ -1190,24 +1245,25 @@ class SweepDataset:
         return
     """
 
+
 class MultiSweeps:
     """Class for holding and analysing data from multiple equilibrium sweeps stored
-    as a SweepDataset class. Initializied by providing an arbitrary number of 
+    as a SweepDataset class. Initializied by providing an arbitrary number of
     SweepDataset objects with key values corresponding to the descriptor attribute
     of SweepDataset objects.
 
     Note that the analysis methods associated with this class assumes that the sweeps
     have the same initial beam properties and simulation parameters, with the only
-    difference being the equilibrium properties of the plasma. 
+    difference being the equilibrium properties of the plasma.
     """
 
     def __init__(
-        self, 
+        self,
         frequencies,
         poloidal_angles,
-        toroidal_angles, 
+        toroidal_angles,
         *args,
-        ):
+    ):
         # Common coordinate arrays of the SweepDatasets
         self.frequencies = frequencies
         self.poloidal_angles = poloidal_angles
@@ -1216,11 +1272,11 @@ class MultiSweeps:
         self.datasets = {}
         for dataset in args:
             self.datasets[dataset.descriptor] = dataset
-        
+
         self.tags = {
-            'hi': None,
-            'lo': None,
-            '1.0x': None,
+            "hi": None,
+            "lo": None,
+            "1.0x": None,
         }
 
     def add_SweepDataset(self, SweepDataset):
@@ -1235,43 +1291,49 @@ class MultiSweeps:
         return list(self.datasets.keys())
 
     def plot_opt_tors(self, poloidal_angles=None):
-        
         if poloidal_angles == None:
             poloidal_angles = self.poloidal_angles
 
         freq_range = np.linspace(self.frequencies[0], self.frequencies[-1], 500)
 
-        linestyles = ['solid', 'dashed', 'dashdot', 'dotted']
+        linestyles = ["solid", "dashed", "dashdot", "dotted"]
         colormap = plt.cm.gnuplot2
         markers = split_list(plt.lines.Line2D.filled_markers)
         pol_count = len(poloidal_angles)
         counter = 0
-        
+
         fig = plt.fig()
-        
+
         for poloidal_angle in poloidal_angles:
             for dataset in self.datasets.values():
-                color = colormap(counter/pol_count)
+                color = colormap(counter / pol_count)
                 marker = markers[counter]
                 plot_spline = dataset.create_1D_spline(
-                    variable = 'opt_tor',
-                    dimension = 'frequency',
-                    coords_dict = {
-                        'poloidal_angle': poloidal_angle
-                    }
+                    variable="opt_tor",
+                    dimension="frequency",
+                    coords_dict={"poloidal_angle": poloidal_angle},
                 )
-                plt.plot(freq_range, plot_spline(freq_range), color=color, label=f'pol={poloidal_angle}')
-                plt.scatter(self.frequencies, plot_spline(self.frequencies), marker=marker, label=f'{dataset.descriptor}')
-                counter+=1
+                plt.plot(
+                    freq_range,
+                    plot_spline(freq_range),
+                    color=color,
+                    label=f"pol={poloidal_angle}",
+                )
+                plt.scatter(
+                    self.frequencies,
+                    plot_spline(self.frequencies),
+                    marker=marker,
+                    label=f"{dataset.descriptor}",
+                )
+                counter += 1
 
-        plt.title('opt_tor vs. equilibrium')
-        plt.xlabel('frequency/GHz')
-        plt.ylabel('opt_tor/deg')
+        plt.title("opt_tor vs. equilibrium")
+        plt.xlabel("frequency/GHz")
+        plt.ylabel("opt_tor/deg")
         plt.legend()
 
 
 class TrajectoryPlot:
-
     def __init__(self, topfile_path):
         with open(topfile_path) as f:
             topfile = json.load(f)
@@ -1279,56 +1341,48 @@ class TrajectoryPlot:
             Z_coord = topfile["Z"]
             polflux = topfile["pol_flux"]
             self.polflux = xr.DataArray(
-                data = np.transpose(polflux),
-                dims = ("R", "Z"),
-                coords = {
+                data=np.transpose(polflux),
+                dims=("R", "Z"),
+                coords={
                     "R": R_coord,
                     "Z": Z_coord,
-                }
+                },
             )
 
-    def plot_pol_trajectory(
-        self, 
-        q_R, 
-        q_Z,
-        xlim=(1.25, 2.5),
-        ylim=(-1.2, 1.2)
-        ):
+    def plot_pol_trajectory(self, q_R, q_Z, xlim=(1.25, 2.5), ylim=(-1.2, 1.2)):
         fig = plt.figure()
-        R_coord = self.polflux.coords['R'].values
-        Z_coord = self.polflux.coords['Z'].values
-        data=np.clip(self.polflux.transpose('Z', 'R'), 0, 1)
+        R_coord = self.polflux.coords["R"].values
+        Z_coord = self.polflux.coords["Z"].values
+        data = np.clip(self.polflux.transpose("Z", "R"), 0, 1)
         xr.plot.contourf(
             darray=data,
             levels=50,
             xlim=xlim,
             ylim=ylim,
             add_colorbar=True,
-            cmap='plasma_r',
+            cmap="plasma_r",
         )
         xr.plot.contour(
             darray=data,
             levels=20,
             xlim=xlim,
             ylim=ylim,
-            colors='w',
+            colors="w",
             linewidth=0.2,
         )
-        plt.plot(q_R, q_Z, label='trajectory', color='k')
+        plt.plot(q_R, q_Z, label="trajectory", color="k")
         plt.legend()
         return fig
-
-
 
 
 ## Helper functions
 def split_list(a_list):
     i_half = len(a_list) // 2
     return a_list[:i_half], a_list[i_half:]
-    
 
 
 ## Helper functions
+
 
 def fit_gaussian(toroidal_angle, opt_tor, delta):
     return np.exp(-(((toroidal_angle - opt_tor) / delta) ** 2))
@@ -1347,6 +1401,7 @@ def find_nearest(array, value):
     index = np.abs((array - value)).argmin()
     return array[index]
 
+
 def scale_array(array):
     maxval = array.max()
-    return array/maxval
+    return array / maxval
