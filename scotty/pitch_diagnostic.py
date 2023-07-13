@@ -87,7 +87,7 @@ class PitchDiagnostic:
     @classmethod
     def from_netcdf(cls, path_string):
         """ """
-        with xr.open_dataset(path_string, group="home", engine='netcdf4') as ds:
+        with xr.open_dataset(path_string, group="home", engine="netcdf4") as ds:
             class_type = ds.attrs["class_type"]
             if class_type != "PitchDiagnostic":
                 raise ValueError(
@@ -174,7 +174,7 @@ class PitchDiagnostic:
     def set_std_noise(self, new_value):
         self.home.attrs["std_noise"] = new_value
 
-    def set_rho_freq_relation(self, SweepDataset):  
+    def set_rho_freq_relation(self, SweepDataset):
         # Assumed equilibrium relation for analysing all equilibria
         # Use an array representation of a spline
         # 2D spline contour averaged over toroidal range to get average relation
@@ -542,11 +542,11 @@ class PitchDiagnostic:
 
     def _fit_gaussians(self, data, descriptor):
         curvefit_results = data.curvefit(
-            coords="toroidal_angle", 
-            func=fit_gaussian, 
+            coords="toroidal_angle",
+            func=fit_gaussian,
             p0={"opt_tor": -2},
             skipna=True,
-            errors='ignore',
+            errors="ignore",
         )
         curvefit_results["curvefit_coefficients"].attrs[
             "method"
@@ -918,7 +918,6 @@ class PitchDiagnostic:
         return fig, axes
 
     def plot_all_opt_tor_measurements(self, sim_type="mismatch"):
-        
         fig = plt.figure()
         plt.title(f"{sim_type}, Opt Tor vs. Probe Frequency")
         colormap = plt.cm.gnuplot2
@@ -926,7 +925,7 @@ class PitchDiagnostic:
         total_count = len(self.descriptors)
 
         for descriptor in self.descriptors:
-            color = colormap(counter/total_count)
+            color = colormap(counter / total_count)
             mean = self.ds_dict[descriptor][f"{sim_type}_mean_opt_tor"].loc[
                 {"poloidal_angle": self.poloidal_angles[0]}
             ]
@@ -939,12 +938,18 @@ class PitchDiagnostic:
             x_coords = self.frequencies
             plt.plot(x_coords, mean, color=color, marker="+")
             plt.fill_between(x_coords, mean - std, mean + std, color=color, alpha=0.3)
-            plt.plot(x_coords, actual, color=color, marker="+", linestyle='dashed')
+            plt.plot(x_coords, actual, color=color, marker="+", linestyle="dashed")
             counter += 1
-        
+
         Line2D = mpl.lines.Line2D
-        custom_colors = [Line2D([0], [0], color=colormap(count / total_count), lw=4) for count in range(total_count)]
-        custom_styles = [Line2D([0], [0], color='k', linestyle='solid'), Line2D([0], [0], color='k', linestyle='dashed')]
+        custom_colors = [
+            Line2D([0], [0], color=colormap(count / total_count), lw=4)
+            for count in range(total_count)
+        ]
+        custom_styles = [
+            Line2D([0], [0], color="k", linestyle="solid"),
+            Line2D([0], [0], color="k", linestyle="dashed"),
+        ]
         custom_handles = custom_colors + custom_styles
         custom_labels = list(self.descriptors) + ["mean", "predicted"]
 
@@ -953,9 +958,9 @@ class PitchDiagnostic:
         plt.legend(
             custom_handles,
             custom_labels,
-            bbox_to_anchor=(1.05, 0), 
-            loc="lower left", 
-            borderaxespad=0.0, 
+            bbox_to_anchor=(1.05, 0),
+            loc="lower left",
+            borderaxespad=0.0,
         )
         return fig
 

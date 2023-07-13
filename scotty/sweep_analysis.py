@@ -339,12 +339,11 @@ class SweepDataset:
             variable="cutoff_rho",
             dimension="frequency",
             coords_dict={
-            "poloidal_angle":poloidal_angle,
-            "toroidal_angle":toroidal_angle,
+                "poloidal_angle": poloidal_angle,
+                "toroidal_angle": toroidal_angle,
             },
         )
         return spline
-
 
     @property
     def dimensions(self):
@@ -975,15 +974,17 @@ class SweepDataset:
         return fig, ax
 
     def compare_loc_cutoff(
-        self, 
+        self,
         loc,
         xdimension,
         ydimension,
         coords_dict,
-        cmap="seismic", 
+        cmap="seismic",
         **kwargs,
-        ):
-        difference = self.dataset['cutoff_index'] - self.dataset[loc].argmax(dim='trajectory_step')
+    ):
+        difference = self.dataset["cutoff_index"] - self.dataset[loc].argmax(
+            dim="trajectory_step"
+        )
         image = difference.loc[coords_dict].transpose(ydimension, xdimension)
         x_coords = self.get_coordinate_array(xdimension)
         y_coords = self.get_coordinate_array(ydimension)
@@ -991,16 +992,12 @@ class SweepDataset:
 
         fig, ax = plt.subplots()
         im = ax.imshow(
-            image, 
-            origin="lower",
-            extent=extent, 
-            cmap=cmap, 
-            aspect="auto",
-            **kwargs)
-        ax.set_xlabel=f'{xdimension}'
-        ax.set_ylabel=f'{ydimension}'
+            image, origin="lower", extent=extent, cmap=cmap, aspect="auto", **kwargs
+        )
+        ax.set_xlabel = f"{xdimension}"
+        ax.set_ylabel = f"{ydimension}"
         plt.colorbar(mappable=im)
-        fig.suptitle(f'Index of cutoff - peak {loc}')
+        fig.suptitle(f"Index of cutoff - peak {loc}")
         return fig, ax
 
     def plot_contour(
@@ -1344,7 +1341,7 @@ class MultiSweeps:
 
     def plot_opt_tors(self, poloidal_angles=None):
         # Expand to allow transforming coordinates, generate and save the spline
-        
+
         if poloidal_angles == None:
             poloidal_angles = self.poloidal_angles
 
@@ -1387,24 +1384,32 @@ class MultiSweeps:
             counter += 1
 
         Line2D = mpl.lines.Line2D
-        custom_colors = [Line2D([0], [0], color=colormap(count / pol_count), lw=4) for count in range(pol_count)]
-        custom_markers = [Line2D([0], [0], color='k', marker=markers[count]) for count in range(pol_count)]
+        custom_colors = [
+            Line2D([0], [0], color=colormap(count / pol_count), lw=4)
+            for count in range(pol_count)
+        ]
+        custom_markers = [
+            Line2D([0], [0], color="k", marker=markers[count])
+            for count in range(pol_count)
+        ]
         custom_handles = custom_colors + custom_markers
-        custom_labels =  [f"pol={pol_angle}" for pol_angle in poloidal_angles] + descriptor_list
+        custom_labels = [
+            f"pol={pol_angle}" for pol_angle in poloidal_angles
+        ] + descriptor_list
         fig.suptitle("opt_tor vs. equilibrium")
         ax.legend(
             custom_handles,
             custom_labels,
-            bbox_to_anchor=(1.05, 0), 
-            loc="lower left", 
-            borderaxespad=0.0, 
-            fontsize=8
+            bbox_to_anchor=(1.05, 0),
+            loc="lower left",
+            borderaxespad=0.0,
+            fontsize=8,
         )
         ax.set_xlabel("frequency/GHz")
         ax.set_ylabel("opt_tor/deg")
-        
+
         return fig, ax
-    
+
     def plot_rho_freq_relations(self, poloidal_angle, toroidal_angle=0):
         # Have a toroidal range argument
 
@@ -1416,7 +1421,13 @@ class MultiSweeps:
         for dataset in self.datasets.values():
             color = colormap(counter / total)
             spline = dataset.get_rho_freq_spline(poloidal_angle, toroidal_angle)
-            plt.plot(freq_range, spline(freq_range), color=color, alpha=0.5, label=f'{dataset.descriptor}')
+            plt.plot(
+                freq_range,
+                spline(freq_range),
+                color=color,
+                alpha=0.5,
+                label=f"{dataset.descriptor}",
+            )
             counter += 1
 
         plt.title("Cutoff Rho vs. Frequency")
@@ -1424,7 +1435,6 @@ class MultiSweeps:
         plt.ylabel("Rho")
         plt.legend()
         return fig
-
 
 
 class TrajectoryPlot:
