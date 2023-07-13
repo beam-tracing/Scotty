@@ -19,6 +19,7 @@ from scipy.interpolate import (
 from scipy.optimize import newton
 from scipy.stats import norm
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from scotty.fun_general import find_q_lab_Cartesian
 from itertools import product
 from scotty.sweep_analysis import (
@@ -45,8 +46,6 @@ class PitchDiagnostic:
     def __init__(self, ds):
         self.home = ds
         self.ds_dict = {}
-
-    # I/O TODO: Fix lingerin I/O issues with variables and attributes not being written properly
 
     @classmethod
     def create_new(
@@ -88,7 +87,7 @@ class PitchDiagnostic:
     @classmethod
     def from_netcdf(cls, path_string):
         """ """
-        with xr.open_dataset(path_string, group="home") as ds:
+        with xr.open_dataset(path_string, group="home", engine='netcdf4') as ds:
             class_type = ds.attrs["class_type"]
             if class_type != "PitchDiagnostic":
                 raise ValueError(
@@ -175,8 +174,7 @@ class PitchDiagnostic:
     def set_std_noise(self, new_value):
         self.home.attrs["std_noise"] = new_value
 
-    ## Simulation methods
-    def set_rho_freq_relation(self, SweepDataset):  # TODO: Current task
+    def set_rho_freq_relation(self, SweepDataset):  
         # Assumed equilibrium relation for analysing all equilibria
         # Use an array representation of a spline
         # 2D spline contour averaged over toroidal range to get average relation
@@ -234,6 +232,8 @@ class PitchDiagnostic:
             frequency_range, self.ds_dict["cutoff_data"]["rho_lower"], s=0
         )
         return upper_spline, lower_spline
+
+    ## Simulation methods
 
     def get_interp_variables(self, SweepDataset):
         descriptor = str(SweepDataset.descriptor)
@@ -322,79 +322,6 @@ class PitchDiagnostic:
         else:
             self.ds_dict[descriptor] = xr.Dataset()
             ds = self.ds_dict[descriptor]
-
-        ## Get splines and profiles
-
-        # Note: For some reason, the 3D interpolation does not work with any method
-        # with an order higher than 'linear'
-        """
-        X, Y, Z = np.meshgrid(frequencies, poloidal_angles, toroidal_range, indexing='ij')
-
-        int_loc_m_spline = SweepDataset.create_3Dspline(
-            variable='int_loc_m',
-            xdimension='frequency',
-            ydimension='poloidal_angle',
-            zdimension='toroidal_angle',
-            method="cubic",
-        )
-        int_loc_m_array = int_loc_m_spline((X, Y, Z))
-        int_loc_m_da = xr.DataArray(
-            data = int_loc_m_array,
-            dims=("frequency", "poloidal_angle", "toroidal_range"),
-            coords={
-                "frequency": frequencies,
-                "poloidal_angle": poloidal_angles,
-                "toroidal_range": toroidal_range
-            },
-        )
-        self.ds_dict[descriptor]["loc_m_profile"] = int_loc_m_da
-
-        int_loc_product_spline = SweepDataset.create_3Dspline(
-            variable='int_loc_product',
-            xdimension='frequency',
-            ydimension='poloidal_angle',
-            zdimension='toroidal_angle',
-            method="cubic",
-        )
-        int_loc_product_array = int_loc_product_spline((X, Y, Z))
-        int_loc_product_da = xr.DataArray(
-            data = int_loc_product_array,
-            dims=("frequency", "poloidal_angle", "toroidal_range"),
-            coords={
-                "frequency": frequencies,
-                "poloidal_angle": poloidal_angles,
-                "toroidal_range": toroidal_range
-            },
-        )
-        
-        self.ds_dict[descriptor]["loc_product_profile"] = int_loc_product_da
-
-        ## Simulate measurements
-        
-        ds['simulated_loc_m'] = xr.DataArray(
-                    dims=("frequency", "poloidal_angle", "toroidal_angle", "iteration"),
-                    coords={
-                        "frequency": frequencies,
-                        "poloidal_angle": poloidal_angles,
-                        "toroidal_angle": toroidal_angles,
-                        "iteration": iter_array,
-                    },
-                )
-
-        ds['simulated_loc_product'] = xr.DataArray(
-                    dims=("frequency", "poloidal_angle", "toroidal_angle", "iteration"),
-                    coords={
-                        "frequency": frequencies,
-                        "poloidal_angle": poloidal_angles,
-                        "toroidal_angle": toroidal_angles,
-                        "iteration": iter_array,
-                    },
-                )
-
-        xgrid, ygrid, zgrid = np.meshgrid(frequencies, poloidal_angles, toroidal_angles, indexing='ij')
-        loc_m_signal = int_loc_m_spline((xgrid, ygrid, zgrid))
-        loc_product_signal = int_loc_product_spline((xgrid, ygrid, zgrid))
-        """
 
         self.ds_dict[descriptor]["loc_m_profile"] = xr.DataArray(
             dims=("frequency", "poloidal_angle", "toroidal_range"),
@@ -569,6 +496,11 @@ class PitchDiagnostic:
 
         return da
 
+    def simulate_all(self, SweepDataset):
+        self.get_interp_variables(SweepDataset)
+        self.simulate_mismatch_measurements(SweepDataset)
+        self.simulate_loc_measurements(SweepDataset)
+
     ## Analysis methods
 
     def fit_measurement_gaussians(self, descriptor=None):
@@ -610,7 +542,11 @@ class PitchDiagnostic:
 
     def _fit_gaussians(self, data, descriptor):
         curvefit_results = data.curvefit(
-            coords="toroidal_angle", func=fit_gaussian, p0={"opt_tor": 0}
+            coords="toroidal_angle", 
+            func=fit_gaussian, 
+            p0={"opt_tor": -2},
+            skipna=True,
+            errors='ignore',
         )
         curvefit_results["curvefit_coefficients"].attrs[
             "method"
@@ -980,6 +916,48 @@ class PitchDiagnostic:
         plt.xlabel("toroidal steering/deg")
         plt.ylabel(f"{variable}")
         return fig, axes
+
+    def plot_all_opt_tor_measurements(self, sim_type="mismatch"):
+        
+        fig = plt.figure()
+        plt.title(f"{sim_type}, Opt Tor vs. Probe Frequency")
+        colormap = plt.cm.gnuplot2
+        counter = 0
+        total_count = len(self.descriptors)
+
+        for descriptor in self.descriptors:
+            color = colormap(counter/total_count)
+            mean = self.ds_dict[descriptor][f"{sim_type}_mean_opt_tor"].loc[
+                {"poloidal_angle": self.poloidal_angles[0]}
+            ]
+            std = self.ds_dict[descriptor][f"{sim_type}_std_opt_tor"].loc[
+                {"poloidal_angle": self.poloidal_angles[0]}
+            ]
+            actual = self.ds_dict[descriptor]["opt_tor"].loc[
+                {"poloidal_angle": self.poloidal_angles[0]}
+            ]
+            x_coords = self.frequencies
+            plt.plot(x_coords, mean, color=color, marker="+")
+            plt.fill_between(x_coords, mean - std, mean + std, color=color, alpha=0.3)
+            plt.plot(x_coords, actual, color=color, marker="+", linestyle='dashed')
+            counter += 1
+        
+        Line2D = mpl.lines.Line2D
+        custom_colors = [Line2D([0], [0], color=colormap(count / total_count), lw=4) for count in range(total_count)]
+        custom_styles = [Line2D([0], [0], color='k', linestyle='solid'), Line2D([0], [0], color='k', linestyle='dashed')]
+        custom_handles = custom_colors + custom_styles
+        custom_labels = list(self.descriptors) + ["mean", "predicted"]
+
+        plt.xlabel("Frequency/GHz")
+        plt.ylabel("Opt. Toroidal Angle/Deg")
+        plt.legend(
+            custom_handles,
+            custom_labels,
+            bbox_to_anchor=(1.05, 0), 
+            loc="lower left", 
+            borderaxespad=0.0, 
+        )
+        return fig
 
     def plot_opt_tor_vs_freq(self, descriptor, sim_type="mismatch"):
         mean = self.ds_dict[descriptor][f"{sim_type}_mean_opt_tor"].loc[

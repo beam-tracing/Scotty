@@ -19,6 +19,7 @@ from scipy.interpolate import (
 from scipy.optimize import newton
 from scipy.stats import norm
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from scotty.fun_general import find_q_lab_Cartesian
 from itertools import product
 
@@ -333,6 +334,18 @@ class SweepDataset:
         data = self.dataset
         return data.coords[dimension].values
 
+    def get_rho_freq_spline(self, poloidal_angle, toroidal_angle):
+        spline = self.create_1Dspline(
+            variable="cutoff_rho",
+            dimension="frequency",
+            coords_dict={
+            "poloidal_angle":poloidal_angle,
+            "toroidal_angle":toroidal_angle,
+            },
+        )
+        return spline
+
+
     @property
     def dimensions(self):
         """A dictionary of Dataset variables and their corresponding dimensions."""
@@ -619,6 +632,9 @@ class SweepDataset:
         return output_da
 
     def generate_mismatch_gaussian(self):
+        if "mismatch_gaussian" in self.variables:
+            print("mismatch_gaussian already generated.")
+            return self.dataset["mismatch_gaussian"]
         delta_m = self.dataset["cutoff_delta_theta_m"]
         theta_m = self.dataset["cutoff_theta_m"]
         gaussian = np.exp(-((theta_m / delta_m) ** 2))
@@ -626,17 +642,24 @@ class SweepDataset:
         return gaussian
 
     def integrate_loc_m(self):
+        if "int_loc_m" in self.variables:
+            print("int_loc_m already generated.")
+            return self.dataset["int_loc_m"]
         loc_m = self.dataset["loc_m"]
         int_loc_m = self._path_integrate(loc_m)
         self.dataset["int_loc_m"] = int_loc_m
         return int_loc_m
 
     def integrate_loc_product(self):
+        if "int_loc_product" in self.variables:
+            print("int_loc_product already generated.")
+            return self.dataset["int_loc_product"]
         loc_m = self.dataset["loc_m"]
         loc_b = self.dataset["loc_b"]
         loc_p = self.dataset["loc_p"]
         loc_r = self.dataset["loc_r"]
         loc_product = loc_m * loc_b * loc_p * loc_r
+        self.dataset["loc_product"] = loc_product
         int_loc_product = self._path_integrate(loc_product)
         self.dataset["int_loc_product"] = int_loc_product
         return int_loc_product
@@ -951,6 +974,35 @@ class SweepDataset:
         plt.colorbar(mappable=im)
         return fig, ax
 
+    def compare_loc_cutoff(
+        self, 
+        loc,
+        xdimension,
+        ydimension,
+        coords_dict,
+        cmap="seismic", 
+        **kwargs,
+        ):
+        difference = self.dataset['cutoff_index'] - self.dataset[loc].argmax(dim='trajectory_step')
+        image = difference.loc[coords_dict].transpose(ydimension, xdimension)
+        x_coords = self.get_coordinate_array(xdimension)
+        y_coords = self.get_coordinate_array(ydimension)
+        extent = [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
+
+        fig, ax = plt.subplots()
+        im = ax.imshow(
+            image, 
+            origin="lower",
+            extent=extent, 
+            cmap=cmap, 
+            aspect="auto",
+            **kwargs)
+        ax.set_xlabel=f'{xdimension}'
+        ax.set_ylabel=f'{ydimension}'
+        plt.colorbar(mappable=im)
+        fig.suptitle(f'Index of cutoff - peak {loc}')
+        return fig, ax
+
     def plot_contour(
         self,
         variable,
@@ -1262,7 +1314,7 @@ class MultiSweeps:
         frequencies,
         poloidal_angles,
         toroidal_angles,
-        *args,
+        datasets,
     ):
         # Common coordinate arrays of the SweepDatasets
         self.frequencies = frequencies
@@ -1270,7 +1322,7 @@ class MultiSweeps:
         self.toroidal_angles = toroidal_angles
 
         self.datasets = {}
-        for dataset in args:
+        for dataset in datasets:
             self.datasets[dataset.descriptor] = dataset
 
         self.tags = {
@@ -1291,6 +1343,8 @@ class MultiSweeps:
         return list(self.datasets.keys())
 
     def plot_opt_tors(self, poloidal_angles=None):
+        # Expand to allow transforming coordinates, generate and save the spline
+        
         if poloidal_angles == None:
             poloidal_angles = self.poloidal_angles
 
@@ -1298,39 +1352,79 @@ class MultiSweeps:
 
         linestyles = ["solid", "dashed", "dashdot", "dotted"]
         colormap = plt.cm.gnuplot2
-        markers = split_list(plt.lines.Line2D.filled_markers)
+        markers = split_list(mpl.lines.Line2D.filled_markers)
         pol_count = len(poloidal_angles)
         counter = 0
+        descriptor_list = []
 
-        fig = plt.fig()
+        fig, ax = plt.subplots()
 
         for poloidal_angle in poloidal_angles:
+            color = colormap(counter / pol_count)
+            counter2 = 0
             for dataset in self.datasets.values():
-                color = colormap(counter / pol_count)
-                marker = markers[counter]
-                plot_spline = dataset.create_1D_spline(
+                if counter == 0:
+                    descriptor_list.append(dataset.descriptor)
+                marker = markers[counter2]
+                plot_spline = dataset.create_1Dspline(
                     variable="opt_tor",
                     dimension="frequency",
                     coords_dict={"poloidal_angle": poloidal_angle},
                 )
-                plt.plot(
+                ax.plot(
                     freq_range,
                     plot_spline(freq_range),
                     color=color,
-                    label=f"pol={poloidal_angle}",
                 )
-                plt.scatter(
+                ax.scatter(
                     self.frequencies,
                     plot_spline(self.frequencies),
                     marker=marker,
-                    label=f"{dataset.descriptor}",
+                    s=10,
+                    color=color,
                 )
-                counter += 1
+                counter2 += 1
+            counter += 1
 
-        plt.title("opt_tor vs. equilibrium")
-        plt.xlabel("frequency/GHz")
-        plt.ylabel("opt_tor/deg")
+        Line2D = mpl.lines.Line2D
+        custom_colors = [Line2D([0], [0], color=colormap(count / pol_count), lw=4) for count in range(pol_count)]
+        custom_markers = [Line2D([0], [0], color='k', marker=markers[count]) for count in range(pol_count)]
+        custom_handles = custom_colors + custom_markers
+        custom_labels =  [f"pol={pol_angle}" for pol_angle in poloidal_angles] + descriptor_list
+        fig.suptitle("opt_tor vs. equilibrium")
+        ax.legend(
+            custom_handles,
+            custom_labels,
+            bbox_to_anchor=(1.05, 0), 
+            loc="lower left", 
+            borderaxespad=0.0, 
+            fontsize=8
+        )
+        ax.set_xlabel("frequency/GHz")
+        ax.set_ylabel("opt_tor/deg")
+        
+        return fig, ax
+    
+    def plot_rho_freq_relations(self, poloidal_angle, toroidal_angle=0):
+        # Have a toroidal range argument
+
+        freq_range = np.linspace(self.frequencies[0], self.frequencies[-1], 500)
+        colormap = plt.cm.gnuplot2
+        counter = 0
+        total = len(self.datasets.keys())
+        fig = plt.figure()
+        for dataset in self.datasets.values():
+            color = colormap(counter / total)
+            spline = dataset.get_rho_freq_spline(poloidal_angle, toroidal_angle)
+            plt.plot(freq_range, spline(freq_range), color=color, alpha=0.5, label=f'{dataset.descriptor}')
+            counter += 1
+
+        plt.title("Cutoff Rho vs. Frequency")
+        plt.xlabel("Frequency/GHz")
+        plt.ylabel("Rho")
         plt.legend()
+        return fig
+
 
 
 class TrajectoryPlot:
@@ -1378,7 +1472,7 @@ class TrajectoryPlot:
 ## Helper functions
 def split_list(a_list):
     i_half = len(a_list) // 2
-    return a_list[:i_half], a_list[i_half:]
+    return a_list[:i_half] + a_list[i_half:]
 
 
 ## Helper functions
