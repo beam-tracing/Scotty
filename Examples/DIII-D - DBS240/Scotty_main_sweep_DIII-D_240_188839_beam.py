@@ -9,9 +9,7 @@ valerian@hall-chen.com
 """
 from scotty.beam_me_up import beam_me_up
 import numpy as np
-import os
 from scotty.init_bruv import get_parameters_for_Scotty
-from scotty.fun_general import modify_beam
 
 launch_beam_width_scalings = np.linspace(0.90, 1.1, 3)
 launch_beam_curvature_scalings = np.array([1.0])

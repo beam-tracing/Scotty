@@ -9,7 +9,6 @@ valerian@hall-chen.com
 """
 from scotty.beam_me_up import beam_me_up
 import numpy as np
-import os
 from scotty.init_bruv import get_parameters_for_Scotty
 
 pol_launch_angles = np.linspace(-1.5, -15.5, 57)
