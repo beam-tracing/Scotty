@@ -7,7 +7,7 @@ Created on Sat Apr  8 16:15:32 2023
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scotty.fun_general import find_q_lab_Cartesian, find_nearest, contract_special
+from scotty.fun_general import find_nearest, contract_special, cylindrical_to_cartesian
 from scotty.fun_general import (
     find_normalised_plasma_freq,
     find_normalised_gyro_freq,
@@ -107,8 +107,8 @@ class outplot(object):
         self.l_lc = (
             self.distance_along_line - self.distance_along_line[self.cutoff_index]
         )  # Distance from cutoff
-        [self.q_X_array, self.q_Y_array, self.q_Z_array] = find_q_lab_Cartesian(
-            np.array([self.q_R_array, self.q_zeta_array, self.q_Z_array])
+        self.q_X_array, self.q_Y_array, self.q_Z_array = cylindrical_to_cartesian(
+            self.q_R_array, self.q_zeta_array, self.q_Z_array
         )
         self.out_index = np.size(self.q_R_array)  # numberOfDataPoints
 
@@ -266,32 +266,14 @@ class outplot(object):
         circle_outboard = np.zeros([1001, 2])
         circle_polmin = np.zeros([1001, 2])
         circle_inboard = np.zeros([1001, 2])
-        circle_outboard[:, 0], circle_outboard[:, 1], _ = find_q_lab_Cartesian(
-            np.array(
-                [
-                    R_outboard * np.ones_like(zeta_plot),
-                    zeta_plot,
-                    np.zeros_like(zeta_plot),
-                ]
-            )
+        circle_outboard[:, 0], circle_outboard[:, 1], _ = cylindrical_to_cartesian(
+            R_outboard * np.ones_like(zeta_plot), zeta_plot, np.zeros_like(zeta_plot)
         )
-        circle_polmin[:, 0], circle_polmin[:, 1], _ = find_q_lab_Cartesian(
-            np.array(
-                [
-                    R_polmin * np.ones_like(zeta_plot),
-                    zeta_plot,
-                    np.zeros_like(zeta_plot),
-                ]
-            )
+        circle_polmin[:, 0], circle_polmin[:, 1], _ = cylindrical_to_cartesian(
+            R_polmin * np.ones_like(zeta_plot), zeta_plot, np.zeros_like(zeta_plot)
         )
-        circle_inboard[:, 0], circle_inboard[:, 1], _ = find_q_lab_Cartesian(
-            np.array(
-                [
-                    R_inboard * np.ones_like(zeta_plot),
-                    zeta_plot,
-                    np.zeros_like(zeta_plot),
-                ]
-            )
+        circle_inboard[:, 0], circle_inboard[:, 1], _ = cylindrical_to_cartesian(
+            R_inboard * np.ones_like(zeta_plot), zeta_plot, np.zeros_like(zeta_plot)
         )
         ##
         ## For plotting how the beam propagates from launch to entry
@@ -299,9 +281,9 @@ class outplot(object):
             launch_position_X,
             launch_position_Y,
             launch_position_Z,
-        ) = find_q_lab_Cartesian(self.launch_position)
-        entry_position_X, entry_position_Y, entry_position_Z = find_q_lab_Cartesian(
-            np.array([self.q_R_array[0], self.q_zeta_array[0], self.q_Z_array[0]])
+        ) = cylindrical_to_cartesian(*self.launch_position)
+        entry_position_X, entry_position_Y, entry_position_Z = cylindrical_to_cartesian(
+            self.q_R_array[0], self.q_zeta_array[0], self.q_Z_array[0]
         )
         ##
         ## For plotting the width in the XY plane
@@ -743,32 +725,14 @@ def compare_plots(
         circle_outboard = np.zeros([1001, 2])
         circle_polmin = np.zeros([1001, 2])
         circle_inboard = np.zeros([1001, 2])
-        circle_outboard[:, 0], circle_outboard[:, 1], _ = find_q_lab_Cartesian(
-            np.array(
-                [
-                    R_outboard * np.ones_like(zeta_plot),
-                    zeta_plot,
-                    np.zeros_like(zeta_plot),
-                ]
-            )
+        circle_outboard[:, 0], circle_outboard[:, 1], _ = cylindrical_to_cartesian(
+            R_outboard * np.ones_like(zeta_plot), zeta_plot, np.zeros_like(zeta_plot)
         )
-        circle_polmin[:, 0], circle_polmin[:, 1], _ = find_q_lab_Cartesian(
-            np.array(
-                [
-                    R_polmin * np.ones_like(zeta_plot),
-                    zeta_plot,
-                    np.zeros_like(zeta_plot),
-                ]
-            )
+        circle_polmin[:, 0], circle_polmin[:, 1], _ = cylindrical_to_cartesian(
+            R_polmin * np.ones_like(zeta_plot), zeta_plot, np.zeros_like(zeta_plot)
         )
-        circle_inboard[:, 0], circle_inboard[:, 1], _ = find_q_lab_Cartesian(
-            np.array(
-                [
-                    R_inboard * np.ones_like(zeta_plot),
-                    zeta_plot,
-                    np.zeros_like(zeta_plot),
-                ]
-            )
+        circle_inboard[:, 0], circle_inboard[:, 1], _ = cylindrical_to_cartesian(
+            R_inboard * np.ones_like(zeta_plot), zeta_plot, np.zeros_like(zeta_plot)
         )
         ##
         plt.figure(figsize=(5, 5))
@@ -785,15 +749,15 @@ def compare_plots(
                 launch_position_X,
                 launch_position_Y,
                 launch_position_Z,
-            ) = find_q_lab_Cartesian(plotobject.launch_position)
-            entry_position_X, entry_position_Y, entry_position_Z = find_q_lab_Cartesian(
-                np.array(
-                    [
-                        plotobject.q_R_array[0],
-                        plotobject.q_zeta_array[0],
-                        plotobject.q_Z_array[0],
-                    ]
-                )
+            ) = cylindrical_to_cartesian(*plotobject.launch_position)
+            (
+                entry_position_X,
+                entry_position_Y,
+                entry_position_Z,
+            ) = cylindrical_to_cartesian(
+                plotobject.q_R_array[0],
+                plotobject.q_zeta_array[0],
+                plotobject.q_Z_array[0],
             )
             ##
             ## For plotting the width in the XY plane

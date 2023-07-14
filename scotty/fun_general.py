@@ -231,18 +231,6 @@ def find_vec_lab_Cartesian(vec_lab, q_zeta):
     return vec_lab_Cartesian
 
 
-def find_q_lab_Cartesian(q_lab):
-    q_R = q_lab[0]
-    q_zeta = q_lab[1]
-    q_Z = q_lab[2]
-
-    q_lab_Cartesian = np.zeros_like(q_lab)
-    q_lab_Cartesian[0] = q_R * np.cos(q_zeta)
-    q_lab_Cartesian[1] = q_R * np.sin(q_zeta)
-    q_lab_Cartesian[2] = q_Z
-    return q_lab_Cartesian
-
-
 def find_q_lab(q_lab_Cartesian):
     q_X = q_lab_Cartesian[0]
     q_Y = q_lab_Cartesian[1]
@@ -1884,7 +1872,7 @@ def cylindrical_to_cartesian(
     R: ArrayLike, phi: ArrayLike, Z: ArrayLike
 ) -> CartesianCoords:
     """Convert cylindrical to Cartesian coordinates"""
-    return R * np.cos(phi), R * np.sin(phi), Z
+    return CartesianCoords(R * np.cos(phi), R * np.sin(phi), Z)
 
 
 def toroidal_to_cartesian(

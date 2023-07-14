@@ -3,7 +3,6 @@ from typing import Dict, Optional
 
 import numpy as np
 from scipy import constants
-from scipy.integrate import cumtrapz
 import xarray as xr
 
 from scotty.check_output import check_output
@@ -15,7 +14,6 @@ from scotty.fun_general import (
     find_nearest,
     find_normalised_gyro_freq,
     find_normalised_plasma_freq,
-    find_q_lab_Cartesian,
     make_unit_vector_from_cross_product,
     find_Psi_3D_lab_Cartesian,
     find_H_Cardano,
@@ -24,6 +22,7 @@ from scotty.fun_general import (
     find_D,
     find_x0,
     find_electron_mass,
+    cylindrical_to_cartesian,
 )
 from scotty.geometry import MagneticField
 from scotty.hamiltonian import DielectricTensor, Hamiltonian, hessians
@@ -229,7 +228,7 @@ def further_analysis(
     dH: Dict[str, ArrayLike],
 ):
     # Calculates various useful stuff
-    [q_X, q_Y, _] = find_q_lab_Cartesian([df.q_R, df.q_zeta, df.q_Z])
+    q_X, q_Y, _ = cylindrical_to_cartesian(df.q_R, df.q_zeta, df.q_Z)
     point_spacing = np.sqrt(
         (np.diff(q_X)) ** 2 + (np.diff(q_Y)) ** 2 + (np.diff(df.q_Z)) ** 2
     )
