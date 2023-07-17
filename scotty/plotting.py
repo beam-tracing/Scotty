@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import xarray as xr
 from datatree import DataTree
 
+from .analysis import beam_width
 from .geometry import MagneticField
 from .fun_general import cylindrical_to_cartesian
 from .launch import find_entry_point
@@ -272,14 +273,23 @@ def plot_beam_path(
 
     plot_field(field, ax=ax, highlight_LCFS=False)
 
+    launch_R = dt.inputs.launch_position.sel(col="R")
+    launch_Z = dt.inputs.launch_position.sel(col="Z")
     ax.plot(
-        np.concatenate([[dt.inputs.launch_position.sel(col="R")], dt.analysis.q_R]),
-        np.concatenate([[dt.inputs.launch_position.sel(col="Z")], dt.analysis.q_Z]),
-        "--k",
+        np.concatenate([[launch_R], dt.analysis.q_R]),
+        np.concatenate([[launch_Z], dt.analysis.q_Z]),
+        ":k",
         label="Central (reference) ray",
     )
+    width = beam_width(dt.analysis)
+    beam_plus = dt.analysis.beam + width
+    beam_minus = dt.analysis.beam - width
+    ax.plot(beam_plus.sel(col="R"), beam_plus.sel(col="Z"), "--k")
+    ax.plot(beam_minus.sel(col="R"), beam_minus.sel(col="Z"), "--k", label="Beam width")
+    ax.scatter(launch_R, launch_Z, c="red", marker=">", label="Launch position")
+
     ax.legend()
-    ax.set_title("Beam path")
+    ax.set_title("Beam path (poloidal plane)")
     ax.set_xlabel("R [m]")
     ax.set_ylabel("Z [m]")
 

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 import numpy as np
 from scipy import constants
@@ -32,9 +32,11 @@ from scotty.typing import ArrayLike, FloatArray, PathLike
 VECTOR_COMPONENTS = ["R", "zeta", "Z"]
 
 
-def set_vector_components_long_name(df: xr.Dataset) -> None:
-    df.col.attrs["long_name"] = "Vector/matrix column component"
-    df.row.attrs["long_name"] = "Matrix row component"
+def set_vector_components_long_name(df: Union[xr.Dataset, xr.DataArray]) -> None:
+    if "col" in df:
+        df.col.attrs["long_name"] = "Vector/matrix column component"
+    if "row" in df:
+        df.row.attrs["long_name"] = "Matrix row component"
 
 
 def save_npz(filename: Path, df: xr.Dataset) -> None:
@@ -164,6 +166,7 @@ def immediate_analysis(
             "x_hat": (["tau", "col"], x_hat),
             "y_hat": (["tau", "col"], y_hat),
             "poloidal_flux": (["tau"], poloidal_flux),
+            "beam": (["tau", "col"], np.vstack([q_R, solver_output.q_zeta, q_Z]).T),
         },
         coords={
             "tau": tau,
@@ -984,3 +987,17 @@ def open_analysis_npz(outputs: xr.Dataset, filename: PathLike) -> xr.Dataset:
                 )
             }
         )
+
+
+def beam_width(ds: xr.Dataset) -> xr.DataArray:
+    W_vec_RZ = np.cross(ds.g_hat, np.array([0, 1, 0]))
+    W_vec_RZ_magnitude = np.linalg.norm(W_vec_RZ, axis=1)
+    # Unit vector
+    W_uvec_RZ = W_vec_RZ / W_vec_RZ_magnitude[:, np.newaxis]
+    width_RZ = np.sqrt(2 / np.imag(dot(W_uvec_RZ, dot(ds.Psi_3D, W_uvec_RZ))))
+    width = xr.DataArray(
+        W_uvec_RZ * width_RZ[:, np.newaxis],
+        coords=({"tau": ds.tau, "col": VECTOR_COMPONENTS}),
+    )
+    set_vector_components_long_name(width)
+    return width
