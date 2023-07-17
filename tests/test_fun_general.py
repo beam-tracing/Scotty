@@ -6,7 +6,7 @@ from scotty.fun_general import (
     find_Psi_3D_lab_Cartesian,
     make_array_3x3,
     K_magnitude,
-    contract_special,
+    dot,
     find_Psi_3D_plasma_discontinuous,
     cartesian_to_cylindrical,
     cylindrical_to_cartesian,
@@ -142,15 +142,15 @@ def test_make_array_3x3():
     npt.assert_array_equal(B, expected)
 
 
-def test_contract_special_vector_vector():
+def test_dot_vector_vector():
     vector1 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     vector2 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     expected = np.array([1, 1, 1])
-    result = contract_special(vector1, vector2)
+    result = dot(vector1, vector2)
     npt.assert_array_equal(result, expected)
 
 
-def test_contract_special_matrix_vector():
+def test_dot_matrix_vector():
     matrix = np.array(
         [
             [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -160,11 +160,11 @@ def test_contract_special_matrix_vector():
     )
     vector = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     expected = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-    result = contract_special(matrix, vector)
+    result = dot(matrix, vector)
     npt.assert_array_equal(result, expected)
 
 
-def test_contract_special_vector_matrix():
+def test_dot_vector_matrix():
     matrix = np.array(
         [
             [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -174,7 +174,7 @@ def test_contract_special_vector_matrix():
     )
     vector = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     expected = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-    result = contract_special(vector, matrix)
+    result = dot(vector, matrix)
     npt.assert_array_equal(result, expected)
 
 

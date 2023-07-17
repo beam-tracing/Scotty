@@ -7,7 +7,7 @@ Created on Sat Apr  8 16:15:32 2023
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scotty.fun_general import find_nearest, contract_special, cylindrical_to_cartesian
+from scotty.fun_general import find_nearest, dot, cylindrical_to_cartesian
 from scotty.fun_general import (
     find_normalised_plasma_freq,
     find_normalised_gyro_freq,
@@ -179,12 +179,7 @@ class outplot(object):
         W_uvec_RZ[:, 1] = W_vec_RZ[:, 1] / W_vec_RZ_magnitude
         W_uvec_RZ[:, 2] = W_vec_RZ[:, 2] / W_vec_RZ_magnitude
         width_RZ = np.sqrt(
-            2
-            / np.imag(
-                contract_special(
-                    W_uvec_RZ, contract_special(self.Psi_3D_output, W_uvec_RZ)
-                )
-            )
+            2 / np.imag(dot(W_uvec_RZ, dot(self.Psi_3D_output, W_uvec_RZ)))
         )
         W_line_RZ_1_Rpoints = self.q_R_array + W_uvec_RZ[:, 0] * width_RZ
         W_line_RZ_1_Zpoints = self.q_Z_array + W_uvec_RZ[:, 2] * width_RZ
@@ -300,12 +295,7 @@ class outplot(object):
             g_hat_Cartesian, np.array([0, 0, 1])
         )
         width_XY = np.sqrt(
-            2
-            / np.imag(
-                contract_special(
-                    W_uvec_XY, contract_special(self.Psi_3D_Cartesian, W_uvec_XY)
-                )
-            )
+            2 / np.imag(dot(W_uvec_XY, dot(self.Psi_3D_Cartesian, W_uvec_XY)))
         )
         W_line_XY_1_Xpoints = self.q_X_array + W_uvec_XY[:, 0] * width_XY
         W_line_XY_1_Ypoints = self.q_Y_array + W_uvec_XY[:, 1] * width_XY
@@ -594,9 +584,9 @@ def compare_plots(
         width_RZ_1 = np.sqrt(
             2
             / np.imag(
-                contract_special(
+                dot(
                     W_uvec_RZ_1,
-                    contract_special(plotobject_1.Psi_3D_output, W_uvec_RZ_1),
+                    dot(plotobject_1.Psi_3D_output, W_uvec_RZ_1),
                 )
             )
         )
@@ -614,13 +604,7 @@ def compare_plots(
         W_uvec_RZ_2[:, 1] = W_vec_RZ_2[:, 1] / W_vec_RZ_magnitude_2
         W_uvec_RZ_2[:, 2] = W_vec_RZ_2[:, 2] / W_vec_RZ_magnitude_2
         width_RZ_2 = np.sqrt(
-            2
-            / np.imag(
-                contract_special(
-                    W_uvec_RZ_2,
-                    contract_special(plotobject_2.Psi_3D_output, W_uvec_RZ_2),
-                )
-            )
+            2 / np.imag(dot(W_uvec_RZ_2, dot(plotobject_2.Psi_3D_output, W_uvec_RZ_2)))
         )
         W_line_RZ_1_Rpoints_2 = plotobject_2.q_R_array + W_uvec_RZ_2[:, 0] * width_RZ_2
         W_line_RZ_1_Zpoints_2 = plotobject_2.q_Z_array + W_uvec_RZ_2[:, 2] * width_RZ_2
@@ -774,13 +758,7 @@ def compare_plots(
                 g_hat_Cartesian, np.array([0, 0, 1])
             )
             width_XY = np.sqrt(
-                2
-                / np.imag(
-                    contract_special(
-                        W_uvec_XY,
-                        contract_special(plotobject.Psi_3D_Cartesian, W_uvec_XY),
-                    )
-                )
+                2 / np.imag(dot(W_uvec_XY, dot(plotobject.Psi_3D_Cartesian, W_uvec_XY)))
             )
             W_line_XY_1_Xpoints = plotobject.q_X_array + W_uvec_XY[:, 0] * width_XY
             W_line_XY_1_Ypoints = plotobject.q_Y_array + W_uvec_XY[:, 1] * width_XY

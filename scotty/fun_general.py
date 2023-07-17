@@ -46,7 +46,7 @@ def find_nearest(array: ArrayLike, value: Any) -> int:
     return int(idx)
 
 
-def contract_special(arg_a: FloatArray, arg_b: FloatArray) -> FloatArray:
+def dot(arg_a: FloatArray, arg_b: FloatArray) -> FloatArray:
     """Dot product of arrays of vectors or matrices.
 
     Covers the case that matmul and dot don't do very elegantly, and
@@ -64,36 +64,7 @@ def contract_special(arg_a: FloatArray, arg_b: FloatArray) -> FloatArray:
         matrices/vectors
 
     """
-    if (
-        np.ndim(arg_a) == 3 and np.ndim(arg_b) == 2
-    ):  # arg_a is the matrix and arg_b is the vector
-        matrix = arg_a
-        vector = arg_b
-        intermediate_result = np.tensordot(matrix, vector, ((2), (1)))
-        result = np.diagonal(
-            intermediate_result, offset=0, axis1=0, axis2=2
-        ).transpose()
-    elif (
-        np.ndim(arg_a) == 2 and np.ndim(arg_b) == 3
-    ):  # arg_a is the vector and arg_b is the matrix
-        vector = arg_a
-        matrix = arg_b
-        intermediate_result = np.tensordot(matrix, vector, ((1), (1)))
-        result = np.diagonal(
-            intermediate_result, offset=0, axis1=0, axis2=2
-        ).transpose()
-    elif (
-        np.ndim(arg_a) == 2 and np.ndim(arg_b) == 2
-    ):  # arg_a is the vector and arg_b is a vector
-        vector1 = arg_a
-        vector2 = arg_b
-        intermediate_result = np.tensordot(vector1, vector2, ((1), (1)))
-        result = np.diagonal(
-            intermediate_result, offset=0, axis1=0, axis2=1
-        ).transpose()
-    else:
-        print("Error: Invalid dimensions")
-    return result
+    return np.array(list(map(np.dot, arg_a, arg_b)))
 
 
 def make_unit_vector_from_cross_product(vector_a, vector_b):

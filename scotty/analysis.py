@@ -10,7 +10,7 @@ from scotty.profile_fit import ProfileFitLike
 from scotty.derivatives import derivative
 from scotty.fun_general import (
     K_magnitude,
-    contract_special,
+    dot,
     find_nearest,
     find_normalised_gyro_freq,
     find_normalised_plasma_freq,
@@ -265,7 +265,7 @@ def further_analysis(
 
     kperp1_hat = make_unit_vector_from_cross_product(df.y_hat, df.b_hat)
     # The negative sign is there by definition
-    sin_theta_analysis = -contract_special(df.x_hat, kperp1_hat)
+    sin_theta_analysis = -dot(df.x_hat, kperp1_hat)
     # The negative sign is there by definition. Alternative way to get sin_theta
     # Assumes theta is never smaller than -90deg or bigger than 90deg
     theta = np.sign(sin_theta_analysis) * np.arcsin(abs(sin_theta_analysis))
@@ -298,24 +298,12 @@ def further_analysis(
     Psi_3D_Cartesian = find_Psi_3D_lab_Cartesian(
         df.Psi_3D, df.q_R, df.q_zeta, df.K_R, df.K_zeta_initial
     )
-    Psi_xx = contract_special(
-        x_hat_Cartesian, contract_special(Psi_3D_Cartesian, x_hat_Cartesian)
-    )
-    Psi_xy = contract_special(
-        x_hat_Cartesian, contract_special(Psi_3D_Cartesian, y_hat_Cartesian)
-    )
-    Psi_yy = contract_special(
-        y_hat_Cartesian, contract_special(Psi_3D_Cartesian, y_hat_Cartesian)
-    )
-    Psi_xg = contract_special(
-        x_hat_Cartesian, contract_special(Psi_3D_Cartesian, g_hat_Cartesian)
-    )
-    Psi_yg = contract_special(
-        y_hat_Cartesian, contract_special(Psi_3D_Cartesian, g_hat_Cartesian)
-    )
-    Psi_gg = contract_special(
-        g_hat_Cartesian, contract_special(Psi_3D_Cartesian, g_hat_Cartesian)
-    )
+    Psi_xx = dot(x_hat_Cartesian, dot(Psi_3D_Cartesian, x_hat_Cartesian))
+    Psi_xy = dot(x_hat_Cartesian, dot(Psi_3D_Cartesian, y_hat_Cartesian))
+    Psi_yy = dot(y_hat_Cartesian, dot(Psi_3D_Cartesian, y_hat_Cartesian))
+    Psi_xg = dot(x_hat_Cartesian, dot(Psi_3D_Cartesian, g_hat_Cartesian))
+    Psi_yg = dot(y_hat_Cartesian, dot(Psi_3D_Cartesian, g_hat_Cartesian))
+    Psi_gg = dot(g_hat_Cartesian, dot(Psi_3D_Cartesian, g_hat_Cartesian))
 
     Psi_xx_entry = np.dot(
         x_hat_Cartesian[0, :],
@@ -332,8 +320,8 @@ def further_analysis(
 
     numberOfDataPoints = len(df.tau)
     # Calculating intermediate terms that are needed for the corrections in M
-    xhat_dot_grad_bhat = contract_special(df.x_hat, df.grad_bhat)
-    yhat_dot_grad_bhat = contract_special(df.y_hat, df.grad_bhat)
+    xhat_dot_grad_bhat = dot(df.x_hat, df.grad_bhat)
+    yhat_dot_grad_bhat = dot(df.y_hat, df.grad_bhat)
     ray_curvature_kappa = np.zeros([numberOfDataPoints, 3])
     ray_curvature_kappa[:, 0] = (1 / df.g_magnitude) * (
         np.gradient(df.g_hat[:, 0], df.tau)
@@ -357,17 +345,17 @@ def further_analysis(
     )  # See notes 07 June 2021
     d_xhat_d_tau[:, 2] = np.gradient(df.x_hat[:, 2], df.tau)
 
-    xhat_dot_grad_bhat_dot_xhat = contract_special(xhat_dot_grad_bhat, df.x_hat)
-    xhat_dot_grad_bhat_dot_yhat = contract_special(xhat_dot_grad_bhat, df.y_hat)
-    xhat_dot_grad_bhat_dot_ghat = contract_special(xhat_dot_grad_bhat, df.g_hat)
-    yhat_dot_grad_bhat_dot_xhat = contract_special(yhat_dot_grad_bhat, df.x_hat)
-    yhat_dot_grad_bhat_dot_yhat = contract_special(yhat_dot_grad_bhat, df.y_hat)
-    yhat_dot_grad_bhat_dot_ghat = contract_special(yhat_dot_grad_bhat, df.g_hat)
-    kappa_dot_xhat = contract_special(ray_curvature_kappa, df.x_hat)
-    kappa_dot_yhat = contract_special(ray_curvature_kappa, df.y_hat)
+    xhat_dot_grad_bhat_dot_xhat = dot(xhat_dot_grad_bhat, df.x_hat)
+    xhat_dot_grad_bhat_dot_yhat = dot(xhat_dot_grad_bhat, df.y_hat)
+    xhat_dot_grad_bhat_dot_ghat = dot(xhat_dot_grad_bhat, df.g_hat)
+    yhat_dot_grad_bhat_dot_xhat = dot(yhat_dot_grad_bhat, df.x_hat)
+    yhat_dot_grad_bhat_dot_yhat = dot(yhat_dot_grad_bhat, df.y_hat)
+    yhat_dot_grad_bhat_dot_ghat = dot(yhat_dot_grad_bhat, df.g_hat)
+    kappa_dot_xhat = dot(ray_curvature_kappa, df.x_hat)
+    kappa_dot_yhat = dot(ray_curvature_kappa, df.y_hat)
     # This should be 0. Good to check.
-    kappa_dot_ghat = contract_special(ray_curvature_kappa, df.g_hat)
-    d_xhat_d_tau_dot_yhat = contract_special(d_xhat_d_tau, df.y_hat)
+    kappa_dot_ghat = dot(ray_curvature_kappa, df.g_hat)
+    d_xhat_d_tau_dot_yhat = dot(d_xhat_d_tau, df.y_hat)
 
     # Calculates the components of M_w, only taking into consideration
     # correction terms that are not small in mismatch
@@ -551,9 +539,9 @@ def further_analysis(
     # Avoids dividing a small number by another small number, leading to a big number because of numerical errors or something
     loc_p_unnormalised = np.divide(
         np.abs(
-            contract_special(
+            dot(
                 np.conjugate(e_hat),
-                contract_special(epsilon_minus_identity, e_hat),
+                dot(epsilon_minus_identity, e_hat),
             )
         )
         ** 2,
