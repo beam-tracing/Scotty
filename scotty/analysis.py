@@ -26,7 +26,7 @@ from scotty.fun_general import (
 )
 from scotty.geometry import MagneticField
 from scotty.hamiltonian import DielectricTensor, Hamiltonian, hessians
-from scotty.typing import ArrayLike, FloatArray
+from scotty.typing import ArrayLike, FloatArray, PathLike
 
 
 VECTOR_COMPONENTS = ["R", "zeta", "Z"]
@@ -676,9 +676,13 @@ def further_analysis(
     df = df.assign_coords(
         {
             "R_midplane": R_midplane_points,
-            "l_lc": (["tau"], l_lc),
-            "RZ_distance_along_line": (["tau"], RZ_distance_along_line),
-            "distance_along_line": (["tau"], distance_along_line),
+            "l_lc": (
+                ["tau"],
+                l_lc,
+                {"long_name": "Distance from cutoff", "units": "m"},
+            ),
+            "RZ_distance_along_line": (["tau"], RZ_distance_along_line, {"units": "m"}),
+            "distance_along_line": (["tau"], distance_along_line, {"units": "m"}),
         }
     )
     df.update(further_df)
@@ -839,3 +843,156 @@ def localisation_analysis(df: xr.Dataset, cutoff_index: int, wavenumber_K0: floa
         "cum_loc_b_r_mean_kperp1": cum_loc_b_r_mean_kperp1,  # mean kperp1
         "cum_loc_b_r_s_delta_kperp1_0": cum_loc_b_r_s_delta_kperp1_0,
     }
+
+
+def open_data_input_npz(filename: PathLike) -> xr.Dataset:
+    """Read a ``data_input.npz`` file created with a previous version of Scotty, returning an xarray dataset"""
+    with np.load(filename) as f:
+        df = xr.Dataset(
+            {
+                "launch_freq_GHz": f["launch_freq_GHz"],
+                "launch_position": (["col"], f["launch_position"]),
+                "mode_flag": f["mode_flag"],
+                "poloidalFlux_grid": (["R", "Z"], f["poloidalFlux_grid"]),
+            },
+            coords={
+                "R": f["data_R_coord"],
+                "Z": f["data_Z_coord"],
+                "row": VECTOR_COMPONENTS,
+                "col": VECTOR_COMPONENTS,
+            },
+        )
+
+    set_vector_components_long_name(df)
+    return df
+
+
+def open_data_output_npz(filename: PathLike) -> xr.Dataset:
+    """Read a ``data_output.npz`` file created with a previous version of Scotty, returning an xarray dataset"""
+
+    with np.load(filename, allow_pickle=True) as f:
+        df = xr.Dataset(
+            {
+                "B_R": (["tau"], f["B_R_output"]),
+                "B_T": (["tau"], f["B_T_output"]),
+                "B_Z": (["tau"], f["B_Z_output"]),
+                "B_magnitude": (["tau"], f["B_magnitude"]),
+                "K_R": (["tau"], f["K_R_array"]),
+                "K_Z": (["tau"], f["K_Z_array"]),
+                "Psi_3D_lab_launch": (["row", "col"], f["Psi_3D_lab_launch"]),
+                "Psi_3D": (["tau", "row", "col"], f["Psi_3D_output"]),
+                "b_hat": (["tau", "col"], f["b_hat_output"]),
+                "dH_dKR": (["tau"], f["dH_dKR_output"]),
+                "dH_dKZ": (["tau"], f["dH_dKZ_output"]),
+                "dH_dKzeta": (["tau"], f["dH_dKzeta_output"]),
+                "dH_dR": (["tau"], f["dH_dR_output"]),
+                "dH_dZ": (["tau"], f["dH_dZ_output"]),
+                "g_hat": (["tau", "col"], f["g_hat_output"]),
+                "g_magnitude": (["tau"], f["g_magnitude_output"]),
+                "grad_bhat": (["tau", "row", "col"], f["grad_bhat_output"]),
+                "x_hat": (["tau", "col"], f["x_hat_output"]),
+                "y_hat": (["tau", "col"], f["y_hat_output"]),
+                "poloidal_flux": (["tau"], f["poloidal_flux_output"]),
+            },
+            coords={
+                "tau": f["tau_array"],
+                "row": VECTOR_COMPONENTS,
+                "col": VECTOR_COMPONENTS,
+                "q_R": f["q_R_array"],
+                "q_Z": f["q_Z_array"],
+                "q_zeta": f["q_zeta_array"],
+            },
+        )
+        if "temperature" in f:
+            df.update({"temperature": (["tau"], f["temperature"])})
+
+        if "Psi_3D_lab_entry" in f:
+            df.update(
+                {
+                    "Psi_3D_lab_entry": (["row", "col"], f["Psi_3D_lab_entry"]),
+                    "distance_from_launch_to_entry": f["distance_from_launch_to_entry"],
+                    "dpolflux_dR_debugging": (["tau"], f["dpolflux_dR_debugging"]),
+                    "dpolflux_dZ_debugging": (["tau"], f["dpolflux_dZ_debugging"]),
+                    "epsilon_para": (["tau"], f["epsilon_para_output"]),
+                    "epsilon_perp": (["tau"], f["epsilon_perp_output"]),
+                    "epsilon_g": (["tau"], f["epsilon_g_output"]),
+                    "electron_density": (["tau"], f["electron_density_output"]),
+                    "normalised_plasma_freqs": (["tau"], f["normalised_plasma_freqs"]),
+                    "normalised_gyro_freqs": (["tau"], f["normalised_gyro_freqs"]),
+                    "H": (["tau"], f["H_output"]),
+                    "H_other": (["tau"], f["H_other"]),
+                }
+            )
+
+    df.tau.attrs["long_name"] = "Parameterised distance along beam"
+    set_vector_components_long_name(df)
+
+    return df
+
+
+def open_analysis_npz(outputs: xr.Dataset, filename: PathLike) -> xr.Dataset:
+    """Read a ``analysis_output.npz`` file created with a previous version of Scotty, returning an xarray dataset"""
+    with np.load(filename, allow_pickle=True) as f:
+        df = xr.Dataset(
+            {
+                "Psi_3D_Cartesian": (["tau", "row", "col"], f["Psi_3D_Cartesian"]),
+                "Psi_xx": (["tau"], f["Psi_xx_output"]),
+                "Psi_xy": (["tau"], f["Psi_xy_output"]),
+                "Psi_yy": (["tau"], f["Psi_yy_output"]),
+                "M_xx": (["tau"], f["M_xx_output"]),
+                "M_xy": (["tau"], f["M_xy_output"]),
+                "xhat_dot_grad_bhat_dot_xhat": (
+                    ["tau"],
+                    f["xhat_dot_grad_bhat_dot_xhat_output"],
+                ),
+                "xhat_dot_grad_bhat_dot_ghat": (
+                    ["tau"],
+                    f["xhat_dot_grad_bhat_dot_ghat_output"],
+                ),
+                "yhat_dot_grad_bhat_dot_ghat": (
+                    ["tau"],
+                    f["yhat_dot_grad_bhat_dot_ghat_output"],
+                ),
+                "d_theta_d_tau": (["tau"], f["d_theta_d_tau"]),
+                "d_xhat_d_tau_dot_yhat": (["tau"], f["d_xhat_d_tau_dot_yhat_output"]),
+                "kappa_dot_xhat": (["tau"], f["kappa_dot_xhat_output"]),
+                "kappa_dot_yhat": (["tau"], f["kappa_dot_yhat_output"]),
+                "distance_along_line": (["tau"], f["distance_along_line"]),
+                "cutoff_index": f["cutoff_index"],
+                "poloidal_flux_on_midplane": (
+                    ["R_midplane"],
+                    f["poloidal_flux_on_midplane"],
+                ),
+                "theta": (["tau"], f["theta_output"]),
+                "theta_m": (["tau"], f["theta_m_output"]),
+                "delta_theta_m": (["tau"], f["delta_theta_m"]),
+                "K_magnitude": (["tau"], f["K_magnitude_array"]),
+                "k_perp_1_bs": (["tau"], f["k_perp_1_bs"]),
+                "loc_b_r_s": (["tau"], f["loc_b_r_s"]),
+                "loc_b_r": (["tau"], f["loc_b_r"]),
+            },
+            coords={
+                "R_midplane": f["R_midplane_points"],
+                "tau": outputs.tau,
+                "row": outputs.row,
+                "col": outputs.col,
+                "q_R": outputs.q_R,
+                "q_Z": outputs.q_Z,
+                "q_zeta": outputs.q_zeta,
+            },
+        )
+
+        if "l_lc" in f:
+            l_lc = f["l_lc"]
+        else:
+            l_lc = df.distance_along_line - df.distance_along_line[df.cutoff_index]
+
+        return df.assign_coords(
+            {
+                "l_lc": (
+                    ["tau"],
+                    l_lc.data,
+                    {"long_name": "Distance from cutoff", "units": "m"},
+                )
+            }
+        )
