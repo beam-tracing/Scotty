@@ -29,6 +29,14 @@ from scotty.hamiltonian import DielectricTensor, Hamiltonian, hessians
 from scotty.typing import ArrayLike, FloatArray
 
 
+VECTOR_COMPONENTS = ["R", "zeta", "Z"]
+
+
+def set_vector_components_long_name(df: xr.Dataset) -> None:
+    df.col.attrs["long_name"] = "Vector/matrix column component"
+    df.row.attrs["long_name"] = "Matrix row component"
+
+
 def save_npz(filename: Path, df: xr.Dataset) -> None:
     """Save xarray dataset to numpy .npz file"""
     np.savez(
@@ -133,8 +141,6 @@ def immediate_analysis(
     # -------------------
     check_output(H)
 
-    vector_components = ["R", "zeta", "Z"]
-
     df = xr.Dataset(
         {
             "B_R": (["tau"], B_R),
@@ -161,16 +167,15 @@ def immediate_analysis(
         },
         coords={
             "tau": tau,
-            "row": vector_components,
-            "col": vector_components,
+            "row": VECTOR_COMPONENTS,
+            "col": VECTOR_COMPONENTS,
             "q_R": q_R,
             "q_Z": q_Z,
             "q_zeta": solver_output.q_zeta,
         },
     )
     df.tau.attrs["long_name"] = "Parameterised distance along beam"
-    df.col.attrs["long_name"] = "Vector/matrix column component"
-    df.row.attrs["long_name"] = "Matrix row component"
+    set_vector_components_long_name(df)
 
     temperature = find_temperature_1D(poloidal_flux) if find_temperature_1D else None
     if temperature is not None:
