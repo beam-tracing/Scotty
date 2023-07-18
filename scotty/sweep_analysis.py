@@ -1,4 +1,4 @@
-"""Functions to load poloidal + toroidal + frequency sweeps of 
+"""Class to load poloidal + toroidal + frequency sweeps of 
 Scotty output data. Uses xarrays with poloidal angle, toroidal
 angle and frequency as axes. 
 
@@ -17,7 +17,6 @@ from scipy.interpolate import (
     RegularGridInterpolator,
 )
 from scipy.optimize import newton
-from scipy.stats import norm
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from scotty.fun_general import find_q_lab_Cartesian
@@ -459,15 +458,10 @@ class SweepDataset:
         self.dataset["cutoff_delta_theta_m"] = cutoff_delta_theta_m
         return self.dataset[["cutoff_theta_m", "cutoff_delta_theta_m"]]
 
-    def generate_opt_tor(self, mask_flag=True):
+    def generate_opt_tor(self):
         """Uses scipy.optimize.newton on an interpolated spline to find
         the optimum toroidal steering with varying frequency and poloidal
         steering and saves it with the key 'opt_tor'.
-
-        Args:
-            mask_flag (bool): Default True. Determines whether the optimum
-            toroidal angle calculated will be reflected or not and saves the
-            result as a boolean mask DataArray 'opt_tor_mask'.
 
         Returns:
             DataArray: A 2-D DataArray of optimal toroidal steering angles (in degrees)
@@ -514,20 +508,18 @@ class SweepDataset:
         no_opt_tor_mask = opt_tor_array.isnull()
         self.dataset["opt_tor"] = opt_tor_array
 
-        if mask_flag:
+        def vfunc(arg):
+            func = lambda x: find_nearest(toroidal_angles, x)
+            return xr.apply_ufunc(func, arg, vectorize=True)
 
-            def vfunc(arg):
-                func = lambda x: find_nearest(toroidal_angles, x)
-                return xr.apply_ufunc(func, arg, vectorize=True)
-
-            closest_tor_array = vfunc(opt_tor_array)
-            reflection_mask = self.generate_reflection_mask().transpose(
-                "frequency", "poloidal_angle", "toroidal_angle"
-            )
-            reflected_opt_tor_mask = reflection_mask.isel(
+        closest_tor_array = vfunc(opt_tor_array)
+        reflection_mask = self.generate_reflection_mask().transpose(
+            "frequency", "poloidal_angle", "toroidal_angle"
+        )
+        reflected_opt_tor_mask = reflection_mask.isel(
                 toroidal_angle=closest_tor_array
-            )
-
+        )
+        self.dataset["nearest_opt_tor_index"] = closest_tor_array
         self.dataset["opt_tor_mask"] = np.logical_and(
             no_opt_tor_mask, reflected_opt_tor_mask
         )
@@ -671,13 +663,64 @@ class SweepDataset:
         self.generate_cutoff_distance()
         self.generate_cutoff_rho()
         self.generate_mismatch_at_cutoff()
-        for variable in ("K_magnitude_array",):
+        for variable in ("K_magnitude_array", "q_R_array", "q_Z_array"):
             self.generate_variable_at_cutoff(variable)
         self.generate_opt_tor()
         self.generate_reflection_mask()
+        self.generate_mismatch_gaussian()
+        self.integrate_loc_m()
+        self.integrate_loc_product()
         return self.variables
 
+    ## WIP: difficulties with automatically defining rho range as well as
+    ## non-monotonicity with certain combinations of parameters
+    '''
+    def transform_opt_tor_to_rho(self):
+        rho_coords = np.linspace(0, 1, 50)
+        poloidal_angles = self.get_coordinate_array('poloidal_angle')
+        toroidal_angles = self.get_coordinate_array('toroidal_angle')
+        frequencies = self.get_coordinate_array('frequency')
+        newvar = 'opt_tor_rho'
+        self.dataset[newvar] = xr.DataArray(
+            dims = ('rho', 'poloidal_angle'),
+            coords = {
+                'rho': rho_coords,
+                'poloidal_angle': poloidal_angles,
+            }
+        )
+        opt_tor_index = self.dataset['nearest_opt_tor_index']
+        rho_at_opt_tor = self.dataset['cutoff_rho'].isel(toroidal_angle=opt_tor_index) 
+        for poloidal_angle in poloidal_angles:
+            index = {
+                    'poloidal_angle': poloidal_angle,
+                }
+            data_spline = self.create_1Dspline(
+                variable='opt_tor',
+                dimension='frequency',
+                coords_dict=index
+            )
+            ## Pre process the relation
+            rho_array = rho_at_opt_tor.loc[index]
+            try:
+                freq_rho = UnivariateSpline(
+                    x=rho_array[::-1],
+                    y=frequencies[::-1],
+                    s=0,
+                )
+            except ValueError:
+                print(f'Rho at cutoff is not a monotonic sequence for pol={poloidal_angle}!')
+            plt.plot(freq_rho(np.linspace(0.1, 0.9, 40)), label=f'pol={poloidal_angle}')
+            newdata = data_spline(freq_rho(rho_coords))
+            self.dataset[newvar].loc[index] = newdata
+        
+        return self.dataset[newvar]
+    '''
+
     ## simulation methods
+    ## TODO: Future plans to accomodate simulation with integrated loc_m or total_loc; SweepDataset
+    ## should provide the methods to simulate either using the mismatch gaussian formulae or by 
+    ## integrating localization, but PitchDiagnostic should be agnostic towards the method used to
+    ## simulate the antenna response and run the same set of analyses on it. 
 
     def get_simulated_power_prof(
         self,
@@ -754,7 +797,7 @@ class SweepDataset:
             self.spline_memo[args] = spline
             return spline
 
-    def create_2Dspline(self, variable, xdimension, ydimension, coords_dict={}):
+    def create_2Dspline(self, variable, xdimension, ydimension, coords_dict={}, method='linear'):
         """Memoized function that interpolates splines for any variable along
         two arbitrary axes with linear interpolation (scipy RegularGridInterpolator).
 
@@ -781,7 +824,7 @@ class SweepDataset:
             spline = RegularGridInterpolator(
                 (x_coordinates, y_coordinates),
                 z_values,
-                method="linear",  # TODO: Change back to pchip once done
+                method=method,  
             )
             self.spline_memo[args] = spline
             return spline
@@ -1484,27 +1527,19 @@ def split_list(a_list):
     i_half = len(a_list) // 2
     return a_list[:i_half] + a_list[i_half:]
 
-
-## Helper functions
-
-
 def fit_gaussian(toroidal_angle, opt_tor, delta):
-    return np.exp(-(((toroidal_angle - opt_tor) / delta) ** 2))
-
+    return np.exp(-2*(((toroidal_angle - opt_tor) / delta) ** 2))
 
 def gaussian(theta_m, delta):
-    return np.exp(-((theta_m / delta) ** 2))
-
+    return np.exp(-2*((theta_m / delta) ** 2))
 
 def noisy_gaussian(theta_m, delta, std=0.05):
     mean = gaussian(theta_m, delta)
     return mean + np.random.normal(0, std)
 
-
 def find_nearest(array, value):
     index = np.abs((array - value)).argmin()
     return array[index]
-
 
 def scale_array(array):
     maxval = array.max()
