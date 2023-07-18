@@ -133,7 +133,7 @@ class PitchDiagnostic:
             B_R = np.transpose(topfile["Br"])
             B_Z = np.transpose(topfile["Bz"])
             B_T = np.transpose(topfile["Bt"])
-            pol_flux = np.transpose(topfile['pol_flux'])
+            pol_flux = np.transpose(topfile["pol_flux"])
 
         var_names = ("Br", "Bz", "Bt", "pol_flux")
         arrays = (B_R, B_Z, B_T, pol_flux)
@@ -141,29 +141,30 @@ class PitchDiagnostic:
             array = arrays[i]
             var_name = var_names[i]
             self.topfiles[descriptor][var_name] = xr.DataArray(
-                data = array,
+                data=array,
                 dims=("R", "Z"),
                 coords={
                     "R": R_coord,
                     "Z": Z_coord,
-                }
+                },
             )
-        
+
         ds = self.topfiles[descriptor]
         # Find pitch angle
-        ds['pitch_angle'] = np.rad2deg(np.arctan(
-            np.divide(
-                np.hypot(ds['Br'], ds['Bz']), 
-                ds['Bt'],
+        ds["pitch_angle"] = np.rad2deg(
+            np.arctan(
+                np.divide(
+                    np.hypot(ds["Br"], ds["Bz"]),
+                    ds["Bt"],
                 )
-            ))
+            )
+        )
 
-        r_index = np.squeeze(ds['pol_flux'].loc[{"Z":0}].argmin().values)
-        magnetic_axis = np.array((ds.coords['R'][r_index], 0))
-        z_index = np.squeeze(np.argwhere(ds.coords['Z'].values == 0))
-        ds.attrs['magnetic_axis'] = magnetic_axis
-        ds.attrs['axis_index'] = np.array((r_index, z_index))
-
+        r_index = np.squeeze(ds["pol_flux"].loc[{"Z": 0}].argmin().values)
+        magnetic_axis = np.array((ds.coords["R"][r_index], 0))
+        z_index = np.squeeze(np.argwhere(ds.coords["Z"].values == 0))
+        ds.attrs["magnetic_axis"] = magnetic_axis
+        ds.attrs["axis_index"] = np.array((r_index, z_index))
 
     def read_topfiles(self):
         for descriptor in self.descriptors:
@@ -223,7 +224,7 @@ class PitchDiagnostic:
         return tuple(self.ds_dict.keys())
 
     def set_current_scaling_attr(self, descriptor, value):
-        self.ds_dict[descriptor].attrs['current_scaling'] = value
+        self.ds_dict[descriptor].attrs["current_scaling"] = value
 
     def get_keys(self):
         keys_dict = {}
@@ -282,94 +283,89 @@ class PitchDiagnostic:
     def get_rho_freq_spline(self, order=5, smoothing=0):
         frequency_range = np.linspace(self.frequencies[0], self.frequencies[-1], 500)
         return UnivariateSpline(
-            frequency_range, self.ds_dict["cutoff_data"]["rho_freq_relation"],  k=order, s=smoothing, ext=3
+            frequency_range,
+            self.ds_dict["cutoff_data"]["rho_freq_relation"],
+            k=order,
+            s=smoothing,
+            ext=3,
         )
 
     def get_freq_rho_spline(self, order=5, smoothing=0):
         frequency_range_r = np.linspace(self.frequencies[-1], self.frequencies[0], 500)
         return UnivariateSpline(
-            self.ds_dict["cutoff_data"]["rho_freq_relation"][::-1], frequency_range_r,  k=order, s=smoothing, ext=3
+            self.ds_dict["cutoff_data"]["rho_freq_relation"][::-1],
+            frequency_range_r,
+            k=order,
+            s=smoothing,
+            ext=3,
         )
 
     def get_rho_delta_splines(self, order=5, smoothing=0):
         frequency_range = np.linspace(self.frequencies[0], self.frequencies[-1], 500)
         upper_spline = UnivariateSpline(
-            frequency_range, self.ds_dict["cutoff_data"]["rho_upper"], k=order, s=smoothing,
+            frequency_range,
+            self.ds_dict["cutoff_data"]["rho_upper"],
+            k=order,
+            s=smoothing,
         )
         lower_spline = UnivariateSpline(
-            frequency_range, self.ds_dict["cutoff_data"]["rho_lower"], k=order, s=smoothing,
+            frequency_range,
+            self.ds_dict["cutoff_data"]["rho_lower"],
+            k=order,
+            s=smoothing,
         )
         return upper_spline, lower_spline
 
     def get_midplane_pitch_rho_spline(self, descriptor, order=5, smoothing=0):
         ds = self.topfiles[descriptor]
-        if 'midplane_pitch_rho_profile' in ds.keys():
-            da = ds['pitch_rho_profile']
-            rho_range = da.coords['midplane_rho']
+        if "midplane_pitch_rho_profile" in ds.keys():
+            da = ds["pitch_rho_profile"]
+            rho_range = da.coords["midplane_rho"]
             return UnivariateSpline(
-                x=rho_range,
-                y=da.values,
-                k=order,
-                s=smoothing,
-                ext=3
+                x=rho_range, y=da.values, k=order, s=smoothing, ext=3
             )
 
-        r_index, z_index = ds.attrs['axis_index']
-        midplane_rho = np.sqrt(ds['pol_flux'].loc[{"Z":0}][r_index:])
-        midplane_pitch = ds['pitch_angle'].loc[{"Z":0}][r_index:]
+        r_index, z_index = ds.attrs["axis_index"]
+        midplane_rho = np.sqrt(ds["pol_flux"].loc[{"Z": 0}][r_index:])
+        midplane_pitch = ds["pitch_angle"].loc[{"Z": 0}][r_index:]
         pitch_rho = UnivariateSpline(
-            x=midplane_rho,
-            y=midplane_pitch,
-            k=order,
-            s=smoothing,
-            ext=3
+            x=midplane_rho, y=midplane_pitch, k=order, s=smoothing, ext=3
         )
         rho_range = np.linspace(midplane_rho[0], midplane_rho[-1], 500)
-        ds['midplane_pitch_rho_profile'] = xr.DataArray(
+        ds["midplane_pitch_rho_profile"] = xr.DataArray(
             data=pitch_rho(rho_range),
-            dims=('midplane_rho'),
-            coords={
-                'midplane_rho': rho_range
-            }
-            )
+            dims=("midplane_rho"),
+            coords={"midplane_rho": rho_range},
+        )
         return pitch_rho
 
     def get_pitch_rho_spline(self, descriptor, order=5, smoothing=0):
         topfile = self.topfiles[descriptor]
         ds = self.ds_dict[descriptor]
-        if 'pitch_rho_profile' in ds.keys():
-            da = ds['pitch_rho_profile']
-            rho_range = da.coords['cutoff_rho']
-            return UnivariateSpline(
-                x=rho_range[::-1],
-                y=da.values[::-1],
-                s=0,
-                ext=3
-            )
-        
-        cutoff_r = ds['cutoff_R']
-        cutoff_z = ds['cutoff_Z']
-        cutoff_pitch = topfile['pitch_angle'].sel(
-            R=cutoff_r, Z=cutoff_z, method='nearest',
+        if "pitch_rho_profile" in ds.keys():
+            da = ds["pitch_rho_profile"]
+            rho_range = da.coords["cutoff_rho"]
+            return UnivariateSpline(x=rho_range[::-1], y=da.values[::-1], s=0, ext=3)
+
+        cutoff_r = ds["cutoff_R"]
+        cutoff_z = ds["cutoff_Z"]
+        cutoff_pitch = topfile["pitch_angle"].sel(
+            R=cutoff_r,
+            Z=cutoff_z,
+            method="nearest",
         )
-        cutoff_rho = np.sqrt(topfile['pol_flux'].sel(
-            R=cutoff_r, Z=cutoff_z, method='nearest'
-        ).squeeze())
+        cutoff_rho = np.sqrt(
+            topfile["pol_flux"].sel(R=cutoff_r, Z=cutoff_z, method="nearest").squeeze()
+        )
         pitch_rho = UnivariateSpline(
-            x=cutoff_rho[::-1],
-            y=cutoff_pitch[::-1],
-            k=order,
-            s=smoothing,
-            ext=3
+            x=cutoff_rho[::-1], y=cutoff_pitch[::-1], k=order, s=smoothing, ext=3
         )
         rho_range = np.linspace(cutoff_rho[0], cutoff_rho[-1], 500)
-        ds['pitch_rho_profile'] = xr.DataArray(
+        ds["pitch_rho_profile"] = xr.DataArray(
             data=pitch_rho(rho_range),
-            dims=('cutoff_rho'),
-            coords={
-                'cutoff_rho': rho_range
-            }
-            )
+            dims=("cutoff_rho"),
+            coords={"cutoff_rho": rho_range},
+        )
         return pitch_rho
 
     def get_opt_tor_freq_spline(self, descriptor, order=5, smoothing=0):
@@ -380,7 +376,7 @@ class PitchDiagnostic:
             y=opt_tor_freq,
             k=order,
             s=smoothing,
-            ext=3
+            ext=3,
         )
 
     def get_opt_tor_rho_spline(self, descriptor):
@@ -394,7 +390,7 @@ class PitchDiagnostic:
         if descriptor not in self.descriptors:
             raise ValueError(f"{descriptor} not saved to PitchDiagnostic instance.")
         self.ds_dict[descriptor].attrs["topfile_path"] = topfile_path
-    
+
     def get_topfile_path(self, descriptor):
         if "topfile_path" in self.ds_dict[descriptor].attrs:
             return self.ds_dict[descriptor].attrs["topfile_path"]
@@ -420,22 +416,18 @@ class PitchDiagnostic:
 
         cutoff_R_spline = SweepDataset.create_2Dspline(
             variable="cutoff_q_R_array",
-            xdimension='frequency',
-            ydimension='toroidal_angle',
-            method='pchip',
-            coords_dict={
-                'poloidal_angle': self.poloidal_angles[0]
-            }
+            xdimension="frequency",
+            ydimension="toroidal_angle",
+            method="pchip",
+            coords_dict={"poloidal_angle": self.poloidal_angles[0]},
         )
 
         cutoff_Z_spline = SweepDataset.create_2Dspline(
             variable="cutoff_q_Z_array",
-            xdimension='frequency',
-            ydimension='toroidal_angle',
-            method='pchip',
-            coords_dict={
-                'poloidal_angle': self.poloidal_angles[0]
-            }
+            xdimension="frequency",
+            ydimension="toroidal_angle",
+            method="pchip",
+            coords_dict={"poloidal_angle": self.poloidal_angles[0]},
         )
 
         opt_tor_freq_spline = self.get_opt_tor_freq_spline(descriptor)
@@ -454,23 +446,18 @@ class PitchDiagnostic:
             )
         )
 
-        self.ds_dict[descriptor]['cutoff_R'] = xr.DataArray(
-            data = R_spline(self.frequencies),
-            dims = ('frequency'),
-            coords = {
-                'frequency': self.frequencies
-            }
+        self.ds_dict[descriptor]["cutoff_R"] = xr.DataArray(
+            data=R_spline(self.frequencies),
+            dims=("frequency"),
+            coords={"frequency": self.frequencies},
         )
-        self.ds_dict[descriptor]['cutoff_Z'] = xr.DataArray(
-            data = Z_spline(self.frequencies),
-            dims = ('frequency'),
-            coords = {
-                'frequency': self.frequencies
-            }
+        self.ds_dict[descriptor]["cutoff_Z"] = xr.DataArray(
+            data=Z_spline(self.frequencies),
+            dims=("frequency"),
+            coords={"frequency": self.frequencies},
         )
 
         return R_spline, Z_spline
-
 
     def get_interp_variables(self, SweepDataset):
         descriptor = str(SweepDataset.descriptor)
@@ -483,7 +470,10 @@ class PitchDiagnostic:
             self.ds_dict[descriptor] = xr.Dataset()
 
         opt_tor_spline = SweepDataset.create_2Dspline(
-            variable="opt_tor", xdimension="frequency", ydimension="poloidal_angle", method='pchip'
+            variable="opt_tor",
+            xdimension="frequency",
+            ydimension="poloidal_angle",
+            method="pchip",
         )
         x, y = self.frequencies, self.poloidal_angles
         x_grid, y_grid = np.meshgrid(x, y, indexing="ij")
@@ -837,27 +827,23 @@ class PitchDiagnostic:
                 ] = std_opt_tor.isel(param=1)
 
     def get_pitch_relation_across_equilibria(self):
-        current_scalings = []        
+        current_scalings = []
         for descriptor in self.descriptors:
-            if 'current_scaling' not in self.ds_dict[descriptor].attrs.keys():
-                raise KeyError(f"{descriptor} is not yet assigned a numerical current_scaling attribute.")
-            current_scalings.append(self.ds_dict[descriptor].attrs['current_scaling'])
+            if "current_scaling" not in self.ds_dict[descriptor].attrs.keys():
+                raise KeyError(
+                    f"{descriptor} is not yet assigned a numerical current_scaling attribute."
+                )
+            current_scalings.append(self.ds_dict[descriptor].attrs["current_scaling"])
         current_scalings = np.array(current_scalings)
         rho_array = np.linspace(0, 1, 100)
         ds = xr.Dataset()
         ds["opt_tor"] = xr.DataArray(
             dims=("current_scaling", "rho"),
-            coords={
-                "current_scaling": current_scalings,
-                "rho": rho_array
-            }
+            coords={"current_scaling": current_scalings, "rho": rho_array},
         )
         ds["pitch"] = xr.DataArray(
             dims=("current_scaling", "rho"),
-            coords={
-                "current_scaling": current_scalings,
-                "rho": rho_array
-            }
+            coords={"current_scaling": current_scalings, "rho": rho_array},
         )
         counter = 0
         for descriptor in self.descriptors:
@@ -866,8 +852,8 @@ class PitchDiagnostic:
             pitch_rho_spline = self.get_pitch_rho_spline(descriptor)
             opt_tor_array = opt_tor_spline(rho_array)
             pitch_rho_array = pitch_rho_spline(rho_array)
-            ds["opt_tor"].loc[{'current_scaling':current_scaling}] = opt_tor_array
-            ds["pitch"].loc[{'current_scaling':current_scaling}] = pitch_rho_array
+            ds["opt_tor"].loc[{"current_scaling": current_scaling}] = opt_tor_array
+            ds["pitch"].loc[{"current_scaling": current_scaling}] = pitch_rho_array
             counter += 1
         self.pitch_ds = ds
         return ds
@@ -876,7 +862,6 @@ class PitchDiagnostic:
         self.fit_measurement_gaussians()
         self.aggregate_fitted_gaussians()
         self.get_pitch_relation_across_equilibria()
-        
 
     ## Plot methods
 
@@ -1329,17 +1314,17 @@ class PitchDiagnostic:
         plt.legend(bbox_to_anchor=(1.05, 0), loc="lower left", borderaxespad=0.0)
         return fig
 
-    def plot_cutoff_positions(self, xlim=None, ylim=None, levels=20, cmap='plasma_r'):
+    def plot_cutoff_positions(self, xlim=None, ylim=None, levels=20, cmap="plasma_r"):
         flag = True
         fig, ax = plt.subplots()
-        markers = ['o', 'X', 'v', '^', 's', 'D', 'p', '*', 'h', '8', '+']
+        markers = ["o", "X", "v", "^", "s", "D", "p", "*", "h", "8", "+"]
         mcount = 0
 
         for descriptor in self.descriptors:
-            ds = self.ds_dict[descriptor]  
+            ds = self.ds_dict[descriptor]
             marker = markers[mcount]
             if flag:
-                rho = np.sqrt(self.topfiles[descriptor]['pol_flux'].transpose("Z", "R"))
+                rho = np.sqrt(self.topfiles[descriptor]["pol_flux"].transpose("Z", "R"))
                 cont = rho.plot.contour(
                     levels=levels,
                     vmax=1.0,
@@ -1348,27 +1333,36 @@ class PitchDiagnostic:
                     cmap=cmap,
                 )
                 ax.clabel(cont, inline=True, fontsize=5)
-                flag=False
+                flag = False
             try:
-                cutoff_R = ds['cutoff_R']
-                cutoff_Z = ds['cutoff_Z']
-                sc = ax.scatter(cutoff_R, cutoff_Z, 
-                s=10, c=self.frequencies, cmap='cool', edgecolors='k', linewidths=0.5, marker=marker)
+                cutoff_R = ds["cutoff_R"]
+                cutoff_Z = ds["cutoff_Z"]
+                sc = ax.scatter(
+                    cutoff_R,
+                    cutoff_Z,
+                    s=10,
+                    c=self.frequencies,
+                    cmap="cool",
+                    edgecolors="k",
+                    linewidths=0.5,
+                    marker=marker,
+                )
                 mcount += 1
             except KeyError:
                 print(f"No cutoff position data for {descriptor}.")
                 continue
-        
+
         plt.colorbar(sc)
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
         ax.set_xlabel("R/m")
         ax.set_ylabel("Z/m")
-        fig.suptitle('Cutoff Positions', fontsize=10)
+        fig.suptitle("Cutoff Positions", fontsize=10)
 
         Line2D = mpl.lines.Line2D
         custom_handles = [
-            Line2D([0], [0], color="k", marker=markers[i], linestyle="None") for i in range(len(self.descriptors))
+            Line2D([0], [0], color="k", marker=markers[i], linestyle="None")
+            for i in range(len(self.descriptors))
         ]
         custom_labels = list(self.descriptors)
         ax.legend(
@@ -1381,43 +1375,47 @@ class PitchDiagnostic:
         return fig, ax
 
     def plot_pitch_contours(self, descriptor, xlim=None, ylim=None):
-
         topfile = self.topfiles[descriptor]
-        ds = self.ds_dict[descriptor]  
+        ds = self.ds_dict[descriptor]
 
         fig, ax = plt.subplots()
-        topfile['pitch_angle'].transpose().plot.contourf(
+        topfile["pitch_angle"].transpose().plot.contourf(
             levels=30,
             add_colorbar=True,
             xlim=xlim,
             ylim=ylim,
-            cmap='plasma',
+            cmap="plasma",
             vmin=-20,
         )
-        cont = np.sqrt(topfile['pol_flux'].transpose()).plot.contour(
+        cont = np.sqrt(topfile["pol_flux"].transpose()).plot.contour(
             levels=15,
             vmax=1.0,
             xlim=xlim,
             ylim=ylim,
-            colors='k',
+            colors="k",
             alpha=0.5,
         )
         ax.clabel(cont, inline=True, fontsize=5)
 
-        cutoff_R = ds['cutoff_R']
-        cutoff_Z = ds['cutoff_Z']
+        cutoff_R = ds["cutoff_R"]
+        cutoff_Z = ds["cutoff_Z"]
         sc = ax.scatter(
-            cutoff_R, cutoff_Z, 
-            s=15, c=self.frequencies, cmap='cool', 
-            marker='o',
-            label='Freq/GHz'
-            )
+            cutoff_R,
+            cutoff_Z,
+            s=15,
+            c=self.frequencies,
+            cmap="cool",
+            marker="o",
+            label="Freq/GHz",
+        )
         plt.gca().set_aspect(1.0)
         fig.colorbar(sc)
         fig.suptitle("Pitch angle contours and cutoff locations", fontsize=20)
         return fig, ax
 
-    def plot_pitch_angle_vs_opt_tor(self, rho_lower=0.1, rho_upper=1.0, unit='deg', sample_index=200):
+    def plot_pitch_angle_vs_opt_tor(
+        self, rho_lower=0.1, rho_upper=1.0, unit="deg", sample_index=200
+    ):
         """Plots pitch angle against opt_tor for all equilibriums, and automatically
         calculates linregress-fitted slope for the range of rho set.
 
@@ -1428,16 +1426,38 @@ class PitchDiagnostic:
         Returns:
             Artists (fig, ax), dictionary of slopes with descriptor keys
         """
-        if unit not in ('deg', 'rad'):
-            raise ValueError('Invalid unit specified')
+        if unit not in ("deg", "rad"):
+            raise ValueError("Invalid unit specified")
 
         rho_range = np.linspace(rho_lower, rho_upper, 500)
         fig, ax = plt.subplots()
-        seq_cmaps = ['Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
-                    'RdPu', 'BuPu','GnBu', 'YlGn', 'YlOrBr']
-        solid_cols = ['dimgray', 'indigo', 'royalblue', 'green', 'darkorange', 'red',
-                    'deeppink', 'mediumslateblue', 'turquoise', 'greenyellow', 'yellow']
-        counter=0
+        seq_cmaps = [
+            "Greys",
+            "Purples",
+            "Blues",
+            "Greens",
+            "Oranges",
+            "Reds",
+            "RdPu",
+            "BuPu",
+            "GnBu",
+            "YlGn",
+            "YlOrBr",
+        ]
+        solid_cols = [
+            "dimgray",
+            "indigo",
+            "royalblue",
+            "green",
+            "darkorange",
+            "red",
+            "deeppink",
+            "mediumslateblue",
+            "turquoise",
+            "greenyellow",
+            "yellow",
+        ]
+        counter = 0
         slopes = {}
         sampled_rho = rho_range[sample_index]
         sampled_pitch = []
@@ -1450,27 +1470,38 @@ class PitchDiagnostic:
             pitch_rho_spline = self.get_pitch_rho_spline(descriptor)
             opt_tor = opt_tor_spline(rho_range)
             pitch = pitch_rho_spline(rho_range)
-            if unit == 'rad':
+            if unit == "rad":
                 opt_tor = np.deg2rad(opt_tor)
                 pitch = np.deg2rad(pitch)
             result = linregress(opt_tor, pitch)
-            fitted_pitch = result.slope*opt_tor + result.intercept
+            fitted_pitch = result.slope * opt_tor + result.intercept
             slopes[descriptor] = result.slope
 
             sampled_pitch.append(pitch[sample_index])
             sampled_opt_tor.append(opt_tor[sample_index])
 
             scat = ax.scatter(opt_tor, pitch, s=2, c=rho_range, cmap=cmap)
-            ax.plot(opt_tor, fitted_pitch, color=color, label=f"{descriptor}, m={round(result.slope, 2)}")
+            ax.plot(
+                opt_tor,
+                fitted_pitch,
+                color=color,
+                label=f"{descriptor}, m={round(result.slope, 2)}",
+            )
             # Set first grayscale colorbar as legend
             if counter == 0:
                 fig.colorbar(scat)
-            counter+=1
-        
-        ax.plot(sampled_opt_tor, sampled_pitch, linestyle='--', color='r', label=f'rho={round(sampled_rho, 2)}')
+            counter += 1
+
+        ax.plot(
+            sampled_opt_tor,
+            sampled_pitch,
+            linestyle="--",
+            color="r",
+            label=f"rho={round(sampled_rho, 2)}",
+        )
         ax.set_xlabel("opt_tor/deg")
         ax.set_ylabel("pitch angle/deg")
-        if unit == 'rad':
+        if unit == "rad":
             ax.set_xlabel("opt_tor/rad")
             ax.set_ylabel("pitch angle/rad")
         ax.legend(
@@ -1480,5 +1511,3 @@ class PitchDiagnostic:
         )
         fig.suptitle("Pitch angle vs. Opt tor", fontsize=20)
         return fig, ax, slopes
-        
-

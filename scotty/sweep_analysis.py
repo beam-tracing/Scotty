@@ -516,9 +516,7 @@ class SweepDataset:
         reflection_mask = self.generate_reflection_mask().transpose(
             "frequency", "poloidal_angle", "toroidal_angle"
         )
-        reflected_opt_tor_mask = reflection_mask.isel(
-                toroidal_angle=closest_tor_array
-        )
+        reflected_opt_tor_mask = reflection_mask.isel(toroidal_angle=closest_tor_array)
         self.dataset["nearest_opt_tor_index"] = closest_tor_array
         self.dataset["opt_tor_mask"] = np.logical_and(
             no_opt_tor_mask, reflected_opt_tor_mask
@@ -674,7 +672,7 @@ class SweepDataset:
 
     ## WIP: difficulties with automatically defining rho range as well as
     ## non-monotonicity with certain combinations of parameters
-    '''
+    """
     def transform_opt_tor_to_rho(self):
         rho_coords = np.linspace(0, 1, 50)
         poloidal_angles = self.get_coordinate_array('poloidal_angle')
@@ -714,13 +712,13 @@ class SweepDataset:
             self.dataset[newvar].loc[index] = newdata
         
         return self.dataset[newvar]
-    '''
+    """
 
     ## simulation methods
     ## TODO: Future plans to accomodate simulation with integrated loc_m or total_loc; SweepDataset
-    ## should provide the methods to simulate either using the mismatch gaussian formulae or by 
+    ## should provide the methods to simulate either using the mismatch gaussian formulae or by
     ## integrating localization, but PitchDiagnostic should be agnostic towards the method used to
-    ## simulate the antenna response and run the same set of analyses on it. 
+    ## simulate the antenna response and run the same set of analyses on it.
 
     def get_simulated_power_prof(
         self,
@@ -797,7 +795,9 @@ class SweepDataset:
             self.spline_memo[args] = spline
             return spline
 
-    def create_2Dspline(self, variable, xdimension, ydimension, coords_dict={}, method='linear'):
+    def create_2Dspline(
+        self, variable, xdimension, ydimension, coords_dict={}, method="linear"
+    ):
         """Memoized function that interpolates splines for any variable along
         two arbitrary axes with linear interpolation (scipy RegularGridInterpolator).
 
@@ -824,7 +824,7 @@ class SweepDataset:
             spline = RegularGridInterpolator(
                 (x_coordinates, y_coordinates),
                 z_values,
-                method=method,  
+                method=method,
             )
             self.spline_memo[args] = spline
             return spline
@@ -1527,19 +1527,24 @@ def split_list(a_list):
     i_half = len(a_list) // 2
     return a_list[:i_half] + a_list[i_half:]
 
+
 def fit_gaussian(toroidal_angle, opt_tor, delta):
-    return np.exp(-2*(((toroidal_angle - opt_tor) / delta) ** 2))
+    return np.exp(-2 * (((toroidal_angle - opt_tor) / delta) ** 2))
+
 
 def gaussian(theta_m, delta):
-    return np.exp(-2*((theta_m / delta) ** 2))
+    return np.exp(-2 * ((theta_m / delta) ** 2))
+
 
 def noisy_gaussian(theta_m, delta, std=0.05):
     mean = gaussian(theta_m, delta)
     return mean + np.random.normal(0, std)
 
+
 def find_nearest(array, value):
     index = np.abs((array - value)).argmin()
     return array[index]
+
 
 def scale_array(array):
     maxval = array.max()
