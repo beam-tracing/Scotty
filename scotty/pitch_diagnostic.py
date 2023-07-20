@@ -827,21 +827,33 @@ class PitchDiagnostic:
                 ] = std_opt_tor.isel(param=1)
 
     def get_pitch_relation_across_equilibria(self):
-        current_scalings = []
+
         for descriptor in self.descriptors:
             if "current_scaling" not in self.ds_dict[descriptor].attrs.keys():
                 raise KeyError(
                     f"{descriptor} is not yet assigned a numerical current_scaling attribute."
                 )
-            current_scalings.append(self.ds_dict[descriptor].attrs["current_scaling"])
-        current_scalings = np.array(current_scalings)
+
+        das = [self.ds_dict[descriptor] for descriptor in self.descriptors]
+        das.sort(key=lambda da: da.attrs["current_scaling"])
+        opt_tor_das = [da["opt_tor"] for da in das]
+        current_scalings = np.array([da.attrs["current_scaling"] for da in das])
+
         rho_array = np.linspace(0, 1, 100)
         ds = xr.Dataset()
-        ds["opt_tor"] = xr.DataArray(
+        
+        ds["opt_tor_freq"] = xr.concat(
+            objs=opt_tor_das,
+            dim=("current_scaling")
+        )
+        ds["opt_tor_freq"] = ds["opt_tor_freq"].assign_coords(
+            coords={"current_scaling": current_scalings}
+        )
+        ds["opt_tor_rho"] = xr.DataArray(
             dims=("current_scaling", "rho"),
             coords={"current_scaling": current_scalings, "rho": rho_array},
         )
-        ds["pitch"] = xr.DataArray(
+        ds["pitch_rho"] = xr.DataArray(
             dims=("current_scaling", "rho"),
             coords={"current_scaling": current_scalings, "rho": rho_array},
         )
@@ -852,16 +864,42 @@ class PitchDiagnostic:
             pitch_rho_spline = self.get_pitch_rho_spline(descriptor)
             opt_tor_array = opt_tor_spline(rho_array)
             pitch_rho_array = pitch_rho_spline(rho_array)
-            ds["opt_tor"].loc[{"current_scaling": current_scaling}] = opt_tor_array
-            ds["pitch"].loc[{"current_scaling": current_scaling}] = pitch_rho_array
+            ds["opt_tor_rho"].loc[{"current_scaling": current_scaling}] = opt_tor_array
+            ds["pitch_rho"].loc[{"current_scaling": current_scaling}] = pitch_rho_array
             counter += 1
         self.pitch_ds = ds
         return ds
+
+    def linregress_pitch_rho(self):
+        opt_tor_da = self.pitch_ds["opt_tor_rho"]
+        pitch_da = self.pitch_ds["pitch_rho"]
+        rho_coords = self.pitch_ds.coords["rho"].values
+
+        ds = self.pitch_ds
+        for key in ('gradient', 'intercept', 'rval', 'stderr'):
+            ds[key] = xr.DataArray(
+                dims=('rho',),
+                coords={
+                    'rho': rho_coords
+                }
+            )
+
+        for rho in rho_coords:
+            opt_tor = opt_tor_da.loc[{'rho':rho}]
+            pitch = pitch_da.loc[{'rho':rho}]
+            result = linregress(opt_tor, pitch)
+            ds['gradient'].loc[{'rho':rho}] = result.slope
+            ds['intercept'].loc[{'rho':rho}] = result.intercept
+            ds['rval'].loc[{'rho':rho}] = result.rvalue
+            ds['stderr'].loc[{'rho':rho}] = result.stderr
+     
+        return ds['gradient'], ds['intercept']
 
     def analyse_all(self):
         self.fit_measurement_gaussians()
         self.aggregate_fitted_gaussians()
         self.get_pitch_relation_across_equilibria()
+        self.linregress_pitch_rho()
 
     ## Plot methods
 
@@ -938,8 +976,8 @@ class PitchDiagnostic:
             left=False,
             right=False,
         )
-        plt.xlabel("toroidal steering/deg")
-        plt.ylabel("normalized received power")
+        plt.xlabel("Toroidal Steering/$^\circ$")
+        plt.ylabel("Normalized Received Power")
         return fig, axes
 
     def plot_profile_fits(self, descriptor, sim_type="mismatch"):
@@ -999,17 +1037,15 @@ class PitchDiagnostic:
             ax.plot(
                 toroidal_range,
                 scale_array(lin_data),
-                alpha=0.5,
                 color=color,
                 label="profile",
             )
             ax.plot(
                 toroidal_range,
                 gaussian_profile,
-                alpha=0.5,
                 color="r",
                 linestyle="--",
-                label="gaussian fit",
+                label="mean gaussian fit",
             )
             ax.axvline(
                 opt_tor_val,
@@ -1043,8 +1079,8 @@ class PitchDiagnostic:
             left=False,
             right=False,
         )
-        plt.xlabel("toroidal steering/deg")
-        plt.ylabel("normalized received power")
+        plt.xlabel("Toroidal Steering/$^\circ$")
+        plt.ylabel("Normalized Received Power")
         return fig, axes
 
     def plot_opt_tor_hist(self, descriptor, sim_type="mismatch"):
@@ -1095,13 +1131,13 @@ class PitchDiagnostic:
             color = colormap(counter / freq_count)
             ax.hist(data_slice, alpha=0.5, color=color)
             ax.axvline(
+                actual.loc[{"frequency": frequency}], label="predicted", color="k"
+            )
+            ax.axvline(
                 mean.loc[{"frequency": frequency}],
                 label="mean",
                 color="r",
                 linestyle="--",
-            )
-            ax.axvline(
-                actual.loc[{"frequency": frequency}], label="predicted", color="k"
             )
             ax.set_title(f"{frequency} GHz", fontsize=8)
             ax.tick_params(axis="both", which="major", labelsize=5)
@@ -1125,7 +1161,7 @@ class PitchDiagnostic:
             left=False,
             right=False,
         )
-        plt.xlabel("Measured optimum toroidal steering/deg")
+        plt.xlabel("Measured optimum toroidal steering/$^\circ$")
         plt.ylabel("Number of measurements")
 
         return fig, axes
@@ -1189,13 +1225,13 @@ class PitchDiagnostic:
             left=False,
             right=False,
         )
-        plt.xlabel("toroidal steering/deg")
+        plt.xlabel("Toroidal steering/$^\circ$")
         plt.ylabel(f"{variable}")
         return fig, axes
 
     def plot_all_opt_tor_measurements(self, sim_type="mismatch"):
         fig = plt.figure()
-        plt.title(f"{sim_type}, Opt Tor vs. Probe Frequency")
+        plt.title(f"{sim_type}, Opt Tor vs. Probe Frequency", fontsize=15)
         colormap = plt.cm.gnuplot2
         counter = 0
         total_count = len(self.descriptors)
@@ -1230,7 +1266,7 @@ class PitchDiagnostic:
         custom_labels = list(self.descriptors) + ["mean", "predicted"]
 
         plt.xlabel("Frequency/GHz")
-        plt.ylabel("Opt. Toroidal Angle/Deg")
+        plt.ylabel("Opt. Toroidal Steering/$^\circ$")
         plt.legend(
             custom_handles,
             custom_labels,
@@ -1257,7 +1293,7 @@ class PitchDiagnostic:
         plt.fill_between(x_coords, mean - std, mean + std, label="1$\sigma$", alpha=0.3)
         plt.plot(x_coords, actual, label="predicted", color="r", marker="+")
         plt.xlabel("Frequency/GHz")
-        plt.ylabel("Opt. Toroidal Angle/Deg")
+        plt.ylabel("Opt. Toroidal Steering/$^\circ$")
         plt.legend()
         return fig
 
@@ -1310,7 +1346,7 @@ class PitchDiagnostic:
 
         plt.xlabel("Frequency/GHz")
         plt.ylabel("Cutoff Rho")
-        plt.title("rho(f) and rho shift over toroidal sweep range")
+        plt.title("Mean $\\rho(f)$ and $\Delta\\rho$ over toroidal steering range")
         plt.legend(bbox_to_anchor=(1.05, 0), loc="lower left", borderaxespad=0.0)
         return fig
 
@@ -1352,12 +1388,12 @@ class PitchDiagnostic:
                 print(f"No cutoff position data for {descriptor}.")
                 continue
 
-        plt.colorbar(sc)
+        plt.colorbar(sc, label='Freq/GHz')
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
         ax.set_xlabel("R/m")
         ax.set_ylabel("Z/m")
-        fig.suptitle("Cutoff Positions", fontsize=10)
+        fig.suptitle("Cutoff positions vs. scaling", fontsize=15)
 
         Line2D = mpl.lines.Line2D
         custom_handles = [
@@ -1374,7 +1410,7 @@ class PitchDiagnostic:
         )
         return fig, ax
 
-    def plot_pitch_contours(self, descriptor, xlim=None, ylim=None):
+    def plot_pitch_contours(self, descriptor, xlim=None, ylim=None, vmin=-20):
         topfile = self.topfiles[descriptor]
         ds = self.ds_dict[descriptor]
 
@@ -1385,7 +1421,7 @@ class PitchDiagnostic:
             xlim=xlim,
             ylim=ylim,
             cmap="plasma",
-            vmin=-20,
+            vmin=vmin,
         )
         cont = np.sqrt(topfile["pol_flux"].transpose()).plot.contour(
             levels=15,
@@ -1393,7 +1429,6 @@ class PitchDiagnostic:
             xlim=xlim,
             ylim=ylim,
             colors="k",
-            alpha=0.5,
         )
         ax.clabel(cont, inline=True, fontsize=5)
 
@@ -1409,8 +1444,8 @@ class PitchDiagnostic:
             label="Freq/GHz",
         )
         plt.gca().set_aspect(1.0)
-        fig.colorbar(sc)
-        fig.suptitle("Pitch angle contours and cutoff locations", fontsize=20)
+        fig.colorbar(sc, label='Freq/GHz')
+        fig.suptitle("Pitch angle contours and cutoff locations", fontsize=15)
         return fig, ax
 
     def plot_pitch_angle_vs_opt_tor(
@@ -1480,16 +1515,17 @@ class PitchDiagnostic:
             sampled_pitch.append(pitch[sample_index])
             sampled_opt_tor.append(opt_tor[sample_index])
 
-            scat = ax.scatter(opt_tor, pitch, s=2, c=rho_range, cmap=cmap)
+            scat = ax.scatter(opt_tor, pitch, s=3, c=rho_range, cmap=cmap)
             ax.plot(
                 opt_tor,
                 fitted_pitch,
                 color=color,
                 label=f"{descriptor}, m={round(result.slope, 2)}",
+                linewidth=1,
             )
             # Set first grayscale colorbar as legend
             if counter == 0:
-                fig.colorbar(scat)
+                fig.colorbar(scat, label='$\\rho$')
             counter += 1
 
         ax.plot(
@@ -1498,9 +1534,10 @@ class PitchDiagnostic:
             linestyle="--",
             color="r",
             label=f"rho={round(sampled_rho, 2)}",
+            linewidth=1,
         )
-        ax.set_xlabel("opt_tor/deg")
-        ax.set_ylabel("pitch angle/deg")
+        ax.set_xlabel("opt_tor/$^\circ$")
+        ax.set_ylabel("pitch angle/$^\circ$")
         if unit == "rad":
             ax.set_xlabel("opt_tor/rad")
             ax.set_ylabel("pitch angle/rad")
@@ -1509,5 +1546,115 @@ class PitchDiagnostic:
             loc="lower left",
             borderaxespad=0.0,
         )
-        fig.suptitle("Pitch angle vs. Opt tor", fontsize=20)
+        fig.suptitle(f"Pitch angle relation, {rho_lower} < $\\rho$ < {rho_upper}", fontsize=15)
         return fig, ax, slopes
+
+    def plot_pitch_angle_vs_opt_tor2(
+        self, rho_lower=0.1, rho_upper=1.0, unit="deg", levels=20,
+    ):
+        """Plots pitch angle against opt_tor at a sampled set of rho positions
+        across all equilibriums.
+
+        Returns:
+            Artists (fig, ax), dictionary of slopes with descriptor keys
+        """
+
+        opt_tor_da = self.pitch_ds['opt_tor_rho']
+        pitch_da = self.pitch_ds['pitch_rho']
+        rho_array = np.linspace(rho_lower, rho_upper, levels)
+        cmap = plt.cm.plasma_r
+        # Interpolating to fit with the range of rho
+        opt_tor_interp = opt_tor_da.interp(
+            coords={'rho': rho_array}
+        )
+        pitch_interp = pitch_da.interp(
+            coords={'rho': rho_array}
+        )
+
+        fig, ax = plt.subplots()
+
+        for rho in rho_array:
+            opt_tor = opt_tor_interp.loc[{"rho": rho}]
+            pitch = pitch_interp.loc[{"rho": rho}]
+            if unit == 'rad':
+                opt_tor = np.deg2rad(opt_tor)
+                pitch = np.deg2rad(pitch)
+            ax.plot(opt_tor, pitch, color=cmap(rho), label=f'{rho}', marker="x")
+
+        ax.set_xlabel("optimal toroidal steering/$^\circ$")
+        ax.set_ylabel("pitch angle/$^\circ$")
+        if unit == "rad":
+            ax.set_xlabel("opt_tor/rad")
+            ax.set_ylabel("pitch angle/rad")
+        sm = plt.cm.ScalarMappable(cmap=cmap)
+        sm.set_clim(vmin=0, vmax=1)
+        fig.colorbar(sm, label='$\\rho$')
+        fig.suptitle(f"Pitch angle relation, {rho_lower} < $\\rho$ < {rho_upper}", fontsize=15)
+        return fig, ax
+
+    def plot_linear_fits_vs_rho(self, key, rho_min=0, rho_max=1):
+        fig, ax = plt.subplots()
+        da = self.pitch_ds[key].loc[dict(rho=slice(rho_min, rho_max))]
+        da.plot(color='k')
+        fig.suptitle(f'{key} of pitch angle v. opt_tor over rho')
+        return fig, ax
+
+    def plot_delta_opt_tor_vs_scaling(self):
+        da = self.pitch_ds["opt_tor_freq"]
+        scaling = da.coords["current_scaling"].values
+        cmap = plt.cm.plasma_r
+        fig, ax = plt.subplots()
+        for frequency in self.frequencies:
+            color = cmap((frequency - self.frequencies[0])/(self.frequencies[-1] - self.frequencies[0]))
+            opt_tors = da.loc[{'frequency':frequency}].squeeze()
+            delta_opt_tors = opt_tors - opt_tors.loc[{'current_scaling':1.0}].values
+            result = linregress(scaling, delta_opt_tors)
+            ax.plot(scaling, delta_opt_tors, color=color, label=f'{frequency} GHz, m={round(result.slope, 2)}')
+        ax.legend(
+            bbox_to_anchor=(1.05, 0),
+            loc="lower left",
+            borderaxespad=0.0,
+        )
+        ax.set_xlabel("scaling")
+        ax.set_ylabel("$\Delta$opt_tor/$^\circ$")
+        fig.suptitle("Change in optimum toroidal steering vs. scaling", fontsize=15)
+        return fig, ax
+
+    def plot_opt_tor_vs_scaling(self):
+        da = self.pitch_ds["opt_tor_freq"]
+        scaling = da.coords["current_scaling"].values
+        cmap = plt.cm.plasma_r
+        fig, ax = plt.subplots()
+
+        das = [self.ds_dict[descriptor] for descriptor in self.descriptors]
+        das.sort(key=lambda da: da.attrs["current_scaling"])
+        std_das = [da["mismatch_std_opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}] for da in das]
+        current_scalings = np.array([da.attrs["current_scaling"] for da in das])
+        std_da = xr.concat(
+            objs=std_das,
+            dim=("current_scaling")
+        )
+        std_da = std_da.assign_coords(
+            coords={"current_scaling": current_scalings}
+        )
+        
+        for frequency in self.frequencies:
+            color = cmap((frequency - self.frequencies[0])/(self.frequencies[-1] - self.frequencies[0]))
+            opt_tors = da.loc[{'frequency':frequency}].squeeze()
+            std = std_da.loc[{'frequency':frequency}].squeeze()
+            result = linregress(scaling, opt_tors)
+            mean_std = std.mean().values
+            delta = round(mean_std/abs(result.slope), 3)
+            ax.plot(scaling, opt_tors, color=color, label=f'{frequency} GHz, $\Delta$scaling={delta}')
+            ax.fill_between(scaling, opt_tors + std, opt_tors - std, color=color, alpha=0.5)
+        
+        ax.legend(
+            bbox_to_anchor=(1.05, 0),
+            loc="lower left",
+            borderaxespad=0.0,
+        )
+        ax.set_xlabel("scaling")
+        ax.set_ylabel("opt_tor/$^\circ$")
+        fig.suptitle("Optimum toroidal steering vs. scaling", fontsize=15)
+        return fig, ax
+

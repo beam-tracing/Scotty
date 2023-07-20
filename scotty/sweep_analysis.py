@@ -720,6 +720,9 @@ class SweepDataset:
     ## integrating localization, but PitchDiagnostic should be agnostic towards the method used to
     ## simulate the antenna response and run the same set of analyses on it.
 
+    ## TODO: There is a bug where the simulated power profile gets sharply inverted crossing tor=0,
+    ## likely due to a sqrt sign flip somewhere. 
+
     def get_simulated_power_prof(
         self,
         frequency,
@@ -1415,10 +1418,11 @@ class MultiSweeps:
                     freq_range,
                     plot_spline(freq_range),
                     color=color,
+                    alpha=0.5,
                 )
                 ax.scatter(
-                    self.frequencies,
-                    plot_spline(self.frequencies),
+                    self.frequencies[::2],
+                    plot_spline(self.frequencies[::2]),
                     marker=marker,
                     s=10,
                     color=color,
@@ -1439,7 +1443,7 @@ class MultiSweeps:
         custom_labels = [
             f"pol={pol_angle}" for pol_angle in poloidal_angles
         ] + descriptor_list
-        fig.suptitle("opt_tor vs. equilibrium")
+        fig.suptitle("Range of optimal steerings vs. scaling", fontsize=15)
         ax.legend(
             custom_handles,
             custom_labels,
@@ -1448,8 +1452,8 @@ class MultiSweeps:
             borderaxespad=0.0,
             fontsize=8,
         )
-        ax.set_xlabel("frequency/GHz")
-        ax.set_ylabel("opt_tor/deg")
+        ax.set_xlabel("Frequency/GHz")
+        ax.set_ylabel("Opt. toroidal steering/$^\circ$")
 
         return fig, ax
 
@@ -1473,9 +1477,9 @@ class MultiSweeps:
             )
             counter += 1
 
-        plt.title("Cutoff Rho vs. Frequency")
+        plt.title("Cutoff $\\rho$ vs. Frequency")
         plt.xlabel("Frequency/GHz")
-        plt.ylabel("Rho")
+        plt.ylabel("$\\rho$")
         plt.legend()
         return fig
 
@@ -1538,7 +1542,7 @@ def gaussian(theta_m, delta):
 
 def noisy_gaussian(theta_m, delta, std=0.05):
     mean = gaussian(theta_m, delta)
-    return mean + np.random.normal(0, std)
+    return mean + np.random.normal(0, std*mean)
 
 
 def find_nearest(array, value):
