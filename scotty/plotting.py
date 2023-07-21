@@ -4,6 +4,7 @@ import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import xarray as xr
 from datatree import DataTree
+from scipy.interpolate import CubicSpline
 
 from .analysis import beam_width
 from .geometry import MagneticField
@@ -146,7 +147,7 @@ def plot_flux_surface(
     return ax
 
 
-def plot_field(
+def plot_poloidal_crosssection(
     field: MagneticField, ax: Optional[plt.Axes] = None, highlight_LCFS: bool = True
 ) -> plt.Axes:
     ax = maybe_make_axis(ax)
@@ -261,17 +262,20 @@ def plot_dispersion_relation(
     return ax
 
 
-def plot_beam_path(
+def plot_poloidal_beam_path(
     dt: DataTree,
     field: MagneticField,
     filename: Optional[PathLike] = None,
     ax: Optional[plt.Axes] = None,
 ) -> plt.Axes:
-    """Plots the beam path on the R Z plane"""
+    """Plots the beam path on the R Z plane
+
+    .. todo:: Would be nice to not have to pass in ``field``
+    """
 
     ax = maybe_make_axis(ax)
 
-    plot_field(field, ax=ax, highlight_LCFS=False)
+    plot_poloidal_crosssection(field, ax=ax, highlight_LCFS=False)
 
     launch_R = dt.inputs.launch_position.sel(col="R")
     launch_Z = dt.inputs.launch_position.sel(col="Z")
@@ -281,7 +285,7 @@ def plot_beam_path(
         ":k",
         label="Central (reference) ray",
     )
-    width = beam_width(dt.analysis)
+    width = beam_width(dt.analysis.g_hat, np.array([0.0, 1.0, 0.0]), dt.analysis.Psi_3D)
     beam_plus = dt.analysis.beam + width
     beam_minus = dt.analysis.beam - width
     ax.plot(beam_plus.sel(col="R"), beam_plus.sel(col="Z"), "--k")
@@ -292,6 +296,66 @@ def plot_beam_path(
     ax.set_title("Beam path (poloidal plane)")
     ax.set_xlabel("R [m]")
     ax.set_ylabel("Z [m]")
+
+    if filename:
+        plt.savefig(f"{filename}.png")
+
+    return ax
+
+
+def plot_toroidal_contour(ax: plt.Axes, R: float, zeta: FloatArray, colour="orange"):
+    x, y, _ = cylindrical_to_cartesian(
+        R * np.ones_like(zeta), zeta, np.zeros_like(zeta)
+    )
+    ax.plot(x, y, colour)
+
+
+def plot_toroidal_beam_path(
+    dt: DataTree, filename: Optional[PathLike] = None, ax: Optional[plt.Axes] = None
+) -> plt.Axes:
+    ax = maybe_make_axis(ax)
+
+    lcfs = 1
+    flux_spline = CubicSpline(
+        dt.analysis.R_midplane, dt.analysis.poloidal_flux_on_midplane - lcfs
+    )
+    all_R_lcfs = flux_spline.roots()
+
+    zeta = np.linspace(-np.pi, np.pi, 1001)
+    for R_lcfs in all_R_lcfs:
+        plot_toroidal_contour(ax, R_lcfs, zeta)
+
+    flux_min_index = dt.analysis.poloidal_flux_on_midplane.argmin()
+    R_axis = dt.analysis.R_midplane[flux_min_index].data
+    plot_toroidal_contour(ax, R_axis, zeta, "#00003f")
+
+    launch_X, launch_Y, _ = cylindrical_to_cartesian(*dt.inputs.launch_position)
+    ax.plot(
+        np.concatenate([[launch_X], dt.analysis.q_X]),
+        np.concatenate([[launch_Y], dt.analysis.q_Y]),
+        ":k",
+        label="Central (reference) ray",
+    )
+    width = beam_width(
+        dt.analysis.g_hat_Cartesian,
+        np.array([0.0, 0.0, 1.0]),
+        dt.analysis.Psi_3D_Cartesian,
+    )
+    beam_plus = dt.analysis.beam_cartesian + width
+    beam_minus = dt.analysis.beam_cartesian - width
+    ax.plot(beam_plus.sel(col_cart="X"), beam_plus.sel(col_cart="Y"), "--k")
+    ax.plot(
+        beam_minus.sel(col_cart="X"),
+        beam_minus.sel(col_cart="Y"),
+        "--k",
+        label="Beam width",
+    )
+    ax.scatter(launch_X, launch_Y, c="red", marker=">", label="Launch position")
+
+    ax.legend()
+    ax.set_title("Beam path (toroidal plane)")
+    ax.set_xlabel("X [m]")
+    ax.set_ylabel("Y [m]")
 
     if filename:
         plt.savefig(f"{filename}.png")

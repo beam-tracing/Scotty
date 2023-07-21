@@ -29,7 +29,8 @@ from scotty.hamiltonian import DielectricTensor, Hamiltonian, hessians
 from scotty.typing import ArrayLike, FloatArray, PathLike
 
 
-VECTOR_COMPONENTS = ["R", "zeta", "Z"]
+CYLINDRICAL_VECTOR_COMPONENTS = ["R", "zeta", "Z"]
+CARTESIAN_VECTOR_COMPONENTS = ["X", "Y", "Z"]
 
 
 def set_vector_components_long_name(df: Union[xr.Dataset, xr.DataArray]) -> None:
@@ -37,6 +38,10 @@ def set_vector_components_long_name(df: Union[xr.Dataset, xr.DataArray]) -> None
         df.col.attrs["long_name"] = "Vector/matrix column component"
     if "row" in df:
         df.row.attrs["long_name"] = "Matrix row component"
+    if "col_cart" in df:
+        df.col_cart.attrs["long_name"] = "Vector/matrix column component"
+    if "row_cart" in df:
+        df.row_cart.attrs["long_name"] = "Matrix row component"
 
 
 def save_npz(filename: Path, df: xr.Dataset) -> None:
@@ -170,8 +175,8 @@ def immediate_analysis(
         },
         coords={
             "tau": tau,
-            "row": VECTOR_COMPONENTS,
-            "col": VECTOR_COMPONENTS,
+            "row": CYLINDRICAL_VECTOR_COMPONENTS,
+            "col": CYLINDRICAL_VECTOR_COMPONENTS,
             "q_R": q_R,
             "q_Z": q_Z,
             "q_zeta": solver_output.q_zeta,
@@ -380,13 +385,13 @@ def further_analysis(
     ) / (K_magnitude_array)
     loc_m = np.exp(-2 * (theta_m / delta_theta_m) ** 2)
 
-    print("polflux: ", df.poloidal_flux[cutoff_index])
+    print("polflux: ", df.poloidal_flux[cutoff_index].data)
 
-    print("theta_m", theta_m[cutoff_index])
-    print("delta_theta_m", delta_theta_m[cutoff_index])
+    print("theta_m: ", theta_m[cutoff_index].data)
+    print("delta_theta_m: ", delta_theta_m[cutoff_index].data)
     print(
-        "mismatch attenuation",
-        np.exp(-2 * (theta_m[cutoff_index] / delta_theta_m[cutoff_index]) ** 2),
+        "mismatch attenuation: ",
+        (np.exp(-2 * (theta_m[cutoff_index] / delta_theta_m[cutoff_index]) ** 2)).data,
     )
 
     # This part is used to make some nice plots when post-processing
@@ -610,10 +615,10 @@ def further_analysis(
         "Psi_xx_entry": Psi_xx_entry,
         "Psi_xy_entry": Psi_xy_entry,
         "Psi_yy_entry": Psi_yy_entry,
-        "Psi_3D_Cartesian": (["tau", "row", "col"], Psi_3D_Cartesian),
-        "x_hat_Cartesian": (["tau", "col"], x_hat_Cartesian),
-        "y_hat_Cartesian": (["tau", "col"], y_hat_Cartesian),
-        "g_hat_Cartesian": (["tau", "col"], g_hat_Cartesian),
+        "Psi_3D_Cartesian": (["tau", "row_cart", "col_cart"], Psi_3D_Cartesian),
+        "x_hat_Cartesian": (["tau", "col_cart"], x_hat_Cartesian),
+        "y_hat_Cartesian": (["tau", "col_cart"], y_hat_Cartesian),
+        "g_hat_Cartesian": (["tau", "col_cart"], g_hat_Cartesian),
         "M_xx": M_xx,
         "M_xy": M_xy,
         "M_yy": M_yy,
@@ -662,6 +667,7 @@ def further_analysis(
         "loc_m": loc_m,
         "loc_b_r_s": loc_b_r_s,
         "loc_b_r": loc_b_r,
+        "beam_cartesian": (["tau", "col_cart"], np.vstack([q_X, q_Y, df.q_Z.data]).T),
     }
 
     df = df.assign_coords(
@@ -674,8 +680,13 @@ def further_analysis(
             ),
             "RZ_distance_along_line": (["tau"], RZ_distance_along_line, {"units": "m"}),
             "distance_along_line": (["tau"], distance_along_line, {"units": "m"}),
+            "row_cart": CARTESIAN_VECTOR_COMPONENTS,
+            "col_cart": CARTESIAN_VECTOR_COMPONENTS,
+            "q_X": q_X,
+            "q_Y": q_Y,
         }
     )
+    set_vector_components_long_name(df)
     df.update(further_df)
 
     if detailed_analysis_flag and (cutoff_index + 1 != len(df.tau)):
@@ -849,8 +860,8 @@ def open_data_input_npz(filename: PathLike) -> xr.Dataset:
             coords={
                 "R": f["data_R_coord"],
                 "Z": f["data_Z_coord"],
-                "row": VECTOR_COMPONENTS,
-                "col": VECTOR_COMPONENTS,
+                "row": CYLINDRICAL_VECTOR_COMPONENTS,
+                "col": CYLINDRICAL_VECTOR_COMPONENTS,
             },
         )
 
@@ -887,8 +898,8 @@ def open_data_output_npz(filename: PathLike) -> xr.Dataset:
             },
             coords={
                 "tau": f["tau_array"],
-                "row": VECTOR_COMPONENTS,
-                "col": VECTOR_COMPONENTS,
+                "row": CYLINDRICAL_VECTOR_COMPONENTS,
+                "col": CYLINDRICAL_VECTOR_COMPONENTS,
                 "q_R": f["q_R_array"],
                 "q_Z": f["q_Z_array"],
                 "q_zeta": f["q_zeta_array"],
@@ -989,15 +1000,14 @@ def open_analysis_npz(outputs: xr.Dataset, filename: PathLike) -> xr.Dataset:
         )
 
 
-def beam_width(ds: xr.Dataset) -> xr.DataArray:
-    W_vec_RZ = np.cross(ds.g_hat, np.array([0, 1, 0]))
-    W_vec_RZ_magnitude = np.linalg.norm(W_vec_RZ, axis=1)
+def beam_width(
+    g_hat: xr.DataArray, orthogonal_dir: FloatArray, Psi_3D: xr.DataArray
+) -> xr.DataArray:
+    W_vec = np.cross(g_hat, orthogonal_dir)
+    W_vec_magnitude = np.linalg.norm(W_vec, axis=1)
     # Unit vector
-    W_uvec_RZ = W_vec_RZ / W_vec_RZ_magnitude[:, np.newaxis]
-    width_RZ = np.sqrt(2 / np.imag(dot(W_uvec_RZ, dot(ds.Psi_3D, W_uvec_RZ))))
-    width = xr.DataArray(
-        W_uvec_RZ * width_RZ[:, np.newaxis],
-        coords=({"tau": ds.tau, "col": VECTOR_COMPONENTS}),
-    )
+    W_uvec = W_vec / W_vec_magnitude[:, np.newaxis]
+    width = np.sqrt(2 / dot(W_uvec, dot(Psi_3D, W_uvec)).imag)
+    width = xr.DataArray(W_uvec * width[:, np.newaxis], coords=g_hat.coords)
     set_vector_components_long_name(width)
     return width

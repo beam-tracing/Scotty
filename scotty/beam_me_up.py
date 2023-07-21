@@ -94,7 +94,7 @@ from scotty.hamiltonian import Hamiltonian
 from scotty.launch import launch_beam, find_entry_point
 from scotty.torbeam import Torbeam
 from scotty.ray_solver import propagate_ray
-from scotty.plotting import plot_dispersion_relation, plot_beam_path
+from scotty.plotting import plot_dispersion_relation, plot_poloidal_beam_path
 from scotty._version import __version__
 
 # Checks
@@ -776,7 +776,7 @@ def default_plots(
     """
 
     print("Making figures")
-    plot_beam_path(dt, field, filename=output_path / f"Ray1_{suffix}.png")
+    plot_poloidal_beam_path(dt, field, filename=output_path / f"Ray1_{suffix}.png")
     plot_dispersion_relation(dt.analysis, filename=output_path / f"H_{suffix}.png")
     print("Figures have been saved")
 
