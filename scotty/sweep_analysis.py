@@ -11,6 +11,7 @@ angle and frequency as axes.
 import xarray as xr
 import numpy as np
 import json
+import warnings
 from scipy.interpolate import (
     UnivariateSpline,
     RectBivariateSpline,
@@ -36,6 +37,7 @@ class SweepDataset:
     def __init__(self, ds):
         self.dataset = ds
         self.spline_memo = {}
+        self.topfile = None
 
     # I/O
 
@@ -66,7 +68,6 @@ class SweepDataset:
         poloidal_angles,
         toroidal_angles,
         filepath_format,
-        output_types=("analysis_output", "data_input", "data_output", "solver_output"),
         attrs_dict={},
     ):
         """Constructs a SweepDataset instance from a set of Scotty output files.
@@ -82,7 +83,11 @@ class SweepDataset:
             and {poloidal_angle} specified in frequencies, toroidal_angles, and poloidal_angles,
             as well as a {output_types} corresponding to the type of scotty output (analysis_output,
             data_input, data_output, solver_output) in the filename.
+            attrs_dict (dictionary): A dictionary of attribute names and values to save to
+            the xarray dataset.
         """
+        output_types=("analysis_output", "data_input", "data_output", "solver_output")
+
         ds = xr.Dataset()
         ds.attrs["class_type"] = "SweepDataset"
         ds.attrs["descriptor"] = ""
@@ -211,7 +216,7 @@ class SweepDataset:
                         "poloidal_flux_output",
                     ):
                         current_ds = ds[key]
-                        if len(current_ds.dims) < 4:
+                        if "trajectory_step" not in current_ds.dims:
                             ds[key] = current_ds.expand_dims(
                                 dim={"trajectory_step": np.arange(0, path_len)}, axis=-1
                             ).copy()
@@ -287,38 +292,104 @@ class SweepDataset:
 
         return classobject
 
-    def to_netcdf(self, folder="", filename=None, suffix=""):
+    def to_netcdf(self, folder="", filename=None):
         """Saves contents of Dataset into a netCDF4 file for easy read and writing.
 
         Args:
-            folder (str, optional): Path to folder to save file to. Default is None.
+            folder (str, optional): Path to folder to save file to. Default is an empty string.
             filename (str, optional): Filename to save the nc file as. Default is 'SweepDataset', or
             the descriptor string if provided.
         """
         self.dataset.attrs["missing_indices"] = json.dumps(self.missing_indices)
-        '''
-        if not filename:
-            descriptor = self.dataset.attrs["descriptor"]
-            if descriptor:
-                filename = descriptor
-            else:
-                filename = "SweepDataset"'''
-
         filename = filename or self.dataset.get("descriptor", "SweepDataset")
-
-        file_path = f"{folder}{filename}{suffix}.nc"
+        file_path = f"{folder}{filename}.nc"
         self.dataset.to_netcdf(path=file_path)
+        print(f"File saved to {file_path}")
 
     #### Set Methods ####
 
     def set_attrs(self, attribute, value):
+        """Used to set attributes of the xarray dataset.
+
+        Args:
+            attribute (str): Name of the attribute.
+            value (hashable): Value of the attribute.
+        """
         self.dataset.attrs[attribute] = value
 
     def set_descriptor(self, descriptor):
         """Used to set a unique descriptor to identify sweeps with different plasma
-        equilibrium.
+        equilibrium. This descriptor is needed to tag SweepDataset data when loaded
+        onto a PitchDiagnostic object.
+
+        Args:
+            descriptor (hasable): Typically a string to describe the SweepDataset, 
+            but it is possible to use floats or integers as well.
         """
         self.set_attrs("descriptor", descriptor)
+
+    def set_topfile_path(self, topfile_path):
+        """Sets the path string to the json topfile associated with this set of
+        SweepDataset data. This path string can thus be saved to persistent
+        memory in netcdf format and be read again.
+
+        Args:
+            topfile_path (str): Path string to the json topfile.
+        """
+        if 'topfile_path' in self.dataset.attrs.keys():
+            warnings.warn("Overwriting previously set topfile path.")
+        self.dataset.attrs["topfile_path"] = topfile_path
+
+    def get_topfile_path(self):
+        """Get method for the topfile path attribute.
+        """
+        if "topfile_path" in self.dataset.attrs.keys():
+            return self.dataset.attrs["topfile_path"]
+        raise ValueError(f"No topfile path set.")
+
+    def load_topfile(self):
+        """Loads data from the topfile associated with the topfile_path string and
+        saves it to a separate self.topfile xarray dataset. This dataset is not saved
+        to the .nc file when the to_netcdf method is called since it is already saved
+        in persistent memory in json format.
+
+        Returns:
+            Dataset: An xarray Dataset of the json data.
+        """
+        topfile_path = self.get_topfile_path()
+        ds = xr.Dataset()
+        with open(topfile_path) as f:
+            topfile = json.load(f)
+            R_coord = topfile["R"]
+            Z_coord = topfile["Z"]
+            B_R = np.transpose(topfile["Br"])
+            B_Z = np.transpose(topfile["Bz"])
+            B_T = np.transpose(topfile["Bt"])
+            pol_flux = np.transpose(topfile["pol_flux"])
+        var_names = ("Br", "Bz", "Bt", "pol_flux")
+        arrays = (B_R, B_Z, B_T, pol_flux) 
+        for i in range(len(arrays)):
+            array = arrays[i]
+            var_name = var_names[i]
+            ds[var_name] = xr.DataArray(
+                data=array,
+                dims=("R", "Z"),
+                coords={
+                    "R": R_coord,
+                    "Z": Z_coord,
+                },
+            )
+        # Find pitch angle
+        ds["pitch_angle"] = np.rad2deg(
+            np.arctan(
+                np.divide(
+                    np.hypot(ds["Br"], ds["Bz"]),
+                    ds["Bt"],
+                )
+            )
+        )
+        self.topfile = ds
+        return ds
 
     ## get methods/properties
 
@@ -330,10 +401,23 @@ class SweepDataset:
         return self.dataset.copy(deep=True)
 
     def get_coordinate_array(self, dimension):
+        """
+        Args:
+            dimension (str): Name of the dimension.
+        Returns:
+            numpy array: Coordinate array associated with dimension.
+        """
         data = self.dataset
         return data.coords[dimension].values
 
     def get_rho_freq_spline(self, poloidal_angle, toroidal_angle):
+        """Method for retrieving a spline of cutoff rho as a function of frequency.
+        Args:
+            poloidal_angle (int/float): Poloidal angle to interpolate the spline at
+            toroidal_angle (int/float): Toroidal angle to interpolate the spline at
+        Returns:
+            UnivariateSpline object
+        """
         spline = self.create_1Dspline(
             variable="cutoff_rho",
             dimension="frequency",
@@ -357,13 +441,16 @@ class SweepDataset:
 
     @property
     def variables(self):
+        """A list of variable names indexing the component DataArrays of self.dataset."""
         return list(self.dataset.keys())
 
     @property
     def descriptor(self):
+        """The descriptor string associated with this SweepDataset."""
         return str(self.dataset.attrs["descriptor"])
 
     def print_KeysView(self):
+        """Prints a summary of the objects and data contained within self.dataset."""
         print(self.dataset.keys())
 
     def generate_variable_at_cutoff(self, variable):
@@ -591,6 +678,8 @@ class SweepDataset:
         return self.dataset["reflection_mask"]
 
     def _path_integrate(self, int_array):
+        """Internal method used to integrate localization along path.
+        """
         frequencies = self.get_coordinate_array("frequency")
         poloidal_angles = self.get_coordinate_array("poloidal_angle")
         toroidal_angles = self.get_coordinate_array("toroidal_angle")
@@ -621,6 +710,9 @@ class SweepDataset:
         return output_da
 
     def generate_mismatch_gaussian(self):
+        """Generates the backscattered power for each simulated run with the mismatch
+        gaussian formula using values at cutoff.
+        """
         if "mismatch_gaussian" in self.variables:
             print("mismatch_gaussian already generated.")
             return self.dataset["mismatch_gaussian"]
@@ -631,6 +723,9 @@ class SweepDataset:
         return gaussian
 
     def integrate_loc_m(self):
+        """Generates the backscattered power for each simulated run by integrating
+        mismatch localization along the ray trajectory.
+        """
         if "int_loc_m" in self.variables:
             print("int_loc_m already generated.")
             return self.dataset["int_loc_m"]
@@ -640,6 +735,10 @@ class SweepDataset:
         return int_loc_m
 
     def integrate_loc_product(self):
+        """Generates the backscattered power for each simulated run by integrating
+        total localization (consisting of the ray, beam, polarization and mismatch
+        pieces) along the ray trajectory.
+        """
         if "int_loc_product" in self.variables:
             print("int_loc_product already generated.")
             return self.dataset["int_loc_product"]
@@ -670,49 +769,25 @@ class SweepDataset:
         self.integrate_loc_product()
         return self.variables
 
-    ## WIP: difficulties with automatically defining rho range as well as
-    ## non-monotonicity with certain combinations of parameters
-    """
-    def transform_opt_tor_to_rho(self):
-        rho_coords = np.linspace(0, 1, 50)
+    def generate_pitch_at_cutoff(self):
+        """Determines the pitch angle at the cutoff point of the ray using
+        data from the json topfile as the ground truth.
+        """
+        cutoff_R = self.dataset['cutoff_q_R_array']
+        cutoff_Z = self.dataset['cutoff_q_Z_array']
         poloidal_angles = self.get_coordinate_array('poloidal_angle')
-        toroidal_angles = self.get_coordinate_array('toroidal_angle')
         frequencies = self.get_coordinate_array('frequency')
-        newvar = 'opt_tor_rho'
-        self.dataset[newvar] = xr.DataArray(
-            dims = ('rho', 'poloidal_angle'),
-            coords = {
-                'rho': rho_coords,
-                'poloidal_angle': poloidal_angles,
-            }
+        toroidal_angles = self.get_coordinate_array('toroidal_angle')
+        pitch = self.topfile['pitch_angle'].expand_dims(
+            dim={
+                'frequency':frequencies, 
+                'poloidal_angle':poloidal_angles, 
+                'toroidal_angle':toroidal_angles,
+                },
         )
-        opt_tor_index = self.dataset['nearest_opt_tor_index']
-        rho_at_opt_tor = self.dataset['cutoff_rho'].isel(toroidal_angle=opt_tor_index) 
-        for poloidal_angle in poloidal_angles:
-            index = {
-                    'poloidal_angle': poloidal_angle,
-                }
-            data_spline = self.create_1Dspline(
-                variable='opt_tor',
-                dimension='frequency',
-                coords_dict=index
-            )
-            ## Pre process the relation
-            rho_array = rho_at_opt_tor.loc[index]
-            try:
-                freq_rho = UnivariateSpline(
-                    x=rho_array[::-1],
-                    y=frequencies[::-1],
-                    s=0,
-                )
-            except ValueError:
-                print(f'Rho at cutoff is not a monotonic sequence for pol={poloidal_angle}!')
-            plt.plot(freq_rho(np.linspace(0.1, 0.9, 40)), label=f'pol={poloidal_angle}')
-            newdata = data_spline(freq_rho(rho_coords))
-            self.dataset[newvar].loc[index] = newdata
-        
-        return self.dataset[newvar]
-    """
+        cutoff_pitch = pitch.sel(R=cutoff_R, Z=cutoff_Z, method='nearest')
+        self.dataset['cutoff_pitch'] = cutoff_pitch
+        return cutoff_pitch
 
     ## simulation methods
     ## TODO: Future plans to accomodate simulation with integrated loc_m or total_loc; SweepDataset
@@ -883,7 +958,6 @@ class SweepDataset:
         """Checks whether a ray of an arbitrary frequency, toroidal and poloidal steering
         will be reflected from the plasma based on nearest grid points.
         """
-
         frequencies = self.get_coordinate_array("frequency")
         poloidal_angles = self.get_coordinate_array("poloidal_angle")
         toroidal_angles = self.get_coordinate_array("toroidal_angle")
@@ -905,7 +979,6 @@ class SweepDataset:
     def check_cutoff_indices(self):
         """Checks for and interpolates problematic cutoff indices (negative integers that
         occur when casting np.NaN to int).
-
         """
         cutoff_indices = self.dataset["cutoff_index"]
         # cast to float to work with np.NaN values
@@ -935,7 +1008,8 @@ class SweepDataset:
             return new_list
 
     def check_float_arrays(self, variable):
-        """Checks for and interpolates any null array values."""
+        """Checks for and interpolates any null array values.
+        """
         new_array = self.dataset[variable]
         print("Number of NaN entries:", len(np.argwhere(new_array.isnull().values)))
         # Try multiple dimensions as interpolating in one axis may not eliminate all gaps
@@ -961,18 +1035,23 @@ class SweepDataset:
             return index_list
 
     def check_all_float_arrays(self):
+        """Calls check_float_arrays for all relevant variables.
+        """
         for variable in self.variables:
             print(f"Checking {variable}...")
             if variable != "cutoff_index":
                 self.check_float_arrays(variable)
 
     def _dict_to_hashable(self, dictionary):
+        """Internal method for converting dictionary arguments to a hashable form 
+        for memoization.
+        """
         return tuple(dictionary.items())
 
     def _hashable_to_dict(self, hashable):
         return dict(hashable)
 
-    ## basic plotting methods
+    ### Plotting Methods ###
 
     def imshow_slice(
         self,
@@ -1019,33 +1098,6 @@ class SweepDataset:
         plt.colorbar(mappable=im)
         return fig, ax
 
-    def compare_loc_cutoff(
-        self,
-        loc,
-        xdimension,
-        ydimension,
-        coords_dict,
-        cmap="seismic",
-        **kwargs,
-    ):
-        difference = self.dataset["cutoff_index"] - self.dataset[loc].argmax(
-            dim="trajectory_step"
-        )
-        image = difference.loc[coords_dict].transpose(ydimension, xdimension)
-        x_coords = self.get_coordinate_array(xdimension)
-        y_coords = self.get_coordinate_array(ydimension)
-        extent = [x_coords[0], x_coords[-1], y_coords[0], y_coords[-1]]
-
-        fig, ax = plt.subplots()
-        im = ax.imshow(
-            image, origin="lower", extent=extent, cmap=cmap, aspect="auto", **kwargs
-        )
-        ax.set_xlabel = f"{xdimension}"
-        ax.set_ylabel = f"{ydimension}"
-        plt.colorbar(mappable=im)
-        fig.suptitle(f"Index of cutoff - peak {loc}")
-        return fig, ax
-
     def plot_contour(
         self,
         variable,
@@ -1068,6 +1120,9 @@ class SweepDataset:
             cmap (str): Colormap to be used
             mask_flag(bool): Whether or not to mask non-reflected rays. Only available
             for dimensions 'frequency', 'poloidal_angle', 'toroidal_angle'.
+
+        Returns:
+            Artist objects fig, ax
         """
         data_spline = self.create_2Dspline(
             variable, xdimension, ydimension, coords_dict
@@ -1146,13 +1201,11 @@ class SweepDataset:
         ax.set_ylabel(f"{ydimension}")
         ax.clabel(CSgo, inline=True, fontsize=6)
         fig.colorbar(CS)
-
         return fig, ax
 
     def plot_cutoff_contour(
         self,
-        const_angle_str,
-        const_angle,
+        coords,
         save_path=None,
         measure="rho",
         mask_flag=True,
@@ -1163,23 +1216,17 @@ class SweepDataset:
         to the data to produce the plot.
 
         Args:
-            const_angle_str (str): Specify if frequency is being plotted against
-            'toroidal_angle' or 'poloidal_angle'.
-            const_angle (int/float): Value of poloidal/toroidal angle to be held
-            constant.
-            save_path (str, optional): If provided, saves the figure to the file
-            path specified. Default is None.
+            coords (dict): Dictionary key must be either 'toroidal_angle' or 'poloidal_angle',
+            with the value provided being the angle held constant for. 
             measure (str, optional): Specify 'rho' or 'm' to plot in terms of normalized
             poloidal radius or actual poloidal distance. Default is 'rho'.
             mask_flag (bool, optional): Select whether to mask the data with 'reflection_mask'.
             Default is True.
             bounds (tup, optional): Specify plotting range in the form (x_start, x_stop,
             y_start, y_stop)
-            return_artists (bool, optional): Default True. If True, returns fig, ax used to
-            plot the diagram, else returns the arrays used for plotting.
 
         Returns:
-            Tuple: A tuple of the X, Y, Z and mask arrays used to plot the contours
+            Artist objects fig, ax
         """
         if const_angle_str == "toroidal_angle":
             var_angle_str = "poloidal_angle"
@@ -1277,19 +1324,116 @@ class SweepDataset:
         ax.set_ylabel(f"{var_angle_str}/$^\circ$")
         ax.clabel(CSgo, inline=True, fontsize=6)
         fig.colorbar(CS)
-
-        if save_path:
-            plt.savefig(
-                save_path + f"cutoff_contour_{const_angle_str}{const_angle}.jpg",
-                dpi=200,
-            )
-
         return fig, ax
 
-    def plot_cutoff_angles(self, poloidal_angle):  # TODO: Implement this
-        return
+    def plot_cutoff_positions(
+        self, 
+        toroidal_angle=0,
+        show_pitch=False,
+        xlim=None, 
+        ylim=None, 
+        levels=20, 
+        flux_cmap="plasma_r", 
+        position_cmap="spectral",
+        pitch_cmap="plasma_r",
+        pitch_max=None,
+        pitch_min=None,
+        ):
+        """Plots the cutoff locations of all ray trajectories for a specified toroidal steering
+        in the poloidal (R-Z) plane. Can be plotted against a colour contour map of the pitch
+        angles in the R-Z plane.
+
+        Args:
+            toroidal_angle (int/float, optional): Toroidal angle to plot the cutoff positions
+            Default 0.
+            show_pitch (bool, optional): Controls whether or not to show pitch angle contours
+            Default False.
+            xlim (tuple of floats, optional): Tuple passed to xlim argument of matplotlib.contour
+            ylim (tuple of floats, optional): Tuple passed to ylim argument of matplotlib.contour
+            levels (int, optional): Number of contour levels to plot
+            flux_cmap (str, optional): Colormap assigned to the flux contours. Ignored and set to
+            black if show_pitch is True. Default "plasma_r".
+            position_cmap (str, optional): Colormap assigned to the position markers by poloidal 
+            steering. Default "spectral".
+            pitch_cmap (str, optional): Colormap assigned to the pitch angle contours. Default
+            "plasma_r".
+            pitch_max (float, optional): Passed to the vmax argument when plotting pitch angle 
+            contours.
+            pitch_min (float, optional): Passed to the vmin argument when plotting pitch angle 
+            contours.
+
+        Returns:
+            Artist objects fig, ax
+        """
+
+        fig, ax = plt.subplots()
+        rho = np.sqrt(self.topfile["pol_flux"].transpose("Z", "R"))
+        
+        if show_pitch:
+            pitch = self.topfile["pitch_angle"].transpose("Z", "R")
+            cont = rho.plot.contour(
+                levels=levels,
+                vmax=1.0,
+                xlim=xlim,
+                ylim=ylim,
+                colors='k',
+            )
+            pitch.plot.contourf(
+                levels=levels,
+                xlim=xlim,
+                ylim=ylim,
+                cmap=pitch_cmap,
+                vmax=pitch_max,
+                vmin=pitch_min,
+                add_colorbar=True,
+            )
+        else:
+            cont = rho.plot.contour(
+                levels=levels,
+                vmax=1.0,
+                xlim=xlim,
+                ylim=ylim,
+                cmap=flux_cmap,
+            )
+            
+        ax.clabel(cont, inline=True, fontsize=5)
+        mask = self.dataset['reflection_mask']
+        cutoff_R = self.dataset['cutoff_q_R_array'].where(np.logical_not(mask))
+        cutoff_Z = self.dataset['cutoff_q_Z_array'].where(np.logical_not(mask))
+        poloidal_angles = self.get_coordinate_array('poloidal_angle')
+        frequencies = self.get_coordinate_array('frequency')
+        for frequency in frequencies:
+            
+            R = cutoff_R.loc[{'frequency':frequency, 'toroidal_angle':toroidal_angle}]
+            Z = cutoff_Z.loc[{'frequency':frequency, 'toroidal_angle':toroidal_angle}]           
+            pol_array = (R.coords['poloidal_angle'].values + 15)/30
+            sc = ax.scatter(
+                R,
+                Z,
+                s=5,
+                c=pol_array,
+                cmap=position_cmap,
+                edgecolors="k",
+                linewidths=0.5,
+                marker="o",
+            )
+        norm = mpl.colors.Normalize(vmin=-15, vmax=15)
+        plt.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=position_cmap), label='Poloidal Angle/$^\circ$')
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        ax.set_xlabel("R/m")
+        ax.set_ylabel("Z/m")
+        fig.suptitle(f"Cutoff positions, tor={toroidal_angle}$^\circ$", fontsize=15)
+        return fig, ax
 
     def plot_opt_tor_contour(self):
+        """
+        Plots contours of the optimal toroidal steering angle in the frequency-poloidal angle
+        parameter space.
+
+        Return:
+            Artist objects fig, ax
+        """
         freq = self.get_coordinate_array("frequency")
         pol = self.get_coordinate_array("poloidal_angle")
         x = np.linspace(freq[0], freq[-1], 500)
@@ -1324,22 +1468,33 @@ class SweepDataset:
         fig.colorbar(CS)
         return fig, ax
 
-    def plot_delta_m_contour(self, poloidal_angle):
-        return
+    def plot_mismatch_angles(self, tor_upper, tor_lower, frequency, poloidal_angle):
+        """Plots the mismatch angle along with an interpolated spline for the specified
+        frequency, poloidal angle, and toroidal steering range.
 
-    def plot_rho_freq_contours(
-        self,
-    ):  # Plot rho against frequency, with contours of constant poloidal steering
-        return
+        Args:
+            tor_upper (float): Upper range of toroidal steerings.
+            tor_lower (float): Lower range of toroidal steerings.
+            frequency (float): Frequency.
+            poloidal_angle (float): Poloidal Angle.
+        """
+        theta_m = self.dataset["cutoff_theta_m"].loc[
+            {'frequency':frequency, 'poloidal_angle':poloidal_angle}
+            ].sel(toroidal_angle=slice(tor_lower, tor_upper))
+        toroidal_angles = theta_m.coords['toroidal_angle'].values
+        spline = UnivariateSpline(toroidal_angles, theta_m.values)
+        toroidal_range = np.linspace(tor_lower, tor_upper, 200)
+        fig, ax = plt.subplots()
+        ax.scatter(toroidal_angles, theta_m, marker='o', label='points')
+        ax.plot(toroidal_range, spline(toroidal_range), label='spline fit')
+        fig.suptitle('Mismatch angle vs. toroidal angle', fontsize=15)
+        return fig, ax
 
-    # To be implemented
-    """ 
-    
-
-    def plot_opt_tor_vs_freq(self, poloidal_angle):
-        return
-    """
-
+## TODO: Expand this as a subclass of SweepDataset, but calling the analysis method
+## iteratively calls the methods for all the Datasets within it.
+## Alternatively can read the xarrays from the SweepDatasets and concatenate them
+## into an even larger xarray with current scaling or some other parameter as the
+## Concatenated dimension? Then extend with base class + subclasses.
 
 class MultiSweeps:
     """Class for holding and analysing data from multiple equilibrium sweeps stored
@@ -1386,7 +1541,17 @@ class MultiSweeps:
         return list(self.datasets.keys())
 
     def plot_opt_tors(self, poloidal_angles=None):
-        # Expand to allow transforming coordinates, generate and save the spline
+        """Plots the optimal toroidal steering vs. frequency for a set of poloidal angles,
+        for all of the SweepDatasets loaded onto this MultiSweep instance.
+
+        Args:
+            poloidal_angles (array): An array of poloidal angles to plot the optimal toroidal
+            steerings for. Default is the poloidal_angle coordinate array assigned when 
+            initializing the class.
+
+        Returns:
+            Artist objects fig, ax
+        """
 
         if poloidal_angles == None:
             poloidal_angles = self.poloidal_angles
@@ -1409,20 +1574,38 @@ class MultiSweeps:
                 if counter == 0:
                     descriptor_list.append(dataset.descriptor)
                 marker = markers[counter2]
-                plot_spline = dataset.create_1Dspline(
+                opt_tor_spline = dataset.create_1Dspline(
                     variable="opt_tor",
                     dimension="frequency",
                     coords_dict={"poloidal_angle": poloidal_angle},
                 )
+                opt_tor_array = opt_tor_spline(freq_range)
+                '''
+                delta_spline = dataset.create_2Dspline(
+                    variable='cutoff_delta_theta_m',
+                    xdimension='frequency',
+                    ydimension='toroidal_angle',
+                    coords_dict={"poloidal_angle": poloidal_angle}
+                )
+                delta_array = delta_spline((freq_range, opt_tor_array))
+                '''
                 ax.plot(
                     freq_range,
-                    plot_spline(freq_range),
+                    opt_tor_array,
                     color=color,
                     alpha=0.5,
                 )
+                '''
+                ax.fill_between(
+                    freq_range,
+                    opt_tor_array + 0.5*delta_array,
+                    opt_tor_array - 0.5*delta_array,
+                    color=color,
+                    alpha=0.2,
+                )'''
                 ax.scatter(
                     self.frequencies[::2],
-                    plot_spline(self.frequencies[::2]),
+                    opt_tor_spline(self.frequencies[::2]),
                     marker=marker,
                     s=10,
                     color=color,
@@ -1458,7 +1641,12 @@ class MultiSweeps:
         return fig, ax
 
     def plot_rho_freq_relations(self, poloidal_angle, toroidal_angle=0):
-        # Have a toroidal range argument
+        """Plots multiple overlapping cutoff rho vs. frequency plots for
+        each SweepDataset loaded onto the MultiSweep class.
+
+        Returns:
+            Artist object fig
+        """
 
         freq_range = np.linspace(self.frequencies[0], self.frequencies[-1], 500)
         colormap = plt.cm.gnuplot2
@@ -1485,6 +1673,9 @@ class MultiSweeps:
 
 
 class TrajectoryPlot:
+    """Convenience class for plotting ray trajectories on top of a set
+    of poloidal flux contours loaded from a json topfile.
+    """
     def __init__(self, topfile_path):
         with open(topfile_path) as f:
             topfile = json.load(f)
@@ -1523,8 +1714,7 @@ class TrajectoryPlot:
         )
         plt.plot(q_R, q_Z, label="trajectory", color="k")
         plt.legend()
-        return fig
-
+        return fig       
 
 ## Helper functions
 def split_list(a_list):
@@ -1532,8 +1722,8 @@ def split_list(a_list):
     return a_list[:i_half] + a_list[i_half:]
 
 
-def fit_gaussian(toroidal_angle, opt_tor, delta):
-    return np.exp(-2 * (((toroidal_angle - opt_tor) / delta) ** 2))
+def fit_gaussian(toroidal_angle, opt_tor, width):
+    return np.exp(-2 * (((toroidal_angle - opt_tor) / width) ** 2))
 
 
 def gaussian(theta_m, delta):
