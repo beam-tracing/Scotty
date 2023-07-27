@@ -6,12 +6,8 @@ Created on Fri Jun  8 10:44:34 2018
 Valerian Hongjie Hall-Chen
 valerian@hall-chen.com valerian_hall-chen@ihpc.a-star.edu.sg
 """
-from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.beam_me_up import beam_me_up
-import numpy as np
-import sys
 import ast
-import os
 
 """
 kwargs_dict = {'poloidal_launch_angle_Torbeam': -2.5,
