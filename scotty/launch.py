@@ -380,7 +380,9 @@ def find_entry_point(
 
     # The spline roots is a pretty good guess for the boundary
     # location, which we now try to refine
-    boundary = root_scalar(poloidal_flux_boundary_along_line, x0=spline_roots[0])
+    boundary = root_scalar(
+        poloidal_flux_boundary_along_line, x0=spline_roots[0], x1=spline_roots[0] + 1e-3
+    )
     if not boundary.converged:
         raise RuntimeError(
             f"Could not find plasma boundary, root finding failed with '{boundary.flag}'"
