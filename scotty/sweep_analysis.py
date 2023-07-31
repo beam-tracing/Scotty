@@ -49,7 +49,7 @@ class SweepDataset:
             path_string (str): Path to .nc file
 
         """
-        with xr.open_dataset(path_string) as ds:
+        with xr.load_dataset(path_string) as ds:
             class_type = ds.attrs["class_type"]
             if class_type != "SweepDataset":
                 raise ValueError(
@@ -280,17 +280,20 @@ class SweepDataset:
         ds["theta_output"] = np.rad2deg(ds["theta_output"])
         ds["theta_m_output"] = np.rad2deg(ds["theta_m_output"])
         ds["delta_theta_m"] = np.rad2deg(ds["delta_theta_m"])
-
         classobject = cls(ds)
         classobject.missing_indices = missing_indices
-
-        # Interpolate missing data where solver couldn't reach completion
-        print("Interpolating missing values...")
-        classobject.check_cutoff_indices()
-        classobject.check_all_float_arrays()
-        print("Interpolation complete. Check output for unsuccessful interpolations.")
-
         return classobject
+
+    def interpolate_missing_values(self):
+        """Attempts to interpolate missing data in cutoff indices and float variable DataArrays.
+        """
+        print("Current gaps in data:")
+        for item in self.missing_indices:
+            print(item)
+        print("Interpolating missing values...")
+        output1 = self.check_cutoff_indices()
+        output2 = self.check_all_float_arrays()
+        print("Interpolation complete. Check print output for unsuccessful interpolations.")
 
     def to_netcdf(self, folder="", filename=None):
         """Saves contents of Dataset into a netCDF4 file for easy read and writing.
@@ -420,7 +423,7 @@ class SweepDataset:
         spline = self.create_1Dspline(
             variable="cutoff_rho",
             dimension="frequency",
-            coords_dict={
+            coords={
                 "poloidal_angle": poloidal_angle,
                 "toroidal_angle": toroidal_angle,
             },
@@ -448,7 +451,7 @@ class SweepDataset:
         """The descriptor string associated with this SweepDataset."""
         return str(self.dataset.attrs["descriptor"])
 
-    def print_KeysView(self):
+    def view(self):
         """Prints a summary of the objects and data contained within self.dataset."""
         print(self.dataset.keys())
 
@@ -574,16 +577,16 @@ class SweepDataset:
 
         for frequency in frequencies:
             for poloidal_angle in poloidal_angles:
-                coords_dict = {
+                coords = {
                     "frequency": frequency,
                     "poloidal_angle": poloidal_angle,
                 }
                 spline = self.create_1Dspline(
-                    "cutoff_theta_m", "toroidal_angle", coords_dict
+                    "cutoff_theta_m", "toroidal_angle", coords
                 )
                 try:
                     root = newton(spline, x0=0, fprime=spline.derivative(), maxiter=100)
-                    opt_tor_array.loc[coords_dict] = root
+                    opt_tor_array.loc[coords] = root
                 except RuntimeError as error:
                     print(
                         f"No zero found for Freq={frequency} GHz, Pol={poloidal_angle} deg: ",
@@ -842,14 +845,14 @@ class SweepDataset:
 
     ## auxillary methods
 
-    def create_1Dspline(self, variable, dimension, coords_dict={}):
+    def create_1Dspline(self, variable, dimension, coords={}):
         """Memoized function that interpolates splines for any variable along
         a single arbitrary axis with scipy.interpolate.UnivariateSpline.
 
         Args:
             variable (str): index the specific DataArray to fit the spline to
             dimension (str): dimension name of the x-coordinate
-            coords_dict (dict): a dictionary of the form {dimension: value} for all
+            coords (dict): a dictionary of the form {dimension: value} for all
             other dimensions apart from the x-coordinate dimension. For example, if
             the spline is for interpolating theta_m as a function of toroidal_angle,
             coordinate values for all other dimensions of theta_m (frequency and
@@ -858,21 +861,21 @@ class SweepDataset:
         Returns:
             Callable: An interpolated UnivariateSpline function.
         """
-        coords_hashable = self._dict_to_hashable(coords_dict)
+        coords_hashable = self._dict_to_hashable(coords)
         args = (variable, dimension, coords_hashable)
         if args in self.spline_memo.keys():
             return self.spline_memo[args]
         else:
             data = self.dataset[variable]
             x_coordinates = self.get_coordinate_array(dimension)
-            y_data = data.loc[coords_dict]
+            y_data = data.loc[coords]
             y_values = y_data.values
             spline = UnivariateSpline(x=x_coordinates, y=y_values, s=0)
             self.spline_memo[args] = spline
             return spline
 
     def create_2Dspline(
-        self, variable, xdimension, ydimension, coords_dict={}, method="linear"
+        self, variable, xdimension, ydimension, coords={}, method="linear"
     ):
         """Memoized function that interpolates splines for any variable along
         two arbitrary axes with linear interpolation (scipy RegularGridInterpolator).
@@ -881,14 +884,14 @@ class SweepDataset:
             variable (str): index the specific DataArray to fit the spline to
             xdimension (str): dimension name of the x-coordinate
             ydimension (str): dimension name of the y-coordinate
-            coords_dict (dict): a dictionary of the form {dimension: value} for all
+            coords (dict): a dictionary of the form {dimension: value} for all
             other dimensions apart from the x and y coordinate dimensions. See
             create_1Dspline for a similar method.
 
         Returns:
             Callable: A RegularGridInterpolator function.
         """
-        coords_hashable = self._dict_to_hashable(coords_dict)
+        coords_hashable = self._dict_to_hashable(coords)
         args = (variable, xdimension, ydimension, coords_hashable)
         if args in self.spline_memo.keys():
             return self.spline_memo[args]
@@ -896,7 +899,7 @@ class SweepDataset:
             data = self.dataset[variable]
             x_coordinates = self.get_coordinate_array(xdimension)
             y_coordinates = self.get_coordinate_array(ydimension)
-            z_values = data.loc[coords_dict].transpose(xdimension, ydimension).values
+            z_values = data.loc[coords].transpose(xdimension, ydimension).values
             spline = RegularGridInterpolator(
                 (x_coordinates, y_coordinates),
                 z_values,
@@ -911,7 +914,7 @@ class SweepDataset:
         xdimension,
         ydimension,
         zdimension,
-        coords_dict={},
+        coords={},
         method="linear",
     ):
         """Memoized function that interpolates splines for any variable along
@@ -923,14 +926,14 @@ class SweepDataset:
             xdimension (str): dimension name of the x-coordinate
             ydimension (str): dimension name of the y-coordinate
             zdimensoin (str): dimension name of the z-coordinate
-            coords_dict (dict): a dictionary of the form {dimension: value} for all
+            coords (dict): a dictionary of the form {dimension: value} for all
             other dimensions apart from the x and y coordinate dimensions. See
             create_1Dspline for a similar method.
 
         Returns:
             Callable: An RegularGridInterpolator function.
         """
-        coords_hashable = self._dict_to_hashable(coords_dict)
+        coords_hashable = self._dict_to_hashable(coords)
         args = (variable, xdimension, ydimension, coords_hashable)
         if args in self.spline_memo.keys():
             return self.spline_memo[args]
@@ -940,7 +943,7 @@ class SweepDataset:
             y_coordinates = self.get_coordinate_array(ydimension)
             z_coordinates = self.get_coordinate_array(zdimension)
             func_values = (
-                data.loc[coords_dict]
+                data.loc[coords]
                 .transpose(xdimension, ydimension, zdimension)
                 .values
             )
@@ -965,14 +968,14 @@ class SweepDataset:
         tor_coord = find_nearest(toroidal_angles, toroidal_angle)
         pol_coord = find_nearest(poloidal_angles, poloidal_angle)
 
-        coords_dict = {
+        coords = {
             "frequency": freq_coord,
             "toroidal_angle": tor_coord,
             "poloidal_angle": pol_coord,
         }
 
         reflection_mask = self.generate_reflection_mask()
-        return reflection_mask[coords_dict]
+        return reflection_mask[coords]
 
     def check_cutoff_indices(self):
         """Checks for and interpolates problematic cutoff indices (negative integers that
@@ -982,7 +985,10 @@ class SweepDataset:
         # cast to float to work with np.NaN values
         float_indices = cutoff_indices.astype(float)
         index_list = np.argwhere(float_indices.values < 0)
+        print("Checking 'cutoff_index'...")
         print(f"Number of problematic indices: {len(index_list)}")
+        if not len(index_list):
+            return []
         interp_indices = float_indices.where(float_indices >= 0)
         for dimension in ("toroidal_angle", "poloidal_angle", "frequency"):
             print(f"trying {dimension}")
@@ -1008,9 +1014,14 @@ class SweepDataset:
     def check_float_arrays(self, variable):
         """Checks for and interpolates any null array values."""
         new_array = self.dataset[variable]
-        print("Number of NaN entries:", len(np.argwhere(new_array.isnull().values)))
+        print(f"Checking {variable}...")
+        nan_entries = len(np.argwhere(new_array.isnull().values))
+        print("Number of NaN entries:", nan_entries)
+        if not nan_entries:
+            return []
         # Try multiple dimensions as interpolating in one axis may not eliminate all gaps
         for dimension in ("toroidal_angle", "poloidal_angle", "frequency"):
+            print(f"trying {dimension}")
             try:
                 new_array = new_array.interpolate_na(
                     dim=dimension,
@@ -1034,7 +1045,6 @@ class SweepDataset:
     def check_all_float_arrays(self):
         """Calls check_float_arrays for all relevant variables."""
         for variable in self.variables:
-            print(f"Checking {variable}...")
             if variable != "cutoff_index":
                 self.check_float_arrays(variable)
 
@@ -1054,7 +1064,7 @@ class SweepDataset:
         variable,
         xdimension,
         ydimension,
-        coords_dict={},
+        coords={},
         cmap="plasma_r",
         **kwargs,
     ):
@@ -1064,16 +1074,16 @@ class SweepDataset:
             variable(str): DataArray variable to visualize
             xdimension (str): Dimension for the x-axis
             ydimension (str): Dimension for the y-axis
-            coords_dict (dict): Dictionary of coordinate values of the other
+            coords (dict): Dictionary of coordinate values of the other
             dimensions to be held constant
             cmap (str): Colormap to be used
             kwargs (optional): Optional keyword arguments to pass to plt.imshow
         """
-        data_slice = self.dataset[variable].loc[coords_dict]
+        data_slice = self.dataset[variable].loc[coords]
         if len(data_slice.shape) != 2:
             raise ValueError("Inappropriate number of constant dimensions supplied")
         title_string = ""
-        for key, value in coords_dict.items():
+        for key, value in coords.items():
             title_string += f",{key}={value} "
         x_coords = self.get_coordinate_array(xdimension)
         y_coords = self.get_coordinate_array(ydimension)
@@ -1099,7 +1109,7 @@ class SweepDataset:
         variable,
         xdimension,
         ydimension,
-        coords_dict={},
+        coords={},
         cmap="plasma_r",
         mask_flag=False,
         levels=20,
@@ -1111,7 +1121,7 @@ class SweepDataset:
             variable(str): DataArray variable to visualize
             xdimension (str): Dimension for the x-axis
             ydimension (str): Dimension for the y-axis
-            coords_dict (dict): Dictionary of coordinate values of the other
+            coords (dict): Dictionary of coordinate values of the other
             dimensions to be held constant
             cmap (str): Colormap to be used
             mask_flag(bool): Whether or not to mask non-reflected rays. Only available
@@ -1121,11 +1131,11 @@ class SweepDataset:
             Artist objects fig, ax
         """
         data_spline = self.create_2Dspline(
-            variable, xdimension, ydimension, coords_dict
+            variable, xdimension, ydimension, coords
         )
 
         title_string = ""
-        for key, value in coords_dict.items():
+        for key, value in coords.items():
             title_string += f",{key}={value} "
         x_coords = self.get_coordinate_array(xdimension)
         y_coords = self.get_coordinate_array(ydimension)
@@ -1137,9 +1147,12 @@ class SweepDataset:
 
         fig, ax = plt.subplots()
         if mask_flag:
+            mask_coords = coords.copy()
+            if 'trajectory_step' in mask_coords.keys():
+                mask_coords.pop('trajectory_step')
             reflection_mask = (
                 self.dataset["reflection_mask"]
-                .loc[coords_dict]
+                .loc[mask_coords]
                 .transpose(xdimension, ydimension)
                 .values
             )
@@ -1168,7 +1181,6 @@ class SweepDataset:
                 levels=levels,
                 colors="k",
                 corner_mask=True,
-                linewidth=0.2,
                 **kwargs,
             )
 
@@ -1189,7 +1201,6 @@ class SweepDataset:
                 levels=levels,
                 colors="k",
                 corner_mask=True,
-                linewidth=0.2,
                 **kwargs,
             )
         fig.suptitle(f"{variable}, " + title_string)
@@ -1224,6 +1235,8 @@ class SweepDataset:
         Returns:
             Artist objects fig, ax
         """
+        const_angle_str = list(coords.keys())[0]
+        const_angle = list(coords.values())[0]
         if const_angle_str == "toroidal_angle":
             var_angle_str = "poloidal_angle"
         elif const_angle_str == "poloidal_angle":
@@ -1243,13 +1256,13 @@ class SweepDataset:
             raise ValueError("Provided measure is not 'rho' or 'm'.")
 
         if const_angle not in self.get_coordinate_array(const_angle_str):
-            raise ValueError("Value of const_angle not in original coordinate array.")
+            raise ValueError(f"Value of {const_angle_str} not in original coordinate array.")
 
-        coords_dict = {const_angle_str: const_angle}
+        coords = {const_angle_str: const_angle}
         xdimension = "frequency"
         ydimension = var_angle_str
         spline_surface = self.create_2Dspline(
-            variable, xdimension, ydimension, coords_dict
+            variable, xdimension, ydimension, coords
         )
 
         x_coordinates = self.get_coordinate_array(xdimension)
@@ -1274,7 +1287,7 @@ class SweepDataset:
         # Interpolate and apply the reflection mask to remove inaccessible regions
         reflection_mask = (
             self.dataset["reflection_mask"]
-            .loc[coords_dict]
+            .loc[coords]
             .transpose(xdimension, ydimension)
             .values
         )
@@ -1299,7 +1312,6 @@ class SweepDataset:
                 levels=20,
                 colors="w",
                 corner_mask=True,
-                linewidth=0.2,
             )
         else:
             CS = ax.contourf(
@@ -1312,7 +1324,6 @@ class SweepDataset:
                 levels=20,
                 colors="w",
                 corner_mask=True,
-                linewidth=0.2,
             )
 
         fig.suptitle(f"Cutoff {title_label}, {const_angle_str}={const_angle}$^\circ$")
@@ -1516,6 +1527,18 @@ class MultiSweeps:
         toroidal_angles,
         datasets,
     ):
+        """Initializes a MultiSweep class.
+
+        Args:
+            frequencies (array): The common 'frequency' coordinate array between all 
+            SweepDatasets loaded.
+            poloidal_angles (array): The common 'poloidal_angle' coordinate array between all 
+            SweepDatasets loaded.
+            toroidal_angles (array): The common 'toroidal_angle' coordinate array between all 
+            SweepDatasets loaded.
+            datasets (iterable): An iterable of SweepDataset objects to load into the class.
+            All SweepDataset objects must have a descriptor attribute set.
+        """
         # Common coordinate arrays of the SweepDatasets
         self.frequencies = frequencies
         self.poloidal_angles = poloidal_angles
@@ -1540,6 +1563,11 @@ class MultiSweeps:
         return item
 
     def get_descriptors(self):
+        """
+        Returns:
+            List: A list of descriptors corresponding to the SweepDatasets loaded in
+            this class.
+        """
         return list(self.datasets.keys())
 
     def plot_opt_tors(self, poloidal_angles=None):
@@ -1579,32 +1607,15 @@ class MultiSweeps:
                 opt_tor_spline = dataset.create_1Dspline(
                     variable="opt_tor",
                     dimension="frequency",
-                    coords_dict={"poloidal_angle": poloidal_angle},
+                    coords={"poloidal_angle": poloidal_angle},
                 )
                 opt_tor_array = opt_tor_spline(freq_range)
-                """
-                delta_spline = dataset.create_2Dspline(
-                    variable='cutoff_delta_theta_m',
-                    xdimension='frequency',
-                    ydimension='toroidal_angle',
-                    coords_dict={"poloidal_angle": poloidal_angle}
-                )
-                delta_array = delta_spline((freq_range, opt_tor_array))
-                """
                 ax.plot(
                     freq_range,
                     opt_tor_array,
                     color=color,
                     alpha=0.5,
                 )
-                """
-                ax.fill_between(
-                    freq_range,
-                    opt_tor_array + 0.5*delta_array,
-                    opt_tor_array - 0.5*delta_array,
-                    color=color,
-                    alpha=0.2,
-                )"""
                 ax.scatter(
                     self.frequencies[::2],
                     opt_tor_spline(self.frequencies[::2]),
@@ -1713,7 +1724,6 @@ class TrajectoryPlot:
             xlim=xlim,
             ylim=ylim,
             colors="w",
-            linewidth=0.2,
         )
         plt.plot(q_R, q_Z, label="trajectory", color="k")
         plt.legend()

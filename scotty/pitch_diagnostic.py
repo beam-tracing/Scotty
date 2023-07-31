@@ -494,6 +494,13 @@ class PitchDiagnostic:
     # For getting pitch angle profiles from corresponding topfiles
 
     def set_topfile_path(self, topfile_path, descriptor):
+        """Sets a path string to a json topfile as an attributed of the associated
+        Dataset.
+
+        Args:
+            topfile_path (str): Path string to the json topfile
+            descriptor (str): Descriptor string of the corresponding SweepDataset
+        """
         if descriptor not in self.descriptors:
             raise ValueError(f"{descriptor} not saved to PitchDiagnostic instance.")
         self.ds_dict[descriptor].attrs["topfile_path"] = topfile_path
@@ -504,6 +511,13 @@ class PitchDiagnostic:
         raise ValueError(f"No topfile path associated with {descriptor}")
 
     def set_topfile_paths(self, path_dict):
+        """Calls set_topfile_path on all key-value pairs in the provided dictionary
+        corresponding to the descriptor and topfile_path respectively.
+
+        Args:
+            path_dict (dict): A dictionary with descriptor keys and path strings to the 
+            corresponding json topfile.
+        """
         if not set(path_dict.keys()).issubset(self.descriptors):
             raise ValueError("Invalid descriptor key provided!")
         for key, value in path_dict.items():
@@ -512,6 +526,13 @@ class PitchDiagnostic:
     ## Simulation methods
 
     def get_cutoff_locations(self, SweepDataset):
+        """Reads the cutoff locations in R-Z coordinates from the SweepDataset.
+        Only data corresponding to the poloidal steering, toroidal range and
+        frequencies of the PitchDiagnostic is read and stored.
+
+        Args:
+            SweepDataset (SweepDataset): SweepDataset to read from.
+        """
         descriptor = str(SweepDataset.descriptor)
         if descriptor in self.ds_dict:
             ds = self.ds_dict[descriptor]
@@ -526,7 +547,7 @@ class PitchDiagnostic:
             xdimension="frequency",
             ydimension="toroidal_angle",
             method="pchip",
-            coords_dict={"poloidal_angle": self.poloidal_angles[0]},
+            coords={"poloidal_angle": self.poloidal_angles[0]},
         )
 
         cutoff_Z_spline = SweepDataset.create_2Dspline(
@@ -534,7 +555,7 @@ class PitchDiagnostic:
             xdimension="frequency",
             ydimension="toroidal_angle",
             method="pchip",
-            coords_dict={"poloidal_angle": self.poloidal_angles[0]},
+            coords={"poloidal_angle": self.poloidal_angles[0]},
         )
 
         opt_tor_freq_spline = self.get_opt_tor_freq_spline(descriptor)
@@ -567,6 +588,13 @@ class PitchDiagnostic:
         return R_spline, Z_spline
 
     def get_interp_variables(self, SweepDataset):
+        """Reads the variables opt_tor, delta_theta_m, K_magnitude from the SweepDataset. 
+        Only data corresponding to the poloidal steering, toroidal range and frequencies 
+        of the PitchDiagnostic is read and stored.
+
+        Args:
+            SweepDataset (SweepDataset): SweepDataset to read from.
+        """
         descriptor = str(SweepDataset.descriptor)
         if descriptor in self.ds_dict:
             ds = self.ds_dict[descriptor]
@@ -649,6 +677,14 @@ class PitchDiagnostic:
         return None
 
     def get_cutoff_pitch(self, SweepDataset):
+        """Reads the cutoff_pitch variable from the SweepDataset. Only data 
+        corresponding to the poloidal steering, toroidal range and frequencies 
+        of the PitchDiagnostic is read and stored. The SweepDataset must have
+        the topfiles loaded and the method generate_pitch_at_cutoff called.
+
+        Args:
+            SweepDataset (SweepDataset): SweepDataset to read from.
+        """
         descriptor = str(SweepDataset.descriptor)
         if descriptor in self.ds_dict:
             ds = self.ds_dict[descriptor]
@@ -657,6 +693,15 @@ class PitchDiagnostic:
                 return None
         else:
             self.ds_dict[descriptor] = xr.Dataset()
+        # Get the topfile path if available
+        try:
+            topfile = SweepDataset.get_topfile_path()
+            self.set_topfile_path(topfile, descriptor)
+            self.from_topfile_path(topfile, descriptor)
+        except ValueError as error:
+            print(
+                f"{descriptor} does not have topfile string assigned. Error message: ", error
+            )
 
         try:
             pitch_spline = SweepDataset.create_3Dspline(
@@ -685,10 +730,22 @@ class PitchDiagnostic:
             return pitch_da
         except ValueError as error:
             print(
-                "SweepDataset does not have cutoff_pitch data. Error message: ", error
+                f"{descriptor} does not have cutoff_pitch data. Error message: ", error
             )
 
     def simulate_loc_measurements(self, SweepDataset, iterations=500, std_noise=None):
+        """Simulate noisy measurements taken by the diagnostic array. The backscattered
+        power is calculated separately for both integrated loc_m and loc_product.
+
+        Args:
+            SweepDataset (SweepDataset): SweepDataset class object used to simulate power received
+            by antenna
+            iterations (int): Number of iterated measurements
+            std_noise (float): Standard deviation of gaussian noise. Default is 'std_noise' attribute
+            initialized in the class.
+            noise_flag (bool): Turn noise on or off. True by default.
+
+        """
         if not std_noise:
             std_noise = self.std_noise
 
@@ -748,26 +805,26 @@ class PitchDiagnostic:
 
         for combination in product(frequencies, poloidal_angles):
             frequency, poloidal_angle = combination
-            coords_dict = {
+            coords = {
                 "frequency": frequency,
                 "poloidal_angle": poloidal_angle,
             }
             int_loc_m_spline = SweepDataset.create_1Dspline(
                 variable="int_loc_m",
                 dimension="toroidal_angle",
-                coords_dict=coords_dict,
+                coords=coords,
             )
             int_loc_product_spline = SweepDataset.create_1Dspline(
                 variable="int_loc_product",
                 dimension="toroidal_angle",
-                coords_dict=coords_dict,
+                coords=coords,
             )
             loc_m_signal = int_loc_m_spline(toroidal_range)
             loc_product_signal = int_loc_product_spline(toroidal_range)
 
-            self.ds_dict[descriptor]["loc_m_profile"].loc[coords_dict] = loc_m_signal
+            self.ds_dict[descriptor]["loc_m_profile"].loc[coords] = loc_m_signal
             self.ds_dict[descriptor]["loc_product_profile"].loc[
-                coords_dict
+                coords
             ] = loc_product_signal
 
             for iteration in iter_array:
@@ -1037,12 +1094,24 @@ class PitchDiagnostic:
     def analyse_all(self):
         self.fit_measurement_gaussians()
         self.aggregate_fitted_gaussians()
-        self.get_pitch_relation_across_equilibria()
-        self.linregress_pitch_rho()
+        try:
+            self.get_pitch_relation_across_equilibria()
+            self.linregress_pitch_rho()
+        except Exception:
+            print("Methods get_pitch_relation_across_equilibria() and linregress_pitch_rho() failed. Check if scaling attributes are assigned.")
 
     ## Plot methods
 
     def plot_profile_comparisons(self, descriptor):
+        """Plots the backscattered power profiles as calculated by the mismatch gaussian
+        formula, and by integrating loc_m and loc_product.
+
+        Args:
+            decriptor(str): Descriptor of the Dataset to plot.
+
+        Returns:
+            fig, axes
+        """
         mismatch_profile = self.ds_dict[descriptor]["mismatch_profile"].loc[
             {"poloidal_angle": self.poloidal_angles[0]}
         ]
@@ -1120,14 +1189,15 @@ class PitchDiagnostic:
         return fig, axes
 
     def plot_profile_fits(self, descriptor, sim_type="mismatch"):
-        """_summary_
+        """Plots the mean gaussian fit over the original backscattered power profile
+        for the set of frequencies defined when intializing the class.
 
         Args:
-            descriptor (_type_): _description_
+            descriptor (str): Descriptor of the Dataset to plot.
             sim_type (str, optional): One of ('mismatch', 'loc_m', 'loc_product'). Defaults to 'mismatch'.
 
         Returns:
-            _type_: _description_
+            fig, axes
         """
         data = self.ds_dict[descriptor][f"{sim_type}_profile"]
         opt_tor = self.ds_dict[descriptor][f"{sim_type}_mean_opt_tor"].loc[
@@ -1223,14 +1293,15 @@ class PitchDiagnostic:
         return fig, axes
 
     def plot_opt_tor_hist(self, descriptor, sim_type="mismatch"):
-        """_summary_
+        """Plots a series of histograms of the opt tor fits generated by the fit_measurement_gaussians
+        method. 
 
         Args:
-            descriptor (_type_): _description_
+            descriptor (str): Descriptor of the Dataset to plot.
             sim_type (str, optional): One of ('mismatch', 'loc_m', 'loc_product'). Defaults to 'mismatch'.
 
         Returns:
-            _type_: _description_
+            fig, axes
         """
         mean = self.ds_dict[descriptor][f"{sim_type}_mean_opt_tor"].loc[
             {"poloidal_angle": self.poloidal_angles[0]}
@@ -1306,6 +1377,15 @@ class PitchDiagnostic:
         return fig, axes
 
     def plot_variable_vs_tor(self, variable, descriptor):
+        """Plot how a variable changes over the toroidal steering range.
+
+        Args:
+            variable (str): One of ("pitch_angle", "K_magnitude", "delta_theta_m")
+            descriptor (str): Descriptor of the Dataset to plot.
+
+        Returns:
+            fig, axes
+        """
         data = self.ds_dict[descriptor][variable]
         actual = self.ds_dict[descriptor]["opt_tor"].loc[
             {"poloidal_angle": self.poloidal_angles[0]}
@@ -1368,7 +1448,16 @@ class PitchDiagnostic:
         plt.ylabel(f"{variable}")
         return fig, axes
 
-    def plot_all_opt_tor_measurements(self, sim_type="mismatch"):
+    def plot_all_opt_tor_fits(self, sim_type="mismatch"):
+        """Plots the optimal toroidal steering vs. frequency for all loaded SweepDatasets, with 
+        colored region representing 1 standard deviation of fitted optimal toroidal steerings.
+
+        Args:
+            sim_type (str, optional): One of ('mismatch', 'loc_m', 'loc_product'). Defaults to 'mismatch'.
+
+        Returns:
+            fig
+        """
         fig = plt.figure()
         plt.title(f"{sim_type}, Opt Tor vs. Probe Frequency", fontsize=15)
         colormap = plt.cm.gnuplot2
@@ -1416,6 +1505,16 @@ class PitchDiagnostic:
         return fig
 
     def plot_opt_tor_with_widths(self, sim_type="mismatch"):
+        """Plots the optimal toroidal steering vs. frequency for all loaded SweepDatasets, with 
+        dotted lines marking out the full-width half-maximum of the gaussian-fitted backscatter
+        profile.
+
+        Args:
+            sim_type (str, optional): One of ('mismatch', 'loc_m', 'loc_product'). Defaults to 'mismatch'.
+
+        Returns:
+            fig
+        """
         fig = plt.figure()
         plt.title(
             f"{sim_type}, Optimal toroidal steering and profile widths", fontsize=15
@@ -1475,6 +1574,16 @@ class PitchDiagnostic:
         return fig
 
     def plot_opt_tor_vs_freq(self, descriptor, sim_type="mismatch"):
+        """Plots the optimal toroidal steering vs. frequency for a specified Dataset, with 
+        colored region representing 1 standard deviation of fitted optimal toroidal steerings.
+
+        Args:
+            descriptor: Descriptor of dataset to plot for
+            sim_type (str, optional): One of ('mismatch', 'loc_m', 'loc_product'). Defaults to 'mismatch'.
+
+        Returns:
+            fig
+        """
         mean = self.ds_dict[descriptor][f"{sim_type}_mean_opt_tor"].loc[
             {"poloidal_angle": self.poloidal_angles[0]}
         ]
@@ -1543,6 +1652,9 @@ class PitchDiagnostic:
         return fig
 
     def plot_cutoff_positions(self, xlim=None, ylim=None, levels=20, cmap="plasma_r"):
+        """Plots the cutoff positions reached by the antenna in the plasma in R-Z coordinates
+        for all datasets, against a set of poloidal flux contours.
+        """
         flag = True
         fig, ax = plt.subplots()
         markers = ["o", "X", "v", "^", "s", "D", "p", "*", "h", "8", "+"]
@@ -1603,6 +1715,10 @@ class PitchDiagnostic:
         return fig, ax
 
     def plot_pitch_contours(self, descriptor, xlim=None, ylim=None, vmin=-20):
+        """Plots the pitch angle on the R-Z plane as a set of filled contours against
+        a foreground of poloidal flux contour lines. Cutoff positions reached by
+        the diagnostic antennas are also plotted.
+        """
         topfile = self.topfiles[descriptor]
         ds = self.ds_dict[descriptor]
 
@@ -1641,7 +1757,7 @@ class PitchDiagnostic:
         return fig, ax
 
     def plot_pitch_angle_vs_opt_tor(
-        self, rho_lower=0.1, rho_upper=1.0, unit="deg", sample_index=200
+        self, rho_lower=0.1, rho_upper=1.0, unit="deg", sample_rho=0.5
     ):
         """Plots pitch angle against opt_tor for all equilibriums, and automatically
         calculates linregress-fitted slope for the range of rho set.
@@ -1657,6 +1773,7 @@ class PitchDiagnostic:
             raise ValueError("Invalid unit specified")
 
         rho_range = np.linspace(rho_lower, rho_upper, 500)
+        sample_index = np.absolute(rho_range - sample_rho).argmin()
         fig, ax = plt.subplots()
         seq_cmaps = [
             "Greys",
@@ -1685,14 +1802,13 @@ class PitchDiagnostic:
             "yellow",
         ]
         counter = 0
-        slopes = {}
         sampled_rho = rho_range[sample_index]
+        print("Rho sampled (dotted red line): ", sampled_rho)
         sampled_pitch = []
         sampled_opt_tor = []
         for descriptor in self.descriptors:
             cmap = seq_cmaps[counter]
             color = solid_cols[counter]
-
             opt_tor_spline = self.get_opt_tor_rho_spline(descriptor)
             pitch_rho_spline = self.get_pitch_rho_spline(descriptor)
             opt_tor = opt_tor_spline(rho_range)
@@ -1700,27 +1816,14 @@ class PitchDiagnostic:
             if unit == "rad":
                 opt_tor = np.deg2rad(opt_tor)
                 pitch = np.deg2rad(pitch)
-            # result = linregress(opt_tor, pitch)
-            # fitted_pitch = result.slope * opt_tor + result.intercept
-            # slopes[descriptor] = result.slope
-
             sampled_pitch.append(pitch[sample_index])
             sampled_opt_tor.append(opt_tor[sample_index])
-
             scat = ax.scatter(
                 opt_tor, pitch, s=3, c=rho_range, cmap=cmap, label=f"{descriptor}"
             )
-            # ax.plot(
-            #    opt_tor,
-            #    fitted_pitch,
-            #   color=color,
-            #    label=f"{descriptor}, m={round(result.slope, 2)}",
-            #    linewidth=1)
-            # Set first grayscale colorbar as legend
             if counter == 0:
                 fig.colorbar(scat, label="$\\rho$")
             counter += 1
-
         ax.plot(
             sampled_opt_tor,
             sampled_pitch,
@@ -1749,7 +1852,7 @@ class PitchDiagnostic:
         fig.suptitle(
             f"Pitch angle relation, {rho_lower} < $\\rho$ < {rho_upper}", fontsize=15
         )
-        return fig, ax, slopes
+        return fig, ax
 
     def plot_pitch_angle_vs_opt_tor2(
         self,
@@ -1762,7 +1865,7 @@ class PitchDiagnostic:
         across all equilibriums.
 
         Returns:
-            Artists (fig, ax), dictionary of slopes with descriptor keys
+            fig, ax
         """
 
         opt_tor_da = self.pitch_ds["opt_tor_rho"]
@@ -1797,6 +1900,17 @@ class PitchDiagnostic:
         return fig, ax
 
     def plot_linear_fits_vs_rho(self, key, rho_min=0, rho_max=1):
+        """Plots the results of a linear regression of pitch angle vs. optimal toroidal
+        steering over a set of rho.
+
+        Args:
+            key (str): One of ('gradient', 'intercept', 'rval', 'std_err')
+            rho_min (float): Lower bound of rho to plot
+            rho_max (float): Upper bound of rho to plot
+
+        Returns:
+            fig, ax
+        """
         fig, ax = plt.subplots()
         da = self.pitch_ds[key].loc[dict(rho=slice(rho_min, rho_max))]
         da.plot(color="k")
@@ -1804,6 +1918,12 @@ class PitchDiagnostic:
         return fig, ax
 
     def plot_delta_opt_tor_vs_scaling(self):
+        """Plots how the amplitude of change in optimal toroidal angle varies with scaling.
+        Requires a current scaling attribbute to be set for all datasets. 
+
+        Returns:
+            fig, ax
+        """
         da = self.pitch_ds["opt_tor_freq"]
         scaling = da.coords["current_scaling"].values
         cmap = plt.cm.plasma
@@ -1834,60 +1954,14 @@ class PitchDiagnostic:
         fig.suptitle("Change in optimum toroidal steering vs. scaling", fontsize=15)
         return fig, ax, np.array(slopes)
 
-    def plot_opt_tor_vs_scaling(self):
-        da = self.pitch_ds["opt_tor_freq"]
-        scaling = da.coords["current_scaling"].values
-        cmap = plt.cm.plasma_r
-        fig, ax = plt.subplots()
-
-        das = [self.ds_dict[descriptor] for descriptor in self.descriptors]
-        das.sort(key=lambda da: da.attrs["current_scaling"])
-        std_das = [
-            da["mismatch_std_opt_tor"].loc[{"poloidal_angle": self.poloidal_angles[0]}]
-            for da in das
-        ]
-        current_scalings = np.array([da.attrs["current_scaling"] for da in das])
-        std_da = xr.concat(objs=std_das, dim=("current_scaling"))
-        std_da = std_da.assign_coords(coords={"current_scaling": current_scalings})
-
-        for frequency in self.frequencies:
-            color = cmap(
-                (frequency - self.frequencies[0])
-                / (self.frequencies[-1] - self.frequencies[0])
-            )
-            opt_tors = da.loc[{"frequency": frequency}].squeeze()
-            std = std_da.loc[{"frequency": frequency}].squeeze()
-            result = linregress(scaling, opt_tors)
-            mean_std = std.mean().values
-            delta = round(mean_std / abs(result.slope), 3)
-            ax.plot(
-                scaling,
-                opt_tors,
-                color=color,
-                label=f"{frequency} GHz, $\Delta$scaling={delta}",
-            )
-            ax.fill_between(
-                scaling, opt_tors + std, opt_tors - std, color=color, alpha=0.5
-            )
-
-        ax.legend(
-            bbox_to_anchor=(1.05, 0),
-            loc="lower left",
-            borderaxespad=0.0,
-        )
-        ax.set_xlabel("scaling")
-        ax.set_ylabel("opt_tor/$^\circ$")
-        fig.suptitle("Optimum toroidal steering vs. scaling", fontsize=15)
-        return fig, ax
-
-    def plot_actual_delta_pitch_vs_scaling(self, default_descriptor="1.0X"):
+    def plot_delta_pitch_vs_scaling(self, default_descriptor="1.0X"):
         """For the given array of frequencies, we assume a fixed set of probe locations within
         the plasma based on the 1.0X current scaling at optimal toroidal steering for this scaling.
         From this static set of 1.0X probe locations in R-Z coordinates, plot how the actual pitch
         angle changes at the location with current scaling.
 
         Returns:
-            _type_: _description_
+            fig, ax, array: Array consists of linearly-fitted gradients as displayed in the legend.
         """
 
         cutoff_R = self.ds_dict[default_descriptor]["cutoff_R"]
@@ -1939,63 +2013,3 @@ class PitchDiagnostic:
             "Change in pitch angle vs. scaling fixed at 1.0X cutoff points", fontsize=15
         )
         return fig, ax, np.array(slopes)
-
-    def plot_predicted_delta_pitch_vs_scaling(self):
-        """For the given array of frequencies, we assume a fixed set of probe locations within
-        the plasma based on the 1.0X current scaling. In reality, the probing frequency measures
-        a different R-Z location within the plasma at different current scalings due to a change
-        in the optimal toroidal steering angle. Plot pitch angle vs. scaling sampled at a slightly
-        different R-Z position based on the current scaling.
-
-        Returns:
-            _type_: _description_
-        """
-
-        scalings = self.pitch_ds["opt_tor_freq"].coords["current_scaling"].values
-        da = xr.DataArray(
-            dims=("frequency", "current_scaling"),
-            coords={
-                "frequency": self.frequencies,
-                "current_scaling": scalings,
-            },
-        )
-        for descriptor in self.descriptors:
-            cutoff_R = self.ds_dict[descriptor]["cutoff_R"]
-            cutoff_Z = self.ds_dict[descriptor]["cutoff_Z"]
-            pitch_da = self.topfiles[descriptor]["pitch_angle"]
-            pitch = pitch_da.sel(
-                R=cutoff_R,
-                Z=cutoff_Z,
-                method="nearest",
-            )
-            scaling = self.ds_dict[descriptor].attrs["current_scaling"]
-            da.loc[{"current_scaling": scaling}] = pitch
-
-        cmap = plt.cm.plasma
-        fig, ax = plt.subplots()
-        for frequency in self.frequencies:
-            color = cmap(
-                (frequency - self.frequencies[0])
-                / (self.frequencies[-1] - self.frequencies[0])
-            )
-            pitch = da.loc[{"frequency": frequency}].squeeze()
-            delta_pitch = pitch - pitch.loc[{"current_scaling": 1.0}].values
-            result = linregress(scalings, delta_pitch)
-            ax.plot(
-                scalings,
-                delta_pitch,
-                color=color,
-                label=f"{frequency} GHz, m={round(result.slope, 2)}",
-            )
-        ax.legend(
-            bbox_to_anchor=(1.05, 0),
-            loc="lower left",
-            borderaxespad=0.0,
-        )
-        ax.set_xlabel("scaling")
-        ax.set_ylabel("$\Delta$pitch/$^\circ$")
-        fig.suptitle(
-            "Static change in pitch angle vs. scaling at corresponding cutoffs",
-            fontsize=15,
-        )
-        return fig, ax
