@@ -279,7 +279,6 @@ def further_analysis(
     theta = np.sign(sin_theta_analysis) * np.arcsin(abs(sin_theta_analysis))
 
     cos_theta_analysis = np.cos(theta)
-    tan_theta_analysis = np.tan(theta)
     # -----
 
     # Calcuating the corrections to make M from Psi
@@ -475,8 +474,6 @@ def further_analysis(
     # Beam piece of localisation as a function of distance along ray
     # Determinant of the imaginary part of Psi_w
     det_imag_Psi_w_analysis = np.imag(Psi_xx) * np.imag(Psi_yy) - np.imag(Psi_xy) ** 2
-    # Determinant of the real part of Psi_w. Not needed for the calculation, but gives useful insight
-    det_real_Psi_w_analysis = np.real(Psi_xx) * np.real(Psi_yy) - np.real(Psi_xy) ** 2
 
     # Assumes circular beam at launch
     beam_waist_y = find_waist(
@@ -565,10 +562,6 @@ def further_analysis(
     ) ** 2 * loc_p_unnormalised
     # Note that loc_p is called varepsilon in my paper
 
-    # Note that K_1 = K cos theta_m, K_2 = 0, K_b = K sin theta_m, as a result of cold plasma dispersion
-    K_hat_dot_e_hat = e_hat[:, 0] * np.cos(theta_m) + e_hat[:, 2] * np.sin(theta_m)
-
-    K_hat_dot_e_hat_sq = np.conjugate(K_hat_dot_e_hat) * K_hat_dot_e_hat
     # --
 
     # TODO: Come back and see if the naming of variables makes sense and is consistent
@@ -578,29 +571,6 @@ def further_analysis(
     # Combining the various localisation pieces to get some overall localisation
     loc_b_r_s = loc_b * loc_r * loc_s
     loc_b_r = loc_b * loc_r
-
-    # Calculates localisation (relevant pieces of the Spherical Tokamak case)
-    d_theta_m_d_tau = np.gradient(theta_m, df.tau)
-    d_K_d_tau = np.gradient(K_magnitude_array, df.tau)
-    # d tau_Booker / d tau_Cardano
-    d_tau_B_d_tau_C = g_magnitude_Cardano / df.g_magnitude
-    theta_m_min_idx = np.argmin(np.abs(theta_m).data)
-    delta_kperp1_ST = k_perp_1_bs - k_perp_1_bs[theta_m_min_idx]
-    G_full = (
-        (
-            d_K_d_tau * df.g_magnitude
-            - K_magnitude_array**2 * d_theta_m_d_tau**2 * M_w_inv_xx
-        )
-        * d_tau_B_d_tau_C**2
-    ) ** (-1)
-    G_term1 = (d_K_d_tau * df.g_magnitude * d_tau_B_d_tau_C**2) ** (-1)
-    G_term2 = (
-        K_magnitude_array**2
-        * d_theta_m_d_tau**2
-        * M_w_inv_xx
-        * G_term1**2
-        * d_tau_B_d_tau_C**2
-    ) ** (-1)
 
     grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians(dH)
 
@@ -809,10 +779,6 @@ def localisation_analysis(df: xr.Dataset, cutoff_index: int, wavenumber_K0: floa
 
     # Gives the median kperp1 for backscattering
     cum_loc_b_r_s_delta_kperp1_0 = find_x0(df.k_perp_1_bs, cum_loc_b_r_s, 0)
-    # Only works if point is before cutoff. To fix.
-    cum_loc_b_r_delta_kperp1_0 = find_x0(
-        df.k_perp_1_bs[0:cutoff_index], cum_loc_b_r[0:cutoff_index], 0
-    )
 
     # Some of these will get added as "dimension coordinates", arrays with
     # coordinates that have the same name, because we've not specified
