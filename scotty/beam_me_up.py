@@ -61,7 +61,6 @@ Units
 from __future__ import annotations
 import numpy as np
 from scipy import integrate as integrate
-import matplotlib.pyplot as plt
 import time
 import json
 import pathlib

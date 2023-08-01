@@ -13,7 +13,7 @@ from scotty.fun_general import (
 from scotty.typing import ArrayLike, FloatArray
 
 import numpy as np
-from typing import Dict, Tuple, Optional, Union
+from typing import Dict, Tuple, Optional
 
 
 class DielectricTensor:
