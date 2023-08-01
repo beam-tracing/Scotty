@@ -220,8 +220,6 @@ def immediate_analysis(
         }
         df.update(vacuum_only)
 
-    save_npz(output_path / f"data_output{output_filename_suffix}", df)
-
     return df
 
 
@@ -537,7 +535,6 @@ def further_analysis(
 
     grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians(dH)
 
-    print("Saving analysis data")
     further_df = {
         "Psi_xx": (["tau"], Psi_xx),
         "Psi_xy": (["tau"], Psi_xy),
@@ -627,8 +624,6 @@ def further_analysis(
 
     if detailed_analysis_flag and (cutoff_index + 1 != len(df.tau)):
         df.update(localisation_analysis(df, cutoff_index, wavenumber_K0))
-
-    save_npz(output_path / f"analysis{output_filename_suffix}", df)
 
     return df
 
