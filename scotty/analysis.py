@@ -238,13 +238,9 @@ def further_analysis(
     # Calculates various useful stuff
     q_X, q_Y, _ = cylindrical_to_cartesian(df.q_R, df.q_zeta, df.q_Z)
     point_spacing = np.sqrt(
-        (np.diff(q_X)) ** 2 + (np.diff(q_Y)) ** 2 + (np.diff(df.q_Z)) ** 2
+        np.diff(q_X) ** 2 + np.diff(q_Y) ** 2 + np.diff(df.q_Z) ** 2
     )
-    distance_along_line = np.cumsum(point_spacing)
-    distance_along_line = np.append(0, distance_along_line)
-    RZ_point_spacing = np.sqrt((np.diff(df.q_Z)) ** 2 + (np.diff(df.q_R)) ** 2)
-    RZ_distance_along_line = np.cumsum(RZ_point_spacing)
-    RZ_distance_along_line = np.append(0, RZ_distance_along_line)
+    distance_along_line = np.append(0, np.cumsum(point_spacing))
 
     # Calculates the index of the minimum magnitude of K
     # That is, finds when the beam hits the cut-off
@@ -606,6 +602,9 @@ def further_analysis(
         "loc_b_r": loc_b_r,
         "beam_cartesian": (["tau", "col_cart"], np.vstack([q_X, q_Y, df.q_Z.data]).T),
     }
+
+    RZ_point_spacing = np.sqrt((np.diff(df.q_Z)) ** 2 + (np.diff(df.q_R)) ** 2)
+    RZ_distance_along_line = np.append(0, np.cumsum(RZ_point_spacing))
 
     df = df.assign_coords(
         {
