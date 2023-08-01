@@ -293,7 +293,7 @@ def launch_beam(
         Psi_3D_lab_initial = Psi_3D_lab_entry
 
     return (
-        K_initial,
+        np.array(K_initial),
         initial_position,
         launch_K,
         Psi_3D_lab_initial,
