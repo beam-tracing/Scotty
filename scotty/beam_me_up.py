@@ -614,13 +614,12 @@ def beam_me_up(
             "delta_K_zeta": delta_K_zeta,
             "delta_R": delta_R,
             "delta_Z": delta_Z,
-            # FIXME: this is an object, needs to be serialisable
-            "density_fit_method": density_fit_method,
-            "density_fit_parameters": density_fit_parameters,
+            "density_fit_method": str(density_fit_method),
+            "density_fit_parameters": str(density_fit_parameters),
             "detailed_analysis_flag": detailed_analysis_flag,
             "equil_time": (equil_time),
             "figure_flag": figure_flag,
-            "find_B_method": find_B_method,
+            "find_B_method": str(find_B_method),
             "initial_position": (["col"], initial_position),
             "input_filename_suffix": input_filename_suffix,
             "interp_order": interp_order,
@@ -632,14 +631,14 @@ def beam_me_up(
             "launch_freq_GHz": launch_freq_GHz,
             "launch_position": (["col"], launch_position),
             "len_tau": len_tau,
-            "magnetic_data_path": magnetic_data_path,
+            "magnetic_data_path": str(magnetic_data_path),
             "minor_radius_a": minor_radius_a,
             "mode_flag": mode_flag,
             "ne_data_density_array": (ne_data_density_array),
-            "ne_data_path": ne_data_path,
+            "ne_data_path": str(ne_data_path),
             "ne_data_radialcoord_array": (ne_data_radialcoord_array),
             "output_filename_suffix": output_filename_suffix,
-            "output_path": output_path,
+            "output_path": str(output_path),
             "plasmaLaunch_K": plasmaLaunch_K,
             "plasmaLaunch_Psi_3D_lab_Cartesian": (
                 ["row", "col"],
@@ -708,9 +707,9 @@ def beam_me_up(
         return
 
     # -------------------
-    # Generates additional data along the path of the beam
+    # Process the data from the main loop to give a bunch of useful stuff
     # -------------------
-
+    print("Analysing data")
     dH = hamiltonian.derivatives(
         q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, second_order=True
     )
@@ -737,16 +736,6 @@ def beam_me_up(
         output_filename_suffix,
         dH,
     )
-    dt["data_output"] = datatree.DataTree(df)
-
-    print("Data saved")
-    # -------------------
-
-    # -------------------
-    # Process the data from the main loop to give a bunch of useful stuff
-    # -------------------
-    print("Analysing data")
-
     analysis = further_analysis(
         inputs,
         df,
@@ -757,13 +746,21 @@ def beam_me_up(
         detailed_analysis_flag,
         dH,
     )
-    dt["analysis"] = datatree.DataTree(analysis)
-    print("Analysis data saved")
+    df.update(analysis)
+    dt["analysis"] = datatree.DataTree(df)
+
+    # We need to use h5netcdf and invalid_netcdf in order to easily
+    # write complex numbers
+    dt.to_netcdf(
+        output_path / f"scotty_{output_filename_suffix}.nc",
+        engine="h5netcdf",
+        invalid_netcdf=True,
+    )
 
     if figure_flag:
         default_plots(dt, field, output_path, output_filename_suffix)
 
-    return dt, field
+    return dt
 
 
 def default_plots(
