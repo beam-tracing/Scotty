@@ -483,47 +483,18 @@ def further_analysis(
     # --
 
     # Polarisation piece of localisation as a function of distance along ray
-    # Polarisation e
-    # eigenvector corresponding to eigenvalue = 0 (H=0)
-    # First, find the components of the tensor D
-    # Refer to 21st Dec 2020 notes for more
-    # Note that e \cdot e* = 1
-    [
-        D_11_component,
-        D_22_component,
-        D_bb_component,
-        D_12_component,
-        D_1b_component,
-    ] = find_D(
+    H_eigvals, e_eigvecs = dispersion_eigenvalues(
         K_magnitude_array,
         inputs.launch_angular_frequency.data,
-        df.epsilon_para,
-        df.epsilon_perp,
-        df.epsilon_g,
+        df,
+        numberOfDataPoints,
         theta_m,
     )
-
-    # Dispersion tensor
-    D_tensor = np.zeros([numberOfDataPoints, 3, 3], dtype="complex128")
-    D_tensor[:, 0, 0] = D_11_component
-    D_tensor[:, 1, 1] = D_22_component
-    D_tensor[:, 2, 2] = D_bb_component
-    D_tensor[:, 0, 1] = -1j * D_12_component
-    D_tensor[:, 1, 0] = 1j * D_12_component
-    D_tensor[:, 0, 2] = D_1b_component
-    D_tensor[:, 2, 0] = D_1b_component
-
-    H_eigvals, e_eigvecs = np.linalg.eigh(D_tensor)
-
     # In my experience, H_eigvals[:,1] corresponds to the O mode, and H_eigvals[:,1] corresponds to the X-mode
     # ALERT: This may not always be the case! Check the output figure to make sure that the appropriate solution is indeed 0 along the ray
     # e_hat has components e_1,e_2,e_b
-    if inputs.mode_flag == 1:
-        H_solver = H_eigvals[:, 1]
-        e_hat = e_eigvecs[:, :, 1]
-    elif inputs.mode_flag == -1:
-        H_solver = H_eigvals[:, 0]
-        e_hat = e_eigvecs[:, :, 0]
+    mode_index = 1 if inputs.mode_flag == 1 else 0
+    e_hat = e_eigvecs[:, :, mode_index]
 
     # equilibrium dielectric tensor - identity matrix. \bm{\epsilon}_{eq} - \bm{1}
     zero = np.zeros(len(df.tau))
@@ -661,6 +632,48 @@ def further_analysis(
     save_npz(output_path / f"analysis{output_filename_suffix}", df)
 
     return df
+
+
+def dispersion_eigenvalues(
+    K_magnitude_array: FloatArray,
+    launch_angular_frequency: float,
+    df: xr.Dataset,
+    numberOfDataPoints: int,
+    theta_m: float,
+):
+    """
+    Polarisation e
+    eigenvector corresponding to eigenvalue = 0 (H=0)
+
+    Returns
+    -------
+    eigenvalues, eigenvectors
+
+    """
+
+    # First, find the components of the tensor D
+    # Refer to 21st Dec 2020 notes for more
+    # Note that e \cdot e* = 1
+    D_11, D_22, D_bb, D_12, D_1b = find_D(
+        K_magnitude_array,
+        launch_angular_frequency,
+        df.epsilon_para,
+        df.epsilon_perp,
+        df.epsilon_g,
+        theta_m,
+    )
+
+    # Dispersion tensor
+    D_tensor = np.zeros([numberOfDataPoints, 3, 3], dtype="complex128")
+    D_tensor[:, 0, 0] = D_11
+    D_tensor[:, 1, 1] = D_22
+    D_tensor[:, 2, 2] = D_bb
+    D_tensor[:, 0, 1] = -1j * D_12
+    D_tensor[:, 1, 0] = 1j * D_12
+    D_tensor[:, 0, 2] = D_1b
+    D_tensor[:, 2, 0] = D_1b
+
+    return np.linalg.eigh(D_tensor)
 
 
 def find_e2_width(
