@@ -91,13 +91,8 @@ def immediate_analysis(
     dH_dKzeta = dH["dH_dKzeta"]
     dH_dKZ = dH["dH_dKZ"]
 
-    # Calculates nabla_K H
-    # Calculates g_hat
-    g_hat = np.zeros([numberOfDataPoints, 3])
     g_magnitude = (q_R**2 * dH_dKzeta**2 + dH_dKR**2 + dH_dKZ**2) ** 0.5
-    g_hat[:, 0] = dH_dKR / g_magnitude  # g_hat_R
-    g_hat[:, 1] = q_R * dH_dKzeta / g_magnitude  # g_hat_zeta
-    g_hat[:, 2] = dH_dKZ / g_magnitude  # g_hat_Z
+    g_hat = (np.block([[dH_dKR], [q_R * dH_dKzeta], [dH_dKZ]]) / g_magnitude.data).T
 
     # Calculates b_hat and grad_b_hat
     B_R = field.B_R(q_R, q_Z)
@@ -329,28 +324,28 @@ def further_analysis(
     # Calculating intermediate terms that are needed for the corrections in M
     xhat_dot_grad_bhat = dot(df.x_hat, df.grad_bhat)
     yhat_dot_grad_bhat = dot(df.y_hat, df.grad_bhat)
-    ray_curvature_kappa = np.zeros([numberOfDataPoints, 3])
-    ray_curvature_kappa[:, 0] = (1 / df.g_magnitude) * (
-        np.gradient(df.g_hat[:, 0], df.tau)
-        - df.g_hat[:, 1] * df.dH_dKzeta  # See notes 07 June 2021
-    )
-    ray_curvature_kappa[:, 1] = (1 / df.g_magnitude) * (
-        np.gradient(df.g_hat[:, 1], df.tau)
-        + df.g_hat[:, 0] * df.dH_dKzeta  # See notes 07 June 2021
-    )
-    ray_curvature_kappa[:, 2] = (1 / df.g_magnitude) * np.gradient(
-        df.g_hat[:, 2], df.tau
-    )
-    kappa_magnitude = np.linalg.norm(ray_curvature_kappa, axis=-1)
-    d_theta_d_tau = np.gradient(theta, df.tau)
-    d_xhat_d_tau = np.zeros([numberOfDataPoints, 3])
-    d_xhat_d_tau[:, 0] = (
-        np.gradient(df.x_hat[:, 0], df.tau) - df.x_hat[:, 1] * df.dH_dKzeta
-    )  # See notes 07 June 2021
-    d_xhat_d_tau[:, 1] = (
-        np.gradient(df.x_hat[:, 1], df.tau) + df.x_hat[:, 0] * df.dH_dKzeta
-    )  # See notes 07 June 2021
-    d_xhat_d_tau[:, 2] = np.gradient(df.x_hat[:, 2], df.tau)
+
+    # See notes 07 June 2021
+    grad_g_hat = df.g_hat.differentiate("tau")
+    ray_curvature_kappa = (
+        np.block(
+            [
+                [grad_g_hat.sel(col="R") - df.g_hat.sel(col="zeta") * df.dH_dKzeta],
+                [grad_g_hat.sel(col="zeta") + df.g_hat.sel(col="R") * df.dH_dKzeta],
+                [grad_g_hat.sel(col="Z")],
+            ]
+        )
+        / df.g_magnitude.data
+    ).T
+
+    grad_x_hat = df.x_hat.differentiate("tau")
+    d_xhat_d_tau = np.block(
+        [
+            [grad_x_hat.sel(col="R") - df.x_hat.sel(col="zeta") * df.dH_dKzeta],
+            [grad_x_hat.sel(col="zeta") + df.x_hat.sel(col="R") * df.dH_dKzeta],
+            [grad_x_hat.sel(col="Z")],
+        ]
+    ).T
 
     xhat_dot_grad_bhat_dot_xhat = dot(xhat_dot_grad_bhat, df.x_hat)
     xhat_dot_grad_bhat_dot_yhat = dot(xhat_dot_grad_bhat, df.y_hat)
@@ -531,15 +526,16 @@ def further_analysis(
         e_hat = e_eigvecs[:, :, 0]
 
     # equilibrium dielectric tensor - identity matrix. \bm{\epsilon}_{eq} - \bm{1}
-    epsilon_minus_identity = np.zeros([numberOfDataPoints, 3, 3], dtype="complex128")
-    identity = np.ones(numberOfDataPoints)
-    epsilon_minus_identity[:, 0, 0] = df.epsilon_perp - identity
-    epsilon_minus_identity[:, 1, 1] = df.epsilon_perp - identity
-    epsilon_minus_identity[:, 2, 2] = df.epsilon_para - identity
-    epsilon_minus_identity[:, 0, 1] = -1j * df.epsilon_g
-    epsilon_minus_identity[:, 1, 0] = 1j * df.epsilon_g
-
-    # loc_p_unnormalised = abs(contract_special(np.conjugate(e_hat_output), contract_special(epsilon_minus_identity,e_hat_output)))**2 / (electron_density_output*10**19)**2
+    zero = np.zeros(len(df.tau))
+    # fmt: off
+    epsilon_minus_identity = np.block(
+        [
+            [[df.epsilon_perp],    [1j * df.epsilon_g], [zero]],
+            [[-1j * df.epsilon_g], [df.epsilon_perp],   [zero]],
+            [[zero],               [zero],              [df.epsilon_para]],
+        ]
+    ).T - np.eye(3)
+    # fmt: on
 
     # Avoids dividing a small number by another small number, leading to a big number because of numerical errors or something
     loc_p_unnormalised = np.divide(
@@ -604,12 +600,12 @@ def further_analysis(
         "grad_grad_H": (["tau", "row", "col"], grad_grad_H),
         "gradK_grad_H": (["tau", "row", "col"], gradK_grad_H),
         "gradK_gradK_H": (["tau", "row", "col"], gradK_gradK_H),
-        "d_theta_d_tau": (["tau"], d_theta_d_tau),
+        "d_theta_d_tau": (["tau"], np.gradient(theta, df.tau)),
         "d_xhat_d_tau_dot_yhat": (["tau"], d_xhat_d_tau_dot_yhat),
         "kappa_dot_xhat": (["tau"], kappa_dot_xhat),
         "kappa_dot_yhat": (["tau"], kappa_dot_yhat),
         "kappa_dot_ghat": (["tau"], kappa_dot_ghat),
-        "kappa_magnitude": (["tau"], kappa_magnitude),
+        "kappa_magnitude": (["tau"], np.linalg.norm(ray_curvature_kappa, axis=-1)),
         "delta_k_perp_2": delta_k_perp_2,
         "delta_theta_m": delta_theta_m,
         "theta_m": theta_m,
