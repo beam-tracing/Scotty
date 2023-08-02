@@ -1249,6 +1249,11 @@ class PitchDiagnostic:
                 color=color,
                 label="profile",
             )
+            ax.axvline(
+                actual.loc[{"frequency": frequency}],
+                label="predicted opt_tor",
+                color=color,
+            )
             ax.plot(
                 toroidal_range,
                 gaussian_profile,
@@ -1261,11 +1266,6 @@ class PitchDiagnostic:
                 label="mean gaussian-fitted peak",
                 color="r",
                 linestyle="--",
-            )
-            ax.axvline(
-                actual.loc[{"frequency": frequency}],
-                label="predicted opt_tor",
-                color=color,
             )
             ax.set_title(f"{frequency} GHz", fontsize=8)
             ax.tick_params(axis="both", which="major", labelsize=5)
@@ -1377,7 +1377,8 @@ class PitchDiagnostic:
         return fig, axes
 
     def plot_variable_vs_tor(self, variable, descriptor):
-        """Plot how a variable changes over the toroidal steering range.
+        """Plot how a variable changes over the toroidal steering range, normalized
+        to the value at opt_tor.
 
         Args:
             variable (str): One of ("pitch_angle", "K_magnitude", "delta_theta_m")
@@ -1413,15 +1414,22 @@ class PitchDiagnostic:
         for frequency in self.frequencies:
             row, col = combinations[counter]
             ax = axes[row, col]
-
+            opt_tor = actual.loc[{"frequency": frequency}].values
+            opt_tor_val = data.sel(
+                    {"frequency": frequency, 
+                    "poloidal_angle": self.poloidal_angles[0],
+                    "toroidal_angle": opt_tor,
+                    },
+                    method="nearest"
+            ).values
             ax.plot(
                 self.toroidal_angles,
                 data.loc[
                     {"frequency": frequency, "poloidal_angle": self.poloidal_angles[0]}
-                ],
+                ]/opt_tor_val,
                 label=f"{variable}",
             )
-            ax.axvline(actual.loc[{"frequency": frequency}], label="opt_tor", color="k")
+            ax.axvline(opt_tor, label="opt_tor", color="k")
             ax.set_title(f"{frequency} GHz", fontsize=8)
             ax.tick_params(axis="both", which="major", labelsize=5)
 
@@ -1430,7 +1438,7 @@ class PitchDiagnostic:
         ax.legend(
             bbox_to_anchor=(1.05, 0), loc="lower left", borderaxespad=0.0, fontsize=8
         )
-        fig.suptitle(f"{variable} vs. Toroidal Steering", fontsize=15)
+        fig.suptitle(f"Normalized {variable} vs. Toroidal Steering", fontsize=15)
         plt.subplots_adjust(top=0.90)
 
         # add a big axis, hide frame
