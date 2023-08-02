@@ -285,15 +285,16 @@ class SweepDataset:
         return classobject
 
     def interpolate_missing_values(self):
-        """Attempts to interpolate missing data in cutoff indices and float variable DataArrays.
-        """
+        """Attempts to interpolate missing data in cutoff indices and float variable DataArrays."""
         print("Current gaps in data:")
         for item in self.missing_indices:
             print(item)
         print("Interpolating missing values...")
         output1 = self.check_cutoff_indices()
         output2 = self.check_all_float_arrays()
-        print("Interpolation complete. Check print output for unsuccessful interpolations.")
+        print(
+            "Interpolation complete. Check print output for unsuccessful interpolations."
+        )
 
     def to_netcdf(self, folder="", filename=None):
         """Saves contents of Dataset into a netCDF4 file for easy read and writing.
@@ -943,9 +944,7 @@ class SweepDataset:
             y_coordinates = self.get_coordinate_array(ydimension)
             z_coordinates = self.get_coordinate_array(zdimension)
             func_values = (
-                data.loc[coords]
-                .transpose(xdimension, ydimension, zdimension)
-                .values
+                data.loc[coords].transpose(xdimension, ydimension, zdimension).values
             )
             spline = RegularGridInterpolator(
                 points=(x_coordinates, y_coordinates, z_coordinates),
@@ -1130,9 +1129,7 @@ class SweepDataset:
         Returns:
             Artist objects fig, ax
         """
-        data_spline = self.create_2Dspline(
-            variable, xdimension, ydimension, coords
-        )
+        data_spline = self.create_2Dspline(variable, xdimension, ydimension, coords)
 
         title_string = ""
         for key, value in coords.items():
@@ -1148,8 +1145,8 @@ class SweepDataset:
         fig, ax = plt.subplots()
         if mask_flag:
             mask_coords = coords.copy()
-            if 'trajectory_step' in mask_coords.keys():
-                mask_coords.pop('trajectory_step')
+            if "trajectory_step" in mask_coords.keys():
+                mask_coords.pop("trajectory_step")
             reflection_mask = (
                 self.dataset["reflection_mask"]
                 .loc[mask_coords]
@@ -1256,14 +1253,14 @@ class SweepDataset:
             raise ValueError("Provided measure is not 'rho' or 'm'.")
 
         if const_angle not in self.get_coordinate_array(const_angle_str):
-            raise ValueError(f"Value of {const_angle_str} not in original coordinate array.")
+            raise ValueError(
+                f"Value of {const_angle_str} not in original coordinate array."
+            )
 
         coords = {const_angle_str: const_angle}
         xdimension = "frequency"
         ydimension = var_angle_str
-        spline_surface = self.create_2Dspline(
-            variable, xdimension, ydimension, coords
-        )
+        spline_surface = self.create_2Dspline(variable, xdimension, ydimension, coords)
 
         x_coordinates = self.get_coordinate_array(xdimension)
         y_coordinates = self.get_coordinate_array(ydimension)
@@ -1530,11 +1527,11 @@ class MultiSweeps:
         """Initializes a MultiSweep class.
 
         Args:
-            frequencies (array): The common 'frequency' coordinate array between all 
+            frequencies (array): The common 'frequency' coordinate array between all
             SweepDatasets loaded.
-            poloidal_angles (array): The common 'poloidal_angle' coordinate array between all 
+            poloidal_angles (array): The common 'poloidal_angle' coordinate array between all
             SweepDatasets loaded.
-            toroidal_angles (array): The common 'toroidal_angle' coordinate array between all 
+            toroidal_angles (array): The common 'toroidal_angle' coordinate array between all
             SweepDatasets loaded.
             datasets (iterable): An iterable of SweepDataset objects to load into the class.
             All SweepDataset objects must have a descriptor attribute set.
