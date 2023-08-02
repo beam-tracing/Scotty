@@ -1419,17 +1419,19 @@ class PitchDiagnostic:
             ax = axes[row, col]
             opt_tor = actual.loc[{"frequency": frequency}].values
             opt_tor_val = data.sel(
-                    {"frequency": frequency, 
+                {
+                    "frequency": frequency,
                     "poloidal_angle": self.poloidal_angles[0],
                     "toroidal_angle": opt_tor,
-                    },
-                    method="nearest"
+                },
+                method="nearest",
             ).values
             ax.plot(
                 self.toroidal_angles,
                 data.loc[
                     {"frequency": frequency, "poloidal_angle": self.poloidal_angles[0]}
-                ]/opt_tor_val,
+                ]
+                / opt_tor_val,
                 label=f"{variable}",
             )
             ax.axvline(opt_tor, label="opt_tor", color="k")
