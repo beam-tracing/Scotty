@@ -20,17 +20,8 @@ from typing import Union
 import warnings
 
 import numpy as np
-
-try:
-    from scipy.optimize import direct as minimise, root_scalar
-except ImportError:
-    # For SciPy < 1.9, `direct` isn't available, so we use a different
-    # global optimiser, but make a shim to ignore `direct`-specific
-    # arguments
-    from scipy.optimize import shgo, root_scalar
-
-    def minimise(func, bounds, **kwargs):
-        return shgo(func, bounds, sampling_method="sobol")
+from scipy.optimize import minimize_scalar, root_scalar
+from scipy.interpolate import CubicSpline
 
 
 def launch_beam(
@@ -289,7 +280,7 @@ def launch_beam(
         Psi_3D_lab_initial = Psi_3D_lab_entry
 
     return (
-        K_initial,
+        np.array(K_initial),
         initial_position,
         launch_K,
         Psi_3D_lab_initial,
@@ -369,22 +360,17 @@ def find_entry_point(
         R, _, Z = cartesian_to_cylindrical(*beam_line(tau))
         return field.poloidal_flux(R, Z) - poloidal_flux_enter
 
-    # Find the plasma boundary using a bracket search. We need the
-    # minimum so that the flux has different sign to our initial
-    # position for the bracket points. There could be one or two
-    # minima (corresponding to the two halves of the torus), we only
-    # care about the closest, so use the first result as a bound for
-    # the second. If there isn't a second, this will just find the
-    # first again
-    first_min = minimise(
-        poloidal_flux_boundary_along_line, bounds=((0, 1),), len_tol=1e-3
+    tau = np.linspace(0, 1, 100)
+    spline = CubicSpline(
+        tau, [poloidal_flux_boundary_along_line(t) for t in tau], extrapolate=False
     )
-    minimum = minimise(
-        poloidal_flux_boundary_along_line, bounds=((0, first_min.x[0]),), len_tol=1e-3
-    )
-    # If the closest minimum is positive, then the beam never actually
-    # enters the plasma, and we should abort
-    if minimum.fun > 0:
+    spline_roots = spline.roots()
+
+    # If there are no roots, then the beam never actually enters the
+    # plasma, and we should abort
+    if len(spline_roots) == 0:
+        # Get an idea of the location of the closest point
+        minimum = minimize_scalar(poloidal_flux_boundary_along_line)
         R_miss, zeta_miss, Z_miss = cartesian_to_cylindrical(*beam_line(minimum.x))
         miss_coords = f"(R={R_miss}, zeta={zeta_miss}, Z={Z_miss})"
         raise RuntimeError(
@@ -392,10 +378,11 @@ def find_entry_point(
             f"distance in poloidal flux to boundary={minimum.fun}"
         )
 
-    # `minimum.x` is some point along the beam that's definitely
-    # inside the plasma. So any root between the start of the beam and
-    # this point is the closest entry point
-    boundary = root_scalar(poloidal_flux_boundary_along_line, bracket=(0, minimum.x))
+    # The spline roots is a pretty good guess for the boundary
+    # location, which we now try to refine
+    boundary = root_scalar(
+        poloidal_flux_boundary_along_line, x0=spline_roots[0], x1=spline_roots[0] + 1e-3
+    )
     if not boundary.converged:
         raise RuntimeError(
             f"Could not find plasma boundary, root finding failed with '{boundary.flag}'"
@@ -408,4 +395,4 @@ def find_entry_point(
     if field.poloidal_flux(R_boundary, Z_boundary) > poloidal_flux_enter:
         boundary_tau += boundary_adjust
 
-    return np.array(cartesian_to_cylindrical(*beam_line(boundary.root)))
+    return np.array(cartesian_to_cylindrical(*beam_line(boundary_tau)))
