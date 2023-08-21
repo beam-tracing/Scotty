@@ -13,6 +13,7 @@ from scotty.fun_general import (
 from scotty.profile_fit import QuadraticFit, TanhFit, PolynomialFit, ProfileFit
 from scotty.hamiltonian import Hamiltonian
 from scotty.launch import find_entry_point, launch_beam
+from scotty.typing import FloatArray
 
 import json
 import numpy as np
@@ -1007,6 +1008,35 @@ def UDA_saved_MAST_U(path: pathlib.Path):
     return kwargs_dict
 
 
+def assert_is_symmetric(array: FloatArray) -> None:
+    assert_allclose(array, array.T)
+
+
+def check_Psi(
+    result: FloatArray,
+    expected_start: FloatArray,
+    cutoff_index: int,
+    expected_cutoff: FloatArray,
+    expected_final: FloatArray,
+):
+    assert_is_symmetric(result[0, ...])
+
+    # Mixed zeta elements: comparitively large atol because these are
+    # expected to be zero
+    assert np.isclose(result[0, 0, 1], expected_start[0, 1], rtol=1e-2, atol=0.4)
+    assert np.isclose(result[0, 1, 2], expected_start[1, 2], rtol=1e-2, atol=0.4)
+
+    # Diagonal elements
+    assert_allclose(
+        result[0, ...].diagonal(), expected_start.diagonal(), rtol=1e-2, atol=0.1
+    )
+    # RZ element
+    assert np.isclose(result[0, 0, 2], expected_start[0, 2], rtol=1e-2, atol=0.1)
+
+    assert_allclose(result[cutoff_index, ...], expected_cutoff, rtol=1e-2, atol=0.1)
+    assert_allclose(result[-1, ...], expected_final, rtol=1.8e-2, atol=0.1)
+
+
 @pytest.mark.parametrize(
     "generator",
     [
@@ -1044,17 +1074,12 @@ def test_integrated_O_mode(tmp_path, generator):
     K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
     assert K_magnitude.argmin() == CUTOFF_INDEX_1
 
-    assert_allclose(
-        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_1, rtol=1e-2, atol=0.1
-    )
-    assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX_1, ...],
+    check_Psi(
+        output["Psi_3D_output"],
+        PSI_START_EXPECTED_1,
+        CUTOFF_INDEX_1,
         PSI_CUTOFF_EXPECTED_1,
-        rtol=1e-2,
-        atol=0.1,
-    )
-    assert_allclose(
-        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_1, rtol=1.8e-2, atol=0.1
+        PSI_FINAL_EXPECTED_1,
     )
 
 
@@ -1097,17 +1122,12 @@ def test_integrated_X_mode(tmp_path, generatorneg):
     K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
     assert K_magnitude.argmin() == CUTOFF_INDEX_NEG1
 
-    assert_allclose(
-        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_NEG1, rtol=1e-2, atol=0.1
-    )
-    assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX_NEG1, ...],
+    check_Psi(
+        output["Psi_3D_output"],
+        PSI_START_EXPECTED_NEG1,
+        CUTOFF_INDEX_NEG1,
         PSI_CUTOFF_EXPECTED_NEG1,
-        rtol=1e-2,
-        atol=0.1,
-    )
-    assert_allclose(
-        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_NEG1, rtol=1.8e-2, atol=0.1
+        PSI_FINAL_EXPECTED_NEG1,
     )
 
 
@@ -1150,20 +1170,12 @@ def test_relativistic_O_mode(tmp_path, generator_rel):
     K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
     assert K_magnitude.argmin() == CUTOFF_INDEX_REL_1
 
-    assert_allclose(
-        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_REL_1, rtol=1e-2, atol=0.1
-    )
-    assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX_REL_1, ...],
+    check_Psi(
+        output["Psi_3D_output"],
+        PSI_START_EXPECTED_REL_1,
+        CUTOFF_INDEX_REL_1,
         PSI_CUTOFF_EXPECTED_REL_1,
-        rtol=1e-2,
-        atol=0.1,
-    )
-    assert_allclose(
-        output["Psi_3D_output"][-1, ...],
         PSI_FINAL_EXPECTED_REL_1,
-        rtol=1.8e-2,
-        atol=0.1,
     )
 
 
@@ -1207,23 +1219,12 @@ def test_relativistic_X_mode(tmp_path, generator_relneg):
     K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
     assert K_magnitude.argmin() == CUTOFF_INDEX_REL_NEG1
 
-    assert_allclose(
-        output["Psi_3D_output"][0, ...],
+    check_Psi(
+        output["Psi_3D_output"],
         PSI_START_EXPECTED_REL_NEG1,
-        rtol=1e-2,
-        atol=0.1,
-    )
-    assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX_REL_NEG1, ...],
+        CUTOFF_INDEX_REL_NEG1,
         PSI_CUTOFF_EXPECTED_REL_NEG1,
-        rtol=1e-2,
-        atol=0.1,
-    )
-    assert_allclose(
-        output["Psi_3D_output"][-1, ...],
         PSI_FINAL_EXPECTED_REL_NEG1,
-        rtol=1.8e-2,
-        atol=0.1,
     )
 
 
@@ -1268,17 +1269,12 @@ def test_null_relativistic_O_mode(tmp_path, generator_nullrel):
     K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
     assert K_magnitude.argmin() == CUTOFF_INDEX_1
 
-    assert_allclose(
-        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_1, rtol=1e-2, atol=0.1
-    )
-    assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX_1, ...],
+    check_Psi(
+        output["Psi_3D_output"],
+        PSI_START_EXPECTED_1,
+        CUTOFF_INDEX_1,
         PSI_CUTOFF_EXPECTED_1,
-        rtol=1e-2,
-        atol=0.1,
-    )
-    assert_allclose(
-        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_1, rtol=1.8e-2, atol=0.1
+        PSI_FINAL_EXPECTED_1,
     )
 
 
@@ -1324,17 +1320,12 @@ def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
     K_magnitude = np.hypot(output["K_R_array"], output["K_Z_array"])
     assert K_magnitude.argmin() == CUTOFF_INDEX_NEG1
 
-    assert_allclose(
-        output["Psi_3D_output"][0, ...], PSI_START_EXPECTED_NEG1, rtol=1e-2, atol=0.1
-    )
-    assert_allclose(
-        output["Psi_3D_output"][CUTOFF_INDEX_NEG1, ...],
+    check_Psi(
+        output["Psi_3D_output"],
+        PSI_START_EXPECTED_NEG1,
+        CUTOFF_INDEX_NEG1,
         PSI_CUTOFF_EXPECTED_NEG1,
-        rtol=1e-2,
-        atol=0.1,
-    )
-    assert_allclose(
-        output["Psi_3D_output"][-1, ...], PSI_FINAL_EXPECTED_NEG1, rtol=1.8e-2, atol=0.1
+        PSI_FINAL_EXPECTED_NEG1,
     )
 
 
@@ -1544,7 +1535,7 @@ def test_launch_golden_answer(tmp_path, generator):
         Psi_3D_lab_entry_cartersian, expected_Psi_3D_lab_entry_cartersian, tol, tol
     )
     # Larger atol due to some small values
-    assert_allclose(Psi_3D_lab_initial, expected_Psi_3D_lab_initial, tol, atol=0.1)
+    assert_allclose(Psi_3D_lab_initial, expected_Psi_3D_lab_initial, tol, atol=0.4)
 
 
 def launch_parameters(start_point, end_point_poloidal_coords):
@@ -1570,6 +1561,7 @@ def launch_parameters(start_point, end_point_poloidal_coords):
     "generator",
     [
         pytest.param(simple, id="simple"),
+        pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
         pytest.param(npz_file, id="test-file"),
         pytest.param(UDA_saved, id="UDA-saved-file"),
@@ -1628,6 +1620,20 @@ def test_find_entry_point(
     )
 
     assert_allclose(entry_position, expected_entry, 1e-6, 1e-6)
+
+
+def test_find_entry_point_bug(tmp_path):
+    args = simple(tmp_path)
+    field = create_magnetic_geometry(**args)
+    R, zeta, Z = find_entry_point(
+        launch_position=[2.3, 0, -0.1],
+        poloidal_launch_angle=np.deg2rad(-1),
+        toroidal_launch_angle=0.0,
+        poloidal_flux_enter=1.0,
+        field=field,
+    )
+
+    assert np.isclose(zeta, 0.0)
 
 
 @pytest.mark.parametrize(
