@@ -736,6 +736,8 @@ def find_K_plasma(
     omega_L = 0.5 * (-gyro_freq + np.sqrt(gyro_freq**2 + 4 * plasma_freq**2))
     omega_UH = np.sqrt(plasma_freq**2 + gyro_freq**2)
 
+    # TODO/FIXME: This assumes that the mode_flag 1,-1 correspond to O and X
+    # respectively. This is not always the case (eg SPARC)
     if mode_flag == 1:
         ## O-mode
         if plasma_freq >= 1.0:
@@ -797,7 +799,7 @@ def find_K_plasma(
             K_v_mag**2
             * (
                 -Booker_beta
-                + mode_flag
+                - mode_flag
                 * np.sqrt(Booker_beta**2 - 4 * Booker_alpha * Booker_gamma)
             )
             / (2 * Booker_alpha)
