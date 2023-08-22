@@ -738,7 +738,7 @@ def find_K_plasma(
 
     # TODO/FIXME: This assumes that the mode_flag 1,-1 correspond to O and X
     # respectively. This is not always the case (eg SPARC)
-    if mode_flag == 1: 
+    if mode_flag == 1:
         ## O-mode
         if plasma_freq >= 1.0:
             ## That is, if the (normalised) cutoff frequency is higher than the launch beam frequency inside the plasma
