@@ -9,10 +9,11 @@ import numpy as np
 from scipy import constants as constants
 from scipy import interpolate as interpolate
 from scipy import integrate as integrate
+from scipy import optimize as optimize
 from typing import TextIO, List, Any, Tuple
 from scotty.typing import ArrayLike, FloatArray
 
-from .typing import ArrayLike
+from scotty.typing import ArrayLike
 from typing import Optional, Union
 
 
@@ -558,6 +559,30 @@ def find_Booker_gamma(
     return Booker_gamma
 
 
+def find_mode_flag_sign(
+    electron_density, B_Total, launch_angular_frequency, temperature=None
+):
+    ## See text after equation 51 of Hall-Chen PPCF 2022
+    ## Exact when theta_m = 0, not sure how applicable when not.
+    ## Normally, we take mode_flag =1 to be O-mode
+    ## Not always true
+    ## factor*mode_flag = 1 should be O-mode, always
+
+    epsilon_para = find_epsilon_para(
+        electron_density, launch_angular_frequency, temperature
+    )
+    epsilon_perp = find_epsilon_perp(
+        electron_density, B_Total, launch_angular_frequency, temperature
+    )
+    epsilon_g = find_epsilon_g(
+        electron_density, B_Total, launch_angular_frequency, temperature
+    )
+
+    discriminant = epsilon_perp**2 - epsilon_g**2 - epsilon_perp * epsilon_para
+    factor = np.sign(discriminant)
+    return factor
+
+
 # ----------------------------------
 
 
@@ -723,7 +748,10 @@ def find_K_plasma(
     dpolflux_dZ,
     temperature=None,
 ):
-    ## Finds
+    ## Finds K across a discontinuous change in the refractive index
+    ## I'm not sure if this works when the mismatch angle is close to 90deg
+    ## In my experience, it's difficult to reach such a situation
+    ## Seems to work for a mismatch angle up to 50ish deg
 
     ## Checks the plasma density
     plasma_freq = find_normalised_plasma_freq(
@@ -731,14 +759,19 @@ def find_K_plasma(
     )
 
     B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
-    gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
+    gyro_freq = find_normalised_gyro_freq(
+        B_Total, launch_angular_frequency, temperature
+    )
     omega_R = 0.5 * (gyro_freq + np.sqrt(gyro_freq**2 + 4 * plasma_freq**2))
     omega_L = 0.5 * (-gyro_freq + np.sqrt(gyro_freq**2 + 4 * plasma_freq**2))
     omega_UH = np.sqrt(plasma_freq**2 + gyro_freq**2)
 
-    # TODO/FIXME: This assumes that the mode_flag 1,-1 correspond to O and X
-    # respectively. This is not always the case (eg SPARC)
-    if mode_flag == 1:
+    mode_flag_sign = find_mode_flag_sign(
+        electron_density_p, B_Total, launch_angular_frequency, temperature=None
+    )
+    # print('mode_flag_sign',mode_flag_sign)
+
+    if mode_flag_sign * mode_flag == 1:
         ## O-mode
         if plasma_freq >= 1.0:
             ## That is, if the (normalised) cutoff frequency is higher than the launch beam frequency inside the plasma
@@ -746,7 +779,7 @@ def find_K_plasma(
                 "Error: cut-off freq higher than beam freq on plasma side of plasma-vac boundary"
             )
 
-    elif mode_flag == -1:
+    elif mode_flag_sign * mode_flag == -1:
         ## X-mode
         if (omega_R >= 1) and (omega_UH <= 1):
             raise ValueError(
@@ -758,12 +791,99 @@ def find_K_plasma(
             )
     ##
 
-    ## Get components of the Booker quartic
-    K_v_mag = np.sqrt(K_v_R**2 + (K_v_zeta / q_R) ** 2 + K_v_Z**2)
-    sin_theta_m_vac = (B_R * K_v_R + B_T * K_v_zeta / q_R + B_Z * K_v_Z) / (
-        B_Total * K_v_mag
+    ## Calculate wavevector in plasma
+    ## K_zeta (toroidal component) and K_pol (poloidal component)
+    ## Radial component more difficult calculated in next section
+    K_p_zeta = K_v_zeta
+
+    K_v_pol = (-K_v_R * dpolflux_dZ + K_v_Z * dpolflux_dR) / np.sqrt(
+        dpolflux_dR**2 + dpolflux_dZ**2
+    )
+    K_p_pol = K_v_pol
+
+    wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
+    # K_v_rad = np.sqrt(wavenumber_K0**2 - K_p_pol**2 - (K_p_zeta/q_R)**2)
+
+    ##
+
+    def find_H_bar(
+        K_rad,
+        K_pol=K_p_pol,
+        K_zeta=K_p_zeta,
+        launch_angular_frequency=launch_angular_frequency,
+        q_R=q_R,
+        B_R=B_R,
+        B_T=B_T,
+        B_Z=B_Z,
+        electron_density=electron_density_p,
+        dpolflux_dR=dpolflux_dR,
+        dpolflux_dZ=dpolflux_dZ,
+        temperature=temperature,
+    ):
+        ## Get components of the Booker quartic
+        [
+            K_R,
+            K_Z,
+        ] = np.matmul(
+            np.linalg.inv([[-dpolflux_dZ, dpolflux_dR], [dpolflux_dR, dpolflux_dZ]])
+            * np.sqrt(dpolflux_dR**2 + dpolflux_dZ**2),
+            [
+                K_pol,
+                K_rad,
+            ],
+        )
+
+        wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
+        B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
+        K_mag = np.sqrt(K_rad**2 + K_pol**2 + (K_zeta / q_R) ** 2)
+
+        sin_theta_m = (B_R * K_R + B_T * K_zeta / q_R + B_Z * K_Z) / (
+            B_Total * K_mag
+        )  # B \cdot K / (abs (B) abs(K))
+        sin_theta_m_sq = sin_theta_m**2
+
+        Booker_alpha = find_Booker_alpha(
+            electron_density,
+            B_Total,
+            sin_theta_m_sq,
+            launch_angular_frequency,
+            temperature,
+        )
+        Booker_beta = find_Booker_beta(
+            electron_density,
+            B_Total,
+            sin_theta_m_sq,
+            launch_angular_frequency,
+            temperature,
+        )
+        Booker_gamma = find_Booker_gamma(
+            electron_density, B_Total, launch_angular_frequency, temperature
+        )
+
+        H_bar = (
+            wavenumber_K0**2
+            * (
+                Booker_beta
+                + mode_flag_sign
+                * mode_flag
+                * np.sqrt(Booker_beta**2 - 4 * Booker_alpha * Booker_gamma)
+            )
+            / (2 * Booker_alpha)
+            + (K_zeta / q_R) ** 2
+            + K_pol**2
+            + K_rad**2
+        )
+
+        return H_bar
+
+    #####
+
+    ## Initial guess of K_radial in plasma
+    ## Will be exact if theta_m = 0
+    sin_theta_m = (B_R * K_v_R + B_T * K_v_zeta / q_R + B_Z * K_v_Z) / (
+        B_Total * wavenumber_K0
     )  # B \cdot K / (abs (B) abs(K))
-    sin_theta_m_sq = sin_theta_m_vac**2
+    sin_theta_m_sq = sin_theta_m**2
 
     Booker_alpha = find_Booker_alpha(
         electron_density_p,
@@ -782,31 +902,33 @@ def find_K_plasma(
     Booker_gamma = find_Booker_gamma(
         electron_density_p, B_Total, launch_angular_frequency, temperature
     )
-
-    ## Calculate wavevector in plasma
-    K_p_zeta = K_v_zeta
-
-    K_v_pol = (-K_v_R * dpolflux_dZ + K_v_Z * dpolflux_dR) / np.sqrt(
-        dpolflux_dR**2 + dpolflux_dZ**2
-    )
-    K_p_pol = K_v_pol
-
-    ## TODO
-    ## This only works if the mismatch angle is continuous. It is not
-    ## I need to implement an iterative solver for this
-    K_p_rad = -np.sqrt(
+    K_p_rad_guess = np.sqrt(
         abs(
-            K_v_mag**2
+            wavenumber_K0**2
             * (
-                -Booker_beta
-                - mode_flag
+                Booker_beta
+                + mode_flag_sign
+                * mode_flag
                 * np.sqrt(Booker_beta**2 - 4 * Booker_alpha * Booker_gamma)
             )
             / (2 * Booker_alpha)
-            - (K_p_zeta / q_R) ** 2
-            - K_p_pol**2
+            + (K_p_zeta / q_R) ** 2
+            + K_p_pol**2
         )
     )
+    ##
+    # print(K_p_rad_guess)
+
+    # K_p_rad_solutions = -optimize.fsolve(
+    #     find_H_bar, K_p_rad_guess
+    #     )
+    # K_p_rad = -abs(K_p_rad_solutions)
+
+    K_p_rad = -optimize.newton(find_H_bar, K_p_rad_guess, tol=1e-6, maxiter=1000)
+    ## This will fail if the beam is too glancing, such that there's no
+    ## possible K_p_rad
+
+    # K_p_rad = -optimize.minimize(find_H_bar, K_p_rad_guess,bounds=(0,wavenumber_K0))
 
     [
         K_p_R,
@@ -821,18 +943,45 @@ def find_K_plasma(
     )
 
     ## For checking
-    H_bar = (K_p_R**2 + (K_p_zeta / q_R) ** 2 + K_p_Z**2) / (K_v_mag) ** 2 - (
+    K_mag = np.sqrt(K_p_rad**2 + K_p_pol**2 + (K_p_zeta / q_R) ** 2)
+    sin_theta_m = (B_R * K_p_R + B_T * K_p_zeta / q_R + B_Z * K_p_Z) / (
+        B_Total * K_mag
+    )  # B \cdot K / (abs (B) abs(K))
+    sin_theta_m_sq = sin_theta_m**2
+
+    Booker_alpha_p = find_Booker_alpha(
+        electron_density_p,
+        B_Total,
+        sin_theta_m_sq,
+        launch_angular_frequency,
+        temperature,
+    )
+    Booker_beta_p = find_Booker_beta(
+        electron_density_p,
+        B_Total,
+        sin_theta_m_sq,
+        launch_angular_frequency,
+        temperature,
+    )
+    Booker_gamma_p = find_Booker_gamma(
+        electron_density_p, B_Total, launch_angular_frequency, temperature
+    )
+
+    H_bar = (K_p_R**2 + (K_p_zeta / q_R) ** 2 + K_p_Z**2) / (wavenumber_K0) ** 2 + (
         (
-            -Booker_beta
-            + mode_flag * np.sqrt(Booker_beta**2 - 4 * Booker_alpha * Booker_gamma)
+            Booker_beta_p
+            + mode_flag_sign
+            * mode_flag
+            * np.sqrt(Booker_beta_p**2 - 4 * Booker_alpha_p * Booker_gamma_p)
         )
-        / (2 * Booker_alpha)
+        / (2 * Booker_alpha_p)
     )
     tol = 1e-3
 
     if abs(H_bar) > tol:
         print("find_K_plasma not working properly")
         print("H_bar =", H_bar)
+    ##
 
     return K_p_R, K_p_zeta, K_p_Z
 
