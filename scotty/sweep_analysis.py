@@ -16,8 +16,11 @@ from scipy.interpolate import (
     UnivariateSpline,
     RectBivariateSpline,
     RegularGridInterpolator,
+    splrep,
+    sproot,
+    PPoly,
 )
-from scipy.optimize import newton
+from scipy.optimize import newton, root_scalar
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from scotty.fun_general import find_q_lab_Cartesian
@@ -575,20 +578,41 @@ class SweepDataset:
                 ("poloidal_angle", poloidal_angles),
             ]
         )
-
+        #theta_m_array = self.dataset["cutoff_theta_m"]
         for frequency in frequencies:
             for poloidal_angle in poloidal_angles:
                 coords = {
                     "frequency": frequency,
                     "poloidal_angle": poloidal_angle,
                 }
+                #x = toroidal_angles
+                #y = theta_m_array.loc[coords].values
+                #spl = splrep(x, y, s=0)
+                #print(spl)
                 spline = self.create_1Dspline(
-                    "cutoff_theta_m", "toroidal_angle", coords
+                    variable='cutoff_theta_m',
+                    dimension='toroidal_angle',
+                    coords=coords,
                 )
                 try:
-                    root = newton(spline, x0=0, fprime=spline.derivative(), maxiter=100)
+                    #print('flag 1')
+                    #ppoly = PPoly.from_spline(spl)
+                    #print(ppoly)
+                    #roots = ppoly.roots()
+                    #print('flag 3')
+                    rootresults = root_scalar(
+                        f=spline,
+                        method='bisect',
+                        bracket = (toroidal_angles[0], toroidal_angles[-1]),
+                        x0=0,
+                        x1=3,
+                        maxiter=200,
+                    )
+                    #if len(roots) != 1:
+                    #    print(f"Wrong number of roots found for Freq={frequency} GHz, Pol={poloidal_angle} deg. Roots: {roots}")
+                    root = rootresults.root
                     opt_tor_array.loc[coords] = root
-                except RuntimeError as error:
+                except Exception as error:
                     print(
                         f"No zero found for Freq={frequency} GHz, Pol={poloidal_angle} deg: ",
                         error,
@@ -988,7 +1012,8 @@ class SweepDataset:
         print(f"Number of problematic indices: {len(index_list)}")
         if not len(index_list):
             return []
-        interp_indices = float_indices.where(float_indices >= 0)
+        interp_indices = float_indices.where(float_indices >= 0, other=np.nan)
+
         for dimension in ("toroidal_angle", "poloidal_angle", "frequency"):
             print(f"trying {dimension}")
             try:
@@ -1010,6 +1035,21 @@ class SweepDataset:
             )
             return new_list
 
+    def set_problematic_indices(self, value=-1):
+        """Bandaid fix for stubborn missing indices that cannot be fixed by interpolation.
+        """
+        cutoff_indices = self.dataset["cutoff_index"]
+        fixed_indices = cutoff_indices.where(cutoff_indices >=0, other=value)
+        self.dataset["cutoff_index"] = fixed_indices
+
+        new_list = np.argwhere(fixed_indices.values < 0)
+        if len(new_list):
+            print(
+                f"Failed to resolve problematic indices. Consider masking the affected regions. Failed indices: {new_list}"
+            )
+        return xr.where(cutoff_indices < 0, 1, 0)
+
+
     def check_float_arrays(self, variable):
         """Checks for and interpolates any null array values."""
         new_array = self.dataset[variable]
@@ -1024,7 +1064,7 @@ class SweepDataset:
             try:
                 new_array = new_array.interpolate_na(
                     dim=dimension,
-                    method="cubic",
+                    method="linear",
                 )
             except Exception:
                 print(
