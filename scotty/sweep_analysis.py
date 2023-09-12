@@ -578,37 +578,37 @@ class SweepDataset:
                 ("poloidal_angle", poloidal_angles),
             ]
         )
-        #theta_m_array = self.dataset["cutoff_theta_m"]
+        # theta_m_array = self.dataset["cutoff_theta_m"]
         for frequency in frequencies:
             for poloidal_angle in poloidal_angles:
                 coords = {
                     "frequency": frequency,
                     "poloidal_angle": poloidal_angle,
                 }
-                #x = toroidal_angles
-                #y = theta_m_array.loc[coords].values
-                #spl = splrep(x, y, s=0)
-                #print(spl)
+                # x = toroidal_angles
+                # y = theta_m_array.loc[coords].values
+                # spl = splrep(x, y, s=0)
+                # print(spl)
                 spline = self.create_1Dspline(
-                    variable='cutoff_theta_m',
-                    dimension='toroidal_angle',
+                    variable="cutoff_theta_m",
+                    dimension="toroidal_angle",
                     coords=coords,
                 )
                 try:
-                    #print('flag 1')
-                    #ppoly = PPoly.from_spline(spl)
-                    #print(ppoly)
-                    #roots = ppoly.roots()
-                    #print('flag 3')
+                    # print('flag 1')
+                    # ppoly = PPoly.from_spline(spl)
+                    # print(ppoly)
+                    # roots = ppoly.roots()
+                    # print('flag 3')
                     rootresults = root_scalar(
                         f=spline,
-                        method='bisect',
-                        bracket = (toroidal_angles[0], toroidal_angles[-1]),
+                        method="bisect",
+                        bracket=(toroidal_angles[0], toroidal_angles[-1]),
                         x0=0,
                         x1=3,
                         maxiter=200,
                     )
-                    #if len(roots) != 1:
+                    # if len(roots) != 1:
                     #    print(f"Wrong number of roots found for Freq={frequency} GHz, Pol={poloidal_angle} deg. Roots: {roots}")
                     root = rootresults.root
                     opt_tor_array.loc[coords] = root
@@ -1036,10 +1036,9 @@ class SweepDataset:
             return new_list
 
     def set_problematic_indices(self, value=-1):
-        """Bandaid fix for stubborn missing indices that cannot be fixed by interpolation.
-        """
+        """Bandaid fix for stubborn missing indices that cannot be fixed by interpolation."""
         cutoff_indices = self.dataset["cutoff_index"]
-        fixed_indices = cutoff_indices.where(cutoff_indices >=0, other=value)
+        fixed_indices = cutoff_indices.where(cutoff_indices >= 0, other=value)
         self.dataset["cutoff_index"] = fixed_indices
 
         new_list = np.argwhere(fixed_indices.values < 0)
@@ -1048,7 +1047,6 @@ class SweepDataset:
                 f"Failed to resolve problematic indices. Consider masking the affected regions. Failed indices: {new_list}"
             )
         return xr.where(cutoff_indices < 0, 1, 0)
-
 
     def check_float_arrays(self, variable):
         """Checks for and interpolates any null array values."""
