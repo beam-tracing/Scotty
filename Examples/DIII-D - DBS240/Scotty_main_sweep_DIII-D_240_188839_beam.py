@@ -89,11 +89,6 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
             # else:
             #     beam_me_up(**kwargs_dict)
 
-            if counter == 0:
-                kwargs_dict["verbose_output_flag"] = True
-            else:
-                kwargs_dict["verbose_output_flag"] = False
-
             beam_me_up(**kwargs_dict)
 
             counter = counter + 1

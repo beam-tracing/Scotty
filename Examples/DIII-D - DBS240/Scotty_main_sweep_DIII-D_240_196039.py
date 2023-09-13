@@ -80,8 +80,6 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
         kwargs_dict["figure_flag"] = False
         kwargs_dict["detailed_analysis_flag"] = False
 
-        kwargs_dict["verbose_output_flag"] = True
-
         counter = counter + 1
         print("simulation ", counter, "of", total_simulations)
 

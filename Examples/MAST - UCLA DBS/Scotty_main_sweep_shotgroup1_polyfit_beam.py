@@ -69,8 +69,6 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
             elif kwargs_dict["mode_flag"] == -1:
                 mode_string = "X"
 
-            kwargs_dict["verbose_output_flag"] = True
-
             kwargs_dict["output_filename_suffix"] = (
                 "_r"
                 + f"{mirror_rotation:.1f}"
