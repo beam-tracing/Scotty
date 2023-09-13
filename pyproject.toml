@@ -47,6 +47,9 @@ write_to = "scotty/_version.py"
 testpaths = [
     "tests",
 ]
+filterwarnings = [
+    "ignore::UserWarning:h5netcdf",
+]
 
 [tool.mypy]
 plugins = "numpy.typing.mypy_plugin"
