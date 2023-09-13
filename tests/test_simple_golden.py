@@ -20,6 +20,7 @@ import numpy as np
 from numpy.testing import assert_allclose, assert_array_equal
 import pathlib
 import pytest
+import xarray as xr
 
 # Print more of arrays in failed tests
 np.set_printoptions(linewidth=120, threshold=100)
@@ -1013,7 +1014,7 @@ def assert_is_symmetric(array: FloatArray) -> None:
 
 
 def check_Psi(
-    result: FloatArray,
+    result: xr.DataArray,
     expected_start: FloatArray,
     cutoff_index: int,
     expected_cutoff: FloatArray,
@@ -1028,7 +1029,7 @@ def check_Psi(
 
     # Diagonal elements
     assert_allclose(
-        result[0, ...].diagonal(), expected_start.diagonal(), rtol=1e-2, atol=0.1
+        result[0, ...].data.diagonal(), expected_start.diagonal(), rtol=1e-2, atol=0.1
     )
     # RZ element
     assert np.isclose(result[0, 0, 2], expected_start[0, 2], rtol=1e-2, atol=0.1)
@@ -1068,7 +1069,7 @@ def test_integrated_O_mode(tmp_path, generator):
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_1
 
     check_Psi(
-        output["Psi_3D_output"],
+        output["Psi_3D"],
         PSI_START_EXPECTED_1,
         CUTOFF_INDEX_1,
         PSI_CUTOFF_EXPECTED_1,
@@ -1109,7 +1110,7 @@ def test_integrated_X_mode(tmp_path, generatorneg):
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_NEG1
 
     check_Psi(
-        output["Psi_3D_output"],
+        output["Psi_3D"],
         PSI_START_EXPECTED_NEG1,
         CUTOFF_INDEX_NEG1,
         PSI_CUTOFF_EXPECTED_NEG1,
@@ -1150,7 +1151,7 @@ def test_relativistic_O_mode(tmp_path, generator_rel):
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_REL_1
 
     check_Psi(
-        output["Psi_3D_output"],
+        output["Psi_3D"],
         PSI_START_EXPECTED_REL_1,
         CUTOFF_INDEX_REL_1,
         PSI_CUTOFF_EXPECTED_REL_1,
@@ -1192,7 +1193,7 @@ def test_relativistic_X_mode(tmp_path, generator_relneg):
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_REL_NEG1
 
     check_Psi(
-        output["Psi_3D_output"],
+        output["Psi_3D"],
         PSI_START_EXPECTED_REL_NEG1,
         CUTOFF_INDEX_REL_NEG1,
         PSI_CUTOFF_EXPECTED_REL_NEG1,
@@ -1235,7 +1236,7 @@ def test_null_relativistic_O_mode(tmp_path, generator_nullrel):
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_1
 
     check_Psi(
-        output["Psi_3D_output"],
+        output["Psi_3D"],
         PSI_START_EXPECTED_1,
         CUTOFF_INDEX_1,
         PSI_CUTOFF_EXPECTED_1,
@@ -1279,7 +1280,7 @@ def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_NEG1
 
     check_Psi(
-        output["Psi_3D_output"],
+        output["Psi_3D"],
         PSI_START_EXPECTED_NEG1,
         CUTOFF_INDEX_NEG1,
         PSI_CUTOFF_EXPECTED_NEG1,
