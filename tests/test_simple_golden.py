@@ -1029,14 +1029,7 @@ def test_integrated_O_mode(tmp_path, generator):
     kwargs_dict["len_tau"] = 10
     kwargs_dict["output_path"] = tmp_path
 
-    number_of_existing_npz_files = len(list(tmp_path.glob("*.npz")))
-
-    beam_me_up(**kwargs_dict)
-
-    assert len(list(tmp_path.glob("*.npz"))) == 4 + number_of_existing_npz_files
-
-    with np.load(tmp_path / "data_output_Bpa0.10.npz") as f:
-        output = dict(f)
+    output = beam_me_up(**kwargs_dict)["analysis"]
 
     for key, value in EXPECTED_1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
@@ -1080,14 +1073,7 @@ def test_integrated_X_mode(tmp_path, generatorneg):
     kwargs_dict["output_path"] = tmp_path
     kwargs_dict["mode_flag"] = -1
 
-    number_of_existing_npz_files = len(list(tmp_path.glob("*.npz")))
-
-    beam_me_up(**kwargs_dict)
-
-    assert len(list(tmp_path.glob("*.npz"))) == 4 + number_of_existing_npz_files
-
-    with np.load(tmp_path / "data_output_Bpa0.11.npz") as f:
-        output = dict(f)
+    output = beam_me_up(**kwargs_dict)["analysis"]
 
     for key, value in EXPECTED_NEG1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
@@ -1133,14 +1119,7 @@ def test_relativistic_O_mode(tmp_path, generator_rel):
     kwargs_dict["relativistic_flag"] = True
     kwargs_dict["temperature_fit_method"] = Te_fit
 
-    number_of_existing_npz_files = len(list(tmp_path.glob("*.npz")))
-    print(kwargs_dict)
-    beam_me_up(**kwargs_dict)
-
-    assert len(list(tmp_path.glob("*.npz"))) == 4 + number_of_existing_npz_files
-
-    with np.load(tmp_path / "data_output_Bpa1.10.npz") as f:
-        output = dict(f)
+    output = beam_me_up(**kwargs_dict)["analysis"]
 
     for key, value in EXPECTED_REL_1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
@@ -1187,14 +1166,7 @@ def test_relativistic_X_mode(tmp_path, generator_relneg):
     kwargs_dict["temperature_fit_method"] = Te_fit
     kwargs_dict["mode_flag"] = -1
 
-    number_of_existing_npz_files = len(list(tmp_path.glob("*.npz")))
-    print(kwargs_dict)
-    beam_me_up(**kwargs_dict)
-
-    assert len(list(tmp_path.glob("*.npz"))) == 4 + number_of_existing_npz_files
-
-    with np.load(tmp_path / "data_output_Bpa1.11.npz") as f:
-        output = dict(f)
+    output = beam_me_up(**kwargs_dict)["analysis"]
 
     for key, value in EXPECTED_REL_NEG1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
@@ -1242,14 +1214,7 @@ def test_null_relativistic_O_mode(tmp_path, generator_nullrel):
     kwargs_dict["relativistic_flag"] = True
     kwargs_dict["temperature_fit_method"] = Te_fit
 
-    number_of_existing_npz_files = len(list(tmp_path.glob("*.npz")))
-
-    beam_me_up(**kwargs_dict)
-
-    assert len(list(tmp_path.glob("*.npz"))) == 4 + number_of_existing_npz_files
-
-    with np.load(tmp_path / "data_output_Bpa2.10.npz") as f:
-        output = dict(f)
+    output = beam_me_up(**kwargs_dict)["analysis"]
 
     for key, value in EXPECTED_1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
@@ -1296,14 +1261,7 @@ def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
     kwargs_dict["temperature_fit_method"] = Te_fit
     kwargs_dict["mode_flag"] = -1
 
-    number_of_existing_npz_files = len(list(tmp_path.glob("*.npz")))
-
-    beam_me_up(**kwargs_dict)
-
-    assert len(list(tmp_path.glob("*.npz"))) == 4 + number_of_existing_npz_files
-
-    with np.load(tmp_path / "data_output_Bpa2.11.npz") as f:
-        output = dict(f)
+    output = beam_me_up(**kwargs_dict)["analysis"]
 
     for key, value in EXPECTED_NEG1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)

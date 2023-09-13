@@ -163,7 +163,7 @@ def beam_me_up(
     # For flipping signs to maintain forward difference
     auto_delta_sign_Z=1,
     auto_delta_sign_R=1,
-):
+) -> datatree.DataTree:
     r"""Run the beam tracer
 
     Overview
