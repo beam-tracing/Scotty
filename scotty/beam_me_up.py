@@ -760,7 +760,7 @@ def beam_me_up(
     # We need to use h5netcdf and invalid_netcdf in order to easily
     # write complex numbers
     dt.to_netcdf(
-        output_path / f"scotty_output{output_filename_suffix}.nc",
+        output_path / f"scotty_output{output_filename_suffix}.h5",
         engine="h5netcdf",
         invalid_netcdf=True,
     )
