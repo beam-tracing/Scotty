@@ -6,18 +6,15 @@ from scotty.beam_me_up import (
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.torbeam import Torbeam
 from scotty.geometry import CircularCrossSectionField
-from scotty.fun_general import (
-    freq_GHz_to_angular_frequency,
-    angular_frequency_to_wavenumber,
-)
-from scotty.profile_fit import QuadraticFit, TanhFit, PolynomialFit, ProfileFit
+from scotty.fun_general import freq_GHz_to_angular_frequency
+from scotty.profile_fit import QuadraticFit
 from scotty.hamiltonian import Hamiltonian
 from scotty.launch import find_entry_point, launch_beam
 from scotty.typing import FloatArray
 
 import json
 import numpy as np
-from numpy.testing import assert_allclose, assert_array_equal
+from numpy.testing import assert_allclose
 import pathlib
 import pytest
 import xarray as xr
