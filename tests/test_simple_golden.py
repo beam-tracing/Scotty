@@ -1035,7 +1035,7 @@ def test_integrated_O_mode(tmp_path, generator):
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
     K_magnitude = np.hypot(output["K_R"], output["K_Z"])
-    assert K_magnitude.argmin() == CUTOFF_INDEX_1
+    assert K_magnitude.argmin("tau") == CUTOFF_INDEX_1
 
     assert_allclose(output["Psi_3D"][0, ...], PSI_START_EXPECTED_1, rtol=1e-2, atol=0.1)
     assert_allclose(
@@ -1079,7 +1079,7 @@ def test_integrated_X_mode(tmp_path, generatorneg):
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
     K_magnitude = np.hypot(output["K_R"], output["K_Z"])
-    assert K_magnitude.argmin() == CUTOFF_INDEX_NEG1
+    assert K_magnitude.argmin("tau") == CUTOFF_INDEX_NEG1
 
     assert_allclose(
         output["Psi_3D"][0, ...], PSI_START_EXPECTED_NEG1, rtol=1e-2, atol=0.1
@@ -1125,7 +1125,7 @@ def test_relativistic_O_mode(tmp_path, generator_rel):
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
     K_magnitude = np.hypot(output["K_R"], output["K_Z"])
-    assert K_magnitude.argmin() == CUTOFF_INDEX_REL_1
+    assert K_magnitude.argmin("tau") == CUTOFF_INDEX_REL_1
 
     assert_allclose(
         output["Psi_3D"][0, ...], PSI_START_EXPECTED_REL_1, rtol=1e-2, atol=0.1
@@ -1172,7 +1172,7 @@ def test_relativistic_X_mode(tmp_path, generator_relneg):
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
     K_magnitude = np.hypot(output["K_R"], output["K_Z"])
-    assert K_magnitude.argmin() == CUTOFF_INDEX_REL_NEG1
+    assert K_magnitude.argmin("tau") == CUTOFF_INDEX_REL_NEG1
 
     assert_allclose(
         output["Psi_3D"][0, ...], PSI_START_EXPECTED_REL_NEG1, rtol=1e-2, atol=0.1
@@ -1220,7 +1220,7 @@ def test_null_relativistic_O_mode(tmp_path, generator_nullrel):
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
     K_magnitude = np.hypot(output["K_R"], output["K_Z"])
-    assert K_magnitude.argmin() == CUTOFF_INDEX_1
+    assert K_magnitude.argmin("tau") == CUTOFF_INDEX_1
 
     assert_allclose(output["Psi_3D"][0, ...], PSI_START_EXPECTED_1, rtol=1e-2, atol=0.1)
     assert_allclose(
@@ -1267,7 +1267,7 @@ def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
     K_magnitude = np.hypot(output["K_R"], output["K_Z"])
-    assert K_magnitude.argmin() == CUTOFF_INDEX_NEG1
+    assert K_magnitude.argmin("tau") == CUTOFF_INDEX_NEG1
 
     assert_allclose(
         output["Psi_3D"][0, ...], PSI_START_EXPECTED_NEG1, rtol=1e-2, atol=0.1

@@ -713,7 +713,7 @@ def cumulative_integrate(array: xr.DataArray) -> xr.DataArray:
 def max_l_lc(
     distance_along_line: xr.DataArray, array: xr.DataArray, cutoff_index: int
 ) -> xr.DataArray:
-    max_index = array.argmax()
+    max_index = array.argmax("tau")
     return distance_along_line[max_index] - distance_along_line[cutoff_index]
 
 
