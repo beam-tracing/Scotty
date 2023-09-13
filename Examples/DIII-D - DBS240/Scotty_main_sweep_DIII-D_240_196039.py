@@ -9,11 +9,7 @@ valerian@hall-chen.com
 """
 from scotty.beam_me_up import beam_me_up
 import numpy as np
-import os
 from scotty.init_bruv import get_parameters_for_Scotty
-
-
-
 
 pol_launch_angles = -np.array([6.50,6.33,6.25,6.17,6.08,
                                6.00,5.92,5.83,5.75,5.67,5.50])
