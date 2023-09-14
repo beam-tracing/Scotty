@@ -140,7 +140,7 @@ class outplot(object):
             Plot saved to output_path, .jpg file (only for option=1 or 2, included when option=0)
         """
 
-        if option == "RZ trajectory" or "all":
+        if option == "RZ trajectory" or option == "all":
             """
             Plots the ray trajectory and projection of beam widths on the RZ plane
             """
@@ -215,7 +215,7 @@ class outplot(object):
             plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "propagation_poloidal.jpg", dpi=200)
 
-        elif option == "XY trajectory" or "all":
+        elif option == "XY trajectory" or option == "all":
             """
             Plots the ray trajectory and projection of beam widths on the XY plane
             """
@@ -335,19 +335,19 @@ class outplot(object):
             plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "propagation_toroidal.jpg", dpi=200)
 
-        elif option == "polflux" or "all":
+        elif option == "polflux" or option == "all":
             plt.figure()
             plt.plot(self.l_lc, self.poloidal_flux_output)
             plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "poloidal_flux_output.jpg", dpi=200)
 
-        elif option == "ne" or "all":
+        elif option == "ne" or option == "all":
             plt.figure()
             plt.plot(self.l_lc, self.electron_density_output)
             # plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "electron_density_output.jpg", dpi=200)
 
-        elif option == "K components" or "all":
+        elif option == "K components" or option == "all":
             plt.figure()
             plt.subplot(1, 3, 1)
             plt.plot(self.l_lc, self.K_R_array, "k")
@@ -358,7 +358,7 @@ class outplot(object):
             # plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "K_R K_Z K_Magnitude.jpg", dpi=200)
 
-        elif option == "b_hat" or "all":
+        elif option == "b_hat" or option == "all":
             plt.figure()
             plt.subplot(1, 3, 1)
             plt.plot(self.l_lc, self.b_hat_output[:, 0] * self.B_magnitude, "k")
@@ -370,7 +370,7 @@ class outplot(object):
             # plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "B_output.jpg", dpi=200)
 
-        elif option == "Psi_w and M_w" or "all":
+        elif option == "Psi_w and M_w" or option == "all":
             plt.figure(figsize=(16, 5))
 
             plt.subplot(2, 3, 1)
@@ -411,7 +411,7 @@ class outplot(object):
             # plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "Option_7.jpg", dpi=200)
 
-        elif option == "Backscattered turbulent k_perp" or "all":
+        elif option == "Backscattered turbulent k_perp" or option == "all":
             plt.figure(figsize=(10, 5))
             plt.plot(self.l_lc, -2 * self.K_magnitude_array, label="Bragg")
             plt.plot(self.l_lc, self.k_perp_1_bs, label="Full Bragg")
@@ -420,7 +420,7 @@ class outplot(object):
             # plt.gca().set_aspect("equal", adjustable="box")
             plt.savefig(self.output_path + "Bragg.jpg", dpi=200)
 
-        elif option == "Ray curvature" or "all":
+        elif option == "Ray curvature" or option == "all":
             plt.figure()
 
             plt.subplot(1, 2, 1)
