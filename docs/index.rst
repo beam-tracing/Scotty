@@ -11,6 +11,8 @@ The main interface to Scotty is through `beam_me_up()
 through `get_parameters_for_Scotty()
 <scotty.get_parameters_for_Scotty>`.
 
+Stable version: v2.4.3
+Unstable version: v3.x.x
 
 .. toctree::
    :maxdepth: 2
