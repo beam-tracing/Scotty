@@ -49,10 +49,10 @@ def plot_bounding_box(dt: DataTree, ax: Optional[plt.Axes] = None) -> plt.Axes:
 
     ax = maybe_make_axis(ax)
 
-    R_min = np.min(dt['inputs'].R.values)
-    R_max = np.max(dt['inputs'].R.values)
-    Z_min = np.min(dt['inputs'].Z.values)
-    Z_max = np.max(dt['inputs'].Z.values)
+    R_min = np.min(dt["inputs"].R.values)
+    R_max = np.max(dt["inputs"].R.values)
+    Z_min = np.min(dt["inputs"].Z.values)
+    Z_max = np.max(dt["inputs"].Z.values)
 
     ax.hlines([Z_min, Z_max], R_min, R_max, color="lightgrey", linestyle="dashed")
     ax.vlines([R_min, R_max], Z_min, Z_max, color="lightgrey", linestyle="dashed")
@@ -155,18 +155,18 @@ def plot_poloidal_crosssection(
     plot_bounding_box(dt, ax)
 
     cax = ax.contour(
-        dt['inputs'].R.values,
-        dt['inputs'].Z.values,
-        (dt['inputs'].poloidalFlux_grid.values).T,
+        dt["inputs"].R.values,
+        dt["inputs"].Z.values,
+        (dt["inputs"].poloidalFlux_grid.values).T,
         levels=np.linspace(0, 1, 11, endpoint=not highlight_LCFS),
         cmap="plasma_r",
     )
     ax.clabel(cax, inline=True)
     if highlight_LCFS:
         ax.contour(
-            dt['inputs'].R.values,
-            dt['inputs'].Z.values,
-            (dt['inputs'].poloidalFlux_grid.values).T,
+            dt["inputs"].R.values,
+            dt["inputs"].Z.values,
+            (dt["inputs"].poloidalFlux_grid.values).T,
             levels=[1.0],
             colors="darkgrey",
             linestyles="dashed",
@@ -266,7 +266,7 @@ def plot_poloidal_beam_path(
     dt: DataTree,
     filename: Optional[PathLike] = None,
     ax: Optional[plt.Axes] = None,
-    zoom = False,
+    zoom=False,
 ) -> plt.Axes:
     """
     Plots the beam path on the R Z plane
@@ -293,16 +293,16 @@ def plot_poloidal_beam_path(
 
     if zoom:
         ## Write a wrapper function for this maybe
-        R_max = max(beam_plus.sel(col="R").max(),beam_minus.sel(col="R").max())
-        R_min = min(beam_plus.sel(col="R").min(),beam_minus.sel(col="R").min())
-        Z_max = max(beam_plus.sel(col="Z").max(),beam_minus.sel(col="Z").max())
-        Z_min = min(beam_plus.sel(col="Z").min(),beam_minus.sel(col="Z").min())   
+        R_max = max(beam_plus.sel(col="R").max(), beam_minus.sel(col="R").max())
+        R_min = min(beam_plus.sel(col="R").min(), beam_minus.sel(col="R").min())
+        Z_max = max(beam_plus.sel(col="Z").max(), beam_minus.sel(col="Z").max())
+        Z_min = min(beam_plus.sel(col="Z").min(), beam_minus.sel(col="Z").min())
 
-        buffer_R = 0.1*(R_max-R_min)
-        buffer_Z = 0.1*(Z_max-Z_min)
+        buffer_R = 0.1 * (R_max - R_min)
+        buffer_Z = 0.1 * (Z_max - Z_min)
 
-        ax.set_xlim(R_min-buffer_R, R_max+buffer_R)
-        ax.set_ylim(Z_min-buffer_Z, Z_max+buffer_Z)
+        ax.set_xlim(R_min - buffer_R, R_max + buffer_R)
+        ax.set_ylim(Z_min - buffer_Z, Z_max + buffer_Z)
 
     ax.legend()
     ax.set_title("Beam path (poloidal plane)")

@@ -119,7 +119,7 @@ def beam_me_up(
     poloidal_flux_zero_density: float = 1.0,  ## When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
     poloidal_flux_zero_temperature: float = 1.0,  ## temperature analogue of poloidal_flux_zero_density
     # Finite-difference and solver parameters
-    auto_delta_sign=True, # For flipping signs to maintain forward difference. Applies to delta_R and delta_Z
+    auto_delta_sign=True,  # For flipping signs to maintain forward difference. Applies to delta_R and delta_Z
     delta_R: float = -0.0001,  # in the same units as data_R_coord
     delta_Z: float = 0.0001,  # in the same units as data_Z_coord
     delta_K_R: float = 0.1,  # in the same units as K_R
@@ -412,7 +412,7 @@ def beam_me_up(
     if auto_delta_sign:
         # Flips the sign of delta_Z depending on the orientation of the poloidal flux surface at the point which the ray enters the plasma.
         # This is to ensure a forward difference across the plasma boundary. We expect poloidal flux to decrease in the direction of the plasma.
-    
+
         entry_coords = find_entry_point(
             launch_position,
             np.deg2rad(poloidal_launch_angle_Torbeam),
@@ -422,12 +422,10 @@ def beam_me_up(
         )
         entry_R, entry_zeta, entry_Z = entry_coords
 
-        d_poloidal_flux_dR = field.d_poloidal_flux_dR(
-            entry_R, entry_Z, delta_R)    
-        d_poloidal_flux_dZ = field.d_poloidal_flux_dZ(
-            entry_R, entry_Z, delta_Z)
+        d_poloidal_flux_dR = field.d_poloidal_flux_dR(entry_R, entry_Z, delta_R)
+        d_poloidal_flux_dZ = field.d_poloidal_flux_dZ(entry_R, entry_Z, delta_Z)
         # print("Gradients at entry point for Z: ", Z_gradient, ", R: ", R_gradient)
-    
+
         if d_poloidal_flux_dZ > 0:
             delta_Z = -1 * abs(delta_Z)
         else:
@@ -487,8 +485,8 @@ def beam_me_up(
             vacuum_propagation_flag=vacuum_propagation_flag,
             Psi_BC_flag=Psi_BC_flag,
             poloidal_flux_enter=poloidal_flux_enter,
-            delta_R= delta_R,
-            delta_Z= delta_Z,
+            delta_R=delta_R,
+            delta_Z=delta_Z,
         )
     else:
         print("Beam launched from inside the plasma")
@@ -582,7 +580,6 @@ def beam_me_up(
 
     print("Main loop complete")
     # -------------------
-
 
     inputs = xr.Dataset(
         {

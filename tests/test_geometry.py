@@ -53,7 +53,9 @@ def test_circular_magnitude():
     field = geometry.CircularCrossSectionField(
         B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
     )
-    assert np.isclose(field.magnitude(R_axis, 0.0), B_T_axis), "on axis" ## This throws a divide by zero error
+    assert np.isclose(
+        field.magnitude(R_axis, 0.0), B_T_axis
+    ), "on axis"  ## This throws a divide by zero error
 
     B_magnitude_top_bottom = np.sqrt(
         B_T_axis**2 + (B_p_a / (R_axis * minor_radius_a)) ** 2

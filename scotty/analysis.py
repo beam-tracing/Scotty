@@ -981,10 +981,9 @@ def open_analysis_npz(outputs: xr.Dataset, filename: PathLike) -> xr.Dataset:
 def beam_width(
     g_hat: xr.DataArray, orthogonal_dir: FloatArray, Psi_3D: xr.DataArray
 ) -> xr.DataArray:
-
     W_vec = np.cross(g_hat, orthogonal_dir)
     W_vec_magnitude = np.linalg.norm(W_vec, axis=1)
-	
+
     # Unit vector
     W_uvec = W_vec / W_vec_magnitude[:, np.newaxis]
     width = np.sqrt(2 / dot(W_uvec, dot(Psi_3D, W_uvec)).imag)
