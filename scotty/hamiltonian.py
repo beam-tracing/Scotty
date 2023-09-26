@@ -8,12 +8,12 @@ from scotty.fun_general import (
     angular_frequency_to_wavenumber,
     find_normalised_gyro_freq,
     find_normalised_plasma_freq,
-    contract_special,
+    dot,
 )
 from scotty.typing import ArrayLike, FloatArray
 
 import numpy as np
-from typing import Dict, Tuple, Optional, Union
+from typing import Dict, Tuple, Optional
 
 
 class DielectricTensor:
@@ -223,7 +223,7 @@ class Hamiltonian:
         else:  # Vectorised version of find_H
             b_hat = b_hat.T
             K_hat = K_hat.T
-            sin_theta_m_sq = contract_special(b_hat, K_hat) ** 2
+            sin_theta_m_sq = dot(b_hat, K_hat) ** 2
 
         epsilon = DielectricTensor(
             electron_density, self.angular_frequency, B_total, temperature

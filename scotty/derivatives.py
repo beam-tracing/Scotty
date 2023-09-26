@@ -4,6 +4,7 @@ from typing import Callable, Dict, Optional, Tuple, Union
 from scotty.typing import ArrayLike, FloatArray
 
 import functools
+from typing import cast
 
 
 def _maybe_bytes(arg):
@@ -11,7 +12,10 @@ def _maybe_bytes(arg):
     try:
         return arg.tobytes()
     except AttributeError:
-        return arg
+        try:
+            return _maybe_bytes(arg.data)
+        except AttributeError:
+            return arg
 
 
 def cache(func):
@@ -216,7 +220,7 @@ def derivative(
         cached_func = func
 
     # We need an array with a shape compatible with input arrays in `args`
-    result = np.zeros(np.broadcast(*args.values()).shape)
+    full_result = None
 
     # Now we can actually compute the derivative
     for stencil_offsets, weight in stencil_.items():
@@ -226,5 +230,9 @@ def derivative(
             dim: start + offsets.get(dim, 0) * spacings.get(dim, 0.0)
             for dim, start in args.items()
         }
-        result += weight * cached_func(**coords)
-    return result / np.prod(dim_spacings)
+        result = weight * cached_func(**coords)
+        if full_result is None:
+            full_result = np.zeros_like(result)
+        full_result += result
+
+    return cast(FloatArray, full_result) / np.prod(dim_spacings)

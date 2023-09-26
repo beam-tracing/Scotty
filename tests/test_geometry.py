@@ -45,6 +45,92 @@ def test_circular():
     assert total_sign[-1, -1] == -1, "Bottom right"
 
 
+def test_circular_magnitude():
+    B_T_axis = 1.0
+    R_axis = 2.0
+    minor_radius_a = 1.0
+    B_p_a = 0.5
+    field = geometry.CircularCrossSectionField(
+        B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
+    )
+    assert np.isclose(
+        field.magnitude(R_axis, 0.0), B_T_axis
+    ), "on axis"  ## This throws a divide by zero error
+
+    B_magnitude_top_bottom = np.sqrt(
+        B_T_axis**2 + (B_p_a / (R_axis * minor_radius_a)) ** 2
+    )
+    assert np.isclose(
+        field.magnitude(R_axis, minor_radius_a), B_magnitude_top_bottom
+    ), "top"
+    assert np.isclose(
+        field.magnitude(R_axis, -minor_radius_a), B_magnitude_top_bottom
+    ), "bottom"
+
+    R_inboard = R_axis - minor_radius_a
+    B_magnitude_inboard = np.sqrt(
+        (R_axis * B_T_axis / R_inboard) ** 2
+        + (B_p_a / (R_inboard * minor_radius_a)) ** 2
+    )
+    assert np.isclose(field.magnitude(R_inboard, 0.0), B_magnitude_inboard), "inboard"
+
+    R_outboard = R_axis + minor_radius_a
+    B_magnitude_outboard = np.sqrt(
+        (R_axis * B_T_axis / R_outboard) ** 2
+        + (B_p_a / (R_outboard * minor_radius_a)) ** 2
+    )
+    assert np.isclose(
+        field.magnitude(R_outboard, 0.0), B_magnitude_outboard
+    ), "outboard"
+
+
+def test_circular_unit():
+    B_T_axis = 1.0
+    R_axis = 2.0
+    minor_radius_a = 1.0
+    B_p_a = 0.5
+    field = geometry.CircularCrossSectionField(
+        B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
+    )
+
+    ## Something around here throws a divide by zero error
+    unit_axis = field.unit(R_axis, 0)
+    assert np.linalg.norm(unit_axis) == 1.0, "on axis, magnitude"
+    assert np.allclose(unit_axis, [0, 1, 0]), "on axis, direction"
+
+    B_magnitude_top_bottom = np.sqrt(
+        B_T_axis**2 + (B_p_a / (R_axis * minor_radius_a)) ** 2
+    )
+    unit_top = field.unit(R_axis, minor_radius_a)
+    expected_unit_top = np.array([0.25, 1, 0]) / B_magnitude_top_bottom
+    assert np.linalg.norm(unit_top) == 1.0, "top, magnitude"
+    assert np.allclose(unit_top, expected_unit_top), "top, direction"
+    unit_bottom = field.unit(R_axis, -minor_radius_a)
+    expected_unit_bottom = np.array([-0.25, 1, 0]) / B_magnitude_top_bottom
+    assert np.linalg.norm(unit_bottom) == 1.0, "bottom, magnitude"
+    assert np.allclose(unit_bottom, expected_unit_bottom), "bottom, direction"
+
+    R_inboard = R_axis - minor_radius_a
+    B_magnitude_inboard = np.sqrt(
+        (R_axis * B_T_axis / R_inboard) ** 2
+        + (B_p_a / (R_inboard * minor_radius_a)) ** 2
+    )
+    unit_inboard = field.unit(R_inboard, 0)
+    expected_unit_inboard = np.array([0, 2, 0.5]) / B_magnitude_inboard
+    assert np.linalg.norm(unit_inboard) == 1.0, "inboard, magnitude"
+    assert np.allclose(unit_inboard, expected_unit_inboard), "inboard, direction"
+
+    R_outboard = R_axis + minor_radius_a
+    B_magnitude_outboard = np.sqrt(
+        (R_axis * B_T_axis / R_outboard) ** 2
+        + (B_p_a / (R_outboard * minor_radius_a)) ** 2
+    )
+    unit_outboard = field.unit(R_outboard, 0)
+    expected_unit_outboard = np.array([0, 2 / 3, -1 / 6]) / B_magnitude_outboard
+    assert np.linalg.norm(unit_outboard) == 1.0, "outboard, magnitude"
+    assert np.allclose(unit_outboard, expected_unit_outboard), "outboard, direction"
+
+
 def test_interpolated():
     B_T_axis = 1.0
     R_axis = 2.0
