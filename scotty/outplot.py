@@ -155,6 +155,7 @@ class outplot(object):
             for key in self.all_plots:
                 plot_func = PLOTS[key]
                 plot_func()
+                
 
         try:
             plot_func = PLOTS[option]
@@ -393,6 +394,7 @@ class outplot(object):
         plt.title(r"Im$(\Psi_{xx})$ and Im$(M_{xx})$")
         plt.xlabel(r"$l-l_c$")
 
+
         plt.subplot(2, 3, 5)
         plt.plot(self.l_lc, np.imag(self.Psi_xy_output), "k")
         plt.plot(self.l_lc, np.imag(self.M_xy_output), "r")
@@ -404,6 +406,7 @@ class outplot(object):
         plt.tight_layout(pad=0.4, w_pad=0.5, h_pad=1.0)
         plt.title(r"Im$(\Psi_{yy})$")
         plt.xlabel(r"$l-l_c$")
+
 
         # plt.gca().set_aspect("equal", adjustable="box")
         plt.savefig(self.output_path + "Option_7.jpg", dpi=200)
