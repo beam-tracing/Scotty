@@ -91,11 +91,6 @@ for freq_GHz in freqs_GHz:
                 "output_path"
             ] = "D:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 14\\"
 
-            if counter == 0:
-                kwargs_dict["verbose_output_flag"] = True
-            else:
-                kwargs_dict["verbose_output_flag"] = False
-
             beam_me_up(**kwargs_dict)
 
             counter = counter + 1

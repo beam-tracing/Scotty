@@ -14,7 +14,6 @@ split into a set of dictionaries (`DEFAULT_DIAGNOSTIC_PARAMETERS`,
 from __future__ import annotations
 import math
 import numpy as np
-from numpy.typing import ArrayLike
 import pathlib
 from typing import Callable, Dict, NamedTuple, Optional, Any
 import warnings

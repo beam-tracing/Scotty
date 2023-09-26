@@ -88,8 +88,6 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
     kwargs_dict["rtol"] = 1e-3
     kwargs_dict["atol"] = 1e-6
 
-    kwargs_dict["verbose_output_flag"] = True
-
     data_output = (
         kwargs_dict["output_path"]
         + "data_output"
