@@ -4,22 +4,13 @@
 
 """
 
-Plan
-~~~~
-
-Output everything to a file, and then do the analysis on that file.
-
-1) Check that gradK_xi and such are done correctly, check that K_mag is calculated correctly when K_zeta is nonzero
-2) Check that the calculation of Psi makes sense (and the rotation angle)
-3) Check that K initial's calculation makes sense
-
 
 Notes
 ~~~~~
 
-- The loading of the input files was taken from integral_5 and modified.
-- I should launch the beam inside the last closed flux surface
 - K**2 = K_R**2 + K_z**2 + (K_zeta/r_R)**2, and K_zeta is constant (mode number). See 14 Sep 2018 notes.
+- Start in vacuum, otherwise Psi_3D_beam_initial_cartersian does not get done properly
+- Launching from plasma is possible, but beam needs to be initialised differently
 
 Coordinates
 ~~~~~~~~~~~
@@ -36,6 +27,7 @@ Abbreviations
 - ``loc`` - localisation
 - ``cum_loc`` - cumulative_localisation
 - ``ne`` - equilibrium electron density
+- ``dt`` - datatree (stores data)
 
 Angles
 ~~~~~~
@@ -54,7 +46,6 @@ Units
 - electron cyclotron frequency positive
 - K normalised such that K = 1 in vacuum. (Not implemented yet)
 - Distance not normalised yet, should give it thought
-- Start in vacuum, otherwise Psi_3D_beam_initial_cartersian does not get done properly
 
 """
 
@@ -128,6 +119,7 @@ def beam_me_up(
     poloidal_flux_zero_density: float = 1.0,  ## When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
     poloidal_flux_zero_temperature: float = 1.0,  ## temperature analogue of poloidal_flux_zero_density
     # Finite-difference and solver parameters
+    auto_delta_sign=True, # For flipping signs to maintain forward difference. Applies to delta_R and delta_Z
     delta_R: float = -0.0001,  # in the same units as data_R_coord
     delta_Z: float = 0.0001,  # in the same units as data_Z_coord
     delta_K_R: float = 0.1,  # in the same units as K_R
@@ -159,9 +151,6 @@ def beam_me_up(
     B_p_a=None,
     R_axis=None,
     minor_radius_a=None,
-    # For flipping signs to maintain forward difference
-    auto_delta_sign_Z=1,
-    auto_delta_sign_R=1,
 ) -> datatree.DataTree:
     r"""Run the beam tracer
 
@@ -321,17 +310,10 @@ def beam_me_up(
     quick_run: bool
         If true, then run only the ray tracer and get an analytic
         estimate of the :math:`K` cut-off location
-    auto_delta_sign_Z:
-        A sign variable that takes on +1/-1. Ensures that forward
-        differebce is always in negative poloidal flux gradient
+    auto_delta_sign:
+        Boolean. Ensures that forward
+        difference is always in negative poloidal flux gradient
         direction (into the plasma).
-        Current implementation is flawed because the MagneticField
-        has to be constructed in order to determine the intersection
-        point and corresponding sign. Sign flip is thus subsequently
-        applied throughout the code except for the already constructed
-        field.
-    auto_delta_sign_R:
-        Similar to auto_delta_sign_Z but for the R coordinate
     """
 
     print("Beam trace me up, Scotty!")
@@ -423,45 +405,46 @@ def beam_me_up(
         B_p_a,
         shot,
         equil_time,
-        delta_R,
-        delta_Z,
+        abs(delta_R),
+        abs(delta_Z),
     )
 
-    # Flips the sign of delta_Z depending on the orientation of the poloidal flux surface at the point which the ray enters the plasma.
-    # This is to ensure a forward difference across the plasma boundary. We expect poloidal flux to decrease in the direction of the plasma.
+    if auto_delta_sign:
+        # Flips the sign of delta_Z depending on the orientation of the poloidal flux surface at the point which the ray enters the plasma.
+        # This is to ensure a forward difference across the plasma boundary. We expect poloidal flux to decrease in the direction of the plasma.
+    
+        entry_coords = find_entry_point(
+            launch_position,
+            np.deg2rad(poloidal_launch_angle_Torbeam),
+            np.deg2rad(toroidal_launch_angle_Torbeam),
+            poloidal_flux_enter,
+            field,
+        )
+        entry_R, entry_zeta, entry_Z = entry_coords
 
-    entry_coords = find_entry_point(
-        launch_position,
-        np.deg2rad(poloidal_launch_angle_Torbeam),
-        np.deg2rad(toroidal_launch_angle_Torbeam),
-        poloidal_flux_enter,
-        field,
-    )
-    entry_R, entry_zeta, entry_Z = entry_coords
+        d_poloidal_flux_dR = field.d_poloidal_flux_dR(
+            entry_R, entry_Z, delta_R)    
+        d_poloidal_flux_dZ = field.d_poloidal_flux_dZ(
+            entry_R, entry_Z, delta_Z)
+        # print("Gradients at entry point for Z: ", Z_gradient, ", R: ", R_gradient)
+    
+        if d_poloidal_flux_dZ > 0:
+            delta_Z = -1 * abs(delta_Z)
+        else:
+            delta_Z = abs(delta_Z)
+        if d_poloidal_flux_dR > 0:
+            delta_R = -1 * abs(delta_R)
+        else:
+            delta_R = abs(delta_R)
 
-    Z_gradient = (
-        field.poloidal_flux(entry_R, entry_Z + delta_Z)
-        - field.poloidal_flux(entry_R, entry_Z - delta_Z)
-    ) / abs(delta_Z)
-    R_gradient = (
-        field.poloidal_flux(entry_R + delta_R, entry_Z)
-        - field.poloidal_flux(entry_R - delta_R, entry_Z)
-    ) / abs(delta_R)
-    print("Gradients at entry point for Z: ", Z_gradient, ", R: ", R_gradient)
-
-    if Z_gradient > 0:
-        auto_delta_sign_Z = -1
-    if R_gradient > 0:
-        auto_delta_sign_R = -1
-
-    # Modify to take in an optional find_temp_1D argument
+    # Initialises H
     hamiltonian = Hamiltonian(
         field,
         launch_angular_frequency,
         mode_flag,
         find_density_1D,
-        auto_delta_sign_R * delta_R,
-        auto_delta_sign_Z * delta_Z,
+        delta_R,
+        delta_Z,
         delta_K_R,
         delta_K_zeta,
         delta_K_Z,
@@ -504,8 +487,8 @@ def beam_me_up(
             vacuum_propagation_flag=vacuum_propagation_flag,
             Psi_BC_flag=Psi_BC_flag,
             poloidal_flux_enter=poloidal_flux_enter,
-            delta_R=auto_delta_sign_R * delta_R,
-            delta_Z=auto_delta_sign_Z * delta_Z,
+            delta_R= delta_R,
+            delta_Z= delta_Z,
         )
     else:
         print("Beam launched from inside the plasma")
@@ -599,6 +582,7 @@ def beam_me_up(
 
     print("Main loop complete")
     # -------------------
+
 
     inputs = xr.Dataset(
         {
@@ -708,8 +692,8 @@ def beam_me_up(
         K_zeta_initial,
         launch_angular_frequency,
         mode_flag,
-        auto_delta_sign_R * delta_R,
-        auto_delta_sign_Z * delta_Z,
+        delta_R,
+        delta_Z,
         delta_K_R,
         delta_K_zeta,
         delta_K_Z,

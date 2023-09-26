@@ -1,3 +1,12 @@
+"""
+This file analyses solver_output (q, K, Psi_3D) from a beam tracing solver.
+
+To do:
+- Separate functions into those which analyse beam tracing only from those which are DBS specific. Maybe different files? (analysis_beam.py, analysis_DBS.py, analysis_highk.py)
+- Write docstrings for functions in this file
+- Change everything to Cartesian coordinates before passing into the functions in this file. Especially since within the scotty framework we expect to have both Cartesian and Cylindrical solvers
+"""
+
 from pathlib import Path
 from typing import Dict, Optional, Union
 
@@ -34,13 +43,13 @@ CARTESIAN_VECTOR_COMPONENTS = ["X", "Y", "Z"]
 
 
 def set_vector_components_long_name(df: Union[xr.Dataset, xr.DataArray]) -> None:
-    if "col" in df:
+    if "col" in df.coords:
         df.col.attrs["long_name"] = "Vector/matrix column component"
-    if "row" in df:
+    if "row" in df.coords:
         df.row.attrs["long_name"] = "Matrix row component"
-    if "col_cart" in df:
+    if "col_cart" in df.coords:
         df.col_cart.attrs["long_name"] = "Vector/matrix column component"
-    if "row_cart" in df:
+    if "row_cart" in df.coords:
         df.row_cart.attrs["long_name"] = "Matrix row component"
 
 
@@ -733,7 +742,7 @@ def mean_kperp(k_perp: xr.DataArray, array: xr.DataArray) -> xr.DataArray:
 
 def localisation_analysis(df: xr.Dataset, cutoff_index: int, wavenumber_K0: float):
     """
-    Now to do some more-complex analysis of the localisation.
+    Now to do some more-complex analysis of the localisation / instrumentation function / filter function.
     This part of the code fails in some situations, hence I'm making
     it possible to skip this section
     """
@@ -817,7 +826,7 @@ def localisation_analysis(df: xr.Dataset, cutoff_index: int, wavenumber_K0: floa
 
 
 def open_data_input_npz(filename: PathLike) -> xr.Dataset:
-    """Read a ``data_input.npz`` file created with a previous version of Scotty, returning an xarray dataset"""
+    """Read a ``data_input.npz`` file created with a previous version of Scotty, v2.4.3 or earlier, returning an xarray dataset"""
     with np.load(filename) as f:
         df = xr.Dataset(
             {
@@ -839,7 +848,7 @@ def open_data_input_npz(filename: PathLike) -> xr.Dataset:
 
 
 def open_data_output_npz(filename: PathLike) -> xr.Dataset:
-    """Read a ``data_output.npz`` file created with a previous version of Scotty, returning an xarray dataset"""
+    """Read a ``data_output.npz`` file created with a previous version of Scotty, v2.4.3 or earlier, returning an xarray dataset"""
 
     with np.load(filename, allow_pickle=True) as f:
         df = xr.Dataset(
@@ -902,7 +911,7 @@ def open_data_output_npz(filename: PathLike) -> xr.Dataset:
 
 
 def open_analysis_npz(outputs: xr.Dataset, filename: PathLike) -> xr.Dataset:
-    """Read a ``analysis_output.npz`` file created with a previous version of Scotty, returning an xarray dataset"""
+    """Read a ``analysis_output.npz`` file created with a previous version of Scotty, v2.4.3 or earlier, returning an xarray dataset"""
     with np.load(filename, allow_pickle=True) as f:
         df = xr.Dataset(
             {
@@ -972,8 +981,10 @@ def open_analysis_npz(outputs: xr.Dataset, filename: PathLike) -> xr.Dataset:
 def beam_width(
     g_hat: xr.DataArray, orthogonal_dir: FloatArray, Psi_3D: xr.DataArray
 ) -> xr.DataArray:
+
     W_vec = np.cross(g_hat, orthogonal_dir)
     W_vec_magnitude = np.linalg.norm(W_vec, axis=1)
+	
     # Unit vector
     W_uvec = W_vec / W_vec_magnitude[:, np.newaxis]
     width = np.sqrt(2 / dot(W_uvec, dot(Psi_3D, W_uvec)).imag)

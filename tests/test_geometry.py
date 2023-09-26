@@ -53,7 +53,7 @@ def test_circular_magnitude():
     field = geometry.CircularCrossSectionField(
         B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
     )
-    assert np.isclose(field.magnitude(R_axis, 0.0), B_T_axis), "on axis"
+    assert np.isclose(field.magnitude(R_axis, 0.0), B_T_axis), "on axis" ## This throws a divide by zero error
 
     B_magnitude_top_bottom = np.sqrt(
         B_T_axis**2 + (B_p_a / (R_axis * minor_radius_a)) ** 2
@@ -91,6 +91,7 @@ def test_circular_unit():
         B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
     )
 
+    ## Something around here throws a divide by zero error
     unit_axis = field.unit(R_axis, 0)
     assert np.linalg.norm(unit_axis) == 1.0, "on axis, magnitude"
     assert np.allclose(unit_axis, [0, 1, 0]), "on axis, direction"

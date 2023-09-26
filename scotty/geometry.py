@@ -24,7 +24,8 @@ class MagneticField(ABC):
     #: Sample locations for the vertical coordinate
     Z_coord: FloatArray
     #: Value of the poloidal magnetic flux, :math:`\psi`, on ``(R_coord, Z_coord)``
-    poloidalFlux_grid: FloatArray
+    poloidalFlux_grid: FloatArray 
+    ## TODO: Include B_R_grid, B_T_grid, and B_Z_grid
 
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         raise NotImplementedError
@@ -587,3 +588,5 @@ class EFITField(InterpolatedField):
                 interp_order=interp_order,
                 interp_smoothing=interp_smoothing,
             )
+
+

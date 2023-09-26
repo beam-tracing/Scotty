@@ -29,8 +29,8 @@ def maybe_make_3D_axis(ax: Optional[plt.Axes], *args, **kwargs) -> plt.Axes:
     return ax
 
 
-def plot_bounding_box(field: MagneticField, ax: Optional[plt.Axes] = None) -> plt.Axes:
-    """Plot the bounding box of the magnetic field1
+def plot_bounding_box(dt: DataTree, ax: Optional[plt.Axes] = None) -> plt.Axes:
+    """Plot the bounding box of the magnetic field
 
     Parameters
     ----------
@@ -49,10 +49,10 @@ def plot_bounding_box(field: MagneticField, ax: Optional[plt.Axes] = None) -> pl
 
     ax = maybe_make_axis(ax)
 
-    R_min = np.min(field.R_coord)
-    R_max = np.max(field.R_coord)
-    Z_min = np.min(field.Z_coord)
-    Z_max = np.max(field.Z_coord)
+    R_min = np.min(dt['inputs'].R.values)
+    R_max = np.max(dt['inputs'].R.values)
+    Z_min = np.min(dt['inputs'].Z.values)
+    Z_max = np.max(dt['inputs'].Z.values)
 
     ax.hlines([Z_min, Z_max], R_min, R_max, color="lightgrey", linestyle="dashed")
     ax.vlines([R_min, R_max], Z_min, Z_max, color="lightgrey", linestyle="dashed")
@@ -66,7 +66,7 @@ def plot_bounding_box(field: MagneticField, ax: Optional[plt.Axes] = None) -> pl
 def plot_bounding_box_3D(
     field: MagneticField, ax: Optional[plt.Axes] = None
 ) -> plt.Axes:
-    """Plot the bounding box of the magnetic field1
+    """Plot the bounding box of the magnetic field
 
     Parameters
     ----------
@@ -148,25 +148,25 @@ def plot_flux_surface(
 
 
 def plot_poloidal_crosssection(
-    field: MagneticField, ax: Optional[plt.Axes] = None, highlight_LCFS: bool = True
+    dt: DataTree, ax: Optional[plt.Axes] = None, highlight_LCFS: bool = True
 ) -> plt.Axes:
     ax = maybe_make_axis(ax)
 
-    plot_bounding_box(field, ax)
+    plot_bounding_box(dt, ax)
 
     cax = ax.contour(
-        field.R_coord,
-        field.Z_coord,
-        field.poloidalFlux_grid.T,
-        levels=np.linspace(0, 1, 10, endpoint=not highlight_LCFS),
+        dt['inputs'].R.values,
+        dt['inputs'].Z.values,
+        (dt['inputs'].poloidalFlux_grid.values).T,
+        levels=np.linspace(0, 1, 11, endpoint=not highlight_LCFS),
         cmap="plasma_r",
     )
     ax.clabel(cax, inline=True)
     if highlight_LCFS:
         ax.contour(
-            field.R_coord,
-            field.Z_coord,
-            field.poloidalFlux_grid.T,
+            dt['inputs'].R.values,
+            dt['inputs'].Z.values,
+            (dt['inputs'].poloidalFlux_grid.values).T,
             levels=[1.0],
             colors="darkgrey",
             linestyles="dashed",
@@ -264,18 +264,17 @@ def plot_dispersion_relation(
 
 def plot_poloidal_beam_path(
     dt: DataTree,
-    field: MagneticField,
     filename: Optional[PathLike] = None,
     ax: Optional[plt.Axes] = None,
+    zoom = False,
 ) -> plt.Axes:
-    """Plots the beam path on the R Z plane
-
-    .. todo:: Would be nice to not have to pass in ``field``
+    """
+    Plots the beam path on the R Z plane
     """
 
     ax = maybe_make_axis(ax)
 
-    plot_poloidal_crosssection(field, ax=ax, highlight_LCFS=False)
+    plot_poloidal_crosssection(dt, ax=ax, highlight_LCFS=False)
 
     launch_R = dt.inputs.launch_position.sel(col="R")
     launch_Z = dt.inputs.launch_position.sel(col="Z")
@@ -291,6 +290,19 @@ def plot_poloidal_beam_path(
     ax.plot(beam_plus.sel(col="R"), beam_plus.sel(col="Z"), "--k")
     ax.plot(beam_minus.sel(col="R"), beam_minus.sel(col="Z"), "--k", label="Beam width")
     ax.scatter(launch_R, launch_Z, c="red", marker=">", label="Launch position")
+
+    if zoom:
+        ## Write a wrapper function for this maybe
+        R_max = max(beam_plus.sel(col="R").max(),beam_minus.sel(col="R").max())
+        R_min = min(beam_plus.sel(col="R").min(),beam_minus.sel(col="R").min())
+        Z_max = max(beam_plus.sel(col="Z").max(),beam_minus.sel(col="Z").max())
+        Z_min = min(beam_plus.sel(col="Z").min(),beam_minus.sel(col="Z").min())   
+
+        buffer_R = 0.1*(R_max-R_min)
+        buffer_Z = 0.1*(Z_max-Z_min)
+
+        ax.set_xlim(R_min-buffer_R, R_max+buffer_R)
+        ax.set_ylim(Z_min-buffer_Z, Z_max+buffer_Z)
 
     ax.legend()
     ax.set_title("Beam path (poloidal plane)")
