@@ -457,7 +457,7 @@ class PitchDiagnostic:
         )
         return pitch_rho
 
-    def get_opt_tor_freq_spline(self, descriptor, order=5, smoothing=0):
+    def get_opt_tor_freq_spline(self, descriptor, order=5, smoothing=0, opt_tor_type="mismatch"):
         """Spline for optimal toroidal steering as a function of launch frequency.
         Args:
             descriptor (int): Descriptor of the Dataset to generate the spline for.
@@ -467,7 +467,7 @@ class PitchDiagnostic:
             UnivariateSpline
         """
         ds = self.ds_dict[descriptor]
-        opt_tor_freq = ds["opt_tor_profile"]
+        opt_tor_freq = ds[f"opt_tor_{opt_tor_type}_profile"]
         return UnivariateSpline(
             x=np.linspace(self.frequencies[0], self.frequencies[-1], 500),
             y=opt_tor_freq,
@@ -525,7 +525,9 @@ class PitchDiagnostic:
 
     ## Simulation methods
 
-    def get_cutoff_locations(self, SweepDataset):
+    def get_cutoff_locations(self, SweepDataset, opt_tor_type="mismatch"): 
+        # opt_tor_type is used as a class-wide toggle since many plots rely on the
+        # cutoff locations calculated; kind of a stop-gap solution
         """Reads the cutoff locations in R-Z coordinates from the SweepDataset.
         Only data corresponding to the poloidal steering, toroidal range and
         frequencies of the PitchDiagnostic is read and stored.
@@ -536,9 +538,10 @@ class PitchDiagnostic:
         descriptor = str(SweepDataset.descriptor)
         if descriptor in self.ds_dict:
             ds = self.ds_dict[descriptor]
+            '''
             if {"cutoff_R", "cutoff_Z"}.issubset(set(ds.keys())):
                 print(f"Cutoff positions already read for {descriptor}.")
-                return None
+                return None'''
         else:
             self.ds_dict[descriptor] = xr.Dataset()
 
@@ -558,7 +561,7 @@ class PitchDiagnostic:
             coords={"poloidal_angle": self.poloidal_angles[0]},
         )
 
-        opt_tor_freq_spline = self.get_opt_tor_freq_spline(descriptor)
+        opt_tor_freq_spline = self.get_opt_tor_freq_spline(descriptor, opt_tor_type=opt_tor_type)
 
         R_spline = lambda freq: cutoff_R_spline(
             (
@@ -585,7 +588,7 @@ class PitchDiagnostic:
             coords={"frequency": self.frequencies},
         )
 
-        return R_spline, Z_spline
+        return R_spline(self.frequencies), R_spline(self.frequencies)
 
     def get_interp_variables(self, SweepDataset):
         """Reads the variables opt_tor, delta_theta_m, K_magnitude from the SweepDataset.
@@ -598,41 +601,44 @@ class PitchDiagnostic:
         descriptor = str(SweepDataset.descriptor)
         if descriptor in self.ds_dict:
             ds = self.ds_dict[descriptor]
-            if {"opt_tor", "delta_theta_m", "K_magnitude"}.issubset(set(ds.keys())):
+            if {"opt_tor_mismatch", "opt_tor_loc_m", "opt_tor_loc_product", "delta_theta_m", "K_magnitude"}.issubset(set(ds.keys())):
                 print(f"Variables already interpolated from {descriptor}!")
                 return None
         else:
             self.ds_dict[descriptor] = xr.Dataset()
 
-        opt_tor_spline = SweepDataset.create_2Dspline(
-            variable="opt_tor",
-            xdimension="frequency",
-            ydimension="poloidal_angle",
-            method="pchip",
-        )
-        x, y = self.frequencies, self.poloidal_angles
-        x_grid, y_grid = np.meshgrid(x, y, indexing="ij")
-        opt_tor_array = opt_tor_spline((x_grid, y_grid))
-        opt_tor_da = xr.DataArray(
-            data=opt_tor_array,
-            dims=("frequency", "poloidal_angle"),
-            coords={
-                "frequency": x,
-                "poloidal_angle": y,
-            },
-        )
-        self.ds_dict[descriptor]["opt_tor"] = opt_tor_da
-        freq_range = np.linspace(self.frequencies[0], self.frequencies[-1], 500)
-        X1, Y1 = np.meshgrid(freq_range, self.poloidal_angles, indexing="ij")
-        opt_tor_profile = opt_tor_spline((X1, Y1))
-        self.ds_dict[descriptor]["opt_tor_profile"] = xr.DataArray(
-            data=opt_tor_profile,
-            dims=("freq_range", "poloidal_angle"),
-            coords={
-                "freq_range": freq_range,
-                "poloidal_angle": self.poloidal_angles,
-            },
-        )
+        for key in ["mismatch", "loc_m", "loc_product"]:
+            
+            opt_tor_spline = SweepDataset.create_2Dspline(
+                variable=f"opt_tor_{key}",
+                xdimension="frequency",
+                ydimension="poloidal_angle",
+                method="pchip",
+            )
+            print(key)
+            x, y = self.frequencies, self.poloidal_angles
+            x_grid, y_grid = np.meshgrid(x, y, indexing="ij")
+            opt_tor_array = opt_tor_spline((x_grid, y_grid))
+            opt_tor_da = xr.DataArray(
+                data=opt_tor_array,
+                dims=("frequency", "poloidal_angle"),
+                coords={
+                    "frequency": x,
+                    "poloidal_angle": y,
+                },
+            )
+            self.ds_dict[descriptor][f"opt_tor_{key}"] = opt_tor_da
+            freq_range = np.linspace(self.frequencies[0], self.frequencies[-1], 500)
+            X1, Y1 = np.meshgrid(freq_range, self.poloidal_angles, indexing="ij")
+            opt_tor_profile = opt_tor_spline((X1, Y1))
+            self.ds_dict[descriptor][f"opt_tor_{key}_profile"] = xr.DataArray(
+                data=opt_tor_profile,
+                dims=("freq_range", "poloidal_angle"),
+                coords={
+                    "freq_range": freq_range,
+                    "poloidal_angle": self.poloidal_angles,
+                },
+            )
 
         delta_m_spline = SweepDataset.create_3Dspline(
             variable="cutoff_delta_theta_m",
@@ -959,7 +965,7 @@ class PitchDiagnostic:
                 continue
 
             mismatch = self.ds_dict[desc]["simulated_mismatch"]
-            mismatch_results = self._fit_gaussians(mismatch, desc)
+            mismatch_results = self._fit_gaussians(mismatch, desc, opt_tor_type='mismatch')
             self.ds_dict[desc]["mismatch_gaussian_coeffs"] = mismatch_results[
                 "curvefit_coefficients"
             ]
@@ -968,7 +974,7 @@ class PitchDiagnostic:
             ]
 
             loc_m = self.ds_dict[desc]["simulated_loc_m"]
-            loc_m_results = self._fit_gaussians(loc_m, desc)
+            loc_m_results = self._fit_gaussians(loc_m, desc, opt_tor_type='loc_m')
             self.ds_dict[desc]["loc_m_gaussian_coeffs"] = loc_m_results[
                 "curvefit_coefficients"
             ]
@@ -977,7 +983,7 @@ class PitchDiagnostic:
             ]
 
             loc_product = self.ds_dict[desc]["simulated_loc_product"]
-            loc_product_results = self._fit_gaussians(loc_product, desc)
+            loc_product_results = self._fit_gaussians(loc_product, desc, opt_tor_type='loc_product')
             self.ds_dict[desc]["loc_product_gaussian_coeffs"] = loc_product_results[
                 "curvefit_coefficients"
             ]
@@ -985,11 +991,11 @@ class PitchDiagnostic:
                 "curvefit_covariance"
             ]
 
-    def _fit_gaussians(self, data, descriptor):
+    def _fit_gaussians(self, data, descriptor, opt_tor_type = 'mismatch'):
         curvefit_results = data.curvefit(
             coords="toroidal_angle",
             func=fit_gaussian,
-            p0={"opt_tor": -2},
+            p0={"opt_tor_{opt_tor_type}": -2},
             skipna=True,
             errors="ignore",
         )
@@ -998,7 +1004,7 @@ class PitchDiagnostic:
         ] = "PitchDiagnostic.fit_gaussians"
         curvefit_results["curvefit_coefficients"].attrs["descriptor"] = descriptor
         curvefit_results["curvefit_coefficients"].attrs["fit_parameters"] = (
-            "opt_tor",
+            f"opt_tor_{opt_tor_type}",
             "width",
             "amplitude",
         )
@@ -1032,7 +1038,7 @@ class PitchDiagnostic:
                     param=1
                 )
 
-    def get_pitch_relation_across_equilibria(self):
+    def get_pitch_relation_across_equilibria(self, opt_tor_type='mismatch'):
         for descriptor in self.descriptors:
             if "current_scaling" not in self.ds_dict[descriptor].attrs.keys():
                 raise KeyError(
@@ -1041,7 +1047,7 @@ class PitchDiagnostic:
 
         das = [self.ds_dict[descriptor] for descriptor in self.descriptors]
         das.sort(key=lambda da: da.attrs["current_scaling"])
-        opt_tor_das = [da["opt_tor"] for da in das]
+        opt_tor_das = [da[f"opt_tor_{opt_tor_type}"] for da in das]
         current_scalings = np.array([da.attrs["current_scaling"] for da in das])
 
         rho_array = np.linspace(0, 1, 100)
@@ -1096,7 +1102,8 @@ class PitchDiagnostic:
         self.fit_measurement_gaussians()
         self.aggregate_fitted_gaussians()
         try:
-            self.get_pitch_relation_across_equilibria()
+            for key in ["mismatch", "loc_m", "loc_product"]:
+                self.get_pitch_relation_across_equilibria(opt_tor_type=key)
             self.linregress_pitch_rho()
         except Exception:
             print(
@@ -1209,7 +1216,7 @@ class PitchDiagnostic:
         delta = self.ds_dict[descriptor][f"{sim_type}_mean_width"].loc[
             {"poloidal_angle": self.poloidal_angles[0]}
         ]
-        actual = self.ds_dict[descriptor]["opt_tor"].loc[
+        actual = self.ds_dict[descriptor][f"opt_tor_{sim_type}"].loc[
             {"poloidal_angle": self.poloidal_angles[0]}
         ]
 
@@ -1306,10 +1313,13 @@ class PitchDiagnostic:
         Returns:
             fig, axes
         """
+        data = self.ds_dict[descriptor][f"{sim_type}_profile"]
+        toroidal_range = data.coords["toroidal_range"].values
+
         mean = self.ds_dict[descriptor][f"{sim_type}_mean_opt_tor"].loc[
             {"poloidal_angle": self.poloidal_angles[0]}
         ]
-        actual = self.ds_dict[descriptor]["opt_tor"].loc[
+        actual = self.ds_dict[descriptor][f"opt_tor_{sim_type}"].loc[
             {"poloidal_angle": self.poloidal_angles[0]}
         ]
 
@@ -1354,6 +1364,7 @@ class PitchDiagnostic:
             )
             ax.set_title(f"{frequency} GHz", fontsize=8)
             ax.tick_params(axis="both", which="major", labelsize=5)
+            ax.set_xlim(toroidal_range[0], toroidal_range[-1])
 
             # ax.legend()
             counter += 1
@@ -1379,7 +1390,7 @@ class PitchDiagnostic:
 
         return fig, axes
 
-    def plot_variable_vs_tor(self, variable, descriptor):
+    def plot_variable_vs_tor(self, variable, descriptor, opt_tor_type='mismatch'):
         """Plot how a variable changes over the toroidal steering range, normalized
         to the value at opt_tor.
 
@@ -1391,7 +1402,7 @@ class PitchDiagnostic:
             fig, axes
         """
         data = self.ds_dict[descriptor][variable]
-        actual = self.ds_dict[descriptor]["opt_tor"].loc[
+        actual = self.ds_dict[descriptor][f"opt_tor_{opt_tor_type}"].loc[
             {"poloidal_angle": self.poloidal_angles[0]}
         ]
 
@@ -1434,7 +1445,7 @@ class PitchDiagnostic:
                 / opt_tor_val,
                 label=f"{variable}",
             )
-            ax.axvline(opt_tor, label="opt_tor", color="k")
+            ax.axvline(opt_tor, label=f"opt_tor_{opt_tor_type}", color="k")
             ax.set_title(f"{frequency} GHz", fontsize=8)
             ax.tick_params(axis="both", which="major", labelsize=5)
 
@@ -1485,7 +1496,7 @@ class PitchDiagnostic:
             std = self.ds_dict[descriptor][f"{sim_type}_std_opt_tor"].loc[
                 {"poloidal_angle": self.poloidal_angles[0]}
             ]
-            actual = self.ds_dict[descriptor]["opt_tor"].loc[
+            actual = self.ds_dict[descriptor][f"opt_tor_{sim_type}"].loc[
                 {"poloidal_angle": self.poloidal_angles[0]}
             ]
             x_coords = self.frequencies
@@ -1544,7 +1555,7 @@ class PitchDiagnostic:
             width = self.ds_dict[descriptor][f"{sim_type}_mean_width"].loc[
                 {"poloidal_angle": self.poloidal_angles[0]}
             ]
-            actual = self.ds_dict[descriptor]["opt_tor"].loc[
+            actual = self.ds_dict[descriptor][f"opt_tor_{sim_type}"].loc[
                 {"poloidal_angle": self.poloidal_angles[0]}
             ]
             x_coords = self.frequencies
@@ -1603,7 +1614,7 @@ class PitchDiagnostic:
         std = self.ds_dict[descriptor][f"{sim_type}_std_opt_tor"].loc[
             {"poloidal_angle": self.poloidal_angles[0]}
         ]
-        actual = self.ds_dict[descriptor]["opt_tor"].loc[
+        actual = self.ds_dict[descriptor][f"opt_tor_{sim_type}"].loc[
             {"poloidal_angle": self.poloidal_angles[0]}
         ]
         x_coords = self.frequencies

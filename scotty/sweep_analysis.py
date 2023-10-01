@@ -19,8 +19,9 @@ from scipy.interpolate import (
     splrep,
     sproot,
     PPoly,
+    Akima1DInterpolator,
 )
-from scipy.optimize import newton, root_scalar
+from scipy.optimize import newton, root_scalar, minimize_scalar, basinhopping
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from scotty.fun_general import find_q_lab_Cartesian
@@ -552,6 +553,89 @@ class SweepDataset:
         return self.dataset[["cutoff_theta_m", "cutoff_delta_theta_m"]]
 
     def generate_opt_tor(self):
+        self.generate_mismatch_opt_tor()
+        self.generate_loc_opt_tor()
+        for key in ["opt_tor_mismatch", "opt_tor_loc_m", "opt_tor_loc_product"]:
+            index_list = self.check_float_arrays(variable=key, method='nearest')
+            print(f"{key} checked. Remaining indices:" + str(index_list))
+
+    def generate_loc_opt_tor(self):
+
+        for key in ["loc_m", "loc_product"]:
+
+            if f"opt_tor_{key}" in self.variables:
+                print(f"opt_tor_{key} already generated.")
+                continue
+
+            frequencies = self.get_coordinate_array("frequency")
+            poloidal_angles = self.get_coordinate_array("poloidal_angle")
+            toroidal_angles = self.get_coordinate_array("toroidal_angle")
+
+            opt_tor_array = xr.DataArray(
+            coords=[
+                ("frequency", frequencies),
+                ("poloidal_angle", poloidal_angles),
+                ]
+            )
+            for frequency in frequencies:
+                for poloidal_angle in poloidal_angles:
+                    coords = {
+                        "frequency": frequency,
+                        "poloidal_angle": poloidal_angle,
+                    }
+                    spline = self.create_1Dspline(
+                        variable=f"int_{key}",
+                        dimension="toroidal_angle",
+                        coords=coords,
+                        method='akima',
+                    )
+                    #derivative = spline.derivative()
+
+                    try:
+                        optimize_results = minimize_scalar(
+                            fun = lambda x: -spline(x),
+                            #x0=0,
+                            bounds=(toroidal_angles[0], toroidal_angles[-1]),
+                            method='bounded'
+                        )
+
+                        if optimize_results.success:
+                            opt_tor_array.loc[coords] = np.squeeze(optimize_results.x)
+                        else:
+                            print(
+                            f"No opt_tor found for Freq={frequency} GHz, Pol={poloidal_angle} deg"
+                            )
+                            opt_tor_array.loc[coords] = np.nan
+
+                        array = np.linspace(-10, 10, 50)
+                        plt.plot(array, spline(array))
+
+                    except Exception as error:
+                        print(
+                            f"No zero found for Freq={frequency} GHz, Pol={poloidal_angle} deg: ",
+                            error,
+                        )
+                        continue
+
+            no_opt_tor_mask = opt_tor_array.isnull()
+            self.dataset[f"opt_tor_{key}"] = opt_tor_array
+
+            def vfunc(arg):
+                func = lambda x: find_nearest(toroidal_angles, x)
+                return xr.apply_ufunc(func, arg, vectorize=True)
+
+            closest_tor_array = vfunc(opt_tor_array)
+            reflection_mask = self.generate_reflection_mask().transpose(
+                "frequency", "poloidal_angle", "toroidal_angle"
+            )
+            reflected_opt_tor_mask = reflection_mask.isel(toroidal_angle=closest_tor_array)
+            #self.dataset["nearest_opt_tor_index"] = closest_tor_array
+            self.dataset[f"opt_tor_{key}_mask"] = np.logical_and(
+                no_opt_tor_mask, reflected_opt_tor_mask
+            )
+
+
+    def generate_mismatch_opt_tor(self):
         """Uses scipy.optimize.newton on an interpolated spline to find
         the optimum toroidal steering with varying frequency and poloidal
         steering and saves it with the key 'opt_tor'.
@@ -559,9 +643,8 @@ class SweepDataset:
         Returns:
             DataArray: A 2-D DataArray of optimal toroidal steering angles (in degrees)
         """
-        if "opt_tor" in self.variables:
-            print("opt-tor already generated.")
-            return self.dataset["opt_tor"]
+        if "opt_tor_mismatch" in self.variables:
+            print("opt_tor_mismatch already generated.")
 
         if "cutoff_theta_m" not in self.variables:
             print(
@@ -620,7 +703,7 @@ class SweepDataset:
                     continue
 
         no_opt_tor_mask = opt_tor_array.isnull()
-        self.dataset["opt_tor"] = opt_tor_array
+        self.dataset["opt_tor_mismatch"] = opt_tor_array
 
         def vfunc(arg):
             func = lambda x: find_nearest(toroidal_angles, x)
@@ -631,8 +714,8 @@ class SweepDataset:
             "frequency", "poloidal_angle", "toroidal_angle"
         )
         reflected_opt_tor_mask = reflection_mask.isel(toroidal_angle=closest_tor_array)
-        self.dataset["nearest_opt_tor_index"] = closest_tor_array
-        self.dataset["opt_tor_mask"] = np.logical_and(
+        #self.dataset["nearest_opt_tor_index"] = closest_tor_array
+        self.dataset["opt_tor_mismatch_mask"] = np.logical_and(
             no_opt_tor_mask, reflected_opt_tor_mask
         )
 
@@ -788,11 +871,12 @@ class SweepDataset:
         self.generate_mismatch_at_cutoff()
         for variable in ("K_magnitude_array", "q_R_array", "q_Z_array"):
             self.generate_variable_at_cutoff(variable)
+        self.integrate_loc_m()
+        self.integrate_loc_product()
         self.generate_opt_tor()
         self.generate_reflection_mask()
         self.generate_mismatch_gaussian()
-        self.integrate_loc_m()
-        self.integrate_loc_product()
+        
         return self.variables
 
     def generate_pitch_at_cutoff(self):
@@ -870,7 +954,7 @@ class SweepDataset:
 
     ## auxillary methods
 
-    def create_1Dspline(self, variable, dimension, coords={}):
+    def create_1Dspline(self, variable, dimension, coords={}, order=3, method='polynomial'):
         """Memoized function that interpolates splines for any variable along
         a single arbitrary axis with scipy.interpolate.UnivariateSpline.
 
@@ -895,7 +979,10 @@ class SweepDataset:
             x_coordinates = self.get_coordinate_array(dimension)
             y_data = data.loc[coords]
             y_values = y_data.values
-            spline = UnivariateSpline(x=x_coordinates, y=y_values, s=0)
+            if method == 'polynomial':
+                spline = UnivariateSpline(x=x_coordinates, y=y_values, s=0, k=order)
+            elif method == 'akima':
+                spline = Akima1DInterpolator(x=x_coordinates, y=y_values)
             self.spline_memo[args] = spline
             return spline
 
@@ -1048,7 +1135,7 @@ class SweepDataset:
             )
         return xr.where(cutoff_indices < 0, 1, 0)
 
-    def check_float_arrays(self, variable):
+    def check_float_arrays(self, variable, method="linear"):
         """Checks for and interpolates any null array values."""
         new_array = self.dataset[variable]
         print(f"Checking {variable}...")
@@ -1062,7 +1149,7 @@ class SweepDataset:
             try:
                 new_array = new_array.interpolate_na(
                     dim=dimension,
-                    method="linear",
+                    method=method,
                 )
             except Exception:
                 print(
@@ -1071,13 +1158,19 @@ class SweepDataset:
                 continue
 
         index_list = np.argwhere(new_array.isnull().values)
-        self.dataset[variable] = new_array
-
+        
         if len(index_list):
             print(
-                f"Failed to resolve problematic {variable} values. Consider masking the affected regions. Failed indices: {index_list}"
+                f"Failed to resolve problematic {variable} values. Failed indices: {index_list}. Starting ND interpolation.."
             )
+
+            valid_indices = np.logical_not(np.isnan(new_array.values))
+
             return index_list
+
+        else:
+            self.dataset[variable] = new_array
+
 
     def check_all_float_arrays(self):
         """Calls check_float_arrays for all relevant variables."""
@@ -1470,7 +1563,7 @@ class SweepDataset:
         fig.suptitle(f"Cutoff positions, tor={toroidal_angle}$^\circ$", fontsize=15)
         return fig, ax
 
-    def plot_opt_tor_contour(self):
+    def plot_opt_tor_contour(self, opt_tor_type = "mismatch"):
         """
         Plots contours of the optimal toroidal steering angle in the frequency-poloidal angle
         parameter space.
@@ -1484,14 +1577,14 @@ class SweepDataset:
         y = np.linspace(pol[0], pol[-1], 500)
         X, Y = np.meshgrid(x, y, indexing="ij")
         spline = self.create_2Dspline(
-            variable="opt_tor",
+            variable=f"opt_tor_{opt_tor_type}",
             xdimension="frequency",
             ydimension="poloidal_angle",
         )
         data = spline((X, Y))
         mask_func = RegularGridInterpolator(
             points=(freq, pol),
-            values=self.dataset["opt_tor_mask"]
+            values=self.dataset[f"opt_tor_{opt_tor_type}_mask"]
             .transpose("frequency", "poloidal_angle")
             .values,
             method="nearest",
@@ -1605,7 +1698,7 @@ class MultiSweeps:
         """
         return list(self.datasets.keys())
 
-    def plot_opt_tors(self, poloidal_angles=None):
+    def plot_opt_tors(self, poloidal_angles=None, opt_tor_type="mismatch"):
         """Plots the optimal toroidal steering vs. frequency for a set of poloidal angles,
         for all of the SweepDatasets loaded onto this MultiSweep instance.
 
@@ -1640,7 +1733,7 @@ class MultiSweeps:
                     descriptor_list.append(dataset.descriptor)
                 marker = markers[counter2]
                 opt_tor_spline = dataset.create_1Dspline(
-                    variable="opt_tor",
+                    variable=f"opt_tor_{opt_tor_type}",
                     dimension="frequency",
                     coords={"poloidal_angle": poloidal_angle},
                 )
