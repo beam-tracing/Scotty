@@ -82,6 +82,12 @@ from scotty.geometry import (
     CurvySlabField,
     EFITField,
 )
+
+from scotty.cart_geometry import (
+    CartMagneticField,
+    CartSlabField
+)
+
 from scotty.hamiltonian import Hamiltonian
 from scotty.launch import launch_beam, find_entry_point
 from scotty.torbeam import Torbeam
@@ -151,6 +157,7 @@ def beam_me_up(
     B_p_a=None,
     R_axis=None,
     minor_radius_a=None,
+    flag_coordinate_system="cylindrical",
 ) -> datatree.DataTree:
     r"""Run the beam tracer
 
@@ -407,21 +414,36 @@ def beam_me_up(
         equil_time,
         abs(delta_R),
         abs(delta_Z),
+        flag_coordinate_system,
     )
 
     if auto_delta_sign:
         # Flips the sign of delta_Z depending on the orientation of the poloidal flux surface at the point which the ray enters the plasma.
         # This is to ensure a forward difference across the plasma boundary. We expect poloidal flux to decrease in the direction of the plasma.
-
-        entry_coords = find_entry_point(
-            launch_position,
-            np.deg2rad(poloidal_launch_angle_Torbeam),
-            np.deg2rad(toroidal_launch_angle_Torbeam),
-            poloidal_flux_enter,
-            field,
-        )
-        entry_R, entry_zeta, entry_Z = entry_coords
-
+        ###new
+        if vacuum_propagation_flag:
+            entry_coords = find_entry_point(
+                launch_position,
+                np.deg2rad(poloidal_launch_angle_Torbeam),
+                np.deg2rad(toroidal_launch_angle_Torbeam),
+                poloidal_flux_enter,
+                field,
+            )
+            entry_R, entry_zeta, entry_Z = entry_coords
+        else:
+            entry_R, entry_zeta, entry_Z = launch_position
+            
+        """ original
+                entry_coords = find_entry_point(
+                    launch_position,
+                    np.deg2rad(poloidal_launch_angle_Torbeam),
+                    np.deg2rad(toroidal_launch_angle_Torbeam),
+                    poloidal_flux_enter,
+                    field,
+                )
+                entry_R, entry_zeta, entry_Z = entry_coords
+        """
+        
         d_poloidal_flux_dR = field.d_poloidal_flux_dR(entry_R, entry_Z, delta_R)
         d_poloidal_flux_dZ = field.d_poloidal_flux_dZ(entry_R, entry_Z, delta_Z)
         # print("Gradients at entry point for Z: ", Z_gradient, ", R: ", R_gradient)
@@ -813,6 +835,7 @@ def create_magnetic_geometry(
     equil_time: Optional[float] = None,
     delta_R: Optional[float] = None,
     delta_Z: Optional[float] = None,
+    flag_coordinate_system = "cylindrical",
     **kwargs,
 ) -> MagneticField:
     """Create an object representing the magnetic field geometry"""
@@ -824,6 +847,16 @@ def create_magnetic_geometry(
         return f"Missing '{argument}' for find_B_method='{find_B_method}'"
 
     # Analytical geometries
+    
+    ###
+    if flag_coordinate_system == "cartesian" and type(find_B_method) == str:
+        find_B_method = "cart_" + find_B_method 
+
+    if find_B_method == "cart_analytical":
+        print("Cartesian Slab Field")
+        return CartSlabField(1)
+    ###
+    
 
     if find_B_method == "analytical":
         print("Analytical constant current density geometry")
