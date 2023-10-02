@@ -627,6 +627,10 @@ def beam_me_up(
             "poloidalFlux_grid": (["R", "Z"], field.poloidalFlux_grid),
             "poloidal_flux_enter": poloidal_flux_enter,
             "poloidal_launch_angle_Torbeam": poloidal_launch_angle_Torbeam,
+            "Psi_3D_lab_initial": (
+                ["row", "col"],
+                Psi_3D_lab_initial,
+            ),
             "quick_run": quick_run,
             "rtol": rtol,
             "shot": shot,

@@ -51,6 +51,8 @@ def dot(arg_a: FloatArray, arg_b: FloatArray) -> FloatArray:
     Covers the case that matmul and dot don't do very elegantly, and
     avoids having to use a for loop to iterate over the array slices.
 
+    Replaces the deprecated contract_special.
+
     Parameters
     ----------
     arg_a, arg_b:

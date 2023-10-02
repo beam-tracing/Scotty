@@ -373,3 +373,30 @@ def plot_toroidal_beam_path(
         plt.savefig(f"{filename}.png")
 
     return ax
+
+
+def plot_widths(
+    dt: DataTree, filename: Optional[PathLike] = None, ax: Optional[plt.Axes] = None
+) -> plt.Axes:
+    ax = maybe_make_axis(ax)
+
+    Psi_w_imag = np.array(
+        np.imag(
+            [
+                [dt["analysis"].Psi_xx.values, dt["analysis"].Psi_xy.values],
+                [dt["analysis"].Psi_xy.values, dt["analysis"].Psi_yy.values],
+            ]
+        )
+    )
+
+    eigvals_imag = np.linalg.eigvalsh(np.moveaxis(Psi_w_imag, -1, 0))
+    widths = np.sqrt(2 / eigvals_imag)
+
+    ax.plot(dt["analysis"].distance_along_line.values, widths)
+    ax.set_ylabel("widths / m")
+    ax.set_xlabel("l / m")
+
+    if filename:
+        plt.savefig(f"{filename}.png")
+
+    return ax

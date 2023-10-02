@@ -292,7 +292,7 @@ def further_analysis(
     def to_Cartesian(array):
         cart = np.empty([len(df.tau), 3])
         cart[:, 0] = array[:, 0] * cos_q_zeta - array[:, 1] * sin_q_zeta
-        cart[:, 1] = array[:, 0] * cos_q_zeta + array[:, 1] * sin_q_zeta
+        cart[:, 1] = array[:, 0] * sin_q_zeta + array[:, 1] * cos_q_zeta
         cart[:, 2] = array[:, 2]
         return cart
 
