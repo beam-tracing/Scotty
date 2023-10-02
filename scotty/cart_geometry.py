@@ -16,7 +16,6 @@ from scotty.fun_general import find_nearest
 from scotty.typing import ArrayLike, FloatArray
 
 
-
 class CartMagneticField(ABC):
     """Abstract base class for magnetic field geometries"""
 
@@ -38,37 +37,39 @@ class CartMagneticField(ABC):
     def B_Z(self, q_X: ArrayLike, q_Y: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         raise NotImplementedError
 
-    def poloidal_flux(self, q_X: ArrayLike, q_Y: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+    def poloidal_flux(
+        self, q_X: ArrayLike, q_Y: ArrayLike, q_Z: ArrayLike
+    ) -> FloatArray:
         raise NotImplementedError
 
     def d_poloidal_flux_dX(
         self, q_X: ArrayLike, q_Y: ArrayLike, q_Z: ArrayLike, delta_X: float
     ) -> FloatArray:
         return derivative(
-            self.poloidal_flux, 
-            "q_X", 
-            {"q_X": q_X, "q_Y": q_Y, "q_Z": q_Z}, 
-            {"q_X": delta_X}
+            self.poloidal_flux,
+            "q_X",
+            {"q_X": q_X, "q_Y": q_Y, "q_Z": q_Z},
+            {"q_X": delta_X},
         )
-        
+
     def d_poloidal_flux_dY(
         self, q_X: ArrayLike, q_Y: ArrayLike, q_Z: ArrayLike, delta_Y: float
     ) -> FloatArray:
         return derivative(
-            self.poloidal_flux, 
-            "q_Y", 
-            {"q_X": q_X, "q_Y": q_Y, "q_Z": q_Z}, 
-            {"q_Y": delta_Y}
+            self.poloidal_flux,
+            "q_Y",
+            {"q_X": q_X, "q_Y": q_Y, "q_Z": q_Z},
+            {"q_Y": delta_Y},
         )
 
     def d_poloidal_flux_dZ(
         self, q_X: ArrayLike, q_Y: ArrayLike, q_Z: ArrayLike, delta_Z: float
     ) -> FloatArray:
         return derivative(
-            self.poloidal_flux, 
+            self.poloidal_flux,
             "q_Z",
-            {"q_X": q_X, "q_Y": q_Y, "q_Z": q_Z}, 
-            {"q_Z": delta_Z}
+            {"q_X": q_X, "q_Y": q_Y, "q_Z": q_Z},
+            {"q_Z": delta_Z},
         )
 
     def d2_poloidal_flux_dX2(
@@ -102,7 +103,12 @@ class CartMagneticField(ABC):
         )
 
     def d2_poloidal_flux_dYdZ(
-        self, q_X: ArrayLike, q_Y: ArrayLike, q_Z: ArrayLike, delta_Y: float, delta_Z: float
+        self,
+        q_X: ArrayLike,
+        q_Y: ArrayLike,
+        q_Z: ArrayLike,
+        delta_Y: float,
+        delta_Z: float,
     ) -> FloatArray:
         return derivative(
             self.poloidal_flux,
@@ -110,9 +116,14 @@ class CartMagneticField(ABC):
             {"q_X": q_X, "q_Y": q_Y, "q_Z": q_Z},
             {"q_Y": delta_Y, "q_Z": delta_Z},
         )
-        
+
     def d2_poloidal_flux_dXdZ(
-        self, q_X: ArrayLike, q_Y: ArrayLike, q_Z: ArrayLike, delta_X: float, delta_Z: float
+        self,
+        q_X: ArrayLike,
+        q_Y: ArrayLike,
+        q_Z: ArrayLike,
+        delta_X: float,
+        delta_Z: float,
     ) -> FloatArray:
         return derivative(
             self.poloidal_flux,
@@ -120,8 +131,14 @@ class CartMagneticField(ABC):
             {"q_X": q_X, "q_Y": q_Y, "q_Z": q_Z},
             {"q_X": delta_X, "q_Z": delta_Z},
         )
+
     def d2_poloidal_flux_dXdY(
-        self, q_X: ArrayLike, q_Y: ArrayLike, q_Z: ArrayLike, delta_X: float, delta_Y: float
+        self,
+        q_X: ArrayLike,
+        q_Y: ArrayLike,
+        q_Z: ArrayLike,
+        delta_X: float,
+        delta_Y: float,
     ) -> FloatArray:
         return derivative(
             self.poloidal_flux,
@@ -130,16 +147,18 @@ class CartMagneticField(ABC):
             {"q_X": delta_X, "q_Y": delta_Y},
         )
 
+
 class CartSlabField(CartMagneticField):
     """Cartesian slab geometry"""
-# change the Y to be the B field 
+
+    # change the Y to be the B field
     def __init__(self, B_Y_0: float):
         pass
         # self.minor_radius_a = minor_radius_a
         # self.B_T_axis = B_T_axis
         # self.R_axis = R_axis
         # R_coord = None
-        B_Y_0 = 1.0 # in teslas
+        B_Y_0 = 1.0  # in teslas
 
     def B_X(self, q_X: ArrayLike, q_Y: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         q_X, q_Y, q_Z = np.asfarray(q_X), np.asfarray(q_Y), np.asfarray(q_Z)
@@ -149,11 +168,13 @@ class CartSlabField(CartMagneticField):
         q_X, q_Y, q_Z = np.asfarray(q_X), np.asfarray(q_Y), np.asfarray(q_Z)
         return np.ones_like(q_Y) * B_Y_0
         # B_Y is constant
-        
+
     def B_Z(self, q_X: ArrayLike, q_Y: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         q_X, q_Y, q_Z = np.asfarray(q_X), np.asfarray(q_Y), np.asfarray(q_Z)
         return np.zeros_like(q_Z)
-        
-    def poloidal_flux(self, q_X: ArrayLike, q_Y: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        return 1/minor_radius_a
-        # linear in x 
+
+    def poloidal_flux(
+        self, q_X: ArrayLike, q_Y: ArrayLike, q_Z: ArrayLike
+    ) -> FloatArray:
+        return 1 / minor_radius_a
+        # linear in x
