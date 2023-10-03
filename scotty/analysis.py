@@ -167,7 +167,7 @@ def immediate_analysis(
     # -------------------
     check_output(H)
     ##
-    
+
     df = xr.Dataset(
         {
             "B_R": (["tau"], B_R),
@@ -201,7 +201,7 @@ def immediate_analysis(
             "g_magnitude": g_magnitude,
             "grad_bhat": (["tau", "row", "col"], grad_bhat),
             "H": (["tau"], H),
-            "H_other": (["tau"], H_other),              
+            "H_other": (["tau"], H_other),
             "normalised_plasma_freqs": (["tau"], normalised_plasma_freqs),
             "normalised_gyro_freqs": (["tau"], normalised_gyro_freqs),
             "x_hat": (["tau", "col"], x_hat),
@@ -286,20 +286,20 @@ def further_analysis(
 
     # The dominant value of kperp1 that is backscattered at every point
     k_perp_1_bs = -2 * K_magnitude_array * np.cos(theta_m + theta) / cos_theta_analysis
-    
-    normal_vectors = np.vstack((
-        df.dpolflux_dR,
-        np.zeros_like(df.dpolflux_dR),
-        df.dpolflux_dZ)).T
+
+    normal_vectors = np.vstack(
+        (df.dpolflux_dR, np.zeros_like(df.dpolflux_dR), df.dpolflux_dZ)
+    ).T
     normal_magnitudes = np.linalg.norm(normal_vectors, axis=-1)
     normal_hat = normal_vectors / normal_magnitudes[:, np.newaxis]
-    binormal_hat = make_unit_vector_from_cross_product(
-        normal_hat,
-        df.b_hat
-        )
+    binormal_hat = make_unit_vector_from_cross_product(normal_hat, df.b_hat)
 
-    k_perp_1_bs_normal = k_perp_1_bs * dot(kperp1_hat,normal_hat) # TODO: Check that this works properly
-    k_perp_1_bs_binormal = k_perp_1_bs * dot(kperp1_hat,binormal_hat) # TODO: Check that this works properly
+    k_perp_1_bs_normal = k_perp_1_bs * dot(
+        kperp1_hat, normal_hat
+    )  # TODO: Check that this works properly
+    k_perp_1_bs_binormal = k_perp_1_bs * dot(
+        kperp1_hat, binormal_hat
+    )  # TODO: Check that this works properly
 
     # Converting x_hat, y_hat, and Psi_3D to Cartesians so we can contract them with each other
     cos_q_zeta = np.cos(df.q_zeta)
