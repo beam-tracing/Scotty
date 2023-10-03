@@ -742,8 +742,8 @@ def default_plots(
     """
 
     print("Making figures")
-    plot_poloidal_beam_path(dt, field, filename=output_path / f"Ray1_{suffix}.png")
-    plot_dispersion_relation(dt.analysis, filename=output_path / f"H_{suffix}.png")
+    plot_poloidal_beam_path(dt, filename=(output_path / f"Ray1_{suffix}.png"))
+    plot_dispersion_relation(dt.analysis, filename=(output_path / f"H_{suffix}.png"))
     print("Figures have been saved")
 
 

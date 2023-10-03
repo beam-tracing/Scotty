@@ -400,3 +400,55 @@ def plot_widths(
         plt.savefig(f"{filename}.png")
 
     return ax
+
+
+def plot_instrumentation_functions(
+    dt: DataTree, filename: Optional[PathLike] = None, ax: Optional[plt.Axes] = None
+) -> plt.Axes:
+    ax = maybe_make_axis(ax, 3, 2)
+
+    x_axis = dt["analysis"].distance_along_line.values
+
+    # ax[0,0].set_title('mismatch')
+    # ax[0,0].plot(x_axis,np.rad2deg(dt["analysis"].theta_m.values),label=r'$\theta_m$')
+    # ax[0,0].plot(x_axis,np.rad2deg(dt["analysis"].delta_theta_m.values),label=r'$\Delta \theta_m$')
+    # ax[0,0].legend()
+    # ax[0,0].set_xlabel(r'$l$ / m')
+    # ax[0,0].set_ylabel('deg')
+    loc_all = (
+        # dt["analysis"].loc_b.values
+        dt["analysis"].loc_m.values
+        * dt["analysis"].loc_p.values
+        * dt["analysis"].loc_r.values
+    )
+    loc_all_and_spectrum = loc_all * dt["analysis"].loc_s.values
+
+    ax[0, 0].plot(x_axis, loc_all_and_spectrum, label="loc mprs")
+    ax[0, 0].legend()
+    ax[0, 0].set_xlabel(r"$l$ / m")
+    ax[0, 0].set_ylabel("deg")
+
+    ax[1, 0].plot(x_axis, dt["analysis"].loc_m.values, label="loc m")
+    ax[1, 0].set_xlabel(r"$l$ / m")
+    ax[1, 0].legend()
+
+    ax[2, 0].plot(x_axis, dt["analysis"].loc_b.values, label="loc b")
+    ax[2, 0].set_xlabel(r"$l$ / m")
+    ax[2, 0].legend()
+
+    ax[0, 1].plot(x_axis, dt["analysis"].loc_r.values, label="loc r")
+    ax[0, 1].set_xlabel(r"$l$ / m")
+    ax[0, 1].legend()
+
+    ax[1, 1].plot(x_axis, dt["analysis"].loc_s.values, label="loc s")
+    ax[1, 1].set_xlabel(r"$l$ / m")
+    ax[1, 1].legend()
+
+    ax[2, 1].plot(x_axis, dt["analysis"].loc_p.values, label="loc p")
+    ax[2, 1].set_xlabel(r"$l$ / m")
+    ax[2, 1].legend()
+
+    if filename:
+        plt.savefig(f"{filename}.png")
+
+    return ax
