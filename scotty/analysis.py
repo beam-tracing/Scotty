@@ -147,11 +147,27 @@ def immediate_analysis(
         delta_K_Z,
     )(q_R.data, q_Z.data, K_R.data, K_zeta_initial, K_Z.data)
 
+    electron_density = np.asfarray(find_density_1D(poloidal_flux))
+    temperature = find_temperature_1D(poloidal_flux) if find_temperature_1D else None
+
+    epsilon = DielectricTensor(
+        electron_density, launch_angular_frequency, B_magnitude, temperature
+    )
+
+    # Plasma and cyclotron frequencies
+    normalised_plasma_freqs = find_normalised_plasma_freq(
+        electron_density, launch_angular_frequency, temperature
+    )
+    normalised_gyro_freqs = find_normalised_gyro_freq(
+        B_magnitude, launch_angular_frequency, temperature
+    )
+
     # -------------------
     # Sanity check. Makes sure that calculated quantities are reasonable
     # -------------------
     check_output(H)
-
+    ##
+    
     df = xr.Dataset(
         {
             "B_R": (["tau"], B_R),
@@ -169,9 +185,25 @@ def immediate_analysis(
             "dH_dKzeta": (["tau"], dH_dKzeta),
             "dH_dR": (["tau"], dH_dR),
             "dH_dZ": (["tau"], dH_dZ),
+            "dpolflux_dR": (
+                ["tau"],
+                field.d_poloidal_flux_dR(q_R, q_Z, delta_R),
+            ),
+            "dpolflux_dZ": (
+                ["tau"],
+                field.d_poloidal_flux_dZ(q_R, q_Z, delta_Z),
+            ),
+            "epsilon_para": (["tau"], epsilon.e_bb),
+            "epsilon_perp": (["tau"], epsilon.e_11),
+            "epsilon_g": (["tau"], epsilon.e_12),
+            "electron_density": (["tau"], electron_density),
             "g_hat": (["tau", "col"], g_hat),
             "g_magnitude": g_magnitude,
             "grad_bhat": (["tau", "row", "col"], grad_bhat),
+            "H": (["tau"], H),
+            "H_other": (["tau"], H_other),              
+            "normalised_plasma_freqs": (["tau"], normalised_plasma_freqs),
+            "normalised_gyro_freqs": (["tau"], normalised_gyro_freqs),
             "x_hat": (["tau", "col"], x_hat),
             "y_hat": (["tau", "col"], y_hat),
             "poloidal_flux": (["tau"], poloidal_flux),
@@ -189,43 +221,13 @@ def immediate_analysis(
     df.tau.attrs["long_name"] = "Parameterised distance along beam"
     set_vector_components_long_name(df)
 
-    temperature = find_temperature_1D(poloidal_flux) if find_temperature_1D else None
     if temperature is not None:
         df.update({"temperature": (["tau"], temperature)})
 
     if vacuumLaunch_flag:
-        electron_density = np.asfarray(find_density_1D(poloidal_flux))
-        epsilon = DielectricTensor(
-            electron_density, launch_angular_frequency, B_magnitude, temperature
-        )
-
-        # Plasma and cyclotron frequencies
-        normalised_plasma_freqs = find_normalised_plasma_freq(
-            electron_density, launch_angular_frequency, temperature
-        )
-        normalised_gyro_freqs = find_normalised_gyro_freq(
-            B_magnitude, launch_angular_frequency, temperature
-        )
-
         vacuum_only = {
             "Psi_3D_lab_entry": (["row", "col"], Psi_3D_lab_entry),
             "distance_from_launch_to_entry": distance_from_launch_to_entry,
-            "dpolflux_dR_debugging": (
-                ["tau"],
-                field.d_poloidal_flux_dR(q_R, q_Z, delta_R),
-            ),
-            "dpolflux_dZ_debugging": (
-                ["tau"],
-                field.d_poloidal_flux_dZ(q_R, q_Z, delta_Z),
-            ),
-            "epsilon_para": (["tau"], epsilon.e_bb),
-            "epsilon_perp": (["tau"], epsilon.e_11),
-            "epsilon_g": (["tau"], epsilon.e_12),
-            "electron_density": (["tau"], electron_density),
-            "normalised_plasma_freqs": (["tau"], normalised_plasma_freqs),
-            "normalised_gyro_freqs": (["tau"], normalised_gyro_freqs),
-            "H": (["tau"], H),
-            "H_other": (["tau"], H_other),
         }
         df.update(vacuum_only)
 
@@ -284,6 +286,20 @@ def further_analysis(
 
     # The dominant value of kperp1 that is backscattered at every point
     k_perp_1_bs = -2 * K_magnitude_array * np.cos(theta_m + theta) / cos_theta_analysis
+    
+    normal_vectors = np.vstack((
+        df.dpolflux_dR,
+        np.zeros_like(df.dpolflux_dR),
+        df.dpolflux_dZ)).T
+    normal_magnitudes = np.linalg.norm(normal_vectors, axis=-1)
+    normal_hat = normal_vectors / normal_magnitudes[:, np.newaxis]
+    binormal_hat = make_unit_vector_from_cross_product(
+        normal_hat,
+        df.b_hat
+        )
+
+    k_perp_1_bs_normal = k_perp_1_bs * dot(kperp1_hat,normal_hat) # TODO: Check that this works properly
+    k_perp_1_bs_binormal = k_perp_1_bs * dot(kperp1_hat,binormal_hat) # TODO: Check that this works properly
 
     # Converting x_hat, y_hat, and Psi_3D to Cartesians so we can contract them with each other
     cos_q_zeta = np.cos(df.q_zeta)
@@ -583,6 +599,8 @@ def further_analysis(
         "delta_theta_m": delta_theta_m,
         "theta_m": theta_m,
         "k_perp_1_bs": k_perp_1_bs,
+        "k_perp_1_bs_normal": k_perp_1_bs_normal,
+        "k_perp_1_bs_binormal": k_perp_1_bs_binormal,
         "K_magnitude": (["tau"], K_magnitude_array),
         "cutoff_index": cutoff_index,
         "x_hat": df.x_hat,
