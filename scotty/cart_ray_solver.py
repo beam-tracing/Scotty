@@ -149,7 +149,9 @@ def make_solver_events(
         K_X = ray_parameters_3D[3]
         K_Y = ray_parameters_3D[4]
         K_Z = ray_parameters_3D[5]
-        K_magnitude = np.sqrt(K_X**2 + K_Y**2 + K_Z**2 / ((q_X**2)+(q_Y**2)))
+        K_magnitude = np.sqrt(
+            K_X**2 + K_Y**2 + K_Z**2 / ((q_X**2) + (q_Y**2))
+        )
 
         dH = cart_hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
 
