@@ -48,7 +48,9 @@ def _event(terminal: bool, direction: float):
 
 
 def make_solver_events(
-    poloidal_flux_enter: float, launch_angular_frequency: float, field: CartMagneticField
+    poloidal_flux_enter: float,
+    launch_angular_frequency: float,
+    field: CartMagneticField,
 ) -> Dict[str, Callable]:
     """Define event handlers for the ray solver
 
@@ -71,9 +73,7 @@ def make_solver_events(
     """
 
     @_event(terminal=True, direction=1.0)
-    def event_leave_plasma(
-        tau, ray_parameters_3D, hamiltonian: cart_Hamiltonian
-    ):
+    def event_leave_plasma(tau, ray_parameters_3D, hamiltonian: cart_Hamiltonian):
         q_X, q_Y, q_Z, _, _, _ = ray_parameters_3D
         poloidal_flux = field.poloidal_flux(q_X, q_Y, q_Z)
 
@@ -82,9 +82,7 @@ def make_solver_events(
         return poloidal_flux - poloidal_flux_enter
 
     @_event(terminal=False, direction=1.0)
-    def event_leave_LCFS(
-        tau, ray_parameters_3D, hamiltonian: cart_Hamiltonian
-    ):
+    def event_leave_LCFS(tau, ray_parameters_3D, hamiltonian: cart_Hamiltonian):
         q_X, q_Y, q_Z, _, _, _ = ray_parameters_3D
         poloidal_flux = field.poloidal_flux(q_X, q_Y, q_Z)
         poloidal_flux_LCFS = 1.0
@@ -100,9 +98,7 @@ def make_solver_events(
     data_Z_coord_max = field.Z_coord.max()
 
     @_event(terminal=True, direction=-1.0)
-    def event_leave_simulation(
-        tau, ray_parameters_3D, hamiltonian: cart_Hamiltonian
-    ):
+    def event_leave_simulation(tau, ray_parameters_3D, hamiltonian: cart_Hamiltonian):
         q_X, q_Y, q_Z, _, _, _ = ray_parameters_3D
 
         is_inside = (
@@ -255,14 +251,14 @@ def handle_no_resonance(
     """
     ray_parameters_3D = solver_ray_output.y
     tau_ray = solver_ray_output.t
-    
+
     q_X = ray_parameters_3D[0]
     q_Y = ray_parameters_3D[1]
     q_Z = ray_parameters_3D[2]
     K_X = ray_parameters_3D[3]
     K_Y = ray_parameters_3D[4]
     K_Z = ray_parameters_3D[5]
-    
+
     max_tau_idx = int(np.argmax(tau_ray[tau_ray <= tau_leave]))
 
     K_magnitude_ray = np.sqrt(K_X**2 + K_Y**2 + K_Z**2)
@@ -290,7 +286,6 @@ def handle_no_resonance(
         args=solver_arguments,
     )
 
-    
     solver_end_time = time()
     print("Time taken (cut-off finder)", solver_end_time - solver_start_time, "s")
 
@@ -333,11 +328,11 @@ def quick_K_cutoff(
         angle
 
     """
-        
+
     K_turning_pt = np.array(
         [
-        np.sqrt(K_X**2 + K_Y**2 + K_Z**2) 
-        for (_, _, _, K_X, K_Y, K_Z) in ray_parameters_turning_pt
+            np.sqrt(K_X**2 + K_Y**2 + K_Z**2)
+            for (_, _, _, K_X, K_Y, K_Z) in ray_parameters_turning_pt
         ]
     )
     K_min_idx = np.argmin(K_turning_pt)
@@ -391,9 +386,9 @@ def ray_evolution_3D_fun(tau, ray_parameters_3D, hamiltonian: cart_Hamiltonian):
 
     # Find derivatives of H
     dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
-    '''
+    """
     print(hamiltonian.field.poloidal_flux(q_X, q_Y, q_Z))
-    '''
+    """
     d_ray_parameters_3D_d_tau = np.zeros_like(ray_parameters_3D)
 
     # d (q_X) / d tau
@@ -506,7 +501,7 @@ def cart_propagate_ray(
         atol=atol,
         max_step=50,
     )
-    '''
+    """
     ### plot x and y and z 
     import matplotlib.pyplot as plt 
     fig, ax = plt.subplots()
@@ -516,7 +511,7 @@ def cart_propagate_ray(
     # ax.plot(solver_ray_output.y[2],label="z")
     ax.legend()
     plt.show()
-    '''
+    """
     solver_end_time = time()
     if verbose:
         print("Time taken (ray solver)", solver_end_time - solver_start_time, "s")
@@ -543,9 +538,7 @@ def cart_propagate_ray(
     )
 
     if quick_run:
-        return quick_K_cutoff(
-            ray_parameters_3D_events["reach_K_min"], field
-        )
+        return quick_K_cutoff(ray_parameters_3D_events["reach_K_min"], field)
 
     # The beam solver outputs data at these values of tau
     # Don't include `tau_leave` itself so that last point is inside
