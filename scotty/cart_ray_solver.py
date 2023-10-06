@@ -16,7 +16,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 from scotty.fun_general import K_magnitude, find_normalised_gyro_freq
-from scotty.geometry import MagneticField
+from scotty.cart_geometry import CartMagneticField
 from scotty.cart_hamiltonian import cart_Hamiltonian
 from scotty.typing import FloatArray
 
@@ -48,7 +48,7 @@ def _event(terminal: bool, direction: float):
 
 
 def make_solver_events(
-    poloidal_flux_enter: float, launch_angular_frequency: float, field: MagneticField
+    poloidal_flux_enter: float, launch_angular_frequency: float, field: CartMagneticField
 ) -> Dict[str, Callable]:
     """Define event handlers for the ray solver
 
@@ -72,7 +72,7 @@ def make_solver_events(
 
     @_event(terminal=True, direction=1.0)
     def event_leave_plasma(
-        tau, ray_parameters_3D, K_z: float, hamiltonian: Hamiltonian
+        tau, ray_parameters_3D, hamiltonian: cart_Hamiltonian
     ):
         q_X, q_Y, q_Z, _, _, _ = ray_parameters_3D
         poloidal_flux = field.poloidal_flux(q_X, q_Y, q_Z)
@@ -83,7 +83,7 @@ def make_solver_events(
 
     @_event(terminal=False, direction=1.0)
     def event_leave_LCFS(
-        tau, ray_parameters_3D, K_zeta: float, hamiltonian: Hamiltonian
+        tau, ray_parameters_3D, hamiltonian: cart_Hamiltonian
     ):
         q_X, q_Y, q_Z, _, _, _ = ray_parameters_3D
         poloidal_flux = field.poloidal_flux(q_X, q_Y, q_Z)
@@ -101,7 +101,7 @@ def make_solver_events(
 
     @_event(terminal=True, direction=-1.0)
     def event_leave_simulation(
-        tau, ray_parameters_3D, K_zeta: float, hamiltonian: Hamiltonian
+        tau, ray_parameters_3D, hamiltonian: cart_Hamiltonian
     ):
         q_X, q_Y, q_Z, _, _, _ = ray_parameters_3D
 
@@ -118,7 +118,7 @@ def make_solver_events(
         return +1 if is_inside else -1
 
     @_event(terminal=True, direction=0.0)
-    def event_cross_resonance(tau, ray_parameters_3D, K_zeta, hamiltonian: Hamiltonian):
+    def event_cross_resonance(tau, ray_parameters_3D, hamiltonian: cart_Hamiltonian):
         # Currently only works when crossing resonance.
         # To implement crossing of higher harmonics as well
         # Not implemented for relativistic temperatures
@@ -138,7 +138,7 @@ def make_solver_events(
         return (gyro_freq - 1.0 - delta_gyro_freq) * (gyro_freq - 1.0 + delta_gyro_freq)
 
     @_event(terminal=False, direction=1.0)
-    def event_reach_K_min(tau, ray_parameters_3D, K_zeta, hamiltonian: Hamiltonian):
+    def event_reach_K_min(tau, ray_parameters_3D, hamiltonian: cart_Hamiltonian):
         # To find tau of the cut-off, that is the location where the
         # wavenumber K is minimised
         # This function finds the turning points
@@ -149,11 +149,9 @@ def make_solver_events(
         K_X = ray_parameters_3D[3]
         K_Y = ray_parameters_3D[4]
         K_Z = ray_parameters_3D[5]
-        K_magnitude = np.sqrt(
-            K_X**2 + K_Y**2 + K_Z**2 / ((q_X**2) + (q_Y**2))
-        )
+        K_magnitude = np.sqrt(K_X**2 + K_Y**2 + K_Z**2)
 
-        dH = cart_hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
+        dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
 
         d_K_d_tau = -(1 / K_magnitude) * (
             dH["dH_dX"] * K_X + dH["dH_dY"] * K_Y + dH["dH_dZ"] * K_Z
@@ -241,7 +239,6 @@ def handle_no_resonance(
     solver_ray_output,
     tau_leave: float,
     tau_points: FloatArray,
-    K_zeta: float,
     solver_arguments,
     event_leave_plasma: Callable,
 ) -> FloatArray:
@@ -258,15 +255,17 @@ def handle_no_resonance(
     """
     ray_parameters_3D = solver_ray_output.y
     tau_ray = solver_ray_output.t
-
+    
+    q_X = ray_parameters_3D[0]
+    q_Y = ray_parameters_3D[1]
+    q_Z = ray_parameters_3D[2]
+    K_X = ray_parameters_3D[3]
+    K_Y = ray_parameters_3D[4]
+    K_Z = ray_parameters_3D[5]
+    
     max_tau_idx = int(np.argmax(tau_ray[tau_ray <= tau_leave]))
 
-    K_magnitude_ray = K_magnitude(
-        K_R=ray_parameters_3D[2, :max_tau_idx],
-        K_zeta=K_zeta,
-        K_Z=ray_parameters_3D[3, :max_tau_idx],
-        q_R=ray_parameters_3D[0, :max_tau_idx],
-    )
+    K_magnitude_ray = np.sqrt(K_X**2 + K_Y**2 + K_Z**2)
 
     index_cutoff_estimate = int(np.argmin(K_magnitude_ray))
     start = max(0, index_cutoff_estimate - 1)
@@ -291,15 +290,11 @@ def handle_no_resonance(
         args=solver_arguments,
     )
 
+    
     solver_end_time = time()
     print("Time taken (cut-off finder)", solver_end_time - solver_start_time, "s")
 
-    K_magnitude_ray_fine = K_magnitude(
-        K_R=solver_ray_output_fine.y[2, :],
-        K_zeta=K_zeta,
-        K_Z=solver_ray_output_fine.y[3, :],
-        q_R=solver_ray_output_fine.y[0, :],
-    )
+    K_magnitude_ray_fine = np.sqrt(K_X**2 + K_Y**2 + K_Z**2)
     index_cutoff_fine = np.argmin(K_magnitude_ray_fine)
     tau_cutoff_fine = float(solver_ray_output_fine.t[index_cutoff_fine])
     return np.sort(np.append(tau_points, tau_cutoff_fine))
@@ -309,7 +304,8 @@ def handle_no_resonance(
 class K_cutoff_data:
     """Properties of :math:`K`-cutoff"""
 
-    q_R: float
+    q_X: float
+    q_Y: float
     q_Z: float
     K_norm_min: float
     poloidal_flux: float
@@ -317,7 +313,7 @@ class K_cutoff_data:
 
 
 def quick_K_cutoff(
-    ray_parameters_turning_pt: FloatArray, K_zeta: float, field: MagneticField
+    ray_parameters_turning_pt: FloatArray, field: CartMagneticField
 ) -> K_cutoff_data:
     r"""Calculate some quantities at the minimum :math:`|K|` along the ray
 
@@ -337,34 +333,34 @@ def quick_K_cutoff(
         angle
 
     """
-
+        
     K_turning_pt = np.array(
         [
-            K_magnitude(K_R, K_zeta, K_Z, q_R)
-            for (q_R, _, K_R, K_Z) in ray_parameters_turning_pt
+        np.sqrt(K_X**2 + K_Y**2 + K_Z**2) 
+        for (_, _, _, K_X, K_Y, K_Z) in ray_parameters_turning_pt
         ]
     )
     K_min_idx = np.argmin(K_turning_pt)
-    q_R, q_Z, K_R, K_Z = ray_parameters_turning_pt[K_min_idx]
+    q_X, q_Y, q_Z, K_X, K_Y, K_Z = ray_parameters_turning_pt[K_min_idx]
 
-    B_R = field.B_R(q_R, q_Z)
-    B_T = field.B_T(q_R, q_Z)
-    B_Z = field.B_Z(q_R, q_Z)
-    B = np.array([B_R, B_T, B_Z])
+    B_X = field.B_X(q_X, q_Y, q_Z)
+    B_Y = field.B_Y(q_X, q_Y, q_Z)
+    B_Z = field.B_Z(q_X, q_Y, q_Z)
+    B = np.array([B_X, B_Y, B_Z])
 
-    K = np.array([K_R, K_zeta / q_R, K_Z])
+    K = np.array([K_X, K_Y, K_Z])
     K_norm_min = K_turning_pt[K_min_idx]
 
     sin_theta_m = np.dot(B, K) / (K_norm_min * np.linalg.norm(B))
     # Assumes the mismatch angle is never smaller than -90deg or bigger than 90deg
     theta_m = np.sign(sin_theta_m) * np.arcsin(abs(sin_theta_m))
 
-    poloidal_flux = field.poloidal_flux(q_R, q_Z)
+    poloidal_flux = field.poloidal_flux(q_X, a_Y, q_Z)
 
-    return K_cutoff_data(q_R, q_Z, K_norm_min, cast(float, poloidal_flux), theta_m)
+    return K_cutoff_data(q_X, q_Y, q_Z, K_norm_min, cast(float, poloidal_flux), theta_m)
 
 
-def ray_evolution_3D_fun(tau, ray_parameters_3D, K_zeta, hamiltonian: Hamiltonian):
+def ray_evolution_3D_fun(tau, ray_parameters_3D, hamiltonian: cart_Hamiltonian):
     """
     Parameters
     ----------
@@ -394,18 +390,24 @@ def ray_evolution_3D_fun(tau, ray_parameters_3D, K_zeta, hamiltonian: Hamiltonia
     K_Z = ray_parameters_3D[5]
 
     # Find derivatives of H
-    dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z)
-
+    dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
+    '''
+    print(hamiltonian.field.poloidal_flux(q_X, q_Y, q_Z))
+    '''
     d_ray_parameters_3D_d_tau = np.zeros_like(ray_parameters_3D)
 
-    # d (q_R) / d tau
-    d_ray_parameters_3D_d_tau[0] = dH["dH_dKR"]
+    # d (q_X) / d tau
+    d_ray_parameters_3D_d_tau[0] = dH["dH_dKX"]
+    # d (q_Y) / d tau
+    d_ray_parameters_3D_d_tau[1] = dH["dH_dKY"]
     # d (q_Z) / d tau
-    d_ray_parameters_3D_d_tau[1] = dH["dH_dKZ"]
-    # d (K_R) / d tau
-    d_ray_parameters_3D_d_tau[2] = -dH["dH_dR"]
+    d_ray_parameters_3D_d_tau[2] = dH["dH_dKZ"]
+    # d (K_X) / d tau
+    d_ray_parameters_3D_d_tau[3] = -dH["dH_dX"]
+    # d (K_Y) / d tau
+    d_ray_parameters_3D_d_tau[4] = -dH["dH_dY"]
     # d (K_Z) / d tau
-    d_ray_parameters_3D_d_tau[3] = -dH["dH_dZ"]
+    d_ray_parameters_3D_d_tau[5] = -dH["dH_dZ"]
 
     return d_ray_parameters_3D_d_tau
 
@@ -413,10 +415,10 @@ def ray_evolution_3D_fun(tau, ray_parameters_3D, K_zeta, hamiltonian: Hamiltonia
 def cart_propagate_ray(
     poloidal_flux_enter: float,
     launch_angular_frequency: float,
-    field: MagneticField,
+    field: CartMagneticField,
     initial_position: FloatArray,
     K_initial: FloatArray,
-    hamiltonian: Hamiltonian,
+    hamiltonian: cart_Hamiltonian,
     rtol: float,
     atol: float,
     quick_run: bool,
@@ -474,18 +476,20 @@ def cart_propagate_ray(
         poloidal_flux_enter, launch_angular_frequency, field
     )
 
-    K_R_initial, K_zeta_initial, K_Z_initial = K_initial
+    K_X_initial, K_Y_initial, K_Z_initial = K_initial
 
-    # Ray evolves q_R, q_Z, K_R, K_Z
+    # Ray evolves q_X, q_Y, q_Z, K_X, K_Y, K_Z
     ray_parameters_3D_initial = [
         initial_position[0],
+        initial_position[1],
         initial_position[2],
-        K_R_initial,
+        K_X_initial,
+        K_Y_initial,
         K_Z_initial,
     ]
 
     # Additional arguments for solver
-    solver_arguments = (K_zeta_initial, hamiltonian)
+    solver_arguments = (hamiltonian,)
 
     solver_start_time = time()
     solver_ray_output = solve_ivp(
@@ -502,6 +506,17 @@ def cart_propagate_ray(
         atol=atol,
         max_step=50,
     )
+    '''
+    ### plot x and y and z 
+    import matplotlib.pyplot as plt 
+    fig, ax = plt.subplots()
+    ax.plot(solver_ray_output.y[0], solver_ray_output.y[2])
+    # ax.plot(solver_ray_output.y[0],label="x")
+    # ax.plot(solver_ray_output.y[1],label="y")
+    # ax.plot(solver_ray_output.y[2],label="z")
+    ax.legend()
+    plt.show()
+    '''
     solver_end_time = time()
     if verbose:
         print("Time taken (ray solver)", solver_end_time - solver_start_time, "s")
@@ -529,7 +544,7 @@ def cart_propagate_ray(
 
     if quick_run:
         return quick_K_cutoff(
-            ray_parameters_3D_events["reach_K_min"], K_zeta_initial, field
+            ray_parameters_3D_events["reach_K_min"], field
         )
 
     # The beam solver outputs data at these values of tau
@@ -542,7 +557,6 @@ def cart_propagate_ray(
             solver_ray_output,
             tau_leave,
             tau_points,
-            K_zeta_initial,
             solver_arguments,
             solver_ray_events["leave_plasma"],
         )
