@@ -203,7 +203,7 @@ class cart_Hamiltonian:
 
         """
 
-        K_magnitude = np.sqrt(K_X**2 + K_Y**2 + K_Z**2)
+        K_magnitude = np.sqrt(K_X**2 + K_Y** 2 + K_Z**2)
         poloidal_flux = self.field.poloidal_flux(q_X, q_Y, q_Z)
         electron_density = self.density(poloidal_flux)
 
@@ -276,14 +276,7 @@ class cart_Hamiltonian:
         """
 
         # Capture the location we want the derivatives at
-        starts = {
-            "q_X": q_X,
-            "q_Y": q_Y,
-            "q_Z": q_Z,
-            "K_X": K_X,
-            "K_Y": K_Y,
-            "K_Z": K_Z,
-        }
+        starts = {"q_X": q_X, "q_Y": q_Y, "q_Z": q_Z, "K_X": K_X, "K_Y": K_Y, "K_Z": K_Z}
 
         def apply_stencil(dims: Tuple[str, ...], stencil: str):
             return derivative(self, dims, starts, self.spacings, stencil)
@@ -303,21 +296,27 @@ class cart_Hamiltonian:
                 "d2H_dX2": apply_stencil(("q_X", "q_X"), "d2_FFD2"),
                 "d2H_dY2": apply_stencil(("q_Y", "q_Y"), "d2_FFD2"),
                 "d2H_dZ2": apply_stencil(("q_Z", "q_Z"), "d2_FFD2"),
+
                 "d2H_dKX2": apply_stencil(("K_X", "K_X"), "d2_CFD2"),
                 "d2H_dKY2": apply_stencil(("K_Y", "K_Y"), "d2_CFD2"),
                 "d2H_dKZ2": apply_stencil(("K_Z", "K_Z"), "d2_CFD2"),
+
                 "d2H_dX_dY": apply_stencil(("q_X", "q_Y"), "d1d1_FFD_FFD2"),
                 "d2H_dX_dZ": apply_stencil(("q_X", "q_Z"), "d1d1_FFD_FFD2"),
                 "d2H_dY_dZ": apply_stencil(("q_Y", "q_Z"), "d1d1_FFD_FFD2"),
+
                 "d2H_dX_dKX": apply_stencil(("q_X", "K_X"), "d1d1_FFD_CFD2"),
                 "d2H_dX_dKY": apply_stencil(("q_X", "K_Y"), "d1d1_FFD_CFD2"),
                 "d2H_dX_dKZ": apply_stencil(("q_X", "K_Z"), "d1d1_FFD_CFD2"),
+
                 "d2H_dY_dKX": apply_stencil(("q_Y", "K_X"), "d1d1_FFD_CFD2"),
                 "d2H_dY_dKY": apply_stencil(("q_Y", "K_Y"), "d1d1_FFD_CFD2"),
                 "d2H_dY_dKZ": apply_stencil(("q_Y", "K_Z"), "d1d1_FFD_CFD2"),
+
                 "d2H_dZ_dKX": apply_stencil(("q_Z", "K_X"), "d1d1_FFD_CFD2"),
                 "d2H_dZ_dKY": apply_stencil(("q_Z", "K_Y"), "d1d1_FFD_CFD2"),
                 "d2H_dZ_dKZ": apply_stencil(("q_Z", "K_Z"), "d1d1_FFD_CFD2"),
+
                 "d2H_dKX_dKZ": apply_stencil(("K_X", "K_Z"), "d1d1_CFD_CFD2"),
                 "d2H_dKX_dKY": apply_stencil(("K_X", "K_Y"), "d1d1_CFD_CFD2"),
                 "d2H_dKY_dKZ": apply_stencil(("K_Y", "K_Z"), "d1d1_CFD_CFD2"),
@@ -374,8 +373,8 @@ def hessians(dH: dict):
         np.array(
             [
                 [d2H_dX2, d2H_dX_dY, d2H_dX_dZ],
-                [d2H_dY_dX, d2H_dY2, d2H_dY_dZ],
-                [d2H_dZ_dX, d2H_dZ_dY, d2H_dZ2],
+                [d2H_dX_dY, d2H_dY2, d2H_dY_dZ],
+                [d2H_dX_dZ, d2H_dY_dZ, d2H_dZ2],
             ]
         )
     )
@@ -383,8 +382,8 @@ def hessians(dH: dict):
         np.array(
             [
                 [d2H_dKX_dX, d2H_dKX_dY, d2H_dKX_dZ],
-                [d2H_dKY_dX, d2H_dKY_dY, d2H_dKY_dZ],
-                [d2H_dKZ_dX, d2H_dKZ_dY, d2H_dKZ_dZ],
+                [d2H_dKX_dY, d2H_dKY_dY, d2H_dKY_dZ],
+                [d2H_dKX_dZ, d2H_dKY_dZ, d2H_dKZ_dZ],
             ]
         )
     )
@@ -392,8 +391,8 @@ def hessians(dH: dict):
         np.array(
             [
                 [d2H_dKX2, d2H_dKX_dKY, d2H_dKX_dKZ],
-                [d2H_dKY_dKX, d2H_dKY2, d2H_dKY_dKZ],
-                [d2H_dKZ_dKX, d2H_dKZ_dKY, d2H_dKZ2],
+                [d2H_dKX_dKY, d2H_dKY2, d2H_dKY_dKZ],
+                [d2H_dKX_dKZ, d2H_dKY_dKZ, d2H_dKZ2],
             ]
         )
     )
