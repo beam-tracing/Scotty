@@ -57,7 +57,9 @@ def cart_pack_beam_parameters(
 
 def cart_unpack_beam_parameters(
     beam_parameters: FloatArray,
-) -> Tuple[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, FloatArray]:
+) -> Tuple[
+    ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, FloatArray
+]:
     """Unpack the flat solver state vector into separate coordinate
     variables and Psi matrix
 
@@ -129,4 +131,6 @@ def cart_beam_evolution_fun(tau, beam_parameters, hamiltonian: cart_Hamiltonian)
         - np.matmul(np.matmul(Psi_3D, gradK_gradK_H), Psi_3D)
     )
 
-    return cart_pack_beam_parameters(dH_dKX, dH_dKY, dH_dKZ, -dH_dX, -dH_dY, -dH_dZ, d_Psi_d_tau)
+    return cart_pack_beam_parameters(
+        dH_dKX, dH_dKY, dH_dKZ, -dH_dX, -dH_dY, -dH_dZ, d_Psi_d_tau
+    )

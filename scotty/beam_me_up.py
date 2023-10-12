@@ -97,11 +97,8 @@ from scotty.check_input import check_input
 from typing import Optional, Union, Sequence, cast
 from scotty.typing import PathLike, FloatArray
 
-#cartesian converters
-from scotty.cart_geometry import (
-    CartMagneticField,
-    CartSlabField
-)
+# cartesian converters
+from scotty.cart_geometry import CartMagneticField, CartSlabField
 from scotty.cart_ray_solver import cart_propagate_ray
 from scotty.cart_hamiltonian import cart_Hamiltonian
 from scotty.cart_fun_evolution import (
@@ -109,6 +106,7 @@ from scotty.cart_fun_evolution import (
     cart_pack_beam_parameters,
     cart_unpack_beam_parameters,
 )
+
 
 def beam_me_up(
     poloidal_launch_angle_Torbeam: float,
@@ -443,7 +441,7 @@ def beam_me_up(
             entry_R, entry_zeta, entry_Z = entry_coords
         else:
             entry_R, entry_zeta, entry_Z = launch_position
-            
+
         """ original
                 entry_coords = find_entry_point(
                     launch_position,
@@ -454,7 +452,7 @@ def beam_me_up(
                 )
                 entry_R, entry_zeta, entry_Z = entry_coords
         """
-        
+
         d_poloidal_flux_dR = field.d_poloidal_flux_dR(entry_R, entry_Z, delta_R)
         d_poloidal_flux_dZ = field.d_poloidal_flux_dZ(entry_R, entry_Z, delta_Z)
         # print("Gradients at entry point for Z: ", Z_gradient, ", R: ", R_gradient)
@@ -498,8 +496,8 @@ def beam_me_up(
         )
     else:
         raise ValueError(
-        f"The flag specified for 'flag_coordinate_system': '{flag_coordinate_system}' does not exist.",
-        "'flag_coordinate_system' only accepts 'cylindrical' or 'cartesian'.",
+            f"The flag specified for 'flag_coordinate_system': '{flag_coordinate_system}' does not exist.",
+            "'flag_coordinate_system' only accepts 'cylindrical' or 'cartesian'.",
         )
     # Checking input data
     check_input(
@@ -556,7 +554,7 @@ def beam_me_up(
         Psi_3D_lab_entry = None
         Psi_3D_lab_entry_cartersian = None
         distance_from_launch_to_entry = None
-    
+
     K_R_initial, K_zeta_initial, K_Z_initial = K_initial
 
     # -------------------
@@ -591,8 +589,8 @@ def beam_me_up(
         )
     else:
         raise ValueError(
-        f"The flag specified for 'flag_coordinate_system': '{flag_coordinate_system}' does not exist.",
-        "'flag_coordinate_system' only accepts 'cylindrical' or 'cartesian'.",
+            f"The flag specified for 'flag_coordinate_system': '{flag_coordinate_system}' does not exist.",
+            "'flag_coordinate_system' only accepts 'cylindrical' or 'cartesian'.",
         )
     if quick_run:
         return ray_solver_output
@@ -647,7 +645,7 @@ def beam_me_up(
             K_Z_array,
             Psi_3D_output,
         ) = unpack_beam_parameters(beam_parameters)
-    
+
     elif flag_coordinate_system == "cartesian":
         K_X_initial = K_R_initial
         K_Y_initial = K_zeta_initial
@@ -701,8 +699,8 @@ def beam_me_up(
 
     else:
         raise ValueError(
-        f"The flag specified for 'flag_coordinate_system': '{flag_coordinate_system}' does not exist.",
-        "'flag_coordinate_system' only accepts 'cylindrical' or 'cartesian'.",
+            f"The flag specified for 'flag_coordinate_system': '{flag_coordinate_system}' does not exist.",
+            "'flag_coordinate_system' only accepts 'cylindrical' or 'cartesian'.",
         )
     plot_poloidal_beam_path()
 
@@ -941,7 +939,7 @@ def create_magnetic_geometry(
     equil_time: Optional[float] = None,
     delta_R: Optional[float] = None,
     delta_Z: Optional[float] = None,
-    flag_coordinate_system = "cylindrical",
+    flag_coordinate_system="cylindrical",
     **kwargs,
 ) -> MagneticField:
     """Create an object representing the magnetic field geometry"""
@@ -953,16 +951,15 @@ def create_magnetic_geometry(
         return f"Missing '{argument}' for find_B_method='{find_B_method}'"
 
     # Analytical geometries
-    
+
     ###
     if flag_coordinate_system == "cartesian" and type(find_B_method) == str:
-        find_B_method = "cart_" + find_B_method 
+        find_B_method = "cart_" + find_B_method
 
     if find_B_method == "cart_analytical":
         print("Cartesian Slab Field")
-        return CartSlabField(1, R_axis, minor_radius_a,1)
+        return CartSlabField(1, R_axis, minor_radius_a, 1)
     ###
-    
 
     if find_B_method == "analytical":
         print("Analytical constant current density geometry")
