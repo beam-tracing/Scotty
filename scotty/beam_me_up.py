@@ -59,8 +59,9 @@ import xarray as xr
 import datatree
 import datetime
 import uuid
+import matplotlib.pyplot as plt
 
-from scotty.analysis import immediate_analysis, further_analysis
+from scotty.analysis import immediate_analysis, further_analysis, beam_analysis, beam_width
 from scotty.fun_general import (
     find_nearest,
     freq_GHz_to_angular_frequency,
@@ -106,6 +107,7 @@ from scotty.cart_fun_evolution import (
     cart_pack_beam_parameters,
     cart_unpack_beam_parameters,
 )
+from scotty.cart_plotting import cart_plot_poloidal_beam_path
 
 
 def beam_me_up(
@@ -702,87 +704,167 @@ def beam_me_up(
             f"The flag specified for 'flag_coordinate_system': '{flag_coordinate_system}' does not exist.",
             "'flag_coordinate_system' only accepts 'cylindrical' or 'cartesian'.",
         )
-    plot_poloidal_beam_path()
+
 
     print("Main loop complete")
     # -------------------
-
-    inputs = xr.Dataset(
-        {
-            "B_T_axis": B_T_axis,
-            "B_p_a": B_p_a,
-            "K_initial": (["col"], K_initial),
-            "Psi_BC_flag": Psi_BC_flag,
-            "R_axis": R_axis,
-            "atol": atol,
-            "delta_K_R": delta_K_R,
-            "delta_K_Z": delta_K_Z,
-            "delta_K_zeta": delta_K_zeta,
-            "delta_R": delta_R,
-            "delta_Z": delta_Z,
-            "density_fit_method": str(density_fit_method),
-            "density_fit_parameters": str(density_fit_parameters),
-            "detailed_analysis_flag": detailed_analysis_flag,
-            "equil_time": (equil_time),
-            "figure_flag": figure_flag,
-            "find_B_method": str(find_B_method),
-            "initial_position": (["col"], initial_position),
-            "input_filename_suffix": input_filename_suffix,
-            "interp_order": interp_order,
-            "interp_smoothing": interp_smoothing,
-            "launch_K": (launch_K),
-            "launch_angular_frequency": launch_angular_frequency,
-            "launch_beam_curvature": launch_beam_curvature,
-            "launch_beam_width": launch_beam_width,
-            "launch_freq_GHz": launch_freq_GHz,
-            "launch_position": (["col"], launch_position),
-            "len_tau": len_tau,
-            "magnetic_data_path": str(magnetic_data_path),
-            "minor_radius_a": minor_radius_a,
-            "mode_flag": mode_flag,
-            "ne_data_density_array": (ne_data_density_array),
-            "ne_data_path": str(ne_data_path),
-            "ne_data_radialcoord_array": (ne_data_radialcoord_array),
-            "output_filename_suffix": output_filename_suffix,
-            "output_path": str(output_path),
-            "plasmaLaunch_K": plasmaLaunch_K,
-            "plasmaLaunch_Psi_3D_lab_Cartesian": (
-                ["row", "col"],
-                plasmaLaunch_Psi_3D_lab_Cartesian,
-            ),
-            "poloidalFlux_grid": (["R", "Z"], field.poloidalFlux_grid),
-            "poloidal_flux_enter": poloidal_flux_enter,
-            "poloidal_launch_angle_Torbeam": poloidal_launch_angle_Torbeam,
-            "quick_run": quick_run,
-            "rtol": rtol,
-            "shot": shot,
-            "toroidal_launch_angle_Torbeam": toroidal_launch_angle_Torbeam,
-            "vacuumLaunch_flag": vacuumLaunch_flag,
-            "vacuum_propagation_flag": vacuum_propagation_flag,
-        },
-        coords={
-            "R": field.R_coord,
-            "Z": field.Z_coord,
-            "row": ["R", "zeta", "Z"],
-            "col": ["R", "zeta", "Z"],
-        },
-    )
-    solver_output = xr.Dataset(
-        {
-            "solver_status": solver_status,
-            "q_R": (["tau"], q_R_array, {"long_name": "R", "units": "m"}),
-            "q_zeta": (["tau"], q_zeta_array, {"long_name": r"$\zeta$", "units": "m"}),
-            "q_Z": (["tau"], q_Z_array, {"long_name": "Z", "units": "m"}),
-            "K_R": (["tau"], K_R_array),
-            "K_Z": (["tau"], K_Z_array),
-            "Psi_3D": (["tau", "row", "col"], Psi_3D_output),
-        },
-        coords={
-            "tau": tau_array,
-            "row": ["R", "zeta", "Z"],
-            "col": ["R", "zeta", "Z"],
-        },
-    )
+    if flag_coordinate_system == "cylindrical":
+        inputs = xr.Dataset(
+            {
+                "B_T_axis": B_T_axis,
+                "B_p_a": B_p_a,
+                "K_initial": (["col"], K_initial),
+                "Psi_BC_flag": Psi_BC_flag,
+                "R_axis": R_axis,
+                "atol": atol,
+                "delta_K_R": delta_K_R,
+                "delta_K_Z": delta_K_Z,
+                "delta_K_zeta": delta_K_zeta,
+                "delta_R": delta_R,
+                "delta_Z": delta_Z,
+                "density_fit_method": str(density_fit_method),
+                "density_fit_parameters": str(density_fit_parameters),
+                "detailed_analysis_flag": detailed_analysis_flag,
+                "equil_time": (equil_time),
+                "figure_flag": figure_flag,
+                "find_B_method": str(find_B_method),
+                "initial_position": (["col"], initial_position),
+                "input_filename_suffix": input_filename_suffix,
+                "interp_order": interp_order,
+                "interp_smoothing": interp_smoothing,
+                "launch_K": (launch_K),
+                "launch_angular_frequency": launch_angular_frequency,
+                "launch_beam_curvature": launch_beam_curvature,
+                "launch_beam_width": launch_beam_width,
+                "launch_freq_GHz": launch_freq_GHz,
+                "launch_position": (["col"], launch_position),
+                "len_tau": len_tau,
+                "magnetic_data_path": str(magnetic_data_path),
+                "minor_radius_a": minor_radius_a,
+                "mode_flag": mode_flag,
+                "ne_data_density_array": (ne_data_density_array),
+                "ne_data_path": str(ne_data_path),
+                "ne_data_radialcoord_array": (ne_data_radialcoord_array),
+                "output_filename_suffix": output_filename_suffix,
+                "output_path": str(output_path),
+                "plasmaLaunch_K": plasmaLaunch_K,
+                "plasmaLaunch_Psi_3D_lab_Cartesian": (
+                    ["row", "col"],
+                    plasmaLaunch_Psi_3D_lab_Cartesian,
+                ),
+                "poloidalFlux_grid": (["R", "Z"], field.poloidalFlux_grid),
+                "poloidal_flux_enter": poloidal_flux_enter,
+                "poloidal_launch_angle_Torbeam": poloidal_launch_angle_Torbeam,
+                "quick_run": quick_run,
+                "rtol": rtol,
+                "shot": shot,
+                "toroidal_launch_angle_Torbeam": toroidal_launch_angle_Torbeam,
+                "vacuumLaunch_flag": vacuumLaunch_flag,
+                "vacuum_propagation_flag": vacuum_propagation_flag,
+            },
+            coords={
+                "R": field.R_coord,
+                "Z": field.Z_coord,
+                "row": ["R", "zeta", "Z"],
+                "col": ["R", "zeta", "Z"],
+            },
+        )
+        solver_output = xr.Dataset(
+            {
+                "solver_status": solver_status,
+                "q_R": (["tau"], q_R_array, {"long_name": "R", "units": "m"}),
+                "q_zeta": (["tau"], q_zeta_array, {"long_name": r"$\zeta$", "units": "m"}),
+                "q_Z": (["tau"], q_Z_array, {"long_name": "Z", "units": "m"}),
+                "K_R": (["tau"], K_R_array),
+                "K_Z": (["tau"], K_Z_array),
+                "Psi_3D": (["tau", "row", "col"], Psi_3D_output),
+            },
+            coords={
+                "tau": tau_array,
+                "row": ["R", "zeta", "Z"],
+                "col": ["R", "zeta", "Z"],
+            },
+        )
+    elif flag_coordinate_system == "cartesian":
+        inputs = xr.Dataset(
+            {
+                "B_T_axis": B_T_axis,
+                "B_p_a": B_p_a,
+                "K_initial": (["col"], K_initial),
+                "Psi_BC_flag": Psi_BC_flag,
+                "R_axis": R_axis,
+                "atol": atol,
+                "delta_K_X": delta_K_X,
+                "delta_K_Y": delta_K_Y,
+                "delta_K_Z": delta_K_Z,
+                "delta_X": delta_X,
+                "delta_Y": delta_Y,
+                "delta_Z": delta_Z,
+                "density_fit_method": str(density_fit_method),
+                "density_fit_parameters": str(density_fit_parameters),
+                "detailed_analysis_flag": detailed_analysis_flag,
+                "equil_time": (equil_time),
+                "figure_flag": figure_flag,
+                "find_B_method": str(find_B_method),
+                "initial_position": (["col"], initial_position),
+                "input_filename_suffix": input_filename_suffix,
+                "interp_order": interp_order,
+                "interp_smoothing": interp_smoothing,
+                "launch_K": (launch_K),
+                "launch_angular_frequency": launch_angular_frequency,
+                "launch_beam_curvature": launch_beam_curvature,
+                "launch_beam_width": launch_beam_width,
+                "launch_freq_GHz": launch_freq_GHz,
+                "launch_position": (["col"], launch_position),
+                "len_tau": len_tau,
+                "magnetic_data_path": str(magnetic_data_path),
+                "minor_radius_a": minor_radius_a,
+                "mode_flag": mode_flag,
+                "ne_data_density_array": (ne_data_density_array),
+                "ne_data_path": str(ne_data_path),
+                "ne_data_radialcoord_array": (ne_data_radialcoord_array),
+                "output_filename_suffix": output_filename_suffix,
+                "output_path": str(output_path),
+                "plasmaLaunch_K": plasmaLaunch_K,
+                "plasmaLaunch_Psi_3D_lab_Cartesian": (
+                    ["row", "col"],
+                    plasmaLaunch_Psi_3D_lab_Cartesian,
+                ),
+                "poloidalFlux_grid": (["X", "Y", "Z"], field.poloidalFlux_grid),
+                "poloidal_flux_enter": poloidal_flux_enter,
+                "poloidal_launch_angle_Torbeam": poloidal_launch_angle_Torbeam,
+                "quick_run": quick_run,
+                "rtol": rtol,
+                "shot": shot,
+                "toroidal_launch_angle_Torbeam": toroidal_launch_angle_Torbeam,
+                "vacuumLaunch_flag": vacuumLaunch_flag,
+                "vacuum_propagation_flag": vacuum_propagation_flag,
+            },
+            coords={
+                "X": field.X_coord,
+                "Y": field.Y_coord,
+                "Z": field.Z_coord,
+                "row": ["X", "Y", "Z"],
+                "col": ["X", "Y", "Z"],
+            },
+        )
+        solver_output = xr.Dataset(
+            {
+                "solver_status": solver_status,
+                "q_X": (["tau"], q_X_array, {"long_name": "X", "units": "m"}),
+                "q_Y": (["tau"], q_Y_array, {"long_name": "Y", "units": "m"}),
+                "q_Z": (["tau"], q_Z_array, {"long_name": "Z", "units": "m"}),
+                "K_X": (["tau"], K_X_array),
+                "K_Y": (["tau"], K_Y_array),
+                "K_Z": (["tau"], K_Z_array),
+                "Psi_3D": (["tau", "row", "col"], Psi_3D_output),
+            },
+            coords={
+                "tau": tau_array,
+                "row": ["X", "Y", "Z"],
+                "col": ["X", "Y", "Z"],
+            },
+        )
 
     dt = datatree.DataTree.from_dict({"inputs": inputs, "solver_output": solver_output})
     dt.attrs = {
@@ -793,53 +875,107 @@ def beam_me_up(
         "id": str(run_id),
     }
 
+
+    
     if solver_status == -1:
         # If the solver doesn't finish, end the function here
         print("Solver did not reach completion")
         return
-
     # -------------------
     # Process the data from the main loop to give a bunch of useful stuff
     # -------------------
     print("Analysing data")
-    dH = hamiltonian.derivatives(
-        q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, second_order=True
-    )
+    
+    if flag_coordinate_system == "cylindrical":
+        dH = hamiltonian.derivatives(
+            q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, second_order=True
+        )
+        df = immediate_analysis(
+            solver_output,
+            field,
+            find_density_1D,
+            find_temperature_1D,
+            hamiltonian,
+            K_zeta_initial,
+            launch_angular_frequency,
+            mode_flag,
+            delta_R,
+            delta_Z,
+            delta_K_R,
+            delta_K_zeta,
+            delta_K_Z,
+            Psi_3D_lab_launch,
+            Psi_3D_lab_entry,
+            distance_from_launch_to_entry,
+            vacuumLaunch_flag,
+            output_path,
+            output_filename_suffix,
+            dH,
+        )
+        analysis = further_analysis(
+            inputs,
+            df,
+            Psi_3D_lab_entry_cartersian,
+            output_path,
+            output_filename_suffix,
+            field,
+            detailed_analysis_flag,
+            dH,
+        )
+        df.update(analysis)
+        dt["analysis"] = datatree.DataTree(df)
+    elif flag_coordinate_system == "cartesian":
+        dH = hamiltonian.derivatives(
+            q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, second_order=True
+        )
+        print("plotting")
+        df = beam_analysis(dt.solver_output, field, dH)
+        dt["analysis"] = datatree.DataTree(df)
+        
+        def plot_beam_width_along_path_length(dt: xr.DataArray):
+            _, ax = plt.subplots()
+            im_part=np.imag(dt.solver_output.Psi_3D.values)
+            eigval,_ =(np.linalg.eig(im_part))
+            eigval1 = eigval[:,1]
+            eigval2 = eigval[:,2]
+            
+            width1 = np.sqrt(2/eigval1)
+            width2 = np.sqrt(2/eigval2)
+            
+            # width = beam_width(dt.analysis.g_hat, np.array([0.0, 1.0, 0.0]), dt.solver_output.Psi_3D)
+            #find difference first, cumulative sum, sqrt(qx2+qY2+qz2)
+            
+            q_X =dt.solver_output.q_X
+            q_Y =dt.solver_output.q_Y
+            q_Z =dt.solver_output.q_Z
 
-    df = immediate_analysis(
-        solver_output,
-        field,
-        find_density_1D,
-        find_temperature_1D,
-        hamiltonian,
-        K_zeta_initial,
-        launch_angular_frequency,
-        mode_flag,
-        delta_R,
-        delta_Z,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-        Psi_3D_lab_launch,
-        Psi_3D_lab_entry,
-        distance_from_launch_to_entry,
-        vacuumLaunch_flag,
-        output_path,
-        output_filename_suffix,
-        dH,
-    )
-    analysis = further_analysis(
-        inputs,
-        df,
-        Psi_3D_lab_entry_cartersian,
-        output_path,
-        output_filename_suffix,
-        field,
-        detailed_analysis_flag,
-        dH,
-    )
-    df.update(analysis)
-    dt["analysis"] = datatree.DataTree(df)
+            point_spacing = np.sqrt(np.diff(q_X) ** 2 + np.diff(q_Y) ** 2 + np.diff(q_Z) ** 2)
+            distance_along_line = np.append(0, np.cumsum(point_spacing))
+            
+            # beam_plus = np.sqrt(beam_plus[:,0]**2+beam_plus[:,1]**2+beam_plus[:,2]**2)
+            ax.plot(distance_along_line,width1)
+            ax.plot(distance_along_line,width2)
+            # print(np.shape(beam_plus))
+            # print(np.shape(beam_minus))
+            
+            # ax.plot(beam_plus.sel(col="X"), beam_plus.sel(col="Z"))
+            # ax.plot(beam_minus.sel(col="X"), beam_plus.sel(col="Z"))
+            
+            # ax.plot(dist,width[:,0])
+            # print(np.shape(dist))
+            # ax.plot(dist,width[:,0],label="X")
+            # ax.plot(dist,width[:,1],label="Y")
+            # ax.plot(dist,width[:,2],label="Z")
+            return ax
+        
+        ax = plot_beam_width_along_path_length(dt)
+        # ax = cart_plot_poloidal_beam_path(dt)
+        # ax.legend()
+        # ax.set_xlim(0.1,0.2)
+        plt.show()
+        
+#plot beam width as a function of path length, eigen values of psi or something
+# psi 3d im part find eigen vals, width = sqrt eign values 
 
     # We need to use h5netcdf and invalid_netcdf in order to easily
     # write complex numbers

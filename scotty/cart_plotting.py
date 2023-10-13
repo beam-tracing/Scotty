@@ -49,14 +49,14 @@ def plot_bounding_box(dt: DataTree, ax: Optional[plt.Axes] = None) -> plt.Axes:
 
     ax = maybe_make_axis(ax)
 
-    R_min = np.min(dt["inputs"].R.values)
-    R_max = np.max(dt["inputs"].R.values)
+    X_min = np.min(dt["inputs"].X.values)
+    X_max = np.max(dt["inputs"].X.values)
     Z_min = np.min(dt["inputs"].Z.values)
     Z_max = np.max(dt["inputs"].Z.values)
 
-    ax.hlines([Z_min, Z_max], R_min, R_max, color="lightgrey", linestyle="dashed")
-    ax.vlines([R_min, R_max], Z_min, Z_max, color="lightgrey", linestyle="dashed")
-    bounds = np.array((R_min, R_max, Z_min, Z_max))
+    ax.hlines([Z_min, Z_max], X_min, X_max, color="lightgrey", linestyle="dashed")
+    ax.vlines([X_min, X_max], Z_min, Z_max, color="lightgrey", linestyle="dashed")
+    bounds = np.array((X_min, X_max, Z_min, Z_max))
     ax.axis(bounds * 1.1)
     ax.axis("equal")
 
@@ -153,18 +153,17 @@ def plot_poloidal_crosssection(
     ax = maybe_make_axis(ax)
 
     plot_bounding_box(dt, ax)
-
     cax = ax.contour(
-        dt["inputs"].R.values,
+        dt["inputs"].X.values,
         dt["inputs"].Z.values,
-        (dt["inputs"].poloidalFlux_grid.values).T,
+        (dt["inputs"].poloidalFlux_grid.sel(Z=0).values).T,
         levels=np.linspace(0, 1, 11, endpoint=not highlight_LCFS),
         cmap="plasma_r",
     )
     ax.clabel(cax, inline=True)
     if highlight_LCFS:
         ax.contour(
-            dt["inputs"].R.values,
+            dt["inputs"].X.values,
             dt["inputs"].Z.values,
             (dt["inputs"].poloidalFlux_grid.values).T,
             levels=[1.0],
@@ -262,7 +261,7 @@ def plot_dispersion_relation(
     return ax
 
 
-def plot_poloidal_beam_path(
+def cart_plot_poloidal_beam_path(
     dt: DataTree,
     filename: Optional[PathLike] = None,
     ax: Optional[plt.Axes] = None,
@@ -276,20 +275,23 @@ def plot_poloidal_beam_path(
 
     plot_poloidal_crosssection(dt, ax=ax, highlight_LCFS=False)
 
-    launch_R = dt.inputs.launch_position.sel(col="R")
+    launch_X = dt.inputs.launch_position.sel(col="X")
     launch_Z = dt.inputs.launch_position.sel(col="Z")
+    
     ax.plot(
-        np.concatenate([[launch_R], dt.analysis.q_R]),
-        np.concatenate([[launch_Z], dt.analysis.q_Z]),
+        np.concatenate([[launch_X], dt.solver_output.q_X]),
+        np.concatenate([[launch_Z], dt.solver_output.q_Z]),
         ":k",
         label="Central (reference) ray",
     )
-    width = beam_width(dt.analysis.g_hat, np.array([0.0, 1.0, 0.0]), dt.analysis.Psi_3D)
+    
+
+    width = beam_width(dt.analysis.g_hat, np.array([0.0, 1.0, 0.0]), dt.solver_output.Psi_3D)
     beam_plus = dt.analysis.beam + width
     beam_minus = dt.analysis.beam - width
-    ax.plot(beam_plus.sel(col="R"), beam_plus.sel(col="Z"), "--k")
-    ax.plot(beam_minus.sel(col="R"), beam_minus.sel(col="Z"), "--k", label="Beam width")
-    ax.scatter(launch_R, launch_Z, c="red", marker=">", label="Launch position")
+    ax.plot(beam_plus.sel(col="X"), beam_plus.sel(col="Z"), "--k")
+    ax.plot(beam_minus.sel(col="X"), beam_minus.sel(col="Z"), "--k", label="Beam width")
+    ax.scatter(launch_X, launch_Z, c="red", marker=">", label="Launch position")
 
     if zoom:
         ## Write a wrapper function for this maybe
@@ -306,7 +308,7 @@ def plot_poloidal_beam_path(
 
     ax.legend()
     ax.set_title("Beam path (poloidal plane)")
-    ax.set_xlabel("R [m]")
+    ax.set_xlabel("X [m]")
     ax.set_ylabel("Z [m]")
 
     if filename:

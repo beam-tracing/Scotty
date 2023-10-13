@@ -168,6 +168,9 @@ class CartSlabField(CartMagneticField):
         self.Z_coord = np.linspace(-grid_width, grid_width, 101)
         grid_buffer_factor: float = (1,)
         self.B_Y_0 = 1.0  # in teslas
+        self.poloidalFlux_grid = self.poloidal_flux(
+            *np.meshgrid(self.X_coord, self.Y_coord, self.Z_coord, indexing="ij")
+        )
 
     def B_X(self, q_X: ArrayLike, q_Y: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         q_X, q_Y, q_Z = np.asfarray(q_X), np.asfarray(q_Y), np.asfarray(q_Z)
