@@ -61,7 +61,12 @@ import datetime
 import uuid
 import matplotlib.pyplot as plt
 
-from scotty.analysis import immediate_analysis, further_analysis, beam_analysis, beam_width
+from scotty.analysis import (
+    immediate_analysis,
+    further_analysis,
+    beam_analysis,
+    beam_width,
+)
 from scotty.fun_general import (
     find_nearest,
     freq_GHz_to_angular_frequency,
@@ -705,7 +710,6 @@ def beam_me_up(
             "'flag_coordinate_system' only accepts 'cylindrical' or 'cartesian'.",
         )
 
-
     print("Main loop complete")
     # -------------------
     if flag_coordinate_system == "cylindrical":
@@ -773,7 +777,11 @@ def beam_me_up(
             {
                 "solver_status": solver_status,
                 "q_R": (["tau"], q_R_array, {"long_name": "R", "units": "m"}),
-                "q_zeta": (["tau"], q_zeta_array, {"long_name": r"$\zeta$", "units": "m"}),
+                "q_zeta": (
+                    ["tau"],
+                    q_zeta_array,
+                    {"long_name": r"$\zeta$", "units": "m"},
+                ),
                 "q_Z": (["tau"], q_Z_array, {"long_name": "Z", "units": "m"}),
                 "K_R": (["tau"], K_R_array),
                 "K_Z": (["tau"], K_Z_array),
@@ -875,8 +883,6 @@ def beam_me_up(
         "id": str(run_id),
     }
 
-
-    
     if solver_status == -1:
         # If the solver doesn't finish, end the function here
         print("Solver did not reach completion")
@@ -885,10 +891,15 @@ def beam_me_up(
     # Process the data from the main loop to give a bunch of useful stuff
     # -------------------
     print("Analysing data")
-    
+
     if flag_coordinate_system == "cylindrical":
         dH = hamiltonian.derivatives(
-            q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, second_order=True
+            q_R_array,
+            q_Z_array,
+            K_R_array,
+            K_zeta_initial,
+            K_Z_array,
+            second_order=True,
         )
         df = immediate_analysis(
             solver_output,
@@ -926,56 +937,64 @@ def beam_me_up(
         dt["analysis"] = datatree.DataTree(df)
     elif flag_coordinate_system == "cartesian":
         dH = hamiltonian.derivatives(
-            q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, second_order=True
+            q_X_array,
+            q_Y_array,
+            q_Z_array,
+            K_X_array,
+            K_Y_array,
+            K_Z_array,
+            second_order=True,
         )
         print("plotting")
         df = beam_analysis(dt.solver_output, field, dH)
         dt["analysis"] = datatree.DataTree(df)
-        
+
         def plot_beam_width_along_path_length(dt: xr.DataArray):
             _, ax = plt.subplots()
-            im_part=np.imag(dt.solver_output.Psi_3D.values)
-            eigval,_ =(np.linalg.eig(im_part))
-            eigval1 = eigval[:,1]
-            eigval2 = eigval[:,2]
-            
-            width1 = np.sqrt(2/eigval1)
-            width2 = np.sqrt(2/eigval2)
-            
-            # width = beam_width(dt.analysis.g_hat, np.array([0.0, 1.0, 0.0]), dt.solver_output.Psi_3D)
-            #find difference first, cumulative sum, sqrt(qx2+qY2+qz2)
-            
-            q_X =dt.solver_output.q_X
-            q_Y =dt.solver_output.q_Y
-            q_Z =dt.solver_output.q_Z
+            im_part = np.imag(dt.solver_output.Psi_3D.values)
+            eigval, _ = np.linalg.eig(im_part)
+            eigval1 = eigval[:, 1]
+            eigval2 = eigval[:, 2]
 
-            point_spacing = np.sqrt(np.diff(q_X) ** 2 + np.diff(q_Y) ** 2 + np.diff(q_Z) ** 2)
+            width1 = np.sqrt(2 / eigval1)
+            width2 = np.sqrt(2 / eigval2)
+
+            # width = beam_width(dt.analysis.g_hat, np.array([0.0, 1.0, 0.0]), dt.solver_output.Psi_3D)
+            # find difference first, cumulative sum, sqrt(qx2+qY2+qz2)
+
+            q_X = dt.solver_output.q_X
+            q_Y = dt.solver_output.q_Y
+            q_Z = dt.solver_output.q_Z
+
+            point_spacing = np.sqrt(
+                np.diff(q_X) ** 2 + np.diff(q_Y) ** 2 + np.diff(q_Z) ** 2
+            )
             distance_along_line = np.append(0, np.cumsum(point_spacing))
-            
+
             # beam_plus = np.sqrt(beam_plus[:,0]**2+beam_plus[:,1]**2+beam_plus[:,2]**2)
-            ax.plot(distance_along_line,width1)
-            ax.plot(distance_along_line,width2)
+            ax.plot(distance_along_line, width1)
+            ax.plot(distance_along_line, width2)
             # print(np.shape(beam_plus))
             # print(np.shape(beam_minus))
-            
+
             # ax.plot(beam_plus.sel(col="X"), beam_plus.sel(col="Z"))
             # ax.plot(beam_minus.sel(col="X"), beam_plus.sel(col="Z"))
-            
+
             # ax.plot(dist,width[:,0])
             # print(np.shape(dist))
             # ax.plot(dist,width[:,0],label="X")
             # ax.plot(dist,width[:,1],label="Y")
             # ax.plot(dist,width[:,2],label="Z")
             return ax
-        
+
         ax = plot_beam_width_along_path_length(dt)
         # ax = cart_plot_poloidal_beam_path(dt)
         # ax.legend()
         # ax.set_xlim(0.1,0.2)
         plt.show()
-        
-#plot beam width as a function of path length, eigen values of psi or something
-# psi 3d im part find eigen vals, width = sqrt eign values 
+
+    # plot beam width as a function of path length, eigen values of psi or something
+    # psi 3d im part find eigen vals, width = sqrt eign values
 
     # We need to use h5netcdf and invalid_netcdf in order to easily
     # write complex numbers
