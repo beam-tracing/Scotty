@@ -60,21 +60,20 @@ def save_npz(filename: Path, df: xr.Dataset) -> None:
         **{str(k): v for k, v in df.items()},
         **{str(k): v.data for k, v in df.coords.items()},
     )
-
-
+    
 def beam_analysis(
     solver_output: xr.Dataset,
     field: MagneticField,
     dH: Dict[str, ArrayLike],
 ):
-    q_X = solver_output.q_X
+    q_X = solver_output.q_X    
     q_Y = solver_output.q_Y
     q_Z = solver_output.q_Z
     tau = solver_output.tau
     K_X = solver_output.K_X
     K_Y = solver_output.K_Y
     K_Z = solver_output.K_Z
-
+    
     dH_dX = dH["dH_dX"]
     dH_dY = dH["dH_dY"]
     dH_dZ = dH["dH_dZ"]
@@ -82,9 +81,10 @@ def beam_analysis(
     dH_dKY = dH["dH_dKY"]
     dH_dKZ = dH["dH_dKZ"]
 
-    g_magnitude = (q_X**2 * dH_dKY**2 + dH_dKX**2 + dH_dKZ**2) ** 0.5
-    g_hat = (np.block([[dH_dKX], [q_X * dH_dKY], [dH_dKZ]]) / g_magnitude.data).T
-
+    g_magnitude = (dH_dKX**2 + dH_dKY**2 + dH_dKZ**2) ** 0.5
+    g_hat = (np.block([[dH_dKX], [dH_dKY], [dH_dKZ]]) / g_magnitude.data).T
+    # print(g_hat)
+    # print(*g_hat[:,],"g hat", sep="\n")
     df = xr.Dataset(
         {
             "g_hat": (["tau", "col"], g_hat),
@@ -99,7 +99,6 @@ def beam_analysis(
     df.tau.attrs["long_name"] = "Parameterised distance along beam"
     set_vector_components_long_name(df)
     return df
-
 
 def immediate_analysis(
     solver_output: xr.Dataset,
@@ -1029,3 +1028,5 @@ def beam_width(
     width = xr.DataArray(W_uvec * width[:, np.newaxis], coords=g_hat.coords)
     set_vector_components_long_name(width)
     return width
+
+

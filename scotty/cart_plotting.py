@@ -277,17 +277,14 @@ def cart_plot_poloidal_beam_path(
 
     launch_X = dt.inputs.launch_position.sel(col="X")
     launch_Z = dt.inputs.launch_position.sel(col="Z")
-
     ax.plot(
         np.concatenate([[launch_X], dt.solver_output.q_X]),
         np.concatenate([[launch_Z], dt.solver_output.q_Z]),
         ":k",
         label="Central (reference) ray",
     )
-
-    width = beam_width(
-        dt.analysis.g_hat, np.array([0.0, 1.0, 0.0]), dt.solver_output.Psi_3D
-    )
+    
+    width = beam_width(dt.analysis.g_hat, np.array([0.0, 1.0, 0.0]), dt.solver_output.Psi_3D)
     beam_plus = dt.analysis.beam + width
     beam_minus = dt.analysis.beam - width
     ax.plot(beam_plus.sel(col="X"), beam_plus.sel(col="Z"), "--k")
@@ -296,8 +293,8 @@ def cart_plot_poloidal_beam_path(
 
     if zoom:
         ## Write a wrapper function for this maybe
-        R_max = max(beam_plus.sel(col="R").max(), beam_minus.sel(col="R").max())
-        R_min = min(beam_plus.sel(col="R").min(), beam_minus.sel(col="R").min())
+        R_max = max(beam_plus.sel(col="X").max(), beam_minus.sel(col="X").max())
+        R_min = min(beam_plus.sel(col="X").min(), beam_minus.sel(col="X").min())
         Z_max = max(beam_plus.sel(col="Z").max(), beam_minus.sel(col="Z").max())
         Z_min = min(beam_plus.sel(col="Z").min(), beam_minus.sel(col="Z").min())
 

@@ -25,7 +25,6 @@ def cart_pack_beam_parameters(
     Psi: FloatArray,
 ) -> FloatArray:
     """Pack coordinates and Psi matrix into single flat array for"""
-
     # This used to be complex, with a length of 11, but the solver
     # throws a warning saying that something is casted to real It
     # seems to be fine, bu
@@ -90,7 +89,6 @@ def cart_unpack_beam_parameters(
     Psi_3D[:, 1, 0] = Psi_3D[:, 0, 1]
     Psi_3D[:, 2, 0] = Psi_3D[:, 0, 2]
     Psi_3D[:, 2, 1] = Psi_3D[:, 1, 2]
-
     return q_X, q_Y, q_Z, K_X, K_Y, K_Z, np.squeeze(Psi_3D)
 
 
@@ -108,10 +106,8 @@ def cart_beam_evolution_fun(tau, beam_parameters, hamiltonian: cart_Hamiltonian)
     d_beam_parameters_d_tau
         d (beam_parameters) / d tau
     """
-
+    
     q_X, q_Y, q_Z, K_X, K_Y, K_Z, Psi_3D = cart_unpack_beam_parameters(beam_parameters)
-
-    # Find derivatives of H
     dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z, second_order=True)
 
     grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians(dH)
@@ -123,9 +119,9 @@ def cart_beam_evolution_fun(tau, beam_parameters, hamiltonian: cart_Hamiltonian)
     dH_dKX = dH["dH_dKX"]
     dH_dKY = dH["dH_dKY"]
     dH_dKZ = dH["dH_dKZ"]
-
+    
     d_Psi_d_tau = (
-        -grad_grad_H
+        - grad_grad_H
         - np.matmul(Psi_3D, gradK_grad_H)
         - np.matmul(grad_gradK_H, Psi_3D)
         - np.matmul(np.matmul(Psi_3D, gradK_gradK_H), Psi_3D)
@@ -134,3 +130,5 @@ def cart_beam_evolution_fun(tau, beam_parameters, hamiltonian: cart_Hamiltonian)
     return cart_pack_beam_parameters(
         dH_dKX, dH_dKY, dH_dKZ, -dH_dX, -dH_dY, -dH_dZ, d_Psi_d_tau
     )
+    
+    

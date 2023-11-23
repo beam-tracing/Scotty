@@ -501,7 +501,7 @@ def cart_propagate_ray(
         atol=atol,
         max_step=50,
     )
-    """
+    '''
     ### plot x and y and z 
     import matplotlib.pyplot as plt 
     fig, ax = plt.subplots()
@@ -511,7 +511,7 @@ def cart_propagate_ray(
     # ax.plot(solver_ray_output.y[2],label="z")
     ax.legend()
     plt.show()
-    """
+    '''
     solver_end_time = time()
     if verbose:
         print("Time taken (ray solver)", solver_end_time - solver_start_time, "s")

@@ -309,6 +309,9 @@ class cart_Hamiltonian:
                 "d2H_dX_dY": apply_stencil(("q_X", "q_Y"), "d1d1_FFD_FFD2"),
                 "d2H_dX_dZ": apply_stencil(("q_X", "q_Z"), "d1d1_FFD_FFD2"),
                 "d2H_dY_dZ": apply_stencil(("q_Y", "q_Z"), "d1d1_FFD_FFD2"),
+                # "d2H_dY_dX": apply_stencil(("q_Y", "q_X"), "d1d1_FFD_FFD2"),
+                # "d2H_dZ_dX": apply_stencil(("q_Z", "q_X"), "d1d1_FFD_FFD2"),
+                # "d2H_dZ_dY": apply_stencil(("q_Z", "q_Y"), "d1d1_FFD_FFD2"),
                 "d2H_dX_dKX": apply_stencil(("q_X", "K_X"), "d1d1_FFD_CFD2"),
                 "d2H_dX_dKY": apply_stencil(("q_X", "K_Y"), "d1d1_FFD_CFD2"),
                 "d2H_dX_dKZ": apply_stencil(("q_X", "K_Z"), "d1d1_FFD_CFD2"),
@@ -321,6 +324,9 @@ class cart_Hamiltonian:
                 "d2H_dKX_dKZ": apply_stencil(("K_X", "K_Z"), "d1d1_CFD_CFD2"),
                 "d2H_dKX_dKY": apply_stencil(("K_X", "K_Y"), "d1d1_CFD_CFD2"),
                 "d2H_dKY_dKZ": apply_stencil(("K_Y", "K_Z"), "d1d1_CFD_CFD2"),
+                # "d2H_dKZ_dKX": apply_stencil(("K_Z", "K_X"), "d1d1_CFD_CFD2"),
+                # "d2H_dKY_dKX": apply_stencil(("K_Y", "K_X"), "d1d1_CFD_CFD2"),
+                # "d2H_dKZ_dKY": apply_stencil(("K_Z", "K_Y"), "d1d1_CFD_CFD2"),
             }
             derivatives.update(second_derivatives)
 
@@ -349,6 +355,9 @@ def hessians(dH: dict):
     d2H_dX_dY = dH["d2H_dX_dY"]
     d2H_dX_dZ = dH["d2H_dX_dZ"]
     d2H_dY_dZ = dH["d2H_dY_dZ"]
+    # d2H_dY_dX = dH["d2H_dY_dX"]
+    # d2H_dZ_dX = dH["d2H_dZ_dX"]
+    # d2H_dZ_dY = dH["d2H_dZ_dY"]
     d2H_dKX_dX = dH["d2H_dX_dKX"]
     d2H_dKY_dX = dH["d2H_dX_dKY"]
     d2H_dKZ_dX = dH["d2H_dX_dKZ"]
@@ -361,6 +370,9 @@ def hessians(dH: dict):
     d2H_dKX_dKY = dH["d2H_dKX_dKY"]
     d2H_dKX_dKZ = dH["d2H_dKX_dKZ"]
     d2H_dKY_dKZ = dH["d2H_dKY_dKZ"]
+    # d2H_dKY_dKX = dH["d2H_dKY_dKX"]
+    # d2H_dKZ_dKX = dH["d2H_dKZ_dKX"]
+    # d2H_dKZ_dKY = dH["d2H_dKZ_dKY"]
 
     zeros = np.zeros_like(d2H_dX2)
 
@@ -383,8 +395,8 @@ def hessians(dH: dict):
         np.array(
             [
                 [d2H_dKX_dX, d2H_dKX_dY, d2H_dKX_dZ],
-                [d2H_dKX_dY, d2H_dKY_dY, d2H_dKY_dZ],
-                [d2H_dKX_dZ, d2H_dKY_dZ, d2H_dKZ_dZ],
+                [d2H_dKY_dX, d2H_dKY_dY, d2H_dKY_dZ],
+                [d2H_dKZ_dX, d2H_dKZ_dY, d2H_dKZ_dZ],
             ]
         )
     )

@@ -61,12 +61,7 @@ import datetime
 import uuid
 import matplotlib.pyplot as plt
 
-from scotty.analysis import (
-    immediate_analysis,
-    further_analysis,
-    beam_analysis,
-    beam_width,
-)
+from scotty.analysis import immediate_analysis, further_analysis, beam_analysis, beam_width
 from scotty.fun_general import (
     find_nearest,
     freq_GHz_to_angular_frequency,
@@ -106,7 +101,7 @@ from scotty.typing import PathLike, FloatArray
 # cartesian converters
 from scotty.cart_geometry import CartMagneticField, CartSlabField
 from scotty.cart_ray_solver import cart_propagate_ray
-from scotty.cart_hamiltonian import cart_Hamiltonian
+from scotty.cart_hamiltonian import cart_Hamiltonian, hessians
 from scotty.cart_fun_evolution import (
     cart_beam_evolution_fun,
     cart_pack_beam_parameters,
@@ -544,7 +539,9 @@ def beam_me_up(
             poloidal_flux_enter=poloidal_flux_enter,
             delta_R=delta_R,
             delta_Z=delta_Z,
+            flag_coordinate_system=flag_coordinate_system,
         )
+        
     else:
         print("Beam launched from inside the plasma")
         Psi_3D_lab_initial = find_Psi_3D_lab(
@@ -603,7 +600,6 @@ def beam_me_up(
         return ray_solver_output
 
     tau_leave, tau_points = cast(tuple, ray_solver_output)
-
     # -------------------
     # Propagate the beam
 
@@ -643,7 +639,7 @@ def beam_me_up(
         beam_parameters = solver_beam_output.y
         tau_array = solver_beam_output.t
         solver_status = solver_beam_output.status
-
+        
         (
             q_R_array,
             q_zeta_array,
@@ -656,7 +652,12 @@ def beam_me_up(
     elif flag_coordinate_system == "cartesian":
         K_X_initial = K_R_initial
         K_Y_initial = K_zeta_initial
-
+        print(initial_position[0],"q_X")
+        print(initial_position[1],"q_y")
+        print(initial_position[2],"q_Z")
+        print(K_X_initial,"K_X")
+        print(K_Y_initial,"K_Y")
+        print(K_Z_initial,"K_Z")
         beam_parameters_initial = cart_pack_beam_parameters(
             initial_position[0],
             initial_position[1],
@@ -666,7 +667,22 @@ def beam_me_up(
             K_Z_initial,
             Psi_3D_lab_initial,
         )
-
+        re_part = np.real(Psi_3D_lab_initial)
+        print(np.linalg.eig(re_part))
+        im_part = np.imag(Psi_3D_lab_initial)
+        eigval,eigvect =(np.linalg.eig(im_part))
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111, projection='3d')
+        # for i in range(len(eigval)):
+            # ax.quiver(0, 0, 0, eigvect[0,i], eigvect[1,i], eigvect[2,i])
+            # ax.set_xlim([-1, 1])
+            # ax.set_ylim([-1, 1])
+            # ax.set_zlim([-1, 1])
+        print(im_part,"imaginary part")
+        print(re_part,"real part")
+        print(eigval,eigvect)
+        print()
+        
         solver_start_time = time.time()
         solver_beam_output = integrate.solve_ivp(
             cart_beam_evolution_fun,
@@ -689,11 +705,9 @@ def beam_me_up(
         print(
             f"Time per beam evolution evaluation: {solver_time / solver_beam_output.nfev}"
         )
-
         beam_parameters = solver_beam_output.y
         tau_array = solver_beam_output.t
         solver_status = solver_beam_output.status
-
         (
             q_X_array,
             q_Y_array,
@@ -703,7 +717,6 @@ def beam_me_up(
             K_Z_array,
             Psi_3D_output,
         ) = cart_unpack_beam_parameters(beam_parameters)
-
     else:
         raise ValueError(
             f"The flag specified for 'flag_coordinate_system': '{flag_coordinate_system}' does not exist.",
@@ -777,11 +790,7 @@ def beam_me_up(
             {
                 "solver_status": solver_status,
                 "q_R": (["tau"], q_R_array, {"long_name": "R", "units": "m"}),
-                "q_zeta": (
-                    ["tau"],
-                    q_zeta_array,
-                    {"long_name": r"$\zeta$", "units": "m"},
-                ),
+                "q_zeta": (["tau"], q_zeta_array, {"long_name": r"$\zeta$", "units": "m"}),
                 "q_Z": (["tau"], q_Z_array, {"long_name": "Z", "units": "m"}),
                 "K_R": (["tau"], K_R_array),
                 "K_Z": (["tau"], K_Z_array),
@@ -793,6 +802,7 @@ def beam_me_up(
                 "col": ["R", "zeta", "Z"],
             },
         )
+        
     elif flag_coordinate_system == "cartesian":
         inputs = xr.Dataset(
             {
@@ -883,6 +893,8 @@ def beam_me_up(
         "id": str(run_id),
     }
 
+
+    
     if solver_status == -1:
         # If the solver doesn't finish, end the function here
         print("Solver did not reach completion")
@@ -891,15 +903,10 @@ def beam_me_up(
     # Process the data from the main loop to give a bunch of useful stuff
     # -------------------
     print("Analysing data")
-
+    
     if flag_coordinate_system == "cylindrical":
         dH = hamiltonian.derivatives(
-            q_R_array,
-            q_Z_array,
-            K_R_array,
-            K_zeta_initial,
-            K_Z_array,
-            second_order=True,
+            q_R_array, q_Z_array, K_R_array, K_zeta_initial, K_Z_array, second_order=True
         )
         df = immediate_analysis(
             solver_output,
@@ -935,66 +942,36 @@ def beam_me_up(
         )
         df.update(analysis)
         dt["analysis"] = datatree.DataTree(df)
+
     elif flag_coordinate_system == "cartesian":
         dH = hamiltonian.derivatives(
-            q_X_array,
-            q_Y_array,
-            q_Z_array,
-            K_X_array,
-            K_Y_array,
-            K_Z_array,
-            second_order=True,
+            q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, second_order=True
         )
         print("plotting")
         df = beam_analysis(dt.solver_output, field, dH)
         dt["analysis"] = datatree.DataTree(df)
+        
+        # ax = plot_beam_width_along_path_length(
+            # dt.solver_output.Psi_3D.values,
+            # dt.solver_output.q_X,
+            # dt.solver_output.q_Y,
+            # dt.solver_output.q_Z,
+            # dt.solver_output.K_X,
+            # dt.solver_output.K_Y,
+            # dt.solver_output.K_Z,
+            # )
 
-        def plot_beam_width_along_path_length(dt: xr.DataArray):
-            _, ax = plt.subplots()
-            im_part = np.imag(dt.solver_output.Psi_3D.values)
-            eigval, _ = np.linalg.eig(im_part)
-            eigval1 = eigval[:, 1]
-            eigval2 = eigval[:, 2]
-
-            width1 = np.sqrt(2 / eigval1)
-            width2 = np.sqrt(2 / eigval2)
-
-            # width = beam_width(dt.analysis.g_hat, np.array([0.0, 1.0, 0.0]), dt.solver_output.Psi_3D)
-            # find difference first, cumulative sum, sqrt(qx2+qY2+qz2)
-
-            q_X = dt.solver_output.q_X
-            q_Y = dt.solver_output.q_Y
-            q_Z = dt.solver_output.q_Z
-
-            point_spacing = np.sqrt(
-                np.diff(q_X) ** 2 + np.diff(q_Y) ** 2 + np.diff(q_Z) ** 2
-            )
-            distance_along_line = np.append(0, np.cumsum(point_spacing))
-
-            # beam_plus = np.sqrt(beam_plus[:,0]**2+beam_plus[:,1]**2+beam_plus[:,2]**2)
-            ax.plot(distance_along_line, width1)
-            ax.plot(distance_along_line, width2)
-            # print(np.shape(beam_plus))
-            # print(np.shape(beam_minus))
-
-            # ax.plot(beam_plus.sel(col="X"), beam_plus.sel(col="Z"))
-            # ax.plot(beam_minus.sel(col="X"), beam_plus.sel(col="Z"))
-
-            # ax.plot(dist,width[:,0])
-            # print(np.shape(dist))
-            # ax.plot(dist,width[:,0],label="X")
-            # ax.plot(dist,width[:,1],label="Y")
-            # ax.plot(dist,width[:,2],label="Z")
-            return ax
-
-        ax = plot_beam_width_along_path_length(dt)
-        # ax = cart_plot_poloidal_beam_path(dt)
-        # ax.legend()
-        # ax.set_xlim(0.1,0.2)
+        ax = cart_plot_poloidal_beam_path(dt)
+        ax.legend()
+        ax.set_xlim(-0.6,0.6)
+        ax.set_ylim(-0.5,0.5)
+        
+        # plot_eigvecs(dt.solver_output.Psi_3D.values)
+        # plot_eigvals(dt.solver_output.Psi_3D.values)
         plt.show()
-
-    # plot beam width as a function of path length, eigen values of psi or something
-    # psi 3d im part find eigen vals, width = sqrt eign values
+        
+# plot beam width as a function of path length, eigen values of psi or something
+# psi 3d im part find eigen vals, width = sqrt eign values 
 
     # We need to use h5netcdf and invalid_netcdf in order to easily
     # write complex numbers
@@ -1289,3 +1266,90 @@ def create_magnetic_geometry(
         )
 
     raise ValueError(f"Invalid find_B_method '{find_B_method}'")
+
+def plot_beam_width_along_path_length(Psi_3D, q_X, q_Y, q_Z, K_X, K_Y, K_Z):
+    _, ax = plt.subplots()
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    im_part = np.imag(Psi_3D)
+    # print(Psi_3D)
+    eigval,eigvect =(np.linalg.eig(im_part))
+    # eigval=np.sort(eigval)
+    eigval1 = eigval[:,1]
+    eigval2 = eigval[:,2]
+    # print(eigval1,eigval2)
+    # width1=(eigval1)
+    # width2=(eigval2)
+    
+    width1 = np.sqrt(2/eigval1)
+    width2 = np.sqrt(2/eigval2)
+    
+    # re_part = np.real(Psi_3D)
+    # eigval,eigvect =(np.linalg.eig(re_part))
+    # K_mag = np.sqrt(K_X*K_X + K_Y*K_Y + K_Z*K_Z)
+    # eigval = eigval
+    # one_over_r=np.divide(eigval,K_mag)
+    # print(one_over_r)
+
+    # print(eigval)
+    # print(eigvect)
+
+    point_spacing = np.sqrt(np.diff(q_X) ** 2 + np.diff(q_Y) ** 2 + np.diff(q_Z) ** 2)
+    distance_along_line = np.append(0, np.cumsum(point_spacing))
+    ax.plot(distance_along_line,width1)
+    ax.plot(distance_along_line,width2)
+    # ax.plot(distance_along_line,one_over_r)
+    
+    # for i in range(len(eigval[0])):
+        # ax.quiver(0, 0, 0, eigvect[0][0,i], eigvect[0][1,i], eigvect[0][2,i])
+    # ax.set_xlim([-1, 1])
+    # ax.set_ylim([-1, 1])
+    # ax.set_zlim([-1, 1])
+    return ax
+
+def plot_eigvecs(Psi_3D):
+    re_part = np.real(Psi_3D)
+    eigval,eigvect =(np.linalg.eig(re_part))
+    # print(eigval)
+    # print(eigvect,"eigvect")
+    # K_mag = np.sqrt(K_X*K_X + K_Y*K_Y + K_Z*K_Z)
+    # eigval = eigval
+    # one_over_r=np.divide(eigval,K_mag)
+    # print(one_over_r)
+
+
+
+    _, (ax1,ax2,ax3 )= plt.subplots(3)
+    im_part = np.imag(Psi_3D)
+    eigval,eigvect =(np.linalg.eig(im_part))
+    # print(np.linalg.eig(Psi_3D))
+    # print(eigval[:,0])
+    eigval1 = eigval[:,1]
+    eigval2 = eigval[:,2]
+    # print(*eigvect[:,2,0], sep="\n")
+    # print(eigvect[:,:,0])
+    # print(eigvect[0,:,1])
+    # print(eigvect[0,:,2])
+
+    ax1.plot(eigvect[:,0,0],label="X")
+    ax1.plot(eigvect[:,1,0],label="Y")
+    ax1.plot(eigvect[:,2,0],label="Z")
+    ax2.plot(eigvect[:,0,1],label="X")
+    ax2.plot(eigvect[:,1,1],label="Y")
+    ax2.plot(eigvect[:,2,1],label="Z")
+    ax3.plot(eigvect[:,0,2],label="X")
+    ax3.plot(eigvect[:,1,2],label="Y")
+    ax3.plot(eigvect[:,2,2],label="Z")
+
+    ax1.legend()
+    ax2.legend()
+    ax3.legend()
+    return ax1,ax2,ax3
+
+
+def plot_eigvals(Psi_3D):
+    _, ax= plt.subplots()
+    im_part = np.imag(Psi_3D)
+    eigval,eigvect =(np.linalg.eig(im_part))
+    ax.plot(eigval)
+    return ax
