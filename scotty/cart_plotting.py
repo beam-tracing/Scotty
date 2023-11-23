@@ -283,8 +283,10 @@ def cart_plot_poloidal_beam_path(
         ":k",
         label="Central (reference) ray",
     )
-    
-    width = beam_width(dt.analysis.g_hat, np.array([0.0, 1.0, 0.0]), dt.solver_output.Psi_3D)
+
+    width = beam_width(
+        dt.analysis.g_hat, np.array([0.0, 1.0, 0.0]), dt.solver_output.Psi_3D
+    )
     beam_plus = dt.analysis.beam + width
     beam_minus = dt.analysis.beam - width
     ax.plot(beam_plus.sel(col="X"), beam_plus.sel(col="Z"), "--k")

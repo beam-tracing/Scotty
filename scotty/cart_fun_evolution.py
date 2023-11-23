@@ -106,7 +106,7 @@ def cart_beam_evolution_fun(tau, beam_parameters, hamiltonian: cart_Hamiltonian)
     d_beam_parameters_d_tau
         d (beam_parameters) / d tau
     """
-    
+
     q_X, q_Y, q_Z, K_X, K_Y, K_Z, Psi_3D = cart_unpack_beam_parameters(beam_parameters)
     dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z, second_order=True)
 
@@ -119,9 +119,9 @@ def cart_beam_evolution_fun(tau, beam_parameters, hamiltonian: cart_Hamiltonian)
     dH_dKX = dH["dH_dKX"]
     dH_dKY = dH["dH_dKY"]
     dH_dKZ = dH["dH_dKZ"]
-    
+
     d_Psi_d_tau = (
-        - grad_grad_H
+        -grad_grad_H
         - np.matmul(Psi_3D, gradK_grad_H)
         - np.matmul(grad_gradK_H, Psi_3D)
         - np.matmul(np.matmul(Psi_3D, gradK_gradK_H), Psi_3D)
@@ -130,5 +130,3 @@ def cart_beam_evolution_fun(tau, beam_parameters, hamiltonian: cart_Hamiltonian)
     return cart_pack_beam_parameters(
         dH_dKX, dH_dKY, dH_dKZ, -dH_dX, -dH_dY, -dH_dZ, d_Psi_d_tau
     )
-    
-    

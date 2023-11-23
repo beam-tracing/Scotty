@@ -46,7 +46,7 @@ def launch_beam(
     delta_R: float = -1e-4,
     delta_Z: float = 1e-4,
     temperature=None,
-    flag_coordinate_system='cylindrical',
+    flag_coordinate_system="cylindrical",
 ):
     r"""
     Propagate the beam from its initial position at the antenna to
@@ -122,15 +122,19 @@ def launch_beam(
         raise ValueError(
             f"Unexpected value for `Psi_BC_flag` ({Psi_BC_flag}), expected one of None, 'continuous, or 'discontinuous'"
         )
-    
+
     toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam)
     poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_Torbeam)
-    
-    wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency) #299792458.0
-    print(wavenumber_K0,"wavenumber_K0")
+
+    wavenumber_K0 = angular_frequency_to_wavenumber(
+        launch_angular_frequency
+    )  # 299792458.0
+    print(wavenumber_K0, "wavenumber_K0")
     if flag_coordinate_system == "cylindrical":
         K_R_launch = (
-            -wavenumber_K0 * np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
+            -wavenumber_K0
+            * np.cos(toroidal_launch_angle)
+            * np.cos(poloidal_launch_angle)
         )
         K_zeta_launch = (
             -wavenumber_K0
@@ -140,9 +144,10 @@ def launch_beam(
         )
         K_Z_launch = -wavenumber_K0 * np.sin(poloidal_launch_angle)
     elif flag_coordinate_system == "cartesian":
-    
         K_R_launch = (
-            -wavenumber_K0 * np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
+            -wavenumber_K0
+            * np.cos(toroidal_launch_angle)
+            * np.cos(poloidal_launch_angle)
         )
         K_zeta_launch = (
             -wavenumber_K0
@@ -150,12 +155,12 @@ def launch_beam(
             * np.cos(poloidal_launch_angle)
         )
         K_Z_launch = -wavenumber_K0 * np.sin(poloidal_launch_angle)
-        print("K_R_launch",K_R_launch)
-        print("K_zeta_launch",K_zeta_launch)
-        print("K_Z_launch",K_Z_launch)
+        print("K_R_launch", K_R_launch)
+        print("K_zeta_launch", K_zeta_launch)
+        print("K_Z_launch", K_Z_launch)
     launch_K = np.array([K_R_launch, K_zeta_launch, K_Z_launch])
     poloidal_rotation_angle = poloidal_launch_angle + (np.pi / 2)
-    print(poloidal_rotation_angle,"poloidal_rotation_angle")
+    print(poloidal_rotation_angle, "poloidal_rotation_angle")
 
     Psi_w_beam_diagonal = (
         wavenumber_K0 * launch_beam_curvature + 2j * launch_beam_width ** (-2)
@@ -178,21 +183,21 @@ def launch_beam(
             [0, 0, 1],
         ]
     )
-    #pol is y
-    #tor is z
+    # pol is y
+    # tor is z
     # rotation_matrix_pol = np.array(
-        # [
-            # [-np.cos(poloidal_rotation_angle), 0, -np.sin(poloidal_rotation_angle)],
-            # [0, 1, 0],
-            # [np.sin(poloidal_rotation_angle), 0, -np.cos(poloidal_rotation_angle)],
-        # ]
+    # [
+    # [-np.cos(poloidal_rotation_angle), 0, -np.sin(poloidal_rotation_angle)],
+    # [0, 1, 0],
+    # [np.sin(poloidal_rotation_angle), 0, -np.cos(poloidal_rotation_angle)],
+    # ]
     # )
     # rotation_matrix_tor = np.array(
-        # [
-            # [np.sin(toroidal_launch_angle), np.cos(toroidal_launch_angle), 0],
-            # [-np.cos(toroidal_launch_angle), np.sin(toroidal_launch_angle), 0],
-            # [0, 0, 1],
-        # ]
+    # [
+    # [np.sin(toroidal_launch_angle), np.cos(toroidal_launch_angle), 0],
+    # [-np.cos(toroidal_launch_angle), np.sin(toroidal_launch_angle), 0],
+    # [0, 0, 1],
+    # ]
     # )
     rotation_matrix = np.matmul(rotation_matrix_pol, rotation_matrix_tor)
     rotation_matrix_inverse = np.transpose(rotation_matrix)
@@ -203,34 +208,40 @@ def launch_beam(
     print("Psi_3D NEEDS to be changed!")
     if flag_coordinate_system == "cartesian":
         dH = hamiltonian.derivatives(
-            launch_position[0], launch_position[1],launch_position[2], K_R_launch, K_zeta_launch, K_Z_launch, second_order=True
-            )
+            launch_position[0],
+            launch_position[1],
+            launch_position[2],
+            K_R_launch,
+            K_zeta_launch,
+            K_Z_launch,
+            second_order=True,
+        )
         dH_dX = dH["dH_dX"]
         dH_dY = dH["dH_dY"]
         dH_dZ = dH["dH_dZ"]
         dH_dKX = dH["dH_dKX"]
         dH_dKY = dH["dH_dKY"]
         dH_dKZ = dH["dH_dKZ"]
-        
+
         # 1/g dh_dxyz . xyz_hat
         # g = |∇KH|
-        
+
         g_magnitude = (dH_dKX**2 + dH_dKY**2 + dH_dKZ**2) ** 0.5
         g_hat = (np.block([[dH_dKX], [dH_dKY], [dH_dKZ]]) / g_magnitude.data).T
-        
-        grad_H = np.array([dH_dX,dH_dY,dH_dZ])
+
+        grad_H = np.array([dH_dX, dH_dY, dH_dZ])
         # rotation from lab to beam
-        
+
         # xyz hat in lab frame
-        x = (np.array([1,0,0]))
-        y = (np.array([0,1,0]))
-        z = (np.array([0,0,1]))
+        x = np.array([1, 0, 0])
+        y = np.array([0, 1, 0])
+        z = np.array([0, 0, 1])
         # xyz hat in beam frame
         # x_hat = np.dot(rotation_matrix_inverse, x)
         # y_hat = np.dot(rotation_matrix_inverse, y)
         # g_hat = np.dot(rotation_matrix_inverse, z)
-        #calcuate x,y,g hat using equations from paper
-        
+        # calcuate x,y,g hat using equations from paper
+
         # print(rotation_matrix,"rotation_matrix")
         # print(rotation_matrix_inverse,"rotation_matrix_inverse")
         # print(x,y,z,"x,y,z")
@@ -241,14 +252,14 @@ def launch_beam(
         # print(np.dot(grad_H, x_hat),"np.dot(grad_H, x hat)")
         # print(np.dot(grad_H, y_hat),"np.dot(grad_H, y hat)")
         # print(np.dot(grad_H, g_hat),"np.dot(grad_H, g hat)")
-        
+
         # print(grad_H,"grad_H before rotation")
         # grad_H = np.matmul(rotation_matrix_inverse,grad_H)
         # print(grad_H,"grad_H after rotation")
-        print(Psi_3D_beam_launch_cartersian,"Psi_3D_beam_launch_cartersian")
-        Psi_3D_beam_launch_cartersian[:,2] = grad_H
-        Psi_3D_beam_launch_cartersian[2,:] = grad_H
-        print(Psi_3D_beam_launch_cartersian,"Psi_3D_beam_launch_cartersian")
+        print(Psi_3D_beam_launch_cartersian, "Psi_3D_beam_launch_cartersian")
+        Psi_3D_beam_launch_cartersian[:, 2] = grad_H
+        Psi_3D_beam_launch_cartersian[2, :] = grad_H
+        print(Psi_3D_beam_launch_cartersian, "Psi_3D_beam_launch_cartersian")
         ## psi_w        0           dh_dx_beam
         ## 0            psi_w       dh_dy_beam
         #  dh_dx_beam   dh_dy_beam  dh_dz_beam
@@ -257,8 +268,8 @@ def launch_beam(
             rotation_matrix_inverse,
             np.matmul(Psi_3D_beam_launch_cartersian, rotation_matrix),
         )
-        
-        print("Psi_3D_lab_launch_cartersian",Psi_3D_lab_launch_cartersian)
+
+        print("Psi_3D_lab_launch_cartersian", Psi_3D_lab_launch_cartersian)
     if flag_coordinate_system == "cylindrical":
         Psi_3D_lab_launch_cartersian = np.matmul(
             rotation_matrix_inverse,
@@ -278,15 +289,16 @@ def launch_beam(
     elif flag_coordinate_system == "cartesian":
         Psi_3D_lab_launch = Psi_3D_lab_launch_cartersian
     else:
-        return print(f"The flag specified for 'flag_coordinate_system': '{flag_coordinate_system}' does not exist.",
+        return print(
+            f"The flag specified for 'flag_coordinate_system': '{flag_coordinate_system}' does not exist.",
             "'flag_coordinate_system' only accepts 'cylindrical' or 'cartesian'.",
         )
     #####
     # trying out equation A6 from Juan's paper on consequences of doppler backscattering
     print()
     # Psi_3D_beam_launch_cartersian = np.array(   [[,-0.5*np.sin(),],
-                                                # [,,],
-                                                # [,,]])
+    # [,,],
+    # [,,]])
     #####
     if not vacuum_propagation_flag:
         return (
@@ -299,7 +311,7 @@ def launch_beam(
             np.full_like(Psi_3D_lab_launch, fill_value=np.nan),
             None,
         )
-    
+
     Psi_w_beam_inverse_launch_cartersian = find_inverse_2D(Psi_w_beam_launch_cartersian)
 
     entry_position = find_entry_point(
@@ -319,7 +331,7 @@ def launch_beam(
         * np.cos(entry_position[1] - launch_position[1])
         + (launch_position[2] - entry_position[2]) ** 2
     )
-    
+
     # Calculate entry parameters from launch parameters
     # That is, find beam at start of plasma given its parameters at the antenna
     K_lab_launch = np.array([K_R_launch, K_zeta_launch, K_Z_launch])
@@ -358,7 +370,7 @@ def launch_beam(
     # -------------------
     # Find initial parameters in plasma
     # -------------------
-    
+
     initial_position = entry_position
     if Psi_BC_flag == "discontinuous":
         K_initial, Psi_3D_lab_initial = apply_discontinuous_BC(
@@ -393,7 +405,7 @@ def launch_beam(
         # No BC case
         K_initial = [K_R_entry, K_zeta_entry, K_Z_entry]
         Psi_3D_lab_initial = Psi_3D_lab_entry
-    
+
     return (
         np.array(K_initial),
         initial_position,
