@@ -67,11 +67,6 @@ for ii, equil_time in enumerate(equil_times):
             elif kwargs_dict["mode_flag"] == -1:
                 mode_string = "X"
 
-            if counter == 0:
-                kwargs_dict["verbose_output_flag"] = True
-            else:
-                kwargs_dict["verbose_output_flag"] = False
-
             kwargs_dict["output_filename_suffix"] = (
                 "_r" + f"{mirror_rotation:.1f}"
                 "_t"

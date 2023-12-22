@@ -10,11 +10,8 @@ from scipy import constants as constants
 from scipy import interpolate as interpolate
 from scipy import integrate as integrate
 from scipy import optimize as optimize
-from typing import TextIO, List, Any, Tuple
+from typing import TextIO, List, Any, Tuple, NamedTuple
 from scotty.typing import ArrayLike, FloatArray
-
-from scotty.typing import ArrayLike
-from typing import Optional, Union
 
 
 def read_floats_into_list_until(terminator: str, lines: TextIO) -> FloatArray:
@@ -48,11 +45,13 @@ def find_nearest(array: ArrayLike, value: Any) -> int:
     return int(idx)
 
 
-def contract_special(arg_a: FloatArray, arg_b: FloatArray) -> FloatArray:
+def dot(arg_a: FloatArray, arg_b: FloatArray) -> FloatArray:
     """Dot product of arrays of vectors or matrices.
 
     Covers the case that matmul and dot don't do very elegantly, and
     avoids having to use a for loop to iterate over the array slices.
+
+    Replaces the deprecated contract_special.
 
     Parameters
     ----------
@@ -66,36 +65,7 @@ def contract_special(arg_a: FloatArray, arg_b: FloatArray) -> FloatArray:
         matrices/vectors
 
     """
-    if (
-        np.ndim(arg_a) == 3 and np.ndim(arg_b) == 2
-    ):  # arg_a is the matrix and arg_b is the vector
-        matrix = arg_a
-        vector = arg_b
-        intermediate_result = np.tensordot(matrix, vector, ((2), (1)))
-        result = np.diagonal(
-            intermediate_result, offset=0, axis1=0, axis2=2
-        ).transpose()
-    elif (
-        np.ndim(arg_a) == 2 and np.ndim(arg_b) == 3
-    ):  # arg_a is the vector and arg_b is the matrix
-        vector = arg_a
-        matrix = arg_b
-        intermediate_result = np.tensordot(matrix, vector, ((1), (1)))
-        result = np.diagonal(
-            intermediate_result, offset=0, axis1=0, axis2=2
-        ).transpose()
-    elif (
-        np.ndim(arg_a) == 2 and np.ndim(arg_b) == 2
-    ):  # arg_a is the vector and arg_b is a vector
-        vector1 = arg_a
-        vector2 = arg_b
-        intermediate_result = np.tensordot(vector1, vector2, ((1), (1)))
-        result = np.diagonal(
-            intermediate_result, offset=0, axis1=0, axis2=1
-        ).transpose()
-    else:
-        print("Error: Invalid dimensions")
-    return result
+    return np.array(list(map(np.dot, arg_a, arg_b)))
 
 
 def make_unit_vector_from_cross_product(vector_a, vector_b):
@@ -231,18 +201,6 @@ def find_vec_lab_Cartesian(vec_lab, q_zeta):
     vec_lab_Cartesian.T[1] = vec_R * np.sin(q_zeta) + vec_zeta * np.cos(q_zeta)
     vec_lab_Cartesian.T[2] = vec_Z
     return vec_lab_Cartesian
-
-
-def find_q_lab_Cartesian(q_lab):
-    q_R = q_lab[0]
-    q_zeta = q_lab[1]
-    q_Z = q_lab[2]
-
-    q_lab_Cartesian = np.zeros_like(q_lab)
-    q_lab_Cartesian[0] = q_R * np.cos(q_zeta)
-    q_lab_Cartesian[1] = q_R * np.sin(q_zeta)
-    q_lab_Cartesian[2] = q_Z
-    return q_lab_Cartesian
 
 
 def find_q_lab(q_lab_Cartesian):
@@ -1470,28 +1428,22 @@ def find_quick_output(ray_parameters_2D, K_zeta_initial, find_B_R, find_B_T, fin
 
 
 # Functions (circular Gaussian beam in vacuum)
-def find_Rayleigh_length(
-    waist, wavenumber
-):  # Finds the size of the waist (assumes vacuum propagation and circular beam)
-    Rayleigh_length = 0.5 * wavenumber * waist**2
-    return Rayleigh_length
+def find_Rayleigh_length(waist, wavenumber):
+    """Finds the size of the waist (assumes vacuum propagation and circular beam)"""
+    return 0.5 * wavenumber * waist**2
 
 
-def find_waist(
-    width, wavenumber, curvature
-):  # Finds the size of the waist (assumes vacuum propagation and circular beam)
-    waist = width / np.sqrt(1 + curvature**2 * width**4 * wavenumber**2 / 4)
-    return waist
+def find_waist(width, wavenumber, curvature):
+    """Finds the size of the waist (assumes vacuum propagation and circular beam)"""
+    return width / np.sqrt(1 + curvature**2 * width**4 * wavenumber**2 / 4)
 
 
-def find_distance_from_waist(
-    width, wavenumber, curvature
-):  # Finds how far you are from the waist (assumes vacuum propagation and circular beam)
-    waist = width / np.sqrt(1 + curvature**2 * width**4 * wavenumber**2 / 4)
-    distance_from_waist = np.sign(curvature) * np.sqrt(
-        (width**2 - waist**2) * waist**2 * wavenumber**2 / 4
+def find_distance_from_waist(width, wavenumber, curvature):
+    """Finds how far you are from the waist (assumes vacuum propagation and circular beam)"""
+    waist_sq = find_waist(width, wavenumber, curvature) ** 2
+    return np.sign(curvature) * np.sqrt(
+        (width**2 - waist_sq) * waist_sq * wavenumber**2 / 4
     )
-    return distance_from_waist
 
 
 # def propagate_circular_beam(distance,wavenumber,w0):
@@ -2018,3 +1970,42 @@ def K_magnitude(
             = \sqrt{K_R^2 + (K_\zeta / q_R)^2 + K_Z^2}
     """
     return np.sqrt(K_R**2 + (K_zeta / q_R) ** 2 + K_Z**2)
+
+
+CartesianCoords = NamedTuple(
+    "CartesianCoords", (("X", ArrayLike), ("Y", ArrayLike), ("Z", ArrayLike))
+)
+CylindricalCoords = NamedTuple(
+    "CylindricalCoords", (("R", ArrayLike), ("phi", ArrayLike), ("Z", ArrayLike))
+)
+ToroidalCoords = NamedTuple(
+    "ToroidalCoords", (("R", ArrayLike), ("theta", ArrayLike), ("phi", ArrayLike))
+)
+
+
+def cartesian_to_cylindrical(
+    X: ArrayLike, Y: ArrayLike, Z: ArrayLike
+) -> CylindricalCoords:
+    """Convert Cartesian to cylindrical coordinates"""
+    return CylindricalCoords(np.sqrt(X**2 + Y**2), np.arctan2(Y, X), Z)
+
+
+def cylindrical_to_cartesian(
+    R: ArrayLike, phi: ArrayLike, Z: ArrayLike
+) -> CartesianCoords:
+    """Convert cylindrical to Cartesian coordinates"""
+    return CartesianCoords(R * np.cos(phi), R * np.sin(phi), Z)
+
+
+def toroidal_to_cartesian(
+    rho: ArrayLike, theta: ArrayLike, phi: ArrayLike, R0: float = 0.0
+) -> CartesianCoords:
+    """Convert toroidal to Cartesian coordinates
+
+    Left-handed coordinate system?
+    """
+    return CartesianCoords(
+        (R0 + rho * np.cos(theta)) * np.cos(phi),
+        (R0 + rho * np.cos(theta)) * np.sin(phi),
+        rho * np.sin(theta),
+    )

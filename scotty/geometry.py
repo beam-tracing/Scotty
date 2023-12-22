@@ -25,6 +25,7 @@ class MagneticField(ABC):
     Z_coord: FloatArray
     #: Value of the poloidal magnetic flux, :math:`\psi`, on ``(R_coord, Z_coord)``
     poloidalFlux_grid: FloatArray
+    ## TODO: Include B_R_grid, B_T_grid, and B_Z_grid
 
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         raise NotImplementedError
@@ -82,6 +83,20 @@ class MagneticField(ABC):
             {"q_R": delta_R, "q_Z": delta_Z},
         )
 
+    def magnitude(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        """Returns :math:`|B|`, the magnitude of the magnetic field"""
+        return np.sqrt(
+            self.B_R(q_R, q_Z) ** 2 + self.B_T(q_R, q_Z) ** 2 + self.B_Z(q_R, q_Z) ** 2
+        )
+
+    def unit(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        r"""Returns :math:`\mathbf{B}/|B|`, the unit vector of the magnetic field"""
+        magnitude = self.magnitude(q_R, q_Z)
+        unit_vector = np.array(
+            [self.B_R(q_R, q_Z), self.B_T(q_R, q_Z), self.B_Z(q_R, q_Z)]
+        )
+        return (unit_vector / magnitude).T
+
 
 class CircularCrossSectionField(MagneticField):
     """Simple circular cross-section magnetic geometry
@@ -131,7 +146,11 @@ class CircularCrossSectionField(MagneticField):
 
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
-        return self.B_p_a * q_Z / (q_R * self.minor_radius_a * self.rho(q_R, q_Z))
+        return np.where(
+            abs(q_Z) < 1e-12,
+            0.0,
+            self.B_p_a * q_Z / (q_R * self.minor_radius_a * self.rho(q_R, q_Z)),
+        )
 
     def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
@@ -139,10 +158,12 @@ class CircularCrossSectionField(MagneticField):
 
     def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
-        return (
+        return np.where(
+            abs(q_R - self.R_axis) < 1e-12,
+            0.0,
             -self.B_p_a
             * (q_R - self.R_axis)
-            / (q_R * self.minor_radius_a * self.rho(q_R, q_Z))
+            / (q_R * self.minor_radius_a * self.rho(q_R, q_Z)),
         )
 
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:

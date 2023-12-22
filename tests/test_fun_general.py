@@ -6,8 +6,10 @@ from scotty.fun_general import (
     find_Psi_3D_lab_Cartesian,
     make_array_3x3,
     K_magnitude,
-    contract_special,
+    dot,
     find_Psi_3D_plasma_discontinuous,
+    cartesian_to_cylindrical,
+    cylindrical_to_cartesian,
 )
 
 import io
@@ -16,6 +18,7 @@ from textwrap import dedent
 from scipy.constants import c as speed_of_light
 import numpy as np
 import numpy.testing as npt
+import pytest
 
 
 def test_freq_GHz_to_wavenumber():
@@ -139,15 +142,15 @@ def test_make_array_3x3():
     npt.assert_array_equal(B, expected)
 
 
-def test_contract_special_vector_vector():
+def test_dot_vector_vector():
     vector1 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     vector2 = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     expected = np.array([1, 1, 1])
-    result = contract_special(vector1, vector2)
+    result = dot(vector1, vector2)
     npt.assert_array_equal(result, expected)
 
 
-def test_contract_special_matrix_vector():
+def test_dot_matrix_vector():
     matrix = np.array(
         [
             [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -157,11 +160,11 @@ def test_contract_special_matrix_vector():
     )
     vector = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     expected = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-    result = contract_special(matrix, vector)
+    result = dot(matrix, vector)
     npt.assert_array_equal(result, expected)
 
 
-def test_contract_special_vector_matrix():
+def test_dot_vector_matrix():
     matrix = np.array(
         [
             [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -171,7 +174,7 @@ def test_contract_special_vector_matrix():
     )
     vector = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     expected = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-    result = contract_special(vector, matrix)
+    result = dot(vector, matrix)
     npt.assert_array_equal(result, expected)
 
 
@@ -267,3 +270,31 @@ def test_find_Psi_3D_plasma_discontinuous():
     )
 
     npt.assert_allclose(Psi_3D_plasma, expected_Psi_3D_plasma)
+
+
+@pytest.mark.parametrize(
+    ("cartesian", "expected_cylindrical"),
+    (
+        ((1.0, 0.0, 0.0), (1.0, 0.0, 0.0)),
+        ((0.0, 1.0, 0.0), (1.0, np.pi / 2, 0.0)),
+        ((0.0, 0.0, 1.0), (0.0, 0.0, 1.0)),
+        ((np.sqrt(2) / 2, np.sqrt(2) / 2, 2.2), (1.0, np.pi / 4, 2.2)),
+    ),
+)
+def test_cartesian_to_cylindrical(cartesian, expected_cylindrical):
+    cylindrical = cartesian_to_cylindrical(*cartesian)
+    npt.assert_allclose(cylindrical, expected_cylindrical)
+
+
+@pytest.mark.parametrize(
+    ("cylindrical", "expected_cartesian"),
+    (
+        ((1.0, 0.0, 0.0), (1.0, 0.0, 0.0)),
+        ((1.0, np.pi / 2, 0.0), (0.0, 1.0, 0.0)),
+        ((0.0, 0.0, 1.0), (0.0, 0.0, 1.0)),
+        ((1.0, np.pi / 4, 2.2), (np.sqrt(2) / 2, np.sqrt(2) / 2, 2.2)),
+    ),
+)
+def test_cylindrical_to_cylindrical(cylindrical, expected_cartesian):
+    cartesian = cylindrical_to_cartesian(*cylindrical)
+    npt.assert_allclose(cartesian, expected_cartesian, atol=1e-15)

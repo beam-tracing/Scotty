@@ -67,11 +67,6 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
             kwargs_dict["figure_flag"] = False
             kwargs_dict["detailed_analysis_flag"] = False
 
-            if ii == 0 and jj == 0 and kk == 0:
-                kwargs_dict["verbose_output_flag"] = True
-            else:
-                kwargs_dict["verbose_output_flag"] = False
-
             an_output = (
                 kwargs_dict["output_path"]
                 + "data_output"

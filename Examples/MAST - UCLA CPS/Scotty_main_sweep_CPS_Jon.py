@@ -88,12 +88,6 @@ for ii, equil_time in enumerate(equil_times):
                     kwargs_dict["rtol"] = 1e-3
                     kwargs_dict["atol"] = 1e-6
 
-                    kwargs_dict["verbose_output_flag"] = True
-                    # if ii == 0 and jj == 0 and kk == 0 and ll == 0:
-                    #     kwargs_dict['verbose_output_flag'] = True
-                    # else:
-                    #     kwargs_dict['verbose_output_flag'] = False
-
                     data_output = (
                         kwargs_dict["output_path"]
                         + "data_output"
