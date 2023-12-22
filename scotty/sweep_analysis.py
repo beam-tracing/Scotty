@@ -9,6 +9,7 @@ angle and frequency as axes.
 
 
 import xarray as xr
+import DataTree as dt
 import numpy as np
 import json
 import warnings
@@ -44,6 +45,218 @@ class SweepDataset:
         self.topfile = None
 
     # I/O
+    @classmethod
+    def from_DataTree(
+        cls,
+        input_path,
+        frequencies,
+        poloidal_angles,
+        toroidal_angles,
+        filepath_format,
+        attrs_dict={},
+    ):
+        """Constructs a SweepDataset instance from a set of Scotty .h5 output files.
+
+        Args:
+            input_path (string): Path to home folder containing all outputs
+            frequencies (iterable): Array or List of indexing frequencies
+            toroidal_angles (iterable): Array or List of indexing toroidal launch angles
+            poloidal_angles (iterable): Array or List of indexing poloidal launch angles
+            filepath_format (f-string): an f-string that specifies the path string to be
+            appended to the end of the input_path to access outputs of individual runs.
+            Note that the file path or filenames must include {frequency}, {toroidal_angle},
+            and {poloidal_angle} specified in frequencies, toroidal_angles, and poloidal_angles.
+            attrs_dict (dictionary): A dictionary of attribute names and values to save to
+            the xarray dataset.
+        """
+        ds = xr.Dataset()
+        ds.attrs["class_type"] = "SweepDataset"
+        ds.attrs["descriptor"] = ""
+        for key, value in attrs_dict:
+            ds.attrs[key] = value
+
+        missing_indices = []
+
+        variables = [
+            "distance_along_line",
+            "delta_theta_m",
+            "theta_m_output",
+            "theta_output",
+            "cutoff_index",
+            "q_R_array",
+            "q_Z_array",
+            "q_zeta_array",
+            "K_magnitude_array",
+            "K_R_array",
+            "K_Z_array",
+            "K_zeta_initial",
+            "poloidal_flux_output",
+            "loc_m",
+            "loc_b",
+            "loc_p",
+            "loc_r",
+        ]
+
+
+        print("Reading .h5 files...")
+
+        for variable in variables:
+            ds[variable] = xr.DataArray(
+                coords=[
+                    ("frequency", frequencies),
+                    ("poloidal_angle", poloidal_angles),
+                    ("toroidal_angle", toroidal_angles),
+                ]
+            )
+
+        for combination in product(frequencies, toroidal_angles, poloidal_angles):
+            frequency, toroidal_angle, poloidal_angle = combination
+            index = {
+                "frequency": float(frequency),
+                "poloidal_angle": float(poloidal_angle),
+                "toroidal_angle": float(toroidal_angle),
+            }
+
+            # File paths for the scotty .h5 output file
+            path = input_path + filepath_format.format(
+                frequency=frequency,
+                poloidal_angle=poloidal_angle,
+                toroidal_angle=toroidal_angle,
+            )
+
+
+            # Load data into the empty Dataset
+
+            input_dict = {
+                "launch_position" : "launch_position",
+                "mode_flag" : "mode_flag",
+                "data_R_coord" : "R",
+                "data_Z_coord" : "Z",
+                "ne_data_density_array" : "ne_data_density_array",
+                "ne_data_radialcoord_array" : "ne_data_radialcoord_array",
+            }
+
+            try:
+                with dt.open_datatree(path) as tree:
+                    analysis = tree['analysis']
+                    path_len = len(tree["distance_along_line"].values)
+
+                    attribute_dict = {
+                        "distance_along_line" : "distance_along_line",
+                        "delta_theta_m" : "delta_theta_m",
+                        "theta_m_output" : "theta_m",
+                        "theta_output": "theta",
+                        "K_magnitude_array": "K_magnitude",
+                        "loc_m" : "loc_m",
+                        "loc_b" : "loc_b",
+                        "loc_p" : "loc_p",
+                        "loc_r" : "loc_r",
+                        "poloidal_flux_output":"poloidal_flux",
+                    }
+
+                    for attribute in (
+                        "distance_along_line",
+                        "delta_theta_m",
+                        "theta_m_output",
+                        "theta_output",
+                        "K_magnitude_array",
+                        "loc_m",
+                        "loc_b",
+                        "loc_p",
+                        "loc_r",
+                        "poloidal_flux_output",
+                    ):
+                        key = attribute_dict[attribute]
+                        current_ds = ds[attribute]
+                        data = analysis[key].values
+                        if len(current_ds.dims) < 4:
+                            ds[attribute] = current_ds.expand_dims(
+                                dim={"trajectory_step": np.arange(0, path_len)}, axis=-1
+                            ).copy()
+                        ds[attribute].loc[index] = data
+
+                    ds["cutoff_index"].loc[index] = analysis["cutoff_index"].values
+
+                    output = tree["solver_output"]
+                    attribute_dict2 = {
+                        "q_R_array": "q_R",
+                        "q_zeta_array": "q_zeta",
+                        "q_Z_array": "q_Z",
+                        "K_R_array": "K_R",
+                        "K_Z_array": "K_Z",
+                        
+                    }
+                    for attribute in (
+                        "q_R_array",
+                        "q_zeta_array",
+                        "q_Z_array",
+                        "K_R_array",
+                        "K_Z_array",
+                    ):  
+                        key = attribute_dict2[attribute]
+                        current_ds = ds[attribute]
+                        if "trajectory_step" not in current_ds.dims:
+                            ds[attribute] = current_ds.expand_dims(
+                                dim={"trajectory_step": np.arange(0, path_len)}, axis=-1
+                            ).copy()
+                        ds[attribute].loc[index] = output[key]
+
+                    ds["K_zeta_initial"].loc[index] = tree["inputs"]["K_initial"].values[1]
+            
+            except FileNotFoundError:
+                print(
+                    f"No file found for freq={frequency} pol={poloidal_angle}, tor={toroidal_angle}"
+                )
+                missing_indices.append(index)
+                continue
+
+        for combination in product(frequencies, toroidal_angles, poloidal_angles):
+            frequency, toroidal_angle, poloidal_angle = combination
+            index = {
+                "frequency": float(frequency),
+                "poloidal_angle": float(poloidal_angle),
+                "toroidal_angle": float(toroidal_angle),
+            }
+            # File paths for the scotty .h5 output file
+            path = input_path + filepath_format.format(
+                frequency=frequency,
+                poloidal_angle=poloidal_angle,
+                toroidal_angle=toroidal_angle,
+            )
+
+            try:
+                with dt.open_datatree(path) as tree:
+                    input_file = tree["inputs"]
+                    for attribute in input_dict.keys():
+                        key = input_dict[attribute]
+                        ds.attrs[attribute] = input_file[attribute]
+
+                    anaysis = tree["analysis"]
+                    ds.attrs["poloidal_flux_on_midplane"] = analysis[
+                        "poloidal_flux_on_midplane"
+                    ]
+                    ds.attrs["R_midplane_points"] = analysis["R_midplane"]
+                    index = ds.attrs["poloidal_flux_on_midplane"].argmin()
+                    R_coord = ds.attrs["R_midplane_points"][index]
+                    ds.attrs["magnetic_axis_RZ"] = np.array((R_coord, 0.0))
+
+                print(f"Input information read from {path_input}")
+                break
+
+            except FileNotFoundError:
+                    continue
+
+        print("File reading complete.")
+
+        ds["cutoff_index"] = ds["cutoff_index"].astype(int)
+        ds["theta_output"] = np.rad2deg(ds["theta_output"])
+        ds["theta_m_output"] = np.rad2deg(ds["theta_m_output"])
+        ds["delta_theta_m"] = np.rad2deg(ds["delta_theta_m"])
+        classobject = cls(ds)
+        classobject.missing_indices = missing_indices
+        return classobject
+            
+    
 
     @classmethod
     def from_netcdf(cls, path_string):
@@ -74,7 +287,7 @@ class SweepDataset:
         filepath_format,
         attrs_dict={},
     ):
-        """Constructs a SweepDataset instance from a set of Scotty output files.
+        """Constructs a SweepDataset instance from a set of Scotty .npz output files.
 
         Args:
             input_path (string): Path to home folder containing all outputs
