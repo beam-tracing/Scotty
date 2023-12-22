@@ -97,7 +97,6 @@ class SweepDataset:
             "loc_r",
         ]
 
-
         print("Reading .h5 files...")
 
         for variable in variables:
@@ -124,34 +123,33 @@ class SweepDataset:
                 toroidal_angle=toroidal_angle,
             )
 
-
             # Load data into the empty Dataset
 
             input_dict = {
-                "launch_position" : "launch_position",
-                "mode_flag" : "mode_flag",
-                "data_R_coord" : "R",
-                "data_Z_coord" : "Z",
-                "ne_data_density_array" : "ne_data_density_array",
-                "ne_data_radialcoord_array" : "ne_data_radialcoord_array",
+                "launch_position": "launch_position",
+                "mode_flag": "mode_flag",
+                "data_R_coord": "R",
+                "data_Z_coord": "Z",
+                "ne_data_density_array": "ne_data_density_array",
+                "ne_data_radialcoord_array": "ne_data_radialcoord_array",
             }
 
             try:
                 with dt.open_datatree(path) as tree:
-                    analysis = tree['analysis']
+                    analysis = tree["analysis"]
                     path_len = len(tree["distance_along_line"].values)
 
                     attribute_dict = {
-                        "distance_along_line" : "distance_along_line",
-                        "delta_theta_m" : "delta_theta_m",
-                        "theta_m_output" : "theta_m",
+                        "distance_along_line": "distance_along_line",
+                        "delta_theta_m": "delta_theta_m",
+                        "theta_m_output": "theta_m",
                         "theta_output": "theta",
                         "K_magnitude_array": "K_magnitude",
-                        "loc_m" : "loc_m",
-                        "loc_b" : "loc_b",
-                        "loc_p" : "loc_p",
-                        "loc_r" : "loc_r",
-                        "poloidal_flux_output":"poloidal_flux",
+                        "loc_m": "loc_m",
+                        "loc_b": "loc_b",
+                        "loc_p": "loc_p",
+                        "loc_r": "loc_r",
+                        "poloidal_flux_output": "poloidal_flux",
                     }
 
                     for attribute in (
@@ -184,7 +182,6 @@ class SweepDataset:
                         "q_Z_array": "q_Z",
                         "K_R_array": "K_R",
                         "K_Z_array": "K_Z",
-                        
                     }
                     for attribute in (
                         "q_R_array",
@@ -192,7 +189,7 @@ class SweepDataset:
                         "q_Z_array",
                         "K_R_array",
                         "K_Z_array",
-                    ):  
+                    ):
                         key = attribute_dict2[attribute]
                         current_ds = ds[attribute]
                         if "trajectory_step" not in current_ds.dims:
@@ -201,8 +198,10 @@ class SweepDataset:
                             ).copy()
                         ds[attribute].loc[index] = output[key]
 
-                    ds["K_zeta_initial"].loc[index] = tree["inputs"]["K_initial"].values[1]
-            
+                    ds["K_zeta_initial"].loc[index] = tree["inputs"][
+                        "K_initial"
+                    ].values[1]
+
             except FileNotFoundError:
                 print(
                     f"No file found for freq={frequency} pol={poloidal_angle}, tor={toroidal_angle}"
@@ -244,7 +243,7 @@ class SweepDataset:
                 break
 
             except FileNotFoundError:
-                    continue
+                continue
 
         print("File reading complete.")
 
@@ -255,8 +254,6 @@ class SweepDataset:
         classobject = cls(ds)
         classobject.missing_indices = missing_indices
         return classobject
-            
-    
 
     @classmethod
     def from_netcdf(cls, path_string):
