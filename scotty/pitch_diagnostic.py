@@ -1023,10 +1023,13 @@ class PitchDiagnostic:
     def _fit_gaussians(
         self, data, descriptor, opt_tor_type="mismatch", opt_tor_guess=-1, width_guess=4
     ):
+        dic = {"opt_tor": opt_tor_guess, "width": width_guess}
+        p0 = {key: value for key, value in dic.items() if value is not None}
+
         curvefit_results = data.curvefit(
             coords="toroidal_angle",
             func=fit_gaussian,
-            p0={"opt_tor": opt_tor_guess, "width": width_guess},
+            p0=p0,
             skipna=True,
             errors="ignore",
         )
@@ -1579,6 +1582,10 @@ class PitchDiagnostic:
         colormap = plt.cm.gnuplot2
         counter = 0
         total_count = len(self.descriptors)
+        data = self.ds_dict[descriptor][f"{sim_type}_profile"]
+        actual = self.ds_dict[descriptor][f"opt_tor_{sim_type}"].loc[
+            {"poloidal_angle": self.poloidal_angles[0]}
+        ]
 
         for descriptor in self.descriptors:
             color = colormap(counter / total_count)
