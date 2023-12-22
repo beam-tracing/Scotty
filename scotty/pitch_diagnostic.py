@@ -457,7 +457,9 @@ class PitchDiagnostic:
         )
         return pitch_rho
 
-    def get_opt_tor_freq_spline(self, descriptor, order=5, smoothing=0, opt_tor_type="mismatch"):
+    def get_opt_tor_freq_spline(
+        self, descriptor, order=5, smoothing=0, opt_tor_type="mismatch"
+    ):
         """Spline for optimal toroidal steering as a function of launch frequency.
         Args:
             descriptor (int): Descriptor of the Dataset to generate the spline for.
@@ -525,7 +527,7 @@ class PitchDiagnostic:
 
     ## Simulation methods
 
-    def get_cutoff_locations(self, SweepDataset, opt_tor_type="mismatch"): 
+    def get_cutoff_locations(self, SweepDataset, opt_tor_type="mismatch"):
         # opt_tor_type is used as a class-wide toggle since many plots rely on the
         # cutoff locations calculated; kind of a stop-gap solution
         """Reads the cutoff locations in R-Z coordinates from the SweepDataset.
@@ -538,10 +540,10 @@ class PitchDiagnostic:
         descriptor = str(SweepDataset.descriptor)
         if descriptor in self.ds_dict:
             ds = self.ds_dict[descriptor]
-            '''
+            """
             if {"cutoff_R", "cutoff_Z"}.issubset(set(ds.keys())):
                 print(f"Cutoff positions already read for {descriptor}.")
-                return None'''
+                return None"""
         else:
             self.ds_dict[descriptor] = xr.Dataset()
 
@@ -561,7 +563,9 @@ class PitchDiagnostic:
             coords={"poloidal_angle": self.poloidal_angles[0]},
         )
 
-        opt_tor_freq_spline = self.get_opt_tor_freq_spline(descriptor, opt_tor_type=opt_tor_type)
+        opt_tor_freq_spline = self.get_opt_tor_freq_spline(
+            descriptor, opt_tor_type=opt_tor_type
+        )
 
         R_spline = lambda freq: cutoff_R_spline(
             (
@@ -601,14 +605,19 @@ class PitchDiagnostic:
         descriptor = str(SweepDataset.descriptor)
         if descriptor in self.ds_dict:
             ds = self.ds_dict[descriptor]
-            if {"opt_tor_mismatch", "opt_tor_loc_m", "opt_tor_loc_product", "delta_theta_m", "K_magnitude"}.issubset(set(ds.keys())):
+            if {
+                "opt_tor_mismatch",
+                "opt_tor_loc_m",
+                "opt_tor_loc_product",
+                "delta_theta_m",
+                "K_magnitude",
+            }.issubset(set(ds.keys())):
                 print(f"Variables already interpolated from {descriptor}!")
                 return None
         else:
             self.ds_dict[descriptor] = xr.Dataset()
 
         for key in ["mismatch", "loc_m", "loc_product"]:
-            
             opt_tor_spline = SweepDataset.create_2Dspline(
                 variable=f"opt_tor_{key}",
                 xdimension="frequency",
@@ -954,7 +963,9 @@ class PitchDiagnostic:
 
     ## Analysis methods
 
-    def fit_measurement_gaussians(self, descriptor=None, opt_tor_guess=-1, width_guess=4):
+    def fit_measurement_gaussians(
+        self, descriptor=None, opt_tor_guess=-1, width_guess=4
+    ):
         if descriptor:
             descriptors = [descriptor]
         else:
@@ -965,7 +976,13 @@ class PitchDiagnostic:
                 continue
 
             mismatch = self.ds_dict[desc]["simulated_mismatch"]
-            mismatch_results = self._fit_gaussians(mismatch, desc, opt_tor_type='mismatch', opt_tor_guess=opt_tor_guess, width_guess=width_guess)
+            mismatch_results = self._fit_gaussians(
+                mismatch,
+                desc,
+                opt_tor_type="mismatch",
+                opt_tor_guess=opt_tor_guess,
+                width_guess=width_guess,
+            )
             self.ds_dict[desc]["mismatch_gaussian_coeffs"] = mismatch_results[
                 "curvefit_coefficients"
             ]
@@ -974,7 +991,13 @@ class PitchDiagnostic:
             ]
 
             loc_m = self.ds_dict[desc]["simulated_loc_m"]
-            loc_m_results = self._fit_gaussians(loc_m, desc, opt_tor_type='loc_m', opt_tor_guess=opt_tor_guess, width_guess=width_guess)
+            loc_m_results = self._fit_gaussians(
+                loc_m,
+                desc,
+                opt_tor_type="loc_m",
+                opt_tor_guess=opt_tor_guess,
+                width_guess=width_guess,
+            )
             self.ds_dict[desc]["loc_m_gaussian_coeffs"] = loc_m_results[
                 "curvefit_coefficients"
             ]
@@ -983,7 +1006,13 @@ class PitchDiagnostic:
             ]
 
             loc_product = self.ds_dict[desc]["simulated_loc_product"]
-            loc_product_results = self._fit_gaussians(loc_product, desc, opt_tor_type='loc_product', opt_tor_guess=opt_tor_guess, width_guess=width_guess)
+            loc_product_results = self._fit_gaussians(
+                loc_product,
+                desc,
+                opt_tor_type="loc_product",
+                opt_tor_guess=opt_tor_guess,
+                width_guess=width_guess,
+            )
             self.ds_dict[desc]["loc_product_gaussian_coeffs"] = loc_product_results[
                 "curvefit_coefficients"
             ]
@@ -991,12 +1020,13 @@ class PitchDiagnostic:
                 "curvefit_covariance"
             ]
 
-    def _fit_gaussians(self, data, descriptor, opt_tor_type = 'mismatch', opt_tor_guess=-1, width_guess=4):
+    def _fit_gaussians(
+        self, data, descriptor, opt_tor_type="mismatch", opt_tor_guess=-1, width_guess=4
+    ):
         curvefit_results = data.curvefit(
             coords="toroidal_angle",
             func=fit_gaussian,
-            p0={"opt_tor": opt_tor_guess,
-                "width": width_guess},
+            p0={"opt_tor": opt_tor_guess, "width": width_guess},
             skipna=True,
             errors="ignore",
         )
@@ -1039,7 +1069,7 @@ class PitchDiagnostic:
                     param=1
                 )
 
-    def get_pitch_relation_across_equilibria(self, opt_tor_type='mismatch'):
+    def get_pitch_relation_across_equilibria(self, opt_tor_type="mismatch"):
         for descriptor in self.descriptors:
             if "current_scaling" not in self.ds_dict[descriptor].attrs.keys():
                 raise KeyError(
@@ -1100,7 +1130,9 @@ class PitchDiagnostic:
         return ds["gradient"], ds["intercept"]
 
     def analyse_all(self, opt_tor_guess=-1, width_guess=4):
-        self.fit_measurement_gaussians(opt_tor_guess=opt_tor_guess, width_guess=width_guess)
+        self.fit_measurement_gaussians(
+            opt_tor_guess=opt_tor_guess, width_guess=width_guess
+        )
         self.aggregate_fitted_gaussians()
         try:
             for key in ["mismatch", "loc_m", "loc_product"]:
@@ -1391,7 +1423,7 @@ class PitchDiagnostic:
 
         return fig, axes
 
-    def plot_variable_vs_tor(self, variable, descriptor, opt_tor_type='mismatch'):
+    def plot_variable_vs_tor(self, variable, descriptor, opt_tor_type="mismatch"):
         """Plot how a variable changes over the toroidal steering range, normalized
         to the value at opt_tor.
 
