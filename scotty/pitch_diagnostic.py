@@ -954,7 +954,7 @@ class PitchDiagnostic:
 
     ## Analysis methods
 
-    def fit_measurement_gaussians(self, descriptor=None):
+    def fit_measurement_gaussians(self, descriptor=None, opt_tor_guess=-1, width_guess=4):
         if descriptor:
             descriptors = [descriptor]
         else:
@@ -965,7 +965,7 @@ class PitchDiagnostic:
                 continue
 
             mismatch = self.ds_dict[desc]["simulated_mismatch"]
-            mismatch_results = self._fit_gaussians(mismatch, desc, opt_tor_type='mismatch')
+            mismatch_results = self._fit_gaussians(mismatch, desc, opt_tor_type='mismatch', opt_tor_guess=opt_tor_guess, width_guess=width_guess)
             self.ds_dict[desc]["mismatch_gaussian_coeffs"] = mismatch_results[
                 "curvefit_coefficients"
             ]
@@ -974,7 +974,7 @@ class PitchDiagnostic:
             ]
 
             loc_m = self.ds_dict[desc]["simulated_loc_m"]
-            loc_m_results = self._fit_gaussians(loc_m, desc, opt_tor_type='loc_m')
+            loc_m_results = self._fit_gaussians(loc_m, desc, opt_tor_type='loc_m', opt_tor_guess=opt_tor_guess, width_guess=width_guess)
             self.ds_dict[desc]["loc_m_gaussian_coeffs"] = loc_m_results[
                 "curvefit_coefficients"
             ]
@@ -983,7 +983,7 @@ class PitchDiagnostic:
             ]
 
             loc_product = self.ds_dict[desc]["simulated_loc_product"]
-            loc_product_results = self._fit_gaussians(loc_product, desc, opt_tor_type='loc_product')
+            loc_product_results = self._fit_gaussians(loc_product, desc, opt_tor_type='loc_product', opt_tor_guess=opt_tor_guess, width_guess=width_guess)
             self.ds_dict[desc]["loc_product_gaussian_coeffs"] = loc_product_results[
                 "curvefit_coefficients"
             ]
@@ -991,11 +991,12 @@ class PitchDiagnostic:
                 "curvefit_covariance"
             ]
 
-    def _fit_gaussians(self, data, descriptor, opt_tor_type = 'mismatch'):
+    def _fit_gaussians(self, data, descriptor, opt_tor_type = 'mismatch', opt_tor_guess=-1, width_guess=4):
         curvefit_results = data.curvefit(
             coords="toroidal_angle",
             func=fit_gaussian,
-            p0={"opt_tor_{opt_tor_type}": -2},
+            p0={"opt_tor": opt_tor_guess,
+                "width": width_guess},
             skipna=True,
             errors="ignore",
         )
@@ -1098,8 +1099,8 @@ class PitchDiagnostic:
 
         return ds["gradient"], ds["intercept"]
 
-    def analyse_all(self):
-        self.fit_measurement_gaussians()
+    def analyse_all(self, opt_tor_guess=-1, width_guess=4):
+        self.fit_measurement_gaussians(opt_tor_guess=opt_tor_guess, width_guess=width_guess)
         self.aggregate_fitted_gaussians()
         try:
             for key in ["mismatch", "loc_m", "loc_product"]:
@@ -1978,7 +1979,7 @@ class PitchDiagnostic:
         fig.suptitle("Change in optimum toroidal steering vs. scaling", fontsize=15)
         return fig, ax, np.array(slopes)
 
-    def plot_delta_pitch_vs_scaling(self, default_descriptor="1.0X"):
+    def plot_delta_pitch_vs_scaling(self, default_descriptor="1.0"):
         """For the given array of frequencies, we assume a fixed set of probe locations within
         the plasma based on the 1.0X current scaling at optimal toroidal steering for this scaling.
         From this static set of 1.0X probe locations in R-Z coordinates, plot how the actual pitch
