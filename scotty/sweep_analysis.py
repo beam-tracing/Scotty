@@ -9,7 +9,7 @@ angle and frequency as axes.
 
 
 import xarray as xr
-import DataTree as dt
+import datatree as dt
 import numpy as np
 import json
 import warnings
@@ -25,7 +25,7 @@ from scipy.interpolate import (
 from scipy.optimize import newton, root_scalar, minimize_scalar, basinhopping
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from scotty.fun_general import find_q_lab_Cartesian
+from scotty.fun_general import find_q_lab # Find q_lab_cartesian?
 from itertools import product
 
 
@@ -135,72 +135,72 @@ class SweepDataset:
             }
 
             try:
-                with dt.open_datatree(path) as tree:
-                    analysis = tree["analysis"]
-                    path_len = len(tree["distance_along_line"].values)
+                tree = dt.open_datatree(path, engine="h5netcdf")
+                analysis = tree["analysis"]
+                path_len = len(analysis["distance_along_line"].values)
 
-                    attribute_dict = {
-                        "distance_along_line": "distance_along_line",
-                        "delta_theta_m": "delta_theta_m",
-                        "theta_m_output": "theta_m",
-                        "theta_output": "theta",
-                        "K_magnitude_array": "K_magnitude",
-                        "loc_m": "loc_m",
-                        "loc_b": "loc_b",
-                        "loc_p": "loc_p",
-                        "loc_r": "loc_r",
-                        "poloidal_flux_output": "poloidal_flux",
-                    }
+                attribute_dict = {
+                    "distance_along_line": "distance_along_line",
+                    "delta_theta_m": "delta_theta_m",
+                    "theta_m_output": "theta_m",
+                    "theta_output": "theta",
+                    "K_magnitude_array": "K_magnitude",
+                    "loc_m": "loc_m",
+                    "loc_b": "loc_b",
+                    "loc_p": "loc_p",
+                    "loc_r": "loc_r",
+                    "poloidal_flux_output": "poloidal_flux",
+                }
 
-                    for attribute in (
-                        "distance_along_line",
-                        "delta_theta_m",
-                        "theta_m_output",
-                        "theta_output",
-                        "K_magnitude_array",
-                        "loc_m",
-                        "loc_b",
-                        "loc_p",
-                        "loc_r",
-                        "poloidal_flux_output",
-                    ):
-                        key = attribute_dict[attribute]
-                        current_ds = ds[attribute]
-                        data = analysis[key].values
-                        if len(current_ds.dims) < 4:
-                            ds[attribute] = current_ds.expand_dims(
-                                dim={"trajectory_step": np.arange(0, path_len)}, axis=-1
-                            ).copy()
-                        ds[attribute].loc[index] = data
+                for attribute in (
+                    "distance_along_line",
+                    "delta_theta_m",
+                    "theta_m_output",
+                    "theta_output",
+                    "K_magnitude_array",
+                    "loc_m",
+                    "loc_b",
+                    "loc_p",
+                    "loc_r",
+                    "poloidal_flux_output",
+                ):
+                    key = attribute_dict[attribute]
+                    current_ds = ds[attribute]
+                    data = analysis[key].values
+                    if len(current_ds.dims) < 4:
+                        ds[attribute] = current_ds.expand_dims(
+                            dim={"trajectory_step": np.arange(0, path_len)}, axis=-1
+                        ).copy()
+                    ds[attribute].loc[index] = data
 
-                    ds["cutoff_index"].loc[index] = analysis["cutoff_index"].values
+                ds["cutoff_index"].loc[index] = analysis["cutoff_index"].values
 
-                    output = tree["solver_output"]
-                    attribute_dict2 = {
-                        "q_R_array": "q_R",
-                        "q_zeta_array": "q_zeta",
-                        "q_Z_array": "q_Z",
-                        "K_R_array": "K_R",
-                        "K_Z_array": "K_Z",
-                    }
-                    for attribute in (
-                        "q_R_array",
-                        "q_zeta_array",
-                        "q_Z_array",
-                        "K_R_array",
-                        "K_Z_array",
-                    ):
-                        key = attribute_dict2[attribute]
-                        current_ds = ds[attribute]
-                        if "trajectory_step" not in current_ds.dims:
-                            ds[attribute] = current_ds.expand_dims(
-                                dim={"trajectory_step": np.arange(0, path_len)}, axis=-1
-                            ).copy()
-                        ds[attribute].loc[index] = output[key]
+                output = tree["solver_output"]
+                attribute_dict2 = {
+                    "q_R_array": "q_R",
+                    "q_zeta_array": "q_zeta",
+                    "q_Z_array": "q_Z",
+                    "K_R_array": "K_R",
+                    "K_Z_array": "K_Z",
+                }
+                for attribute in (
+                    "q_R_array",
+                    "q_zeta_array",
+                    "q_Z_array",
+                    "K_R_array",
+                    "K_Z_array",
+                ):
+                    key = attribute_dict2[attribute]
+                    current_ds = ds[attribute]
+                    if "trajectory_step" not in current_ds.dims:
+                        ds[attribute] = current_ds.expand_dims(
+                            dim={"trajectory_step": np.arange(0, path_len)}, axis=-1
+                        ).copy()
+                    ds[attribute].loc[index] = output[key].values
 
-                    ds["K_zeta_initial"].loc[index] = tree["inputs"][
-                        "K_initial"
-                    ].values[1]
+                ds["K_zeta_initial"].loc[index] = tree["inputs"][
+                    "K_initial"
+                ].values[1]
 
             except FileNotFoundError:
                 print(
@@ -224,22 +224,22 @@ class SweepDataset:
             )
 
             try:
-                with dt.open_datatree(path) as tree:
-                    input_file = tree["inputs"]
-                    for attribute in input_dict.keys():
-                        key = input_dict[attribute]
-                        ds.attrs[attribute] = input_file[attribute]
+                tree = dt.open_datatree(path)
+                input_file = tree["inputs"]
+                for attribute in input_dict.keys():
+                    key = input_dict[attribute]
+                    ds.attrs[attribute] = input_file[key].values
 
-                    anaysis = tree["analysis"]
-                    ds.attrs["poloidal_flux_on_midplane"] = analysis[
-                        "poloidal_flux_on_midplane"
-                    ]
-                    ds.attrs["R_midplane_points"] = analysis["R_midplane"]
-                    index = ds.attrs["poloidal_flux_on_midplane"].argmin()
-                    R_coord = ds.attrs["R_midplane_points"][index]
-                    ds.attrs["magnetic_axis_RZ"] = np.array((R_coord, 0.0))
+                analysis = tree["analysis"]
+                ds.attrs["poloidal_flux_on_midplane"] = analysis[
+                    "poloidal_flux_on_midplane"
+                ].values
+                ds.attrs["R_midplane_points"] = analysis["R_midplane"].values
+                index = ds.attrs["poloidal_flux_on_midplane"].argmin()
+                R_coord = ds.attrs["R_midplane_points"][index]
+                ds.attrs["magnetic_axis_RZ"] = np.array((R_coord, 0.0))
 
-                print(f"Input information read from {path_input}")
+                print(f"Input information read from {path}")
                 break
 
             except FileNotFoundError:
@@ -510,7 +510,7 @@ class SweepDataset:
             "Interpolation complete. Check print output for unsuccessful interpolations."
         )
 
-    def to_netcdf(self, folder="", filename=None):
+    def to_netcdf(self, folder="", filename=None, engine='h5netcdf'):
         """Saves contents of Dataset into a netCDF4 file for easy read and writing.
 
         Args:
@@ -521,7 +521,7 @@ class SweepDataset:
         self.dataset.attrs["missing_indices"] = json.dumps(self.missing_indices)
         filename = filename or self.dataset.get("descriptor", "SweepDataset")
         file_path = f"{folder}{filename}.nc"
-        self.dataset.to_netcdf(path=file_path)
+        self.dataset.to_netcdf(path=file_path, engine=engine)
         print(f"File saved to {file_path}")
 
     #### Set Methods ####
@@ -970,7 +970,7 @@ class SweepDataset:
             {"trajectory_step": 0}
         )
         launch_vector = np.array((del_qR0, del_qZ0, del_qzeta0))
-        launch_cart = find_q_lab_Cartesian(launch_vector)
+        launch_cart = find_q_lab(launch_vector)
 
         # Calculate final exit vector
         del_qR1 = q_R.isel({"trajectory_step": -1}) - q_R.isel({"trajectory_step": -2})
@@ -979,7 +979,7 @@ class SweepDataset:
             {"trajectory_step": -2}
         )
         exit_vector = np.array((del_qR1, del_qZ1, del_qzeta1))
-        exit_cart = find_q_lab_Cartesian(exit_vector)
+        exit_cart = find_q_lab(exit_vector)
 
         dimensions = del_qR0.dims
 

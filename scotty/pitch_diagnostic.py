@@ -22,7 +22,7 @@ from scipy.optimize import newton
 from scipy.stats import linregress
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from scotty.fun_general import find_q_lab_Cartesian
+from scotty.fun_general import find_vec_lab_Cartesian #q_lab_cartesian?
 from itertools import product
 from scotty.sweep_analysis import (
     SweepDataset,
