@@ -25,7 +25,7 @@ from scipy.interpolate import (
 from scipy.optimize import newton, root_scalar, minimize_scalar, basinhopping
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from scotty.fun_general import find_q_lab # Find q_lab_cartesian?
+from scotty.fun_general import find_q_lab  # Find q_lab_cartesian?
 from itertools import product
 
 
@@ -198,9 +198,7 @@ class SweepDataset:
                         ).copy()
                     ds[attribute].loc[index] = output[key].values
 
-                ds["K_zeta_initial"].loc[index] = tree["inputs"][
-                    "K_initial"
-                ].values[1]
+                ds["K_zeta_initial"].loc[index] = tree["inputs"]["K_initial"].values[1]
 
             except FileNotFoundError:
                 print(
@@ -510,7 +508,7 @@ class SweepDataset:
             "Interpolation complete. Check print output for unsuccessful interpolations."
         )
 
-    def to_netcdf(self, folder="", filename=None, engine='h5netcdf'):
+    def to_netcdf(self, folder="", filename=None, engine="h5netcdf"):
         """Saves contents of Dataset into a netCDF4 file for easy read and writing.
 
         Args:
