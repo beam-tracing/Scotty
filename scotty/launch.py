@@ -360,7 +360,12 @@ def find_entry_point(
         R, _, Z = cartesian_to_cylindrical(*beam_line(tau))
         return field.poloidal_flux(R, Z) - poloidal_flux_enter
 
-    tau = np.linspace(0, 1, 100)
+    # If max_length is *really* big, then our parameterised beam line
+    # might not have enough points to actually capture the plasma at
+    # all. So let's make sure we've got enough points to get at least
+    # 10 points inside the plasma, with a minimum of 100 total
+    N_steps = int(10 * max_length / (field.R_coord.max() - field.R_coord.min()))
+    tau = np.linspace(0, 1, max(100, N_steps))
     spline = CubicSpline(
         tau, [poloidal_flux_boundary_along_line(t) for t in tau], extrapolate=False
     )
