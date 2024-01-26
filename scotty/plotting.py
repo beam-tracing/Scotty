@@ -458,15 +458,18 @@ def plot_instrumentation_functions(
     return ax
 
 
-def plot_3D_beam_profile_3D_plotting(dt: DataTree, filename: Optional[PathLike] = None):
+def plot_3D_beam_profile_3D_plotting(dt: DataTree, filename: Optional[PathLike] = None, 
+                                     include_p: Optional = False, include_s: Optional = False,
+                                     include_b: Optional = False, include_r: Optional = False,
+                                     include_m: Optional = False):
+    
+    # include_...: whether or not to mutliply these values in the localisation graph
+    # eg. include_p & include_s True -> plot graph of loc_p * loc_s against distance
+    
+    
+    include_width1 = True # green beam width
+    include_width2 = True # red beam width
 
-    include_width1 = True
-    include_width2 = True
-    include_p = True
-    include_s = True
-    include_b = True
-    include_r = True
-    include_m = True
 
     include_title = True
     title_additional_notes = ''
@@ -477,8 +480,8 @@ def plot_3D_beam_profile_3D_plotting(dt: DataTree, filename: Optional[PathLike] 
 
     title_shot = 189998
     title_time = 3005
-    title_mode = dt.inputs.mode_flag
-    title_freq = dt.inputs.launch_freq_GHz
+    title_mode = dt.inputs.mode_flag.data
+    title_freq = dt.inputs.launch_freq_GHz.data
     title_pol = dt.inputs.poloidal_launch_angle_Torbeam
     title_tor = dt.inputs.toroidal_launch_angle_Torbeam
     title_width = dt.inputs.launch_beam_width
@@ -705,8 +708,8 @@ def plot_3D_beam_profile_3D_plotting(dt: DataTree, filename: Optional[PathLike] 
         y_plane[idx1][1] = mag_y_plane[idx1] * y_hat_Cartesian[idx1] + cray_pos
 
 
-    colorx = 'red'
-    colory = 'green'
+    colorx = 'green'
+    colory = 'red'
 
     ax.plot_surface(
         x_plane[:, :, 0], x_plane[:, :, 1], x_plane[:, :, 2], edgecolor=colorx, lw=0.04, rstride=4, cstride=4, color=colorx, alpha=0.1
@@ -720,7 +723,7 @@ def plot_3D_beam_profile_3D_plotting(dt: DataTree, filename: Optional[PathLike] 
 
 
     def index_pos(distance):
-        print(np.abs(distance_along_line - distance))
+        # print(np.abs(distance_along_line - distance))
         index_pos = np.argmin(np.abs(distance_along_line - distance))
         return index_pos
 
@@ -848,10 +851,10 @@ def plot_3D_beam_profile_3D_plotting(dt: DataTree, filename: Optional[PathLike] 
     ax3.set_ylabel('width/m')
     ax3.set_xlim(min(distance_along_line) - window_size, max(distance_along_line) + window_size)
     if include_width1:
-        ax3.plot(distance_along_line, width1, lw=2, color='red', label='width1')
+        ax3.plot(distance_along_line, width1, lw=2, color='green', label='width1')
 
     if include_width2:
-        ax3.plot(distance_along_line, width2, lw=2, color='green', label='width2')
+        ax3.plot(distance_along_line, width2, lw=2, color='red', label='width2')
 
     lambda_array = (2 * np.pi) / K_magnitude_array
 
@@ -913,8 +916,6 @@ def plot_3D_beam_profile_3D_plotting(dt: DataTree, filename: Optional[PathLike] 
         name += '_r'
         resultant_loc = resultant_loc * loc_r
 
-    # ax5.plot(np.sqrt(poloidal_flux_output), resultant_loc)
-
     ax5.plot(distance_along_line, resultant_loc, lw=2, color='red', label=name)
 
 
@@ -940,9 +941,8 @@ def plot_3D_beam_profile_3D_plotting(dt: DataTree, filename: Optional[PathLike] 
         valinit=init_distance,
     )
 
-
+    # update function for the slider
     def update(val):
-        # dot.remove()
         pos = dot_pos(val)
         idx = index_pos(val)
         pvec1a = pos - pvec1[idx]
@@ -995,10 +995,12 @@ def plot_3D_beam_profile_3D_plotting(dt: DataTree, filename: Optional[PathLike] 
         line_ax4.set_xdata(val)
         line_ax5.set_xdata(val)
 
-
     distance_slider.on_changed(update)
-    if filename:
-        plt.savefig(f"{filename}.png")
+    # keep the slider updated
+    
+    
+    return ax, distance_slider
+    # must keep the slider globally in order for it to respond. Store it in any variable should be sufficient
 
 
 def plot_psi(dt: DataTree, filename: Optional[PathLike] = None):
