@@ -132,9 +132,11 @@ def make_solver_events(
         # The function's return value gives zero when the gyrofreq on the ray goes from either
         # above to below or below to above the resonance.
         return (
-            (gyro_freq - 1.0 - delta_gyro_freq) * (gyro_freq - 1.0 + delta_gyro_freq) # Fundamental
-            * (gyro_freq - 2.0 - delta_gyro_freq) * (gyro_freq - 2.0 + delta_gyro_freq) # Second harmonic
-            ) 
+            (gyro_freq - 1.0 - delta_gyro_freq)
+            * (gyro_freq - 1.0 + delta_gyro_freq)  # Fundamental
+            * (gyro_freq - 2.0 - delta_gyro_freq)
+            * (gyro_freq - 2.0 + delta_gyro_freq)  # Second harmonic
+        )
 
     @_event(terminal=False, direction=1.0)
     def event_reach_K_min(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
