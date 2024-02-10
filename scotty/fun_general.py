@@ -260,14 +260,10 @@ def find_Psi_3D_lab(Psi_3D_lab_Cartesian, q_R, q_zeta, K_R, K_zeta):
     Psi_3D_lab = np.zeros([3, 3], dtype="complex128")
 
     Psi_3D_lab[0][0] = (
-        Psi_XX * cos_zeta**2
-        + 2 * Psi_XY * sin_zeta * cos_zeta
-        + Psi_YY * sin_zeta**2
+        Psi_XX * cos_zeta**2 + 2 * Psi_XY * sin_zeta * cos_zeta + Psi_YY * sin_zeta**2
     )  # Psi_RR
     Psi_3D_lab[1][1] = (
-        Psi_XX * sin_zeta**2
-        - 2 * Psi_XY * sin_zeta * cos_zeta
-        + Psi_YY * cos_zeta**2
+        Psi_XX * sin_zeta**2 - 2 * Psi_XY * sin_zeta * cos_zeta + Psi_YY * cos_zeta**2
     ) * q_R**2 - K_R * q_R  # Psi_zetazeta
     Psi_3D_lab[2][2] = Psi_ZZ  # Psi_ZZ
 

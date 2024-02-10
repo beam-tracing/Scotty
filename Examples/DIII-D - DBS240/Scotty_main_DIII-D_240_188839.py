@@ -38,6 +38,7 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
             kwargs_dict["toroidal_launch_angle_Torbeam"] = tor_launch_angle
             kwargs_dict["mode_flag"] = -1
 
+            kwargs_dict["Psi_BC_flag"] = 'continuous'
             kwargs_dict["poloidal_flux_enter"] = 1.44
             kwargs_dict["input_filename_suffix"] = "_188839_1900ms"
             kwargs_dict["output_path"] = (
