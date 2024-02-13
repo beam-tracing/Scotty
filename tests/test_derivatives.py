@@ -12,9 +12,7 @@ def test_first_derivative():
 
 
 def test_2D_derivative():
-    result = derivative(
-        lambda x, y: np.sin(x) * y**2, ("x", "y"), {"x": 0.0, "y": 2.0}
-    )
+    result = derivative(lambda x, y: np.sin(x) * y**2, ("x", "y"), {"x": 0.0, "y": 2.0})
     assert np.isclose(result, 4.0)
 
 
