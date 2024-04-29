@@ -14,6 +14,7 @@ from .launch import find_entry_point
 from typing import Optional, Union, List
 from scotty.typing import FloatArray, PathLike
 
+
 from matplotlib.widgets import Slider
 from scotty.fun_general import find_q_lab_Cartesian
 import datatree
@@ -154,6 +155,9 @@ def plot_flux_surface(
 def plot_poloidal_crosssection(
     dt: DataTree, ax: Optional[plt.Axes] = None, highlight_LCFS: bool = True
 ) -> plt.Axes:
+    """
+    Plots the poloidal cross section
+    """
     ax = maybe_make_axis(ax)
 
     plot_bounding_box(dt, ax)
@@ -273,7 +277,7 @@ def plot_poloidal_beam_path(
     zoom=False,
 ) -> plt.Axes:
     """
-    Plots the beam path on the R Z plane
+    Plots the beam path on the R Z plane (poloidal cross section)
     """
 
     ax = maybe_make_axis(ax)
@@ -282,12 +286,22 @@ def plot_poloidal_beam_path(
 
     launch_R = dt.inputs.launch_position.sel(col="R")
     launch_Z = dt.inputs.launch_position.sel(col="Z")
+    #plot piece in vacuum separately
     ax.plot(
-        np.concatenate([[launch_R], dt.analysis.q_R]),
-        np.concatenate([[launch_Z], dt.analysis.q_Z]),
+        [launch_R,dt.analysis.q_R[0]],
+        [launch_Z,dt.analysis.q_Z[0]],
         ":k",
-        label="Central (reference) ray",
+        label="Central (reference) ray in vacuum",
     )
+    
+    #now plot piece in plasma
+    ax.plot(
+        dt.analysis.q_R,
+        dt.analysis.q_Z,
+        "-k",
+        label="Central (reference) ray in plasma",
+    )
+    
     width = beam_width(dt.analysis.g_hat, np.array([0.0, 1.0, 0.0]), dt.analysis.Psi_3D)
     beam_plus = dt.analysis.beam + width
     beam_minus = dt.analysis.beam - width
@@ -329,6 +343,9 @@ def plot_toroidal_contour(ax: plt.Axes, R: float, zeta: FloatArray, colour="oran
 def plot_toroidal_beam_path(
     dt: DataTree, filename: Optional[PathLike] = None, ax: Optional[plt.Axes] = None
 ) -> plt.Axes:
+    """
+    Plots the trajectory of the beam in the toroidal plane
+    """
     ax = maybe_make_axis(ax)
 
     lcfs = 1
@@ -382,6 +399,9 @@ def plot_toroidal_beam_path(
 def plot_widths(
     dt: DataTree, filename: Optional[PathLike] = None, ax: Optional[plt.Axes] = None
 ) -> plt.Axes:
+    """
+    Plots a graph of the beam width vs the distance along the ray
+    """
     ax = maybe_make_axis(ax)
 
     Psi_w_imag = np.array(
@@ -409,6 +429,9 @@ def plot_widths(
 def plot_instrumentation_functions(
     dt: DataTree, filename: Optional[PathLike] = None, ax: Optional[plt.Axes] = None
 ) -> plt.Axes:
+    """
+    Plots the different localisation terms
+    """
     ax = maybe_make_axis(ax, 3, 2)
 
     x_axis = dt["analysis"].distance_along_line.values
@@ -427,28 +450,28 @@ def plot_instrumentation_functions(
     )
     loc_all_and_spectrum = loc_all * dt["analysis"].loc_s.values
 
-    ax[0, 0].plot(x_axis, loc_all_and_spectrum, label="loc mprs")
+    ax[0, 0].plot(x_axis, loc_all_and_spectrum, label="loc mprs") #product of all localisation terms
     ax[0, 0].legend()
     ax[0, 0].set_xlabel(r"$l$ / m")
     ax[0, 0].set_ylabel("deg")
 
-    ax[1, 0].plot(x_axis, dt["analysis"].loc_m.values, label="loc m")
+    ax[1, 0].plot(x_axis, dt["analysis"].loc_m.values, label="loc m") #mismatch term
     ax[1, 0].set_xlabel(r"$l$ / m")
     ax[1, 0].legend()
 
-    ax[2, 0].plot(x_axis, dt["analysis"].loc_b.values, label="loc b")
+    ax[2, 0].plot(x_axis, dt["analysis"].loc_b.values, label="loc b") #beam term
     ax[2, 0].set_xlabel(r"$l$ / m")
     ax[2, 0].legend()
 
-    ax[0, 1].plot(x_axis, dt["analysis"].loc_r.values, label="loc r")
+    ax[0, 1].plot(x_axis, dt["analysis"].loc_r.values, label="loc r") #ray term
     ax[0, 1].set_xlabel(r"$l$ / m")
     ax[0, 1].legend()
 
-    ax[1, 1].plot(x_axis, dt["analysis"].loc_s.values, label="loc s")
+    ax[1, 1].plot(x_axis, dt["analysis"].loc_s.values, label="loc s") #spectrum term
     ax[1, 1].set_xlabel(r"$l$ / m")
     ax[1, 1].legend()
 
-    ax[2, 1].plot(x_axis, dt["analysis"].loc_p.values, label="loc p")
+    ax[2, 1].plot(x_axis, dt["analysis"].loc_p.values, label="loc p") #polarisation term
     ax[2, 1].set_xlabel(r"$l$ / m")
     ax[2, 1].legend()
 
@@ -459,15 +482,19 @@ def plot_instrumentation_functions(
 
 
 def plot_3D_beam_profile_3D_plotting(
-    dt: DataTree,
-    filename: Optional[PathLike] = None,
+    dt: DataTree, filename: Optional[PathLike] = None,
     include_p: Optional = False,
     include_s: Optional = False,
     include_b: Optional = False,
     include_r: Optional = False,
-    include_m: Optional = False,
-):
-
+    include_m: Optional = False,):
+    """
+    Plots a 3D plot of the Beam profile, along with:
+    - Eigenvector plot showing the beam width axis
+    - Width of the beam along the ray
+    - Curvature of the beam along the ray
+    - localisations
+    """
     # include_...: whether or not to mutliply these values in the localisation graph
     # eg. include_p & include_s True -> plot graph of loc_p * loc_s against distance
 
@@ -481,6 +508,7 @@ def plot_3D_beam_profile_3D_plotting(
     window_size = 0.01
     ellipse_resolution = 30
 
+    ##extracting inputs
     title_shot = 189998
     title_time = 3005
     title_mode = dt.inputs.mode_flag.data
@@ -512,7 +540,9 @@ def plot_3D_beam_profile_3D_plotting(
     theta_output = dt.analysis.theta.data
     theta_m_output = dt.analysis.theta_m.data
     cutoff_index = dt.analysis.cutoff_index.data
-
+    
+    
+    ##for calculating product of localisations:
     loc_p = dt.analysis.loc_p.data
     loc_s = dt.analysis.loc_s.data
     loc_m = dt.analysis.loc_m.data
@@ -524,11 +554,11 @@ def plot_3D_beam_profile_3D_plotting(
 
     [q_X_array, q_Y_array, q_Z_array] = find_q_lab_Cartesian(
         np.array([q_R_array, q_zeta_array, q_Z_array])
-    )  # to plot the path
+    )  # to plot the path in the X,Y,Z space
 
     numberOfDataPoints = np.size(q_R_array)
     out_index = numberOfDataPoints - 1
-
+    ##convert g_hat to cartesian
     g_hat_Cartesian = np.zeros([numberOfDataPoints, 3])
     g_hat_Cartesian[:, 0] = g_hat_output[:, 0] * np.cos(q_zeta_array) - g_hat_output[
         :, 1
@@ -537,7 +567,7 @@ def plot_3D_beam_profile_3D_plotting(
         :, 1
     ] * np.cos(q_zeta_array)
     g_hat_Cartesian[:, 2] = g_hat_output[:, 2]
-
+    ##setting up the psi_w arrays, separating real and imaginary parts
     Psi_w_real = np.array(
         np.real([[Psi_xx_output, Psi_xy_output], [Psi_xy_output, Psi_yy_output]])
     )
@@ -644,13 +674,13 @@ def plot_3D_beam_profile_3D_plotting(
 
     # fig refers to the entire window, each axes refers to a specific graph within the entire figure
 
-    ax = plt.subplot2grid((4, 8), (0, 0), colspan=4, rowspan=4, projection="3d")
+    ax = plt.subplot2grid((4, 8), (0, 0), colspan=4, rowspan=4, projection="3d") #initialise the plot
 
-    ax.plot(q_X_array, q_Y_array, q_Z_array, label="Central Ray", lw=5, color="blue")
+    ax.plot(q_X_array, q_Y_array, q_Z_array, label="Central Ray", lw=5, color="blue") #plot the trajectory of the central ray
 
     ax.scatter(
         [q_X_array[0]], [q_Y_array[0]], [q_Z_array[0]], marker="o", s=50, color="black"
-    )
+    ) #plots starting point
 
     arrow_vec = g_hat_Cartesian[out_index]
     ax.quiver(
@@ -665,8 +695,10 @@ def plot_3D_beam_profile_3D_plotting(
         linewidth=5.0,
         normalize=True,
         color="blue",
-    )
+    ) #add an arrow at the end of the ray trajectory to tell users how ray is travelling
 
+
+    ##resizing stuff
     length_required = np.array(
         [
             np.max(q_X_array) - np.min(q_X_array),
@@ -696,7 +728,7 @@ def plot_3D_beam_profile_3D_plotting(
     # ==================================================================================#
     # Plotting the beam surface
     # We can use the coordinates here for the interactive ellipse to be plotted
-
+    
     X_beam_surface = np.zeros([numberOfDataPoints, ellipse_resolution + 1])
     Y_beam_surface = np.zeros([numberOfDataPoints, ellipse_resolution + 1])
     Z_beam_surface = np.zeros([numberOfDataPoints, ellipse_resolution + 1])
@@ -727,7 +759,7 @@ def plot_3D_beam_profile_3D_plotting(
         rstride=4,
         cstride=4,
         alpha=0.01,
-    )
+    ) #plot the beam surface
 
     # ==================================================================================#
     # Plotting the x and y hat planes
@@ -761,7 +793,7 @@ def plot_3D_beam_profile_3D_plotting(
         cstride=4,
         color=colorx,
         alpha=0.1,
-    )
+    )   #plot the x_hat plane
     ax.plot_surface(
         y_plane[:, :, 0],
         y_plane[:, :, 1],
@@ -772,7 +804,7 @@ def plot_3D_beam_profile_3D_plotting(
         cstride=4,
         color=colory,
         alpha=0.1,
-    )
+    )  #plot the y_hat plane
     # ==================================================================================#
     # Setting the required functions
     # For the initial poss, and slider updating
@@ -790,7 +822,7 @@ def plot_3D_beam_profile_3D_plotting(
     # Initial conditions
 
     init_distance = distance_along_line[cutoff_index]
-
+    
     # Dot on the path
     (dot,) = ax.plot(
         dot_pos(init_distance)[0],
@@ -799,8 +831,8 @@ def plot_3D_beam_profile_3D_plotting(
         "ro",
         markersize=10,
         color="black",
-    )
-
+    ) #initialise the moveable point to be at the cutoff point
+    
     (dot_cutoff,) = ax.plot(
         dot_pos(init_distance)[0],
         dot_pos(init_distance)[1],
@@ -808,7 +840,7 @@ def plot_3D_beam_profile_3D_plotting(
         "ro",
         markersize=15,
         color="red",
-    )
+    ) #mark out where the cutoff point is located
 
     pvec1_init_pos = pvec1[index_pos(init_distance)]
     pvec2_init_pos = pvec2[index_pos(init_distance)]
@@ -933,7 +965,8 @@ def plot_3D_beam_profile_3D_plotting(
 
     # ==================================================================================#
     # Plot for the widths
-
+    
+    #2D width plot
     ax3 = plt.subplot2grid((4, 8), (2, 4), colspan=2, rowspan=2)
 
     ax3.set_xlabel("distance/m")
@@ -956,7 +989,7 @@ def plot_3D_beam_profile_3D_plotting(
         dashes=[4, 2],
         color="blue",
         label="wavelength",
-    )
+    ) #plot how the wavelength changes
 
     line_ax3_cutoff = ax3.axvline(x=init_distance, color="orange", lw=1.5)
     line_ax3 = ax3.axvline(x=init_distance, color="black", lw=1.5)
@@ -994,6 +1027,7 @@ def plot_3D_beam_profile_3D_plotting(
     ax5.set_ylabel("localisation")
     # ax5.set_xlim(min(distance_along_line)-window_size, max(distance_along_line)+window_size)
 
+    ##labelling localisations and multiplying localisation terms together
     resultant_loc = 1
     name = "loc"
     if include_p:
@@ -1107,29 +1141,36 @@ def plot_3D_beam_profile_3D_plotting(
 
 
 def plot_psi(dt: DataTree, filename: Optional[PathLike] = None):
+    """
+    Plots the following:
+    1. Poloidal flux vs tau
+    2. Real and imaginary part of psi_xx vs tau
+    3. Real and imaginary part of psi_xy vs tau
+    4. Real and imaginary part of psi_yy vs tau
+    """
     plt.figure()
     plt.rcParams.update({"axes.titlesize": "small"})
 
     plt.subplot(2, 2, 1)
-    plt.plot(dt.analysis.tau, dt.analysis.poloidal_flux)
+    plt.plot(dt.analysis.tau, dt.analysis.poloidal_flux)  ##plot poloidal flux
     plt.title("Poloidal flux", pad=-5)
 
     plt.subplot(2, 2, 2)
-    plt.plot(dt.analysis.tau, dt.analysis.Psi_xx.real, label="re")
-    plt.plot(dt.analysis.tau, dt.analysis.Psi_xx.imag, label="im")
+    plt.plot(dt.analysis.tau, dt.analysis.Psi_xx.real, label="re") ##real part psi_xx
+    plt.plot(dt.analysis.tau, dt.analysis.Psi_xx.imag, label="im") ##im part psi_xx
     plt.title("psi_xx", pad=-5)
 
     plt.subplot(2, 2, 3)
-    plt.plot(dt.analysis.tau, dt.analysis.Psi_xy.real, label="re")
-    plt.plot(dt.analysis.tau, dt.analysis.Psi_xy.imag, label="im")
+    plt.plot(dt.analysis.tau, dt.analysis.Psi_xy.real, label="re") ##real part psi_xy
+    plt.plot(dt.analysis.tau, dt.analysis.Psi_xy.imag, label="im") ##im part psi_xy
     plt.title("psi_xy", pad=-5)
 
     plt.subplot(2, 2, 4)
-    plt.plot(dt.analysis.tau, dt.analysis.Psi_yy.real, label="re")
-    plt.plot(dt.analysis.tau, dt.analysis.Psi_yy.imag, label="im")
+    plt.plot(dt.analysis.tau, dt.analysis.Psi_yy.real, label="re") ##re part psi_yy
+    plt.plot(dt.analysis.tau, dt.analysis.Psi_yy.imag, label="im") ##im part psi_yy
     plt.title("psi_yy", pad=-5)
 
     plt.legend(loc="lower right")
 
     if filename:
-        plt.savefig(f"{filename}.png", dpi=1200)
+        plt.savefig(f"{filename}.png", dpi=1200) #save figure
