@@ -11,7 +11,7 @@ from scipy import interpolate as interpolate
 from scipy import constants as constants
 import matplotlib.pyplot as plt
 from scotty.fun_FFD import find_dpolflux_dR, find_dpolflux_dZ # For find_B if using efit files directly
-from netCDF4 import Dataset
+from h5netcdf.legacyapi import Dataset
 
 
 
