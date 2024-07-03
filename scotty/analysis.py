@@ -292,7 +292,9 @@ def further_analysis(
     ).T
     normal_magnitudes = np.linalg.norm(normal_vectors, axis=-1)
     normal_hat = normal_vectors / normal_magnitudes[:, np.newaxis]
-    binormal_hat = make_unit_vector_from_cross_product(df.b_hat,normal_hat) #by definition, binormal vector = tangent vector cross normal vector. Juan follows this convention as well.
+    binormal_hat = make_unit_vector_from_cross_product(
+        df.b_hat, normal_hat
+    )  # by definition, binormal vector = tangent vector cross normal vector. Juan follows this convention as well.
 
     k_perp_1_bs_normal = k_perp_1_bs * dot(
         kperp1_hat, normal_hat
