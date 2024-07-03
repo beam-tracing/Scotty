@@ -63,7 +63,7 @@ from scipy import linalg as linalg
 import matplotlib.pyplot as plt
 import os
 import sys
-from netCDF4 import Dataset
+from h5netcdf.legacyapi import Dataset
 import bisect
 import time
 
