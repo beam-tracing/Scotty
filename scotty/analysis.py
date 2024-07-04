@@ -294,7 +294,7 @@ def further_analysis(
     normal_hat = normal_vectors / normal_magnitudes[:, np.newaxis]
     binormal_hat = make_unit_vector_from_cross_product(
         df.b_hat, normal_hat
-    )  # by definition, binormal vector = tangent vector cross normal vector. Juan follows this convention as well.
+    ) #by definition, binormal vector = tangent vector cross normal vector. Follows the same sign convention as Pyrokinetics [Patel, Bhavin, et al. "Pyrokinetics-A Python library to standardise gyrokinetic analysis." Journal of open source software (2024)]
 
     k_perp_1_bs_normal = k_perp_1_bs * dot(
         kperp1_hat, normal_hat
