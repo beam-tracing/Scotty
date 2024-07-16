@@ -115,10 +115,34 @@ def make_solver_events(
 
     @_event(terminal=True, direction=0.0)
     def event_cross_resonance(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
+        # this is for the fundamental electron cyclotron frequency
         # Currently only works when crossing resonance.
-        # To implement crossing of higher harmonics as well
         # Not implemented for relativistic temperatures
-        delta_gyro_freq = 0.01
+        
+        #used to include a delta_gyro_freq where the event triggers when 
+        #beam frequency is close to the electron frequency, but this is removed because it works unreliably.
+        
+        q_R, q_Z, _, _ = ray_parameters_2D
+
+        B_R = field.B_R(q_R, q_Z)
+        B_T = field.B_T(q_R, q_Z)
+        B_Z = field.B_Z(q_R, q_Z)
+
+        B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2) #magnitude of B field
+        gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency) #find the ratio of beam freq to electron cyclotron freq
+        final = (gyro_freq-1)  #find the difference, if the sign changes, it means you have crossed the resonance frequency
+        return final
+    
+    @_event(terminal=True, direction=0.0)
+    def event_cross_resonance2(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
+        # this is for the second harmonic electron cyclotron frequency
+        # Currently only works when crossing resonance.
+        # Not implemented for relativistic temperatures
+        
+        
+        #used to include a delta_gyro_freq where the event triggers when 
+        #beam frequency is close to the second harmonic electron frequency, but this is removed because it works unreliably.
+        
 
         q_R, q_Z, _, _ = ray_parameters_2D
 
@@ -126,13 +150,14 @@ def make_solver_events(
         B_T = field.B_T(q_R, q_Z)
         B_Z = field.B_Z(q_R, q_Z)
 
-        B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
-        gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
-
-        # The function's return value gives zero when the gyrofreq on the ray goes from either
-        # above to below or below to above the resonance.
-        return (gyro_freq - 1.0 - delta_gyro_freq) * (gyro_freq - 1.0 + delta_gyro_freq)
-
+        B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2) #magnitude of B field
+        gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency) 
+        final = (gyro_freq-0.5) #find the difference, if the sign changes, it means you have crossed the resonance frequency. 
+        #We want 0.5. This is because second harmonic is 2*\omega_c = \omega
+        # normalised gyrofreq = \omega_c/\omega = 0.5
+        return final
+    
+    
     @_event(terminal=False, direction=1.0)
     def event_reach_K_min(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
         # To find tau of the cut-off, that is the location where the
@@ -157,6 +182,7 @@ def make_solver_events(
         "leave_LCFS": event_leave_LCFS,
         "leave_simulation": event_leave_simulation,
         "cross_resonance": event_cross_resonance,
+        "cross_resonance2": event_cross_resonance2,
         "reach_K_min": event_reach_K_min,
     }
 
@@ -202,7 +228,10 @@ def handle_leaving_plasma_events(
 
     if detected("cross_resonance"):
         return tau_events["cross_resonance"][0]
-
+    
+    if detected("cross_resonance2"):
+        return tau_events["cross_resonance2"][0]
+    
     if not detected("leave_plasma") and detected("leave_LCFS"):
         return tau_events["leave_LCFS"][0]
 
@@ -527,7 +556,7 @@ def propagate_ray(
     # the plasma
     tau_points = np.linspace(0, tau_leave, len_tau - 1, endpoint=False)
 
-    if len(tau_events["cross_resonance"]) == 0:
+    if len(tau_events["cross_resonance"]) == 0 and len(tau_events["cross_resonance2"]) == 0: #you want no resonance at all, so both must be 0
         tau_points = handle_no_resonance(
             solver_ray_output,
             tau_leave,
