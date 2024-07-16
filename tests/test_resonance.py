@@ -33,6 +33,7 @@ np.set_printoptions(linewidth=120, threshold=100)
 
 # Expected values for nonrelativistic simple golden, mode_flag = 1
 
+
 def test_fund_harmonic_1(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 3,
@@ -41,13 +42,13 @@ def test_fund_harmonic_1(tmp_path):
         "mode_flag": 1,
         "launch_beam_width": 0.04,
         "launch_beam_curvature": -0.25,
-        "launch_position": np.array([3,0,0]),
+        "launch_position": np.array([3, 0, 0]),
         "density_fit_parameters": np.array([4.0, 1.0]),
         "delta_R": -0.00001,
         "delta_Z": 0.00001,
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",
-        "Psi_BC_flag": 'continuous',
+        "Psi_BC_flag": "continuous",
         "figure_flag": False,
         "vacuum_propagation_flag": True,
         "vacuumLaunch_flag": True,
@@ -60,7 +61,11 @@ def test_fund_harmonic_1(tmp_path):
     }
     kwargs_dict["output_path"] = tmp_path
     output = beam_me_up(**kwargs_dict)["analysis"]
-    assert [float(output['q_R'][-1]),float(output['q_Z'][-1]),float(output['q_zeta'][-1])] == [1.9159087193750617, -0.06388797500308252, -0.0004997835782251143]
+    assert [
+        float(output["q_R"][-1]),
+        float(output["q_Z"][-1]),
+        float(output["q_zeta"][-1]),
+    ] == [1.9159087193750617, -0.06388797500308252, -0.0004997835782251143]
 
 
 def test_fund_harmonic_2(tmp_path):
@@ -71,7 +76,7 @@ def test_fund_harmonic_2(tmp_path):
         "mode_flag": 1,
         "launch_beam_width": 0.04,
         "launch_beam_curvature": -0.25,
-        "launch_position": np.array([3,0,0.05]),
+        "launch_position": np.array([3, 0, 0.05]),
         "density_fit_parameters": np.array([4.0, 1.0]),
         "delta_R": -0.00001,
         "delta_Z": 0.00001,
@@ -90,7 +95,11 @@ def test_fund_harmonic_2(tmp_path):
     }
     kwargs_dict["output_path"] = tmp_path
     output = beam_me_up(**kwargs_dict)["analysis"]
-    assert [float(output['q_R'][-1]),float(output['q_Z'][-1]),float(output['q_zeta'][-1])] == [1.959548340506553, 0.1057637625447584, 0.00011320064162032355]
+    assert [
+        float(output["q_R"][-1]),
+        float(output["q_Z"][-1]),
+        float(output["q_zeta"][-1]),
+    ] == [1.959548340506553, 0.1057637625447584, 0.00011320064162032355]
 
 
 def test_fund_harmonic_3(tmp_path):
@@ -101,7 +110,7 @@ def test_fund_harmonic_3(tmp_path):
         "mode_flag": 1,
         "launch_beam_width": 0.04,
         "launch_beam_curvature": -0.25,
-        "launch_position": np.array([3,0,0.05]),
+        "launch_position": np.array([3, 0, 0.05]),
         "density_fit_parameters": np.array([4.0, 1.0]),
         "delta_R": -0.00001,
         "delta_Z": 0.00001,
@@ -120,7 +129,11 @@ def test_fund_harmonic_3(tmp_path):
     }
     kwargs_dict["output_path"] = tmp_path
     output = beam_me_up(**kwargs_dict)["analysis"]
-    assert [float(output['q_R'][-1]),float(output['q_Z'][-1]),float(output['q_zeta'][-1])] == [1.9186799430609414, 0.15549131819720569, 0.0016313326245700687]
+    assert [
+        float(output["q_R"][-1]),
+        float(output["q_Z"][-1]),
+        float(output["q_zeta"][-1]),
+    ] == [1.9186799430609414, 0.15549131819720569, 0.0016313326245700687]
 
 
 def test_fund_harmonic_4(tmp_path):
@@ -131,7 +144,7 @@ def test_fund_harmonic_4(tmp_path):
         "mode_flag": 1,
         "launch_beam_width": 0.04,
         "launch_beam_curvature": -0.25,
-        "launch_position": np.array([2.4,0,0.05]),
+        "launch_position": np.array([2.4, 0, 0.05]),
         "density_fit_parameters": np.array([4.0, 1.0]),
         "delta_R": -0.00001,
         "delta_Z": 0.00001,
@@ -150,8 +163,11 @@ def test_fund_harmonic_4(tmp_path):
     }
     kwargs_dict["output_path"] = tmp_path
     output = beam_me_up(**kwargs_dict)["analysis"]
-    assert [float(output['q_R'][-1]),float(output['q_Z'][-1]),float(output['q_zeta'][-1])] == [1.8948392652387762, 0.023755528514813423, 1.5055640111241806e-05]
-
+    assert [
+        float(output["q_R"][-1]),
+        float(output["q_Z"][-1]),
+        float(output["q_zeta"][-1]),
+    ] == [1.8948392652387762, 0.023755528514813423, 1.5055640111241806e-05]
 
 
 def test_fund_harmonic_5(tmp_path):
@@ -162,7 +178,7 @@ def test_fund_harmonic_5(tmp_path):
         "mode_flag": 1,
         "launch_beam_width": 0.04,
         "launch_beam_curvature": -0.25,
-        "launch_position": np.array([2.2,0,-0.4]),
+        "launch_position": np.array([2.2, 0, -0.4]),
         "density_fit_parameters": np.array([4.0, 1.0]),
         "delta_R": -0.00001,
         "delta_Z": 0.00001,
@@ -181,7 +197,11 @@ def test_fund_harmonic_5(tmp_path):
     }
     kwargs_dict["output_path"] = tmp_path
     output = beam_me_up(**kwargs_dict)["analysis"]
-    assert [float(output['q_R'][-1]),float(output['q_Z'][-1]),float(output['q_zeta'][-1])] == [1.8954314162145214, -0.44718748795975066, -0.0020475610663150405]
+    assert [
+        float(output["q_R"][-1]),
+        float(output["q_Z"][-1]),
+        float(output["q_zeta"][-1]),
+    ] == [1.8954314162145214, -0.44718748795975066, -0.0020475610663150405]
 
 
 def test_sec_harm_1(tmp_path):
@@ -211,7 +231,12 @@ def test_sec_harm_1(tmp_path):
     }
     kwargs_dict["output_path"] = tmp_path
     output = beam_me_up(**kwargs_dict)["analysis"]
-    assert [float(output['q_R'][-1]),float(output['q_Z'][-1]),float(output['q_zeta'][-1])] == [1.9248542571474876, -0.01608339652600115, -4.952006410054158e-05]
+    assert [
+        float(output["q_R"][-1]),
+        float(output["q_Z"][-1]),
+        float(output["q_zeta"][-1]),
+    ] == [1.9248542571474876, -0.01608339652600115, -4.952006410054158e-05]
+
 
 def test_sec_harm_2(tmp_path):
     kwargs_dict = {
@@ -240,7 +265,12 @@ def test_sec_harm_2(tmp_path):
     }
     kwargs_dict["output_path"] = tmp_path
     output = beam_me_up(**kwargs_dict)["analysis"]
-    assert [float(output['q_R'][-1]),float(output['q_Z'][-1]),float(output['q_zeta'][-1])] == [1.8402531279851815, -0.17260313701585342, -0.0024810338010890884]
+    assert [
+        float(output["q_R"][-1]),
+        float(output["q_Z"][-1]),
+        float(output["q_zeta"][-1]),
+    ] == [1.8402531279851815, -0.17260313701585342, -0.0024810338010890884]
+
 
 def test_sec_harm_3(tmp_path):
     kwargs_dict = {
@@ -265,11 +295,16 @@ def test_sec_harm_3(tmp_path):
         "B_T_axis": 1.0,
         "B_p_a": 0.1,
         "R_axis": 1.5,
-        "minor_radius_a": 0.5
+        "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
     output = beam_me_up(**kwargs_dict)["analysis"]
-    assert [float(output['q_R'][-1]),float(output['q_Z'][-1]),float(output['q_zeta'][-1])] == [1.800610991524015, -0.20374718813163345, 0.0253947790819785]
+    assert [
+        float(output["q_R"][-1]),
+        float(output["q_Z"][-1]),
+        float(output["q_zeta"][-1]),
+    ] == [1.800610991524015, -0.20374718813163345, 0.0253947790819785]
+
 
 def test_sec_harm_4(tmp_path):
     kwargs_dict = {
@@ -279,7 +314,7 @@ def test_sec_harm_4(tmp_path):
         "mode_flag": 1,
         "launch_beam_width": 0.04,
         "launch_beam_curvature": -0.25,
-        "launch_position": np.array([0.1,0,-0.2]),
+        "launch_position": np.array([0.1, 0, -0.2]),
         "density_fit_parameters": np.array([4.0, 1.0]),
         "delta_R": -0.00001,
         "delta_Z": 0.00001,
@@ -294,11 +329,16 @@ def test_sec_harm_4(tmp_path):
         "B_T_axis": 1.0,
         "B_p_a": 0.1,
         "R_axis": 1.5,
-        "minor_radius_a": 0.5,    
+        "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
     output = beam_me_up(**kwargs_dict)["analysis"]
-    assert [float(output['q_R'][-1]),float(output['q_Z'][-1]),float(output['q_zeta'][-1])] == [1.403227523610646, -0.4181774880054182, -2.9500966593848186]
+    assert [
+        float(output["q_R"][-1]),
+        float(output["q_Z"][-1]),
+        float(output["q_zeta"][-1]),
+    ] == [1.403227523610646, -0.4181774880054182, -2.9500966593848186]
+
 
 def test_sec_harm_5(tmp_path):
     kwargs_dict = {
@@ -308,7 +348,7 @@ def test_sec_harm_5(tmp_path):
         "mode_flag": 1,
         "launch_beam_width": 0.04,
         "launch_beam_curvature": -0.25,
-        "launch_position": np.array([0.1,0,0]),
+        "launch_position": np.array([0.1, 0, 0]),
         "density_fit_parameters": np.array([4.0, 1.0]),
         "delta_R": -0.00001,
         "delta_Z": 0.00001,
@@ -327,5 +367,8 @@ def test_sec_harm_5(tmp_path):
     }
     kwargs_dict["output_path"] = tmp_path
     output = beam_me_up(**kwargs_dict)["analysis"]
-    assert [float(output['q_R'][-1]),float(output['q_Z'][-1]),float(output['q_zeta'][-1])] == [1.796484769128003, -0.09972777433924115, 3.1479306578685664]
-
+    assert [
+        float(output["q_R"][-1]),
+        float(output["q_Z"][-1]),
+        float(output["q_zeta"][-1]),
+    ] == [1.796484769128003, -0.09972777433924115, 3.1479306578685664]
