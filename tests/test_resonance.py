@@ -33,7 +33,7 @@ np.set_printoptions(linewidth=120, threshold=100)
 
 # Expected values for nonrelativistic simple golden, mode_flag = 1
 
-def test_fund_harmonic_1(tmp_path):
+def test_fund_1(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 3,
         "toroidal_launch_angle_Torbeam": 0,
@@ -63,7 +63,7 @@ def test_fund_harmonic_1(tmp_path):
     assert_allclose([float(output['q_R'][-1]),float(output['q_Z'][-1]),float(output['q_zeta'][-1])], [1.9159087193750617, -0.06388797500308252, -0.0004997835782251143], rtol=1e-2, atol=1e-2)
 
 
-def test_fund_harmonic_2(tmp_path):
+def test_fund_2(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": -3,
         "toroidal_launch_angle_Torbeam": 0,
@@ -93,7 +93,7 @@ def test_fund_harmonic_2(tmp_path):
     assert_allclose([float(output['q_R'][-1]),float(output['q_Z'][-1]),float(output['q_zeta'][-1])] , [1.959548340506553, 0.1057637625447584, 0.00011320064162032355], rtol=1e-2, atol=1e-2)
 
 
-def test_fund_harmonic_3(tmp_path):
+def test_fund_3(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": -5,
         "toroidal_launch_angle_Torbeam": 0,
@@ -123,7 +123,7 @@ def test_fund_harmonic_3(tmp_path):
     assert_allclose([float(output['q_R'][-1]),float(output['q_Z'][-1]),float(output['q_zeta'][-1])], [1.9186799430609414, 0.15549131819720569, 0.0016313326245700687], rtol=1e-2, atol=1e-2)
 
 
-def test_fund_harmonic_4(tmp_path):
+def test_fund_4(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 3,
         "toroidal_launch_angle_Torbeam": 0,
@@ -154,7 +154,7 @@ def test_fund_harmonic_4(tmp_path):
 
 
 
-def test_fund_harmonic_5(tmp_path):
+def test_fund_5(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 0,
         "toroidal_launch_angle_Torbeam": 0,
