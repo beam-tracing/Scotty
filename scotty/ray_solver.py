@@ -127,15 +127,15 @@ def make_solver_events(
         B_R = field.B_R(q_R, q_Z)
         B_T = field.B_T(q_R, q_Z)
         B_Z = field.B_Z(q_R, q_Z)
-        
+
         # magnitude of B field
-        B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)  
-        
+        B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
+
         # find the ratio of beam freq to electron cyclotron freq
         gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
-        
+
         # find the difference, if the sign changes, it means you have crossed the resonance frequency
-        difference = (gyro_freq - 1)  
+        difference = gyro_freq - 1
         return difference
 
     @_event(terminal=True, direction=0.0)
@@ -154,17 +154,17 @@ def make_solver_events(
         B_R = field.B_R(q_R, q_Z)
         B_T = field.B_T(q_R, q_Z)
         B_Z = field.B_Z(q_R, q_Z)
-        
+
         # magnitude of B field
-        B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)  
-        
+        B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
+
         gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
-        
+
         # find the difference, if the sign changes, it means you have crossed the resonance frequency.
         # We want 0.5. This is because second harmonic is 2*\omega_c = \omega
         # normalised gyrofreq = \omega_c/\omega = 0.5
-        
-        difference = (gyro_freq - 0.5)
+
+        difference = gyro_freq - 0.5
         return difference
 
     @_event(terminal=False, direction=1.0)
@@ -564,10 +564,12 @@ def propagate_ray(
     # Don't include `tau_leave` itself so that last point is inside
     # the plasma
     tau_points = np.linspace(0, tau_leave, len_tau - 1, endpoint=False)
-    
-    
+
     # you want no resonance at all, so both must be 0
-    if (len(tau_events["cross_resonance"]) == 0 and len(tau_events["cross_resonance2"]) == 0):  
+    if (
+        len(tau_events["cross_resonance"]) == 0
+        and len(tau_events["cross_resonance2"]) == 0
+    ):
         tau_points = handle_no_resonance(
             solver_ray_output,
             tau_leave,
