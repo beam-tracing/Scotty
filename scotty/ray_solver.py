@@ -566,10 +566,7 @@ def propagate_ray(
     tau_points = np.linspace(0, tau_leave, len_tau - 1, endpoint=False)
 
     # you want no resonance at all, so both must be 0
-    if (
-        len(tau_events["cross_resonance"]) == 0
-        and len(tau_events["cross_resonance2"]) == 0
-    ):
+    if len(tau_events["cross_resonance"]) == 0 and len(tau_events["cross_resonance2"]) == 0:
         tau_points = handle_no_resonance(
             solver_ray_output,
             tau_leave,
