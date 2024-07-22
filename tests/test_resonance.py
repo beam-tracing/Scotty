@@ -232,7 +232,7 @@ def test_fund_5(tmp_path):
 
 def test_fund_6(tmp_path):
     kwargs_dict = {
-        "poloidal_launch_angle_Torbeam": -2,
+        "poloidal_launch_angle_Torbeam": 4,
         "toroidal_launch_angle_Torbeam": 0,
         "launch_freq_GHz": 50,
         "mode_flag": -1,
@@ -263,7 +263,7 @@ def test_fund_6(tmp_path):
             float(output["q_Z"][-1]),
             float(output["q_zeta"][-1]),
         ],
-        [1.098452049770299, 0.2666603811450501, 3.1415317344535847],
+        [1.0978655753712652, 0.06840555151937941, 3.1413690049921548],
         rtol=1e-2,
         atol=1e-2,
     )
