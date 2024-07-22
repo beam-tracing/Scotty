@@ -115,7 +115,7 @@ def make_solver_events(
 
     @_event(terminal=True, direction=0.0)
     def event_cross_resonance(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
-        # This is for the fundamental electron cyclotron frequency <-- This event triggers when the beam's frequency is equal 
+        # This is for the fundamental electron cyclotron frequency <-- This event triggers when the beam's frequency is equal
         # to the fundamental electron cyclotron frequency
         # Currently only works when crossing resonance.
         # Not implemented for relativistic temperatures
@@ -143,7 +143,7 @@ def make_solver_events(
     def event_cross_resonance2(
         tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian
     ):
-        # This is for the second harmonic electron cyclotron frequency <-- This event triggers when the beam's frequency is equal 
+        # This is for the second harmonic electron cyclotron frequency <-- This event triggers when the beam's frequency is equal
         # to the second harmonic electron cyclotron frequency
         # Currently only works when crossing resonance.
         # Not implemented for relativistic temperatures
