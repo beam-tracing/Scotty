@@ -32,8 +32,9 @@ np.set_printoptions(linewidth=120, threshold=100)
 
 # Test_fund: test to see whether the beam will be absorbed when its frequency is equal
 # to the fundamental electron cyclotron frequency.
-# Six test cases were created to test for this by varying beam frequency, launch angles, 
+# Six test cases were created to test for this by varying beam frequency, launch angles,
 # launch positions (including launching from inboard side), polarisations and magnetic field strength.
+
 
 def test_fund_1(tmp_path):
     kwargs_dict = {
@@ -271,8 +272,9 @@ def test_fund_6(tmp_path):
 
 # Test_sec_harm: test to see whether the beam will be absorbed when its frequency is equal
 # to the second harmonic electron cyclotron frequency.
-# Six test cases were created to test for this by varying beam frequency, launch angles, 
+# Six test cases were created to test for this by varying beam frequency, launch angles,
 # launch positions (including launching from inboard side), polarisations and magnetic field strength.
+
 
 def test_sec_harm_1(tmp_path):
     kwargs_dict = {
@@ -467,6 +469,7 @@ def test_sec_harm_5(tmp_path):
         rtol=1e-2,
         atol=1e-2,
     )
+
 
 def test_sec_harm_6(tmp_path):
     kwargs_dict = {
