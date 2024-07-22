@@ -29,10 +29,11 @@ import xarray as xr
 # Print more of arrays in failed tests
 np.set_printoptions(linewidth=120, threshold=100)
 
-# For circular flux surfaces, O-mode mode_flag=1, X-mode mode_flag=-1
 
-# Expected values for nonrelativistic simple golden, mode_flag = 1
-
+# Test_fund: test to see whether the beam will be absorbed when its frequency is equal
+# to the fundamental electron cyclotron frequency.
+# Six test cases were created to test for this by varying beam frequency, launch angles, 
+# launch positions (including launching from inboard side), polarisations and magnetic field strength.
 
 def test_fund_1(tmp_path):
     kwargs_dict = {
@@ -229,6 +230,50 @@ def test_fund_5(tmp_path):
     )
 
 
+def test_fund_6(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": -2,
+        "toroidal_launch_angle_Torbeam": 0,
+        "launch_freq_GHz": 50,
+        "mode_flag": -1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([0.8, 0, 0.2]),
+        "density_fit_parameters": np.array([4.0, 1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "Psi_BC_flag": True,
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.3,
+        "B_p_a": 0.2,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.098452049770299, 0.2666603811450501, 3.1415317344535847],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
+# Test_sec_harm: test to see whether the beam will be absorbed when its frequency is equal
+# to the second harmonic electron cyclotron frequency.
+# Six test cases were created to test for this by varying beam frequency, launch angles, 
+# launch positions (including launching from inboard side), polarisations and magnetic field strength.
+
 def test_sec_harm_1(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 0,
@@ -419,6 +464,44 @@ def test_sec_harm_5(tmp_path):
             float(output["q_zeta"][-1]),
         ],
         [1.796484769128003, -0.09972777433924115, 3.1479306578685664],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+def test_sec_harm_6(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": 10,
+        "toroidal_launch_angle_Torbeam": 0.0,
+        "launch_freq_GHz": 44,
+        "mode_flag": -1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([2.587, 0.0, -0.0157]),
+        "density_fit_parameters": np.array([4.0, 1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "Psi_BC_flag": True,
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.0,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.9246718991949834, -0.13835603389402745, 0.0005892868969585501],
         rtol=1e-2,
         atol=1e-2,
     )

@@ -115,11 +115,12 @@ def make_solver_events(
 
     @_event(terminal=True, direction=0.0)
     def event_cross_resonance(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
-        # this is for the fundamental electron cyclotron frequency
+        # This is for the fundamental electron cyclotron frequency <-- This event triggers when the beam's frequency is equal 
+        # to the fundamental electron cyclotron frequency
         # Currently only works when crossing resonance.
         # Not implemented for relativistic temperatures
 
-        # used to include a delta_gyro_freq where the event triggers when
+        # Used to include a delta_gyro_freq where the event triggers when
         # beam frequency is close to the electron frequency, but this is removed because it works unreliably.
 
         q_R, q_Z, _, _ = ray_parameters_2D
@@ -128,13 +129,13 @@ def make_solver_events(
         B_T = field.B_T(q_R, q_Z)
         B_Z = field.B_Z(q_R, q_Z)
 
-        # magnitude of B field
+        # Magnitude of B field
         B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
 
-        # find the ratio of beam freq to electron cyclotron freq
+        # Find the ratio of beam freq to electron cyclotron freq
         gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
 
-        # find the difference, if the sign changes, it means you have crossed the resonance frequency
+        # Find the difference. If the sign changes, it means you have crossed the resonance frequency
         difference = gyro_freq - 1
         return difference
 
@@ -142,11 +143,12 @@ def make_solver_events(
     def event_cross_resonance2(
         tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian
     ):
-        # this is for the second harmonic electron cyclotron frequency
+        # This is for the second harmonic electron cyclotron frequency <-- This event triggers when the beam's frequency is equal 
+        # to the second harmonic electron cyclotron frequency
         # Currently only works when crossing resonance.
         # Not implemented for relativistic temperatures
 
-        # used to include a delta_gyro_freq where the event triggers when
+        # Used to include a delta_gyro_freq where the event triggers when
         # beam frequency is close to the second harmonic electron frequency, but this is removed because it works unreliably.
 
         q_R, q_Z, _, _ = ray_parameters_2D
@@ -155,12 +157,12 @@ def make_solver_events(
         B_T = field.B_T(q_R, q_Z)
         B_Z = field.B_Z(q_R, q_Z)
 
-        # magnitude of B field
+        # Magnitude of B field
         B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
 
         gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
 
-        # find the difference, if the sign changes, it means you have crossed the resonance frequency.
+        # Find the difference, if the sign changes, it means you have crossed the resonance frequency.
         # We want 0.5. This is because second harmonic is 2*\omega_c = \omega
         # normalised gyrofreq = \omega_c/\omega = 0.5
 
