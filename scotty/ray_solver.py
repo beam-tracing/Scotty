@@ -186,16 +186,15 @@ def make_solver_events(
         d_K_d_tau = -(1 / K_magnitude) * (
             dH["dH_dR"] * K_R + dH["dH_dZ"] * K_Z + dH["dH_dKR"] * q_R
         )
-        
-        
-        #when ray reaches resonance, dK_dtau goes to infinity. Just set to 0 to tell scotty
-        #that we are heading to infinity if we get a NaN.
-        
-        #cannot set condition where K_magnitude > some value. K_magnitude does not actually 
-        #blow up. Only dK_dtau
-        if np.isnan(d_K_d_tau) == True: 
+
+        # when ray reaches resonance, dK_dtau goes to infinity. Just set to 0 to tell scotty
+        # that we are heading to infinity if we get a NaN.
+
+        # cannot set condition where K_magnitude > some value. K_magnitude does not actually
+        # blow up. Only dK_dtau
+        if np.isnan(d_K_d_tau) == True:
             d_K_d_tau = 0
-        
+
         return d_K_d_tau
 
     return {
