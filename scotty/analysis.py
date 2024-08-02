@@ -136,7 +136,7 @@ def immediate_analysis(
     # There are two definitions of H used in Scotty
     # H_Booker: H is the determinant of the dispersion tensor D. Booker quartic
     # H_Cardano: H is the zero eigenvalue of the dispersion tensor D. Can be calculated with Cardano's formula.
-    
+
     H_Booker = hamiltonian(q_R.data, q_Z.data, K_R.data, K_zeta_initial, K_Z.data)
     # Create and immediately evaluate a Hamiltonian with the opposite mode
     # That is, the opposite of the discriminant in the Booker quartic
@@ -171,7 +171,7 @@ def immediate_analysis(
     # Sanity check. Makes sure that calculated quantities are reasonable
     # -------------------
     check_output(H_Booker)
-    print('The final value of H_Booker is', H_Booker[-1])
+    print("The final value of H_Booker is", H_Booker[-1])
     ##
 
     df = xr.Dataset(
@@ -614,7 +614,10 @@ def further_analysis(
         "b_hat": df.b_hat,
         "g_hat": df.g_hat,
         "e_hat": (["tau", "col"], e_hat),
-        "H_eigvals": (["tau", "col"], H_eigvals), ##TODO: the second index should be 1,2,3. Not 'col', which is R, zeta, Z
+        "H_eigvals": (
+            ["tau", "col"],
+            H_eigvals,
+        ),  ##TODO: the second index should be 1,2,3. Not 'col', which is R, zeta, Z
         "e_eigvecs": (["tau", "row", "col"], e_eigvecs),
         "H_1_Cardano": (["tau"], H_1_Cardano),
         "H_2_Cardano": (["tau"], H_2_Cardano),
