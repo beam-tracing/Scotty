@@ -253,25 +253,55 @@ def plot_dispersion_relation(
 
     ## The title of 'col' in H_eigvals is a misnomer
     ax.plot(
-        analysis.l_lc, abs(analysis.H_eigvals.sel(col="R")), color = 'pink', linestyle="-", linewidth = 4, label="H_eigvals_1 (X?)"
+        analysis.l_lc,
+        abs(analysis.H_eigvals.sel(col="R")),
+        color="pink",
+        linestyle="-",
+        linewidth=4,
+        label="H_eigvals_1 (X?)",
     )
     ax.plot(
-        analysis.l_lc, abs(analysis.H_eigvals.sel(col="zeta")), color = 'lightgreen', linestyle="-", linewidth = 4, label="H_eigvals_2 (O?)"
+        analysis.l_lc,
+        abs(analysis.H_eigvals.sel(col="zeta")),
+        color="lightgreen",
+        linestyle="-",
+        linewidth=4,
+        label="H_eigvals_2 (O?)",
     )
     ax.plot(
-        analysis.l_lc, abs(analysis.H_eigvals.sel(col="Z")), color = 'gray', linestyle="-", linewidth = 4, label="H_eigvals_3"
+        analysis.l_lc,
+        abs(analysis.H_eigvals.sel(col="Z")),
+        color="gray",
+        linestyle="-",
+        linewidth=4,
+        label="H_eigvals_3",
     )
-    
+
     ax.plot(
-        analysis.l_lc, abs(analysis.H_1_Cardano), color = 'k', linestyle=":", linewidth = 4, label="H_1_Cardano"
+        analysis.l_lc,
+        abs(analysis.H_1_Cardano),
+        color="k",
+        linestyle=":",
+        linewidth=4,
+        label="H_1_Cardano",
     )
     ax.plot(
-        analysis.l_lc, abs(analysis.H_2_Cardano), color = 'r', linestyle=":", linewidth = 4, label="H_2_Cardano (X?)"
+        analysis.l_lc,
+        abs(analysis.H_2_Cardano),
+        color="r",
+        linestyle=":",
+        linewidth=4,
+        label="H_2_Cardano (X?)",
     )
     ax.plot(
-        analysis.l_lc, abs(analysis.H_3_Cardano), color = 'g', linestyle=":", linewidth = 4, label="H_3_Cardano (O?)"
+        analysis.l_lc,
+        abs(analysis.H_3_Cardano),
+        color="g",
+        linestyle=":",
+        linewidth=4,
+        label="H_3_Cardano (O?)",
     )
-    
+
     ax.set_title("Dispersion relation")
     ax.legend()
 
