@@ -187,11 +187,11 @@ def make_solver_events(
 
         # This event does not work properly when the ray reaches resonance
         # The following if statement introduces a trick to avoid this problem
-        # When ray reaches resonance, dK_dtau goes to infinity. Just set to 0 
+        # When ray reaches resonance, dK_dtau goes to infinity. Just set to 0
         # to tell scotty that we are heading to infinity if we get a NaN.
         ##
         # Note to developers:
-        # Cannot set condition where K_magnitude > some value. K_magnitude 
+        # Cannot set condition where K_magnitude > some value. K_magnitude
         # does not actually blow up. Only dK_dtau blows up
         # Matthew Liang, Peter Hill, and Valerian Hall-Chen (01 August 2024)
         if np.isnan(d_K_d_tau) == True:
