@@ -117,7 +117,6 @@ def make_solver_events(
     def event_cross_resonance(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
         # This event triggers when the beam's frequency is equal
         # to the fundamental electron cyclotron frequency
-        # Currently only works when crossing resonance.
         # Not implemented for relativistic temperatures
 
         # Used to include a delta_gyro_freq where the event triggers when
@@ -145,7 +144,6 @@ def make_solver_events(
     ):
         # This event triggers when the beam's frequency is equal
         # to the second harmonic of the electron cyclotron frequency
-        # Currently only works when crossing resonance.
         # Not implemented for relativistic temperatures
 
         # Used to include a delta_gyro_freq where the event triggers when
@@ -187,11 +185,15 @@ def make_solver_events(
             dH["dH_dR"] * K_R + dH["dH_dZ"] * K_Z + dH["dH_dKR"] * q_R
         )
 
-        # when ray reaches resonance, dK_dtau goes to infinity. Just set to 0 to tell scotty
-        # that we are heading to infinity if we get a NaN.
-
-        # cannot set condition where K_magnitude > some value. K_magnitude does not actually
-        # blow up. Only dK_dtau
+        # This event does not work properly when the ray reaches resonance
+        # The following if statement introduces a trick to avoid this problem
+        # When ray reaches resonance, dK_dtau goes to infinity. Just set to 0 
+        # to tell scotty that we are heading to infinity if we get a NaN.
+        ##
+        # Note to developers:
+        # Cannot set condition where K_magnitude > some value. K_magnitude 
+        # does not actually blow up. Only dK_dtau blows up
+        # Matthew Liang, Peter Hill, and Valerian Hall-Chen (01 August 2024)
         if np.isnan(d_K_d_tau) == True:
             d_K_d_tau = 0
 
