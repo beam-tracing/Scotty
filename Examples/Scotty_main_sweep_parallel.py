@@ -4,8 +4,6 @@ Created on Fri Jun  8 10:44:34 2018
 
 @author: VH Hall-Chen
 Valerian Hongjie Hall-Chen
-valerian@hall-chen.com
-
 
 For shot 29908, the EFIT++ times are efit_times = np.linspace(0.155,0.25,20)
 I want efit_times[np.arange(0,10)*2 + 1]. 160ms, 170ms, ..., 250ms

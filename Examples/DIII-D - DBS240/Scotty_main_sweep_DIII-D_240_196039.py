@@ -4,7 +4,6 @@ Created on Fri Jun  8 10:44:34 2018
 
 @author: VH Hall-Chen
 Valerian Hongjie Hall-Chen
-valerian@hall-chen.com
 
 """
 from scotty.beam_me_up import beam_me_up
