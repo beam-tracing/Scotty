@@ -504,7 +504,13 @@ def beam_me_up(
         K_initial = plasmaLaunch_K
         initial_position = launch_position
         launch_K = None
-        Psi_3D_lab_launch = find_Psi_3D_lab(plasmaLaunch_Psi_3D_lab_Cartesian, launch_position[0], launch_position[1], plasmaLaunch_K[0], plasmaLaunch_K[1])
+        Psi_3D_lab_launch = find_Psi_3D_lab(
+            plasmaLaunch_Psi_3D_lab_Cartesian,
+            launch_position[0],
+            launch_position[1],
+            plasmaLaunch_K[0],
+            plasmaLaunch_K[1],
+        )
         Psi_3D_lab_entry = np.zeros([3, 3])
         Psi_3D_lab_entry_cartersian = np.zeros([3, 3])
         distance_from_launch_to_entry = None
@@ -681,7 +687,6 @@ def beam_me_up(
             # If the solver doesn't finish, end the function here
             print("Solver did not reach completion")
             return
-    
 
     # -------------------
     # Process the data from the main loop to give a bunch of useful stuff

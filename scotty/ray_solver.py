@@ -48,7 +48,10 @@ def _event(terminal: bool, direction: float):
 
 
 def make_solver_events(
-    poloidal_flux_enter: float, launch_angular_frequency: float, field: MagneticField, reflectometry_flag: bool
+    poloidal_flux_enter: float,
+    launch_angular_frequency: float,
+    field: MagneticField,
+    reflectometry_flag: bool,
 ) -> Dict[str, Callable]:
     """Define event handlers for the ray solver
 
@@ -210,7 +213,9 @@ def make_solver_events(
 
 
 def handle_leaving_plasma_events(
-    tau_events: Dict[str, FloatArray], ray_parameters_2D_events: FloatArray, reflectometry_flag: bool
+    tau_events: Dict[str, FloatArray],
+    ray_parameters_2D_events: FloatArray,
+    reflectometry_flag: bool,
 ) -> float:
     """Handle events detected by `scipy.integrate.solve_ivp`. This
     only handles events due to the ray leaving the plasma or
@@ -246,22 +251,22 @@ def handle_leaving_plasma_events(
     # Event names here must match those in the `solver_ray_events`
     # dict defined outside this function
     if detected("leave_plasma") and not detected("leave_LCFS"):
-        print('Hi1')
+        print("Hi1")
         return tau_events["leave_plasma"][0]
 
     if detected("cross_resonance"):
-        print('Hi2')
+        print("Hi2")
         return tau_events["cross_resonance"][0]
 
     if detected("cross_resonance2"):
-        print('Hi3')
+        print("Hi3")
         return tau_events["cross_resonance2"][0]
 
     if not detected("leave_plasma") and detected("leave_LCFS"):
-        print('Hi4')
+        print("Hi4")
         return tau_events["leave_LCFS"][0]
     if detected("leave_plasma") and detected("leave_LCFS"):
-        print('Hi5')
+        print("Hi5")
         # If both event_leave_plasma and event_leave_LCFS occur
         K_R_LCFS = ray_parameters_2D_events[0][2]
         if K_R_LCFS < 0:
