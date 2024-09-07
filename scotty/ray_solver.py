@@ -48,7 +48,7 @@ def _event(terminal: bool, direction: float):
 
 
 def make_solver_events(
-    poloidal_flux_enter: float, launch_angular_frequency: float, field: MagneticField
+    poloidal_flux_enter: float, launch_angular_frequency: float, field: MagneticField, reflectometry_flag: bool
 ) -> Dict[str, Callable]:
     """Define event handlers for the ray solver
 
@@ -115,10 +115,12 @@ def make_solver_events(
 
     @_event(terminal=True, direction=0.0)
     def event_cross_resonance(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
-        # Currently only works when crossing resonance.
-        # To implement crossing of higher harmonics as well
+        # This event triggers when the beam's frequency is equal
+        # to the fundamental electron cyclotron frequency
         # Not implemented for relativistic temperatures
-        delta_gyro_freq = 0.01
+
+        # Used to include a delta_gyro_freq where the event triggers when
+        # beam frequency is close to the electron frequency, but this is removed because it works unreliably.
 
         q_R, q_Z, _, _ = ray_parameters_2D
 
@@ -126,12 +128,44 @@ def make_solver_events(
         B_T = field.B_T(q_R, q_Z)
         B_Z = field.B_Z(q_R, q_Z)
 
+        # Magnitude of B field
         B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
+
+        # Find the ratio of beam freq to electron cyclotron freq
         gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
 
-        # The function's return value gives zero when the gyrofreq on the ray goes from either
-        # above to below or below to above the resonance.
-        return (gyro_freq - 1.0 - delta_gyro_freq) * (gyro_freq - 1.0 + delta_gyro_freq)
+        # Find the difference. If the sign changes, it means you have crossed the resonance frequency
+        difference = gyro_freq - 1
+        return difference
+
+    @_event(terminal=True, direction=0.0)
+    def event_cross_resonance2(
+        tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian
+    ):
+        # This event triggers when the beam's frequency is equal
+        # to the second harmonic of the electron cyclotron frequency
+        # Not implemented for relativistic temperatures
+
+        # Used to include a delta_gyro_freq where the event triggers when
+        # beam frequency is close to the second harmonic electron frequency, but this is removed because it works unreliably.
+
+        q_R, q_Z, _, _ = ray_parameters_2D
+
+        B_R = field.B_R(q_R, q_Z)
+        B_T = field.B_T(q_R, q_Z)
+        B_Z = field.B_Z(q_R, q_Z)
+
+        # Magnitude of B field
+        B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
+
+        gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
+
+        # Find the difference, if the sign changes, it means you have crossed the resonance frequency.
+        # We want 0.5. This is because second harmonic is 2*\omega_c = \omega
+        # normalised gyrofreq = \omega_c/\omega = 0.5
+
+        difference = gyro_freq - 0.5
+        return difference
 
     @_event(terminal=False, direction=1.0)
     def event_reach_K_min(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
@@ -150,6 +184,19 @@ def make_solver_events(
         d_K_d_tau = -(1 / K_magnitude) * (
             dH["dH_dR"] * K_R + dH["dH_dZ"] * K_Z + dH["dH_dKR"] * q_R
         )
+
+        # This event does not work properly when the ray reaches resonance
+        # The following if statement introduces a trick to avoid this problem
+        # When ray reaches resonance, dK_dtau goes to infinity. Just set to 0
+        # to tell scotty that we are heading to infinity if we get a NaN.
+        ##
+        # Note to developers:
+        # Cannot set condition where K_magnitude > some value. K_magnitude
+        # does not actually blow up. Only dK_dtau blows up
+        # Matthew Liang, Peter Hill, and Valerian Hall-Chen (01 August 2024)
+        if np.isnan(d_K_d_tau) == True:
+            d_K_d_tau = 0
+
         return d_K_d_tau
 
     return {
@@ -157,12 +204,13 @@ def make_solver_events(
         "leave_LCFS": event_leave_LCFS,
         "leave_simulation": event_leave_simulation,
         "cross_resonance": event_cross_resonance,
+        "cross_resonance2": event_cross_resonance2,
         "reach_K_min": event_reach_K_min,
     }
 
 
 def handle_leaving_plasma_events(
-    tau_events: Dict[str, FloatArray], ray_parameters_2D_events: FloatArray
+    tau_events: Dict[str, FloatArray], ray_parameters_2D_events: FloatArray, reflectometry_flag: bool
 ) -> float:
     """Handle events detected by `scipy.integrate.solve_ivp`. This
     only handles events due to the ray leaving the plasma or
@@ -198,15 +246,22 @@ def handle_leaving_plasma_events(
     # Event names here must match those in the `solver_ray_events`
     # dict defined outside this function
     if detected("leave_plasma") and not detected("leave_LCFS"):
+        print('Hi1')
         return tau_events["leave_plasma"][0]
 
     if detected("cross_resonance"):
+        print('Hi2')
         return tau_events["cross_resonance"][0]
 
-    if not detected("leave_plasma") and detected("leave_LCFS"):
-        return tau_events["leave_LCFS"][0]
+    if detected("cross_resonance2"):
+        print('Hi3')
+        return tau_events["cross_resonance2"][0]
 
+    if not detected("leave_plasma") and detected("leave_LCFS"):
+        print('Hi4')
+        return tau_events["leave_LCFS"][0]
     if detected("leave_plasma") and detected("leave_LCFS"):
+        print('Hi5')
         # If both event_leave_plasma and event_leave_LCFS occur
         K_R_LCFS = ray_parameters_2D_events[0][2]
         if K_R_LCFS < 0:
@@ -412,6 +467,7 @@ def propagate_ray(
     quick_run: bool,
     len_tau: int,
     tau_max: float = 1e5,
+    reflectometry_flag: bool = False,
     verbose: bool = True,
 ) -> Union[Tuple[float, FloatArray], K_cutoff_data]:
     """Propagate a ray. Quickly finds tau at which the ray leaves the
@@ -461,7 +517,7 @@ def propagate_ray(
     # with the returned events, and use these names instead of list
     # indices
     solver_ray_events = make_solver_events(
-        poloidal_flux_enter, launch_angular_frequency, field
+        poloidal_flux_enter, launch_angular_frequency, field, reflectometry_flag
     )
 
     K_R_initial, K_zeta_initial, K_Z_initial = K_initial
@@ -514,7 +570,7 @@ def propagate_ray(
         zip(solver_ray_events.keys(), solver_ray_output.y_events)
     )
     tau_leave = handle_leaving_plasma_events(
-        tau_events, ray_parameters_2D_events["leave_LCFS"]
+        tau_events, ray_parameters_2D_events["leave_LCFS"], reflectometry_flag
     )
 
     if quick_run:
@@ -527,7 +583,11 @@ def propagate_ray(
     # the plasma
     tau_points = np.linspace(0, tau_leave, len_tau - 1, endpoint=False)
 
-    if len(tau_events["cross_resonance"]) == 0:
+    # you want no resonance at all, so both must be 0
+    if (
+        len(tau_events["cross_resonance"]) == 0
+        and len(tau_events["cross_resonance2"]) == 0
+    ):
         tau_points = handle_no_resonance(
             solver_ray_output,
             tau_leave,

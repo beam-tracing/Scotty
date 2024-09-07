@@ -25,6 +25,7 @@ from scotty.fun_general import (
     find_normalised_plasma_freq,
     make_unit_vector_from_cross_product,
     find_Psi_3D_lab_Cartesian,
+    find_Psi_3D_lab,
     find_H_Cardano,
     angular_frequency_to_wavenumber,
     find_waist,
@@ -242,15 +243,17 @@ def further_analysis(
     output_filename_suffix: str,
     field: MagneticField,
     detailed_analysis_flag: bool,
+    reflectometry_flag: bool,
     dH: Dict[str, ArrayLike],
 ):
     # Calculates various useful stuff
     q_X, q_Y, _ = cylindrical_to_cartesian(df.q_R, df.q_zeta, df.q_Z)
+
     point_spacing = np.sqrt(
         np.diff(q_X) ** 2 + np.diff(q_Y) ** 2 + np.diff(df.q_Z) ** 2
     )
     distance_along_line = np.append(0, np.cumsum(point_spacing))
-
+    
     # Calculates the index of the minimum magnitude of K
     # That is, finds when the beam hits the cut-off
     K_magnitude_array = np.asfarray(
@@ -280,20 +283,20 @@ def further_analysis(
 
     cos_theta_analysis = np.cos(theta)
     # -----
-
+    
     # Calcuating the corrections to make M from Psi
     # Includes terms small in mismatch
 
     # The dominant value of kperp1 that is backscattered at every point
     k_perp_1_bs = -2 * K_magnitude_array * np.cos(theta_m + theta) / cos_theta_analysis
-
+    
     normal_vectors = np.vstack(
         (df.dpolflux_dR, np.zeros_like(df.dpolflux_dR), df.dpolflux_dZ)
     ).T
     normal_magnitudes = np.linalg.norm(normal_vectors, axis=-1)
     normal_hat = normal_vectors / normal_magnitudes[:, np.newaxis]
     binormal_hat = make_unit_vector_from_cross_product(normal_hat, df.b_hat)
-
+    
     k_perp_1_bs_normal = k_perp_1_bs * dot(
         kperp1_hat, normal_hat
     )  # TODO: Check that this works properly
@@ -325,7 +328,7 @@ def further_analysis(
     Psi_xg = dot(x_hat_Cartesian, dot(Psi_3D_Cartesian, g_hat_Cartesian))
     Psi_yg = dot(y_hat_Cartesian, dot(Psi_3D_Cartesian, g_hat_Cartesian))
     Psi_gg = dot(g_hat_Cartesian, dot(Psi_3D_Cartesian, g_hat_Cartesian))
-
+    
     Psi_xx_entry = np.dot(
         x_hat_Cartesian[0, :],
         np.dot(Psi_3D_lab_entry_cartersian, x_hat_Cartesian[0, :]),
@@ -338,12 +341,12 @@ def further_analysis(
         y_hat_Cartesian[0, :],
         np.dot(Psi_3D_lab_entry_cartersian, y_hat_Cartesian[0, :]),
     )
-
+    
     numberOfDataPoints = len(df.tau)
     # Calculating intermediate terms that are needed for the corrections in M
     xhat_dot_grad_bhat = dot(df.x_hat, df.grad_bhat)
     yhat_dot_grad_bhat = dot(df.y_hat, df.grad_bhat)
-
+    
     # See notes 07 June 2021
     grad_g_hat = df.g_hat.differentiate("tau")
     ray_curvature_kappa = (
@@ -356,8 +359,9 @@ def further_analysis(
         )
         / df.g_magnitude.data
     ).T
-
+    
     grad_x_hat = df.x_hat.differentiate("tau")
+    
     d_xhat_d_tau = np.block(
         [
             [grad_x_hat.sel(col="R") - df.x_hat.sel(col="zeta") * df.dH_dKzeta],
@@ -365,7 +369,7 @@ def further_analysis(
             [grad_x_hat.sel(col="Z")],
         ]
     ).T
-
+    
     xhat_dot_grad_bhat_dot_xhat = dot(xhat_dot_grad_bhat, df.x_hat)
     xhat_dot_grad_bhat_dot_yhat = dot(xhat_dot_grad_bhat, df.y_hat)
     xhat_dot_grad_bhat_dot_ghat = dot(xhat_dot_grad_bhat, df.g_hat)
@@ -377,14 +381,15 @@ def further_analysis(
     # This should be 0. Good to check.
     kappa_dot_ghat = dot(ray_curvature_kappa, df.g_hat)
     d_xhat_d_tau_dot_yhat = dot(d_xhat_d_tau, df.y_hat)
-
+    
+    
     # Calculates the components of M_w, only taking into consideration
     # correction terms that are not small in mismatch
     M_xx = Psi_xx + (k_perp_1_bs / 2) * xhat_dot_grad_bhat_dot_ghat
     M_xy = Psi_xy + (k_perp_1_bs / 2) * yhat_dot_grad_bhat_dot_ghat
     M_yy = Psi_yy
     # -----
-
+    
     # Calculates the localisation, wavenumber resolution, and mismatch attenuation pieces
     det_M_w_analysis = M_xx * M_yy - M_xy**2
     M_w_inv_xx = M_yy / det_M_w_analysis
@@ -406,7 +411,7 @@ def further_analysis(
         "mismatch attenuation: ",
         (np.exp(-2 * (theta_m[cutoff_index] / delta_theta_m[cutoff_index]) ** 2)).data,
     )
-
+    
     # This part is used to make some nice plots when post-processing
     R_midplane_points = np.linspace(field.R_coord[0], field.R_coord[-1], 1000)
     # poloidal flux at R and z=0
@@ -649,10 +654,12 @@ def further_analysis(
     set_vector_components_long_name(df)
     df.update(further_df)
 
-    if detailed_analysis_flag and (cutoff_index + 1 != len(df.tau)):
-        df.update(localisation_analysis(df, cutoff_index, wavenumber_K0))
+    if not reflectometry_flag:
+        if detailed_analysis_flag and (cutoff_index + 1 != len(df.tau)):
+            df.update(localisation_analysis(df, cutoff_index, wavenumber_K0))
 
     return df
+
 
 
 def dispersion_eigenvalues(
