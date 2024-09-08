@@ -4,7 +4,6 @@ Created on Fri Jun  8 10:44:34 2018
 
 @author: VH Hall-Chen
 Valerian Hongjie Hall-Chen
-valerian@hall-chen.com
 
 ## Initial beam properties (width, curv) are a function of frequency ##
 launch_freqs_GHz       = np.array([32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50])

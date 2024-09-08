@@ -27,3 +27,5 @@ dt = datatree.open_datatree(path+"scotty_output.h5", engine="h5netcdf")
 plot_poloidal_beam_path(dt,zoom=True)
 
 # plot_toroidal_beam_path(dt)
+
+# dt.close()

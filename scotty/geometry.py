@@ -7,7 +7,7 @@ from abc import ABC
 import pathlib
 from typing import Callable, Optional, Tuple
 
-from netCDF4 import Dataset
+from h5netcdf.legacyapi import Dataset
 import numpy as np
 from scipy.interpolate import RectBivariateSpline, UnivariateSpline
 

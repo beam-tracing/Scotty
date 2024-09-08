@@ -134,9 +134,14 @@ def immediate_analysis(
     # But good for checking whether things are working properly
     # -------------------
     #
-    H = hamiltonian(q_R.data, q_Z.data, K_R.data, K_zeta_initial, K_Z.data)
+    # There are two definitions of H used in Scotty
+    # H_Booker: H is the determinant of the dispersion tensor D. Booker quartic
+    # H_Cardano: H is the zero eigenvalue of the dispersion tensor D. Can be calculated with Cardano's formula.
+
+    H_Booker = hamiltonian(q_R.data, q_Z.data, K_R.data, K_zeta_initial, K_Z.data)
     # Create and immediately evaluate a Hamiltonian with the opposite mode
-    H_other = Hamiltonian(
+    # That is, the opposite of the discriminant in the Booker quartic
+    H_Booker_other = Hamiltonian(
         field,
         launch_angular_frequency,
         -mode_flag,
@@ -166,7 +171,8 @@ def immediate_analysis(
     # -------------------
     # Sanity check. Makes sure that calculated quantities are reasonable
     # -------------------
-    check_output(H)
+    check_output(H_Booker)
+    print("The final value of H_Booker is", H_Booker[-1])
     ##
 
     df = xr.Dataset(
@@ -201,8 +207,8 @@ def immediate_analysis(
             "g_hat": (["tau", "col"], g_hat),
             "g_magnitude": g_magnitude,
             "grad_bhat": (["tau", "row", "col"], grad_bhat),
-            "H": (["tau"], H),
-            "H_other": (["tau"], H_other),
+            "H_Booker": (["tau"], H_Booker),
+            "H_Booker_other": (["tau"], H_Booker_other),
             "normalised_plasma_freqs": (["tau"], normalised_plasma_freqs),
             "normalised_gyro_freqs": (["tau"], normalised_gyro_freqs),
             "x_hat": (["tau", "col"], x_hat),
@@ -295,7 +301,9 @@ def further_analysis(
     ).T
     normal_magnitudes = np.linalg.norm(normal_vectors, axis=-1)
     normal_hat = normal_vectors / normal_magnitudes[:, np.newaxis]
-    binormal_hat = make_unit_vector_from_cross_product(normal_hat, df.b_hat)
+    binormal_hat = make_unit_vector_from_cross_product(
+        df.b_hat, normal_hat
+    )  # by definition, binormal vector = tangent vector cross normal vector. Follows the same sign convention as Pyrokinetics [Patel, Bhavin, et al. "Pyrokinetics-A Python library to standardise gyrokinetic analysis." Journal of open source software (2024)]
 
     k_perp_1_bs_normal = k_perp_1_bs * dot(
         kperp1_hat, normal_hat
@@ -511,7 +519,7 @@ def further_analysis(
         numberOfDataPoints,
         theta_m,
     )
-    # In my experience, H_eigvals[:,1] corresponds to the O mode, and H_eigvals[:,1] corresponds to the X-mode
+    # In my experience, H_eigvals[:,1] corresponds to the O mode, and H_eigvals[:,0] corresponds to the X-mode
     # ALERT: This may not always be the case! Check the output figure to make sure that the appropriate solution is indeed 0 along the ray
     # e_hat has components e_1,e_2,e_b
     mode_index = 1 if inputs.mode_flag == 1 else 0
@@ -610,7 +618,10 @@ def further_analysis(
         "b_hat": df.b_hat,
         "g_hat": df.g_hat,
         "e_hat": (["tau", "col"], e_hat),
-        "H_eigvals": (["tau", "col"], H_eigvals),
+        "H_eigvals": (
+            ["tau", "col"],
+            H_eigvals,
+        ),  ##TODO: the second index should be 1,2,3. Not 'col', which is R, zeta, Z
         "e_eigvecs": (["tau", "row", "col"], e_eigvecs),
         "H_1_Cardano": (["tau"], H_1_Cardano),
         "H_2_Cardano": (["tau"], H_2_Cardano),
