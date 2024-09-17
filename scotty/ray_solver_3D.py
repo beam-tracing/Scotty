@@ -1,13 +1,11 @@
 from dataclasses import dataclass
-from geometry_3D import MagneticField_3D_Cartesian
-from hamiltonian_3D import Hamiltonian_3D
 import numpy as np
 from scotty.fun_general import find_normalised_gyro_freq
+from scotty.geometry_3D import MagneticField_3D_Cartesian
+from scotty.hamiltonian_3D import Hamiltonian_3D
 from scotty.typing import FloatArray
 from time import time
 from typing import Callable, Dict, Protocol, Tuple, Union
-
-
 
 ### Declaring class _Event and def _event
 # Decorator event used in make_solver_events()
