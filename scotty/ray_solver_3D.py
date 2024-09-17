@@ -5,7 +5,7 @@ from scotty.geometry_3D import MagneticField_3D_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
 from scotty.typing import FloatArray
 from time import time
-from typing import Callable, Dict, Protocol, Tuple, Union
+from typing import Any, Callable, Dict, Protocol, Tuple, Union
 
 ### Declaring class _Event and def _event
 # Decorator event used in make_solver_events()
@@ -367,7 +367,7 @@ def propagate_ray(
     ]
 
     # Additional arguments for solver
-    solver_arguments = (hamiltonian)
+    solver_arguments = (hamiltonian,)
 
     solver_start_time = time()
     solver_ray_output = solve_ivp(
