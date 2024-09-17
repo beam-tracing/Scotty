@@ -45,7 +45,7 @@ def make_solver_events(
     
     # This event triggers when the beam leaves the same poloidal flux value it entered at
     # Goes from negative to positive when leaving the plasma
-    @_event(terminal = True, directions = 1.0)
+    @_event(terminal = True, direction = 1.0)
     def event_leave_plasma(tau, ray_parameters_3D, hamiltonian: Hamiltonian_3D):
         q_X, q_Y, q_Z, K_X, K_Y, K_Z = ray_parameters_3D
         polflux = field.polflux(q_X, q_Y, q_Z)
