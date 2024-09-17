@@ -3,6 +3,8 @@
 
 from abc import ABC
 import numpy as np
+from scipy.interpolate import RegularGridInterpolator
+import scotty.derivatives
 from scotty.typing import ArrayLike, FloatArray
 from typing import Callable, Tuple
 
@@ -133,11 +135,6 @@ class MagneticField_3D_Cartesian(ABC):
 ### Declaring class InterpolatedField_3D_Cartesian(MagneticField_3D_Cartesian)
 # Implementing a child class of the abstract base class MagneticField_3D_Cartesian.
 
-import numpy as np
-import scotty.derivatives
-from scotty.typing import ArrayLike, FloatArray
-from typing import Callable, Tuple
-
 class InterpolatedField_3D_Cartesian(MagneticField_3D_Cartesian):
 
     def __init__(self,
@@ -155,16 +152,16 @@ class InterpolatedField_3D_Cartesian(MagneticField_3D_Cartesian):
         self.Z_coord = Z_grid
         self.polflux_grid = psi
         
-        self._interp_B_X, _ = _interp_mesh3D_data1d(
+        self._interp_B_X, _ = _interp_mesh3D_data1D(
             X_grid, Y_grid, Z_grid, B_X, interp_order)
         
-        self._interp_B_Y, _ = _interp_mesh3D_data1d(
+        self._interp_B_Y, _ = _interp_mesh3D_data1D(
             X_grid, Y_grid, Z_grid, B_Y, interp_order)
         
-        self._interp_B_Z, _ = _interp_mesh3D_data1d(
+        self._interp_B_Z, _ = _interp_mesh3D_data1D(
             X_grid, Y_grid, Z_grid, B_Z, interp_order)
         
-        self._interp_polflux, spline_polflux = _interp_mesh3D_data1d(
+        self._interp_polflux, spline_polflux = _interp_mesh3D_data1D(
             X_grid, Y_grid, Z_grid, psi, interp_order)
     
     # Defining the class attributes
@@ -294,15 +291,11 @@ class InterpolatedField_3D_Cartesian(MagneticField_3D_Cartesian):
 
 
 
-### Declaring def _interp_mesh3D_data1d
+### Declaring def _interp_mesh3D_data1D
 # Implementing an interpolation method for $B_X$, $B_Y$, $B_Z$, and $polflux$.
 # *interp_smoothing no longer supported.
 
-from scipy.interpolate import RegularGridInterpolator
-from scotty.typing import ArrayLike, FloatArray
-from typing import Callable, Tuple
-
-def _interp_mesh3D_data1d(
+def _interp_mesh3D_data1D(
         X_grid, Y_grid, Z_grid,
         data_array,
         interp_order: int,
@@ -313,7 +306,7 @@ def _interp_mesh3D_data1d(
     elif interp_order == 5: interp_order_str = "quintic"
     else:
         interp_order_str = "quintic"
-        print("interp_order not supported. Setting interp_order = 5 for _interp_mesh3D_data1d")
+        print("interp_order not supported. Setting interp_order = 5 for _interp_mesh3D_data1D")
 
     spline = RegularGridInterpolator(
         points = (X_grid, Y_grid, Z_grid),
