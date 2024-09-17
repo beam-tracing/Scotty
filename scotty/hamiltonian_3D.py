@@ -1,8 +1,14 @@
 ### Declaring class DielectricTensor_3D
 
-from scotty.fun_general import angular_frequency_to_wavenumber, find_normalised_gyro_freq, find_normalised_plasma_freq
-from scotty.typing import ArrayLike
-from typing import Optional
+import numpy as np
+import scotty.derivatives
+from scotty.fun_general import (angular_frequency_to_wavenumber,
+                                dot,
+                                find_normalised_gyro_freq,
+                                find_normalised_plasma_freq)
+from scotty.profile_fit import ProfileFitLike
+from scotty.typing import ArrayLike, FloatArray
+from typing import Dict, Optional, Tuple
 
 class DielectricTensor_3D:
     r"""
@@ -76,13 +82,6 @@ class DielectricTensor_3D:
 
 
 ### Declaring class Hamiltonian_3D
-
-import numpy as np
-import scotty.derivatives
-from scotty.fun_general import angular_frequency_to_wavenumber, dot
-from scotty.profile_fit import ProfileFitLike
-from scotty.typing import ArrayLike
-from typing import Dict, Optional, Tuple
 
 class Hamiltonian_3D:
     r"""
@@ -267,13 +266,6 @@ class Hamiltonian_3D:
 
 
 ### Declaring def hessians_3D
-
-import numpy as np
-#import scotty.derivatives
-#from scotty.fun_general import angular_frequency_to_wavenumber, dot
-#from scotty.profile_fit import ProfileFitLike
-from scotty.typing import FloatArray
-from typing import Dict
 
 def hessians_3D(dH: dict):
     """
