@@ -85,7 +85,6 @@ class Torbeam:
     @classmethod
     def from_file(cls, filename: PathLike) -> Torbeam:
         """Read TORBEAM geometry file"""
-
         with open(filename) as f:
             while "X-coordinates" not in f.readline():
                 pass  # Start reading only from X-coords onwards
@@ -107,6 +106,37 @@ class Torbeam:
             )
 
         return cls(R_grid, Z_grid, B_R, B_T, B_Z, poloidal_flux)
+
+
+    def from_file_scaled_psi(cls, filename: PathLike) -> Torbeam:
+        """Read TORBEAM geometry file with scaled psi"""
+        print(filename)
+        with open(filename) as f:
+            while "Inside and Outside radius and psi_sep" not in f.readline():
+                pass  # Start reading only from this onwards
+            psi_sep = read_floats_into_list_until("X-coordinates", f)[2]
+            R_grid = read_floats_into_list_until("Z-coordinates", f)
+            Z_grid = read_floats_into_list_until("B_R", f)
+            R_points = len(R_grid)
+            Z_points = len(Z_grid)
+
+            # Row-major and column-major business (Torbeam is in
+            # Fortran and Scotty is in Python)
+            def from_fortran(array):
+                return array.reshape((Z_points, R_points)).transpose()
+
+            B_R = from_fortran(read_floats_into_list_until("B_t", f))
+            B_T = from_fortran(read_floats_into_list_until("B_Z", f))
+            B_Z = from_fortran(read_floats_into_list_until("psi", f))
+            poloidal_flux = from_fortran(
+                read_floats_into_list_until("you fall asleep", f)
+            )
+            
+            # rescale poloidal_flux to match scotty format
+            # poloidal_flux.max() -> 0; psi_sep -> 1
+            poloidal_flux = (poloidal_flux - poloidal_flux.max()) / (psi_sep - poloidal_flux.max())
+        return cls(R_grid, Z_grid, B_R, B_T, B_Z, poloidal_flux)
+
 
     def write(self, filename: PathLike):
         """Write TORBEAM geometry file"""
