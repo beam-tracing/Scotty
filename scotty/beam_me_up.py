@@ -871,7 +871,7 @@ def create_magnetic_geometry(
 
     if find_B_method == "torbeam":
         print("Using Torbeam input files for B and poloidal flux")
-        
+
         # topfile
         # Others: inbeam.dat, Te.dat (not currently used in this code)
         topfile_filename = magnetic_data_path / f"topfile{input_filename_suffix}"

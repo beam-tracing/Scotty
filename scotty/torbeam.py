@@ -107,7 +107,6 @@ class Torbeam:
 
         return cls(R_grid, Z_grid, B_R, B_T, B_Z, poloidal_flux)
 
-
     def from_file_scaled_psi(cls, filename: PathLike) -> Torbeam:
         """Read TORBEAM geometry file with scaled psi"""
         print(filename)
@@ -131,12 +130,13 @@ class Torbeam:
             poloidal_flux = from_fortran(
                 read_floats_into_list_until("you fall asleep", f)
             )
-            
+
             # rescale poloidal_flux to match scotty format
             # poloidal_flux.max() -> 0; psi_sep -> 1
-            poloidal_flux = (poloidal_flux - poloidal_flux.max()) / (psi_sep - poloidal_flux.max())
+            poloidal_flux = (poloidal_flux - poloidal_flux.max()) / (
+                psi_sep - poloidal_flux.max()
+            )
         return cls(R_grid, Z_grid, B_R, B_T, B_Z, poloidal_flux)
-
 
     def write(self, filename: PathLike):
         """Write TORBEAM geometry file"""
