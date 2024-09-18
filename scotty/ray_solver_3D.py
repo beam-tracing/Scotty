@@ -136,8 +136,8 @@ def make_solver_events(
         # Cannot set condition where K_magnitude > some value. K_magnitude
         # does not actually blow up. Only dK_dtau blows up
         # Matthew Liang, Peter Hill, and Valerian Hall-Chen (01 August 2024)
-        if np.isnan(d_K_d_tau) == True:
-            d_K_d_tau = 0
+        if np.isnan(dK_d_tau) == True:
+            dK_d_tau = 0
         
         return dK_d_tau
     
