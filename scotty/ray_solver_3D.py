@@ -377,6 +377,12 @@ def propagate_ray(
         atol=atol,
         max_step=50,
     )
+    
+    # to remove, just for debugging
+    print(solver_ray_output.t_events)
+    print()
+    print(solver_ray_output.y_events)
+
     solver_end_time = time()
     if verbose:
         print("Time taken (ray solver)", solver_end_time - solver_start_time, "s")
