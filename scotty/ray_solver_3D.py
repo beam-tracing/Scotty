@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import numpy as np
+import scipy
 from scotty.fun_general import find_normalised_gyro_freq
 from scotty.geometry_3D import MagneticField_3D_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
