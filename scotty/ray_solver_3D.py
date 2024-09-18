@@ -308,17 +308,9 @@ class K_cutoff_data_cartesian:
 
 ### Declaring def ray_evolution_3D_fun
 
-#from hamiltonian_3D import Hamiltonian_3D
-#from scotty.fun_general import cylindrical_to_cartesian
-#import numpy as np
-
-# SHOULD THESE BE IN CARTESIAN OR CYLINDRICAL ?????
-# TRACE BACK HOW THE ARGUMENTS ARE PASSED IN THE ORIGINAL beam_me_up()
-# launch_beam() -> initial_position ->
-
 def ray_evolution_3D_fun(tau, ray_parameters_3D, hamiltonian: Hamiltonian_3D):
     
-    # Converting from cylindrical to cartesian ### TO CHANGE
+    # Saving the coordinates
     q_X, q_Y, q_Z, K_X, K_Y, K_Z = ray_parameters_3D
 
     # Find the derivatives of H
