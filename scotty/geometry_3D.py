@@ -312,7 +312,7 @@ def _interp_mesh3D_data1D(
         points = (X_grid, Y_grid, Z_grid),
         values = data_array,
         method = interp_order_str,
-        bounds_error = True,
+        bounds_error = False,
     )
 
     return lambda X,Y,Z: spline((X,Y,Z)), spline
