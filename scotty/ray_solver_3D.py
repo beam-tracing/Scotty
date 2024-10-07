@@ -310,6 +310,11 @@ class K_cutoff_data_cartesian:
 
 def ray_evolution_3D_fun(tau, ray_parameters_3D, hamiltonian: Hamiltonian_3D):
     
+    """
+    # TO REMOVE -- for debugging only
+    print(np.array((ray_parameters_3D[0], ray_parameters_3D[1], ray_parameters_3D[2])))
+    """
+
     # Saving the coordinates
     q_X, q_Y, q_Z, K_X, K_Y, K_Z = ray_parameters_3D
 
@@ -318,9 +323,8 @@ def ray_evolution_3D_fun(tau, ray_parameters_3D, hamiltonian: Hamiltonian_3D):
 
     # d(parameter) / d(tau)
     # indexes 0, 1, 2 correspond to d(q_X)/d(tau), d(q_Y)/d(tau), d(q_Z)/d(tau)
-    # indexes 3, 4, 5 correspond to d(K_X)/d(tau), d(K_Y)/d(tau), d(K_Z)/d(tau)
-    d_ray_parameters_3D_d_tau = np.zeros_like(ray_parameters_3D)
-    d_ray_parameters_3D_d_tau = dH["dH_dX"], dH["dH_dY"], dH["dH_dZ"], dH["dH_dKx"], dH["dH_dKy"], dH["dH_dKz"]
+    # indexes 3, 4, 5 correspond to d(K_X)/d(tau), d(K_Y)/d(tau), d(K_Z)/d(tau)y
+    d_ray_parameters_3D_d_tau = np.array([dH["dH_dKx"], dH["dH_dKy"], dH["dH_dKz"], -dH["dH_dX"], -dH["dH_dY"], -dH["dH_dZ"]])
 
     return d_ray_parameters_3D_d_tau
 
@@ -375,13 +379,14 @@ def propagate_ray(
         args=solver_arguments,
         rtol=rtol,
         atol=atol,
-        max_step=50,
+        max_step=5, # TO REMOVE -- change this from 5 back to 50 (basically changes the number of steps for solving)
     )
     
-    # to remove, just for debugging
-    print(solver_ray_output.t_events)
-    print()
-    print(solver_ray_output.y_events)
+    """
+    # TO REMOVE -- for debugging only
+    print("solution, t: ", solver_ray_output.t)
+    print("solution, x,y,z,Kx,Ky,Kz: ", solver_ray_output.y)
+    """
 
     solver_end_time = time()
     if verbose:
@@ -430,5 +435,10 @@ def propagate_ray(
             solver_arguments,
             solver_ray_events["leave_plasma"],
         )
+    
+    """
+    # TO REMOVE -- for debugging only
+    return solver_ray_output.t, solver_ray_output.y
+    """
 
     return tau_leave, tau_points

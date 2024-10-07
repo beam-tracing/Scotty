@@ -201,6 +201,19 @@ class Hamiltonian_3D:
 
         H_discriminant = np.maximum(np.zeros_like(Booker_beta), (Booker_beta**2 - 4 * Booker_alpha * Booker_gamma))
 
+        """
+        # TO REMOVE in the future -- for debugging only
+        print("X, Y, Z: ", X, Y, Z)
+        print("Kx, Ky, Kz: ", K_X, K_Y, K_Z)
+        print("K: ", K_magnitude)
+        print("polflux: ", polflux)
+        print("electron density: ", electron_density)
+        print("epsilon e11, e12, ebb: ", epsilon.e_11, epsilon.e_12, epsilon.e_bb)
+        print("alpha, beta, gamma: ", Booker_alpha, Booker_beta, Booker_gamma)
+        print("H_discriminant: ", H_discriminant)
+        print("H: ", (K_magnitude / self.wavenumber_K0) ** 2 + (Booker_beta - self.mode_flag * np.sqrt(H_discriminant)) / (2 * Booker_alpha))
+        """
+
         return (K_magnitude / self.wavenumber_K0) ** 2 + (Booker_beta - self.mode_flag * np.sqrt(H_discriminant)) / (2 * Booker_alpha)
     
     def derivatives(self,
@@ -230,6 +243,20 @@ class Hamiltonian_3D:
             "dH_dKy": apply_stencil(("K_Y"), "d1_CFD2"),
             "dH_dKz": apply_stencil(("K_Z"), "d1_CFD2"),
         }
+
+        
+        """
+        # TO REMOVE -- for debugging only
+        print("dH_dX", derivatives["dH_dX"])
+        print("dH_dY", derivatives["dH_dY"])
+        print("dH_dZ", derivatives["dH_dZ"])
+        print("dH_dKx", derivatives["dH_dKx"])
+        print("dH_dKy", derivatives["dH_dKy"])
+        print("dH_dKz", derivatives["dH_dKz"])
+        print()
+        print()
+        print()
+        """
 
         if second_order:
             second_derivatives = {
