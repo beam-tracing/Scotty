@@ -245,8 +245,10 @@ class Hamiltonian_3D:
         }
 
         
-        """
+        
         # TO REMOVE -- for debugging only
+        print(np.array((X,Y,Z)))
+        print(np.array((K_X,K_Y,K_Z)))
         print("dH_dX", derivatives["dH_dX"])
         print("dH_dY", derivatives["dH_dY"])
         print("dH_dZ", derivatives["dH_dZ"])
@@ -256,7 +258,7 @@ class Hamiltonian_3D:
         print()
         print()
         print()
-        """
+        
 
         if second_order:
             second_derivatives = {

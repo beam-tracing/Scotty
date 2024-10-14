@@ -1,14 +1,21 @@
+import datetime
 import datatree
 import json
 import numpy as np
 import pathlib
+from scipy.integrate import solve_ivp
+from scotty.fun_evolution_3D import pack_beam_parameters_3D, unpack_beam_parameters_3D, beam_evolution_fun_3D
 from scotty.fun_general import freq_GHz_to_angular_frequency
 from scotty.geometry_3D import MagneticField_3D_Cartesian, InterpolatedField_3D_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
 from scotty.profile_fit import ProfileFitLike, profile_fit
 from scotty.ray_solver_3D import propagate_ray
 from scotty.typing import FloatArray, PathLike
+from scotty._version import __version__
+import time
 from typing import cast, Optional, Sequence, Union
+import uuid
+import xarray as xr
 
 def beam_me_up_3D(
     poloidal_launch_angle_Torbeam: float,
@@ -76,9 +83,12 @@ def beam_me_up_3D(
     # TO DO THIS SOON
 
     # INSERT LONG LIST OF EXPLANATIONS
-
-    # INSERT UUID STUFF
     """
+
+    print("Beam trace me up, Scotty!")
+    print(f"scotty version {__version__}")
+    run_id = uuid.uuid4()
+    print(f"Run ID: {run_id}")
 
     # ------------------------------
     # Input data #
@@ -220,14 +230,11 @@ def beam_me_up_3D(
         print("Beam launched from inside the plasma")
         Psi_3D_lab_initial_cartesian = plasmaLaunch_Psi_3D_lab_cartesian
         K_initial_cartesian = plasmaLaunch_K_cartesian
-        K_X_initial, K_Y_initial, K_Z_initial = K_initial_cartesian
         initial_position = launch_position_cartesian
         launch_K = None
         Psi_3D_lab_launch_cartesian = None
         Psi_3D_lab_entry_cartersian = None
         distance_from_launch_to_entry = None
-    
-    K_X_initial, K_Y_initial, K_Z_initial = K_initial_cartesian
 
     # -------------------
     # Propagate the ray
@@ -250,7 +257,159 @@ def beam_me_up_3D(
 
     tau_leave, tau_points = cast(tuple, ray_solver_output)
 
-    return ray_solver_output # to remove
+    # return ray_solver_output # TO REMOVE -- for debugging purposes only
+
+    # -------------------
+    # Propagate the beam
+
+    # Initial conditions for the solver
+    beam_parameters_initial = pack_beam_parameters_3D(
+        initial_position[0],
+        initial_position[1],
+        initial_position[2],
+        K_initial_cartesian[0],
+        K_initial_cartesian[1],
+        K_initial_cartesian[2],
+        Psi_3D_lab_initial_cartesian,
+    )
+
+    solver_start_time = time.time()
+
+    solver_beam_output = solve_ivp(
+        beam_evolution_fun_3D,
+        [0, tau_leave],
+        beam_parameters_initial,
+        method="RK45",
+        t_eval=tau_points,
+        dense_output=False,
+        events=None,
+        vectorized=False,
+        args=(hamiltonian,),
+        rtol=rtol,
+        atol=atol,
+    )
+
+    solver_end_time = time.time()
+    solver_time = solver_end_time - solver_start_time
+    print(f"Time taken (beam solver) {solver_time}s")
+    print(f"Number of beam evolution evaluations: {solver_beam_output.nfev}")
+    print(f"Time per beam evolution evaluation: {solver_time / solver_beam_output.nfev}")
+
+    tau_array = solver_beam_output.t
+    beam_parameters_final = solver_beam_output.y
+    solver_status = solver_beam_output.status
+
+    q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, Psi_3D_output = unpack_beam_parameters_3D(beam_parameters_final)
+
+    print("Main loop complete")
+    # -------------------
+
+    inputs = xr.Dataset(
+        {
+            "B_T_axis": B_T_axis,
+            "B_p_a": B_p_a,
+            "K_initial": (["col"], K_initial_cartesian),
+            "Psi_BC_flag": Psi_BC_flag,
+            "R_axis": R_axis,
+            "atol": atol,
+            "delta_X": delta_X,
+            "delta_Y": delta_Y,
+            "delta_Z": delta_Z,
+            "delta_K_X": delta_K_X,
+            "delta_K_Y": delta_K_Y,
+            "delta_K_Z": delta_K_Z,
+            "density_fit_method": str(density_fit_method),
+            "density_fit_parameters": str(density_fit_parameters),
+            "detailed_analysis_flag": detailed_analysis_flag,
+            "equil_time": (equil_time),
+            "figure_flag": figure_flag,
+            "find_B_method": str(find_B_method),
+            "initial_position": (["col"], initial_position),
+            "input_filename_suffix": input_filename_suffix,
+            "interp_order": interp_order,
+            # "interp_smoothing": interp_smoothing,
+            "launch_K": (launch_K),
+            "launch_angular_frequency": launch_angular_frequency,
+            "launch_beam_curvature": launch_beam_curvature,
+            "launch_beam_width": launch_beam_width,
+            "launch_freq_GHz": launch_freq_GHz,
+            "launch_position": (["col"], launch_position_cartesian),
+            "len_tau": len_tau,
+            "magnetic_data_path": str(magnetic_data_path),
+            "minor_radius_a": minor_radius_a,
+            "mode_flag": mode_flag,
+            "ne_data_density_array": (ne_data_density_array),
+            "ne_data_path": str(ne_data_path),
+            "ne_data_radialcoord_array": (ne_data_radialcoord_array),
+            "output_filename_suffix": output_filename_suffix,
+            "output_path": str(output_path),
+            "plasmaLaunch_K": plasmaLaunch_K_cartesian,
+            "plasmaLaunch_Psi_3D_lab_Cartesian": (
+                ["row", "col"],
+                plasmaLaunch_Psi_3D_lab_cartesian,
+            ),
+            "poloidalFlux_grid": (["R", "Z"], field.polflux_grid),
+            "poloidal_flux_enter": poloidal_flux_enter,
+            "poloidal_launch_angle_Torbeam": poloidal_launch_angle_Torbeam,
+            "Psi_3D_lab_initial": (
+                ["row", "col"],
+                Psi_3D_lab_initial_cartesian,
+            ),
+            "quick_run": quick_run,
+            "rtol": rtol,
+            "shot": shot,
+            "toroidal_launch_angle_Torbeam": toroidal_launch_angle_Torbeam,
+            "vacuumLaunch_flag": vacuumLaunch_flag,
+            "vacuum_propagation_flag": vacuum_propagation_flag,
+        },
+        coords = {
+            "X": field.X_coord,
+            "Y": field.Y_coord,
+            "Z": field.Z_coord,
+            "row": ["X", "Y", "Z"],
+            "col": ["X", "Y", "Z"],
+        },
+    )
+
+    solver_output = xr.Dataset(
+        {
+            "solver_status": solver_status,
+            "q_X": (["tau"], q_X_array, {"long_name": "X", "units": "m"}),
+            "q_Y": (["tau"], q_Y_array, {"long_name": "Y", "units": "m"}),
+            "q_Z": (["tau"], q_Z_array, {"long_name": "Z", "units": "m"}),
+
+            "K_X": (["tau"], K_X_array),
+            "K_Y": (["tau"], K_Y_array),
+            "K_Z": (["tau"], K_Z_array),
+            "Psi_3D": (["tau", "row", "col"], Psi_3D_output)
+        },
+        coords = {
+            "tau": tau_array,
+            "row": ["X", "Y", "Z"],
+            "col": ["X", "Y", "Z"],
+        },
+    )
+
+    dt = datatree.DataTree.from_dict({"inputs": inputs, "solver_output": solver_output})
+    dt.attrs = {
+        "title": output_filename_suffix,
+        "software_name": "scotty-beam-tracing",
+        "software_version": __version__,
+        "date_created": str(datetime.datetime.now()),
+        "id": str(run_id),
+    }
+
+    if solver_status == -1:
+        # If the solver doesn't finish, end the function here
+        print("Solver did not reach completion")
+        return
+    
+    
+
+
+
+
+
 
 
 
