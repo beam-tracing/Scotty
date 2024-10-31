@@ -244,22 +244,6 @@ class Hamiltonian_3D:
             "dH_dKz": apply_stencil(("K_Z"), "d1_CFD2"),
         }
 
-        
-        
-        # TO REMOVE -- for debugging only
-        print(np.array((X,Y,Z)))
-        print(np.array((K_X,K_Y,K_Z)))
-        print("dH_dX", derivatives["dH_dX"])
-        print("dH_dY", derivatives["dH_dY"])
-        print("dH_dZ", derivatives["dH_dZ"])
-        print("dH_dKx", derivatives["dH_dKx"])
-        print("dH_dKy", derivatives["dH_dKy"])
-        print("dH_dKz", derivatives["dH_dKz"])
-        print()
-        print()
-        print()
-        
-
         if second_order:
             second_derivatives = {
                 "d2H_dX2":     apply_stencil(("X","X"), "d2_FFD2"),
@@ -287,6 +271,15 @@ class Hamiltonian_3D:
                 "d2H_dZ_dKz":  apply_stencil(("Z","K_Z"), "d1d1_FFD_CFD2"),
             }
             derivatives.update(second_derivatives)
+
+        # TO REMOVE -- for debugging only
+        print(np.array((X,Y,Z)))
+        print(np.array((K_X,K_Y,K_Z)))
+        for key, value in derivatives.items():
+            print(key, value)
+        print()
+        print()
+        print()
         
         return derivatives
 
@@ -343,7 +336,7 @@ def hessians_3D(dH: dict):
         [d2H_dX_dZ,     d2H_dY_dZ,     d2H_dZ2  ]
     ]))
 
-    gradK_grad_H = reshape(np.array([
+    grad_gradK_H = reshape(np.array([
         [d2H_dX_dKx,    d2H_dY_dKx,    d2H_dZ_dKx],
         [d2H_dX_dKy,    d2H_dY_dKy,    d2H_dZ_dKy],
         [d2H_dX_dKz,    d2H_dY_dKz,    d2H_dZ_dKz]
@@ -355,4 +348,4 @@ def hessians_3D(dH: dict):
         [d2H_dKx_dKz,   d2H_dKy_dKz,   d2H_dKz2   ]
     ]))
 
-    return grad_grad_H, gradK_grad_H, gradK_gradK_H
+    return grad_grad_H, grad_gradK_H, gradK_gradK_H

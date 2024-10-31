@@ -12,29 +12,30 @@ def pack_beam_parameters_3D(
         K_X: ArrayLike,
         K_Y: ArrayLike,
         K_Z: ArrayLike,
-        Psi: FloatArray
+        Psi: FloatArray,
 ) -> FloatArray:
     """Pack coordinates and Psi matrix into single flat array"""
 
     beam_parameters = np.array(
-        q_X,
-        q_Y,
-        q_Z,
-        K_X,
-        K_Y,
-        K_Z,
-        np.real(Psi[0,0]), # Psi_xx
-        np.real(Psi[1,1]), # Psi_yy
-        np.real(Psi[2,2]), # Psi_zz
-        np.real(Psi[0,1]), # Psi_xy
-        np.real(Psi[0,2]), # Psi_xz
-        np.real(Psi[1,2]), # Psi_yz
-        np.imag(Psi[0,0]), # Psi_xx
-        np.imag(Psi[1,1]), # Psi_yy
-        np.imag(Psi[2,2]), # Psi_zz
-        np.imag(Psi[0,1]), # Psi_xy
-        np.imag(Psi[0,2]), # Psi_xz
-        np.imag(Psi[1,2]), # Psi_yz
+        (q_X,
+         q_Y,
+         q_Z,
+         K_X,
+         K_Y,
+         K_Z,
+         np.real(Psi[0,0]), # Psi_xx, index 6
+         np.real(Psi[1,1]), # Psi_yy, index 7
+         np.real(Psi[2,2]), # Psi_zz, index 8
+         np.real(Psi[0,1]), # Psi_xy, index 9
+         np.real(Psi[0,2]), # Psi_xz, index 10
+         np.real(Psi[1,2]), # Psi_yz, index 11
+         np.imag(Psi[0,0]), # Psi_xx, index 12
+         np.imag(Psi[1,1]), # Psi_yy, index 13
+         np.imag(Psi[2,2]), # Psi_zz, index 14
+         np.imag(Psi[0,1]), # Psi_xy, index 15
+         np.imag(Psi[0,2]), # Psi_xz, index 16
+         np.imag(Psi[1,2]), # Psi_yz, index 17
+         )
     )
 
     return beam_parameters
@@ -42,7 +43,7 @@ def pack_beam_parameters_3D(
 
 
 def unpack_beam_parameters_3D(
-        beam_parameters: FloatArray
+        beam_parameters: FloatArray,
 ) -> Tuple[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, FloatArray]:
     """Unpack the flat solver state vector into separate coordinate variables and Psi matrix"""
 
@@ -62,7 +63,7 @@ def unpack_beam_parameters_3D(
     Psi[:,0,1] = beam_parameters[9, ...] + 1j * beam_parameters[15, ...]  # Psi_xy
     Psi[:,0,2] = beam_parameters[10, ...] + 1j * beam_parameters[16, ...] # Psi_xz
     Psi[:,1,2] = beam_parameters[11, ...] + 1j * beam_parameters[17, ...] # Psi_yz
-    Psi[:,0,1] = Psi[:,1,0] # Psi is symmetric
+    Psi[:,1,0] = Psi[:,0,1] # Psi is symmetric
     Psi[:,2,0] = Psi[:,0,2] # Psi is symmetric
     Psi[:,2,1] = Psi[:,1,2] # Psi is symmetric
 
@@ -88,10 +89,10 @@ def beam_evolution_fun_3D(tau, beam_parameters, hamiltonian: Hamiltonian_3D):
     q_X, q_Y, q_Z, K_X, K_Y, K_Z, Psi = unpack_beam_parameters_3D(beam_parameters)
 
     # Find derivatives of H
-    dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
+    dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z, second_order = True)
 
-    grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians_3D(dH)
-    grad_gradK_H = np.transpose(gradK_grad_H)
+    grad_grad_H, grad_gradK_H, gradK_gradK_H = hessians_3D(dH)
+    gradK_grad_H = np.transpose(grad_gradK_H)
 
     dH_dX = dH["dH_dX"]
     dH_dY = dH["dH_dY"]
@@ -100,11 +101,55 @@ def beam_evolution_fun_3D(tau, beam_parameters, hamiltonian: Hamiltonian_3D):
     dH_dKy = dH["dH_dKy"]
     dH_dKz = dH["dH_dKz"]
 
+    # to remove
+    d2H = {
+        "d2H_dX2":     dH["d2H_dX2"],
+        "d2H_dY2":     dH["d2H_dY2"],
+        "d2H_dZ2":     dH["d2H_dZ2"],
+        "d2H_dX_dY":   dH["d2H_dX_dY"],
+        "d2H_dX_dZ":   dH["d2H_dX_dZ"],
+        "d2H_dY_dZ":   dH["d2H_dY_dZ"],
+
+        "d2H_dKx2":    dH["d2H_dKx2"],
+        "d2H_dKy2":    dH["d2H_dKy2"],
+        "d2H_dKz2":    dH["d2H_dKz2"],
+        "d2H_dKx_dKy": dH["d2H_dKx_dKy"],
+        "d2H_dKx_dKz": dH["d2H_dKx_dKz"],
+        "d2H_dKy_dKz": dH["d2H_dKy_dKz"],
+
+        "d2H_dX_dKx":  dH["d2H_dX_dKx"],
+        "d2H_dX_dKy":  dH["d2H_dX_dKy"],
+        "d2H_dX_dKz":  dH["d2H_dX_dKz"],
+        "d2H_dY_dKx":  dH["d2H_dY_dKx"],
+        "d2H_dY_dKy":  dH["d2H_dY_dKy"],
+        "d2H_dY_dKz":  dH["d2H_dY_dKz"],
+        "d2H_dZ_dKx":  dH["d2H_dZ_dKx"],
+        "d2H_dZ_dKy":  dH["d2H_dZ_dKy"],
+        "d2H_dZ_dKz":  dH["d2H_dZ_dKz"],
+    }
+
     d_Psi_d_tau = (
-        - grad_grad_H
+        - np.matmul(np.matmul(Psi, gradK_gradK_H), Psi)
         - np.matmul(Psi, gradK_grad_H)
         - np.matmul(grad_gradK_H, Psi)
-        - np.matmul(np.matmul(Psi, gradK_gradK_H), Psi)
+        - grad_grad_H
     )
+
+    # to remove
+    print("Look here for Psi, 1: ")
+    print(Psi)
+    print()
+    print("Look here for the grads, 2 -- last entry should be equal to (2/K_0^2) * I")
+    print("grad grad H")
+    print(grad_grad_H)
+    print()
+    print("gradK grad H")
+    print(gradK_grad_H)
+    print()
+    print("grad gradK H")
+    print(grad_gradK_H)
+    print()
+    print("gradK gradK H")
+    print(gradK_gradK_H)
 
     return pack_beam_parameters_3D(dH_dKx, dH_dKy, dH_dKz, -dH_dX, -dH_dY, -dH_dZ, d_Psi_d_tau)

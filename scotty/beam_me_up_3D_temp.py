@@ -273,6 +273,15 @@ def beam_me_up_3D(
         Psi_3D_lab_initial_cartesian,
     )
 
+    print("Psi: ")
+    print("Psi_xx: ", beam_parameters_initial[6], beam_parameters_initial[12])
+    print("Psi_yy: ", beam_parameters_initial[7], beam_parameters_initial[13])
+    print("Psi_zz: ", beam_parameters_initial[8], beam_parameters_initial[14])
+
+    print("Psi_xy: ", beam_parameters_initial[9], beam_parameters_initial[15])
+    print("Psi_xz: ", beam_parameters_initial[10], beam_parameters_initial[16])
+    print("Psi_yz: ", beam_parameters_initial[11], beam_parameters_initial[17])
+
     solver_start_time = time.time()
 
     solver_beam_output = solve_ivp(
@@ -304,6 +313,51 @@ def beam_me_up_3D(
     print("Main loop complete")
     # -------------------
 
+    # TO REMOVE
+    if solver_status == -1: print("Solver did not reach completion.")
+    else:
+        pointwise_data = [[q_X_array[i],
+                           q_Y_array[i],
+                           q_Z_array[i],
+                           K_X_array[i],
+                           K_Y_array[i],
+                           K_Z_array[i],
+                           Psi_3D_output[i],
+                           tau_array[i]]
+                           for i in range(len(tau_array))]
+    
+        # to remove
+        def check_second_derivatives_correct_anot(index):
+
+            from scotty.hamiltonian_3D import hessians_3D
+
+            X, Y, Z, K_X, K_Y, K_Z, Psi_3D, tau = pointwise_data[index]
+            
+            derivatives_and_second_derivatives_dict = hamiltonian.derivatives(X, Y, Z, K_X, K_Y, K_Z, second_order = True)
+
+            grad_grad_H, grad_gradK_H, gradK_gradK_H = hessians_3D(derivatives_and_second_derivatives_dict)
+            gradK_grad_H = np.transpose(grad_gradK_H)
+
+            print()
+            print("grad_grad_H should = 0")
+            print(grad_grad_H)
+            print()
+            print("grad_gradK_H should = 0")
+            print(grad_gradK_H)
+            print()
+            print("gradK_grad_H should = 0")
+            print(gradK_grad_H)
+            print()
+            print("gradK_gradK_H should = 0")
+            print(gradK_gradK_H)
+            print()
+
+        # to remove
+        for index in range(len(tau_array)):
+            check_second_derivatives_correct_anot(index)
+
+
+    """
     inputs = xr.Dataset(
         {
             "B_T_axis": B_T_axis,
@@ -404,7 +458,15 @@ def beam_me_up_3D(
         print("Solver did not reach completion")
         return
     
-    
+    # -------------------
+    # Process the data from the main loop to give a bunch of useful stuff
+    # -------------------
+
+    print("Analysing data")
+    dH = hamiltonian.derivatives(q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, second_order = True)
+
+    # df = immediate_analysis
+    """
 
 
 
