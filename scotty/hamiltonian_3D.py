@@ -249,16 +249,16 @@ class Hamiltonian_3D:
                 "d2H_dX2":     apply_stencil(("X","X"), "d2_FFD2"),
                 "d2H_dY2":     apply_stencil(("Y","Y"), "d2_FFD2"),
                 "d2H_dZ2":     apply_stencil(("Z","Z"), "d2_FFD2"),
-                "d2H_dX_dY":   apply_stencil(("X","Y"), "d2_FFD2"),
-                "d2H_dX_dZ":   apply_stencil(("X","Z"), "d2_FFD2"),
-                "d2H_dY_dZ":   apply_stencil(("Y","Z"), "d2_FFD2"),
+                "d2H_dX_dY":   apply_stencil(("X","Y"), "d1d1_FFD_FFD2"),
+                "d2H_dX_dZ":   apply_stencil(("X","Z"), "d1d1_FFD_FFD2"),
+                "d2H_dY_dZ":   apply_stencil(("Y","Z"), "d1d1_FFD_FFD2"),
 
                 "d2H_dKx2":    apply_stencil(("K_X","K_X"), "d2_CFD2"),
                 "d2H_dKy2":    apply_stencil(("K_Y","K_Y"), "d2_CFD2"),
                 "d2H_dKz2":    apply_stencil(("K_Z","K_Z"), "d2_CFD2"),
-                "d2H_dKx_dKy": apply_stencil(("K_X","K_Y"), "d2_CFD2"),
-                "d2H_dKx_dKz": apply_stencil(("K_X","K_Z"), "d2_CFD2"),
-                "d2H_dKy_dKz": apply_stencil(("K_Y","K_Z"), "d2_CFD2"),
+                "d2H_dKx_dKy": apply_stencil(("K_X","K_Y"), "d1d1_CFD_CFD2"),
+                "d2H_dKx_dKz": apply_stencil(("K_X","K_Z"), "d1d1_CFD_CFD2"),
+                "d2H_dKy_dKz": apply_stencil(("K_Y","K_Z"), "d1d1_CFD_CFD2"),
 
                 "d2H_dX_dKx":  apply_stencil(("X","K_X"), "d1d1_FFD_CFD2"),
                 "d2H_dX_dKy":  apply_stencil(("X","K_Y"), "d1d1_FFD_CFD2"),
@@ -277,9 +277,6 @@ class Hamiltonian_3D:
         print(np.array((K_X,K_Y,K_Z)))
         for key, value in derivatives.items():
             print(key, value)
-        print()
-        print()
-        print()
         
         return derivatives
 
