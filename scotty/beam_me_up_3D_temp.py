@@ -325,9 +325,43 @@ def beam_me_up_3D(
                            Psi_3D_output[i],
                            tau_array[i]]
                            for i in range(len(tau_array))]
+        
+        ### THIS IS TO SEE HOW THE FIRST AND SECOND DERIVATIVES CHANGE IN INDEXES
+        # to remove
+        first_order_derivative_dicts_to_plot_how_they_evolve = {
+            "dH_dX": [],
+            "dH_dY": [],
+            "dH_dZ": [],
+            "dH_dKx": [],
+            "dH_dKy": [],
+            "dH_dKz": []
+        }
+        second_order_derivative_dicts_to_plot_how_they_evolve = {
+            "d2H_dX2": [],
+            "d2H_dY2": [],
+            "d2H_dZ2": [],
+            "d2H_dX_dY": [],
+            "d2H_dX_dZ": [],
+            "d2H_dY_dZ": [],
+            "d2H_dKx2": [],
+            "d2H_dKy2": [],
+            "d2H_dKz2": [],
+            "d2H_dKx_dKy": [],
+            "d2H_dKx_dKz": [],
+            "d2H_dKy_dKz": [],
+            "d2H_dX_dKx": [],
+            "d2H_dX_dKy": [],
+            "d2H_dX_dKz": [],
+            "d2H_dY_dKx": [],
+            "d2H_dY_dKy": [],
+            "d2H_dY_dKz": [],
+            "d2H_dZ_dKx": [],
+            "d2H_dZ_dKy": [],
+            "d2H_dZ_dKz": [],
+        }
     
         # to remove
-        def check_second_derivatives_correct_anot(index):
+        def check_derivatives_correct_anot(index):
 
             from scotty.hamiltonian_3D import hessians_3D
 
@@ -351,10 +385,127 @@ def beam_me_up_3D(
             print("gradK_gradK_H should = 0")
             print(gradK_gradK_H)
             print()
+            print()
+            print()
+
+            for key, value in derivatives_and_second_derivatives_dict.items():
+                if key in ["dH_dX", "dH_dY", "dH_dZ", "dH_dKx", "dH_dKy", "dH_dKz"]: first_order_derivative_dicts_to_plot_how_they_evolve[key].append(value)
+                else: second_order_derivative_dicts_to_plot_how_they_evolve[key].append(value)
 
         # to remove
         for index in range(len(tau_array)):
-            check_second_derivatives_correct_anot(index)
+            check_derivatives_correct_anot(index)
+        
+        import matplotlib.pyplot as plt
+        # to remove
+        def plot_how_second_derivatives_evolve(dictionary):
+            counter = 0
+            for key, value in dictionary.items():
+                axs[counter].plot(value, marker='o')
+                axs[counter].set_xlabel("tau index")
+                axs[counter].set_ylabel(key)
+                axs[counter].set_title(f"{key} changing along tau")
+                axs[counter].grid(True)
+                counter += 1
+        
+        # to remove
+        # THIS IS TO SEE HOW THE SECOND DERIVATIVES CHANGE IN INDEXES
+        fig, axs = plt.subplots(7, 3, figsize=(15, 15))
+        axs = axs.flatten()
+        plot_how_second_derivatives_evolve(second_order_derivative_dicts_to_plot_how_they_evolve)
+        plt.tight_layout()
+        plt.show()
+
+        ### THIS IS TO SEE HOW WIDTH CHANGES AS PSI EVOLVES
+        widths1 = []
+        widths2 = []
+        widths3 = []
+        for eachPsi in Psi_3D_output:
+            imagPsi = np.imag(eachPsi)
+            (eigval1, eigval2, eigval3), (eigvec1, eigvec2, eigvec3) = np.linalg.eig(imagPsi) # these are indexed 1,2,3 and not x,y,z because the eigenvalues are not in order
+            width1, width2, width3 = np.sqrt(2 / eigval1), np.sqrt(2 / eigval2), np.sqrt(2 / eigval3)
+
+            print("width, eigval, eigvec")
+            print(width1, eigval1, eigvec1)
+            print(width2, eigval2, eigvec2)
+            print(width3, eigval3, eigvec3)
+            print("=== === ===")
+
+            pairs = [(width1, eigvec1), (width2, eigvec2), (width3, eigvec3)]
+
+            import math
+
+            valid_widths = [width for width, _ in pairs if not (isinstance(width, float) and math.isnan(width))]
+            nan_widths = [width for width, _ in pairs if isinstance(width, float) and math.isnan(width)]
+
+            # Distribute valid widths
+            if len(valid_widths) == 1:
+                widths1.append(valid_widths[0])
+                widths2.append(nan_widths[0])
+                widths3.append(nan_widths[1])
+            elif len(valid_widths) == 2:
+                widths1.append(min(valid_widths))
+                widths2.append(max(valid_widths))
+                widths3.append(nan_widths[0])
+        
+        counter = 1
+        for graph in [widths1, widths2, widths3]:
+            plt.plot(graph, marker="o")
+            plt.xlabel("tau index")
+            plt.ylabel("beam width")
+            plt.title(f"beam width{counter} changing along tau")
+            plt.show()
+            counter += 1
+
+        ### THIS IS TO SEE HOW d2H_dKz2 changes w.r.t to Kx, Ky, Kz
+        for graph, graphname in [(K_X_array, "K_X"), (K_Y_array, "K_Y"), (K_Z_array, "K_Z")]:
+            plt.plot(graph, second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dKz2"], marker='o')
+            plt.xlabel(f"{graphname} values")
+            plt.ylabel("d2H_dKz2 values")
+            plt.title(f"{graphname} vs d2H_dKz2")
+            plt.show()
+
+        ### THIS IS TO SEE IF MY INTERPOLATION FUNCTION IS WORKING CORRECTLY
+        num_points = 100
+        x_samples = np.random.uniform(0, 1, num_points)
+        y_samples = np.random.uniform(0, 1, num_points)
+        z_samples = np.random.uniform(-0.1, 0.1, num_points)
+        points_to_sample = np.column_stack((x_samples, y_samples, z_samples))
+        for point in points_to_sample:
+            x_point, y_point, z_point = point
+            print(point, field.B_X(x_point, y_point, z_point), field.B_Y(x_point, y_point, z_point), field.B_Z(x_point, y_point, z_point), field.polflux(x_point, y_point, z_point))
+        
+        ### THIS IS TO SEE HOW THE FIRST DERIVATIVES CHANGE IN INDEXES
+        def plot_how_first_derivatives_evolve(dictionary):
+            counter = 0
+            for key, value in dictionary.items():
+                axs[counter].plot(value, marker='o')
+                axs[counter].set_xlabel("tau index")
+                axs[counter].set_ylabel(key)
+                axs[counter].set_title(f"{key} changing along tau")
+                axs[counter].grid(True)
+                counter += 1
+
+        fig, axs = plt.subplots(2, 3, figsize=(15, 15))
+        axs = axs.flatten()
+        plot_how_first_derivatives_evolve(first_order_derivative_dicts_to_plot_how_they_evolve)
+        plt.tight_layout()
+        plt.show()
+
+        ### THIS IS TO SEE HOW dH_dKz and d2H_dKz2 changes w.r.t. Kz
+        for graph, graphname in [(first_order_derivative_dicts_to_plot_how_they_evolve["dH_dKz"], "dH_dKz"), (second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dKz2"], "d2H_dKz2")]:
+            plt.plot(K_Z_array, graph, marker='o')
+            plt.xlabel("K_Z values")
+            plt.ylabel(graphname)
+            plt.title(f"K_Z vs {graphname}")
+            plt.show()
+
+
+
+
+
+
+
 
 
     """

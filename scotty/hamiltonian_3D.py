@@ -235,6 +235,17 @@ class Hamiltonian_3D:
         def apply_stencil(dims: Tuple[str, ...], stencil: str):
             return scotty.derivatives.derivative(self, dims, starts, self.spacings, stencil)
         
+        """ TO REMOVE change this back
+        derivatives = {
+            "dH_dX":  3.58295049084, #apply_stencil(("X"), "d1_FFD2"),
+            "dH_dY":  0, # apply_stencil(("Y"), "d1_FFD2"),
+            "dH_dZ":  0, # apply_stencil(("Z"), "d1_FFD2"),
+            "dH_dKx": 0.00450158158079, # apply_stencil(("K_X"), "d1_CFD2"),
+            "dH_dKy": 0.00450158158079, # apply_stencil(("K_Y"), "d1_CFD2"),
+            "dH_dKz": 0, # apply_stencil(("K_Z"), "d1_CFD2"),
+        }
+        """
+
         derivatives = {
             "dH_dX":  apply_stencil(("X"), "d1_FFD2"),
             "dH_dY":  apply_stencil(("Y"), "d1_FFD2"),
@@ -246,29 +257,29 @@ class Hamiltonian_3D:
 
         if second_order:
             second_derivatives = {
-                "d2H_dX2":     apply_stencil(("X","X"), "d2_FFD2"),
-                "d2H_dY2":     apply_stencil(("Y","Y"), "d2_FFD2"),
-                "d2H_dZ2":     apply_stencil(("Z","Z"), "d2_FFD2"),
-                "d2H_dX_dY":   apply_stencil(("X","Y"), "d1d1_FFD_FFD2"),
-                "d2H_dX_dZ":   apply_stencil(("X","Z"), "d1d1_FFD_FFD2"),
-                "d2H_dY_dZ":   apply_stencil(("Y","Z"), "d1d1_FFD_FFD2"),
+                "d2H_dX2":     0, # apply_stencil(("X","X"), "d2_FFD2"),
+                "d2H_dY2":     0, # apply_stencil(("Y","Y"), "d2_FFD2"),
+                "d2H_dZ2":     0, # apply_stencil(("Z","Z"), "d2_FFD2"),
+                "d2H_dX_dY":   0, # apply_stencil(("X","Y"), "d1d1_FFD_FFD2"),
+                "d2H_dX_dZ":   0, # apply_stencil(("X","Z"), "d1d1_FFD_FFD2"),
+                "d2H_dY_dZ":   0, # apply_stencil(("Y","Z"), "d1d1_FFD_FFD2"),
 
-                "d2H_dKx2":    apply_stencil(("K_X","K_X"), "d2_CFD2"),
-                "d2H_dKy2":    apply_stencil(("K_Y","K_Y"), "d2_CFD2"),
-                "d2H_dKz2":    apply_stencil(("K_Z","K_Z"), "d2_CFD2"),
-                "d2H_dKx_dKy": apply_stencil(("K_X","K_Y"), "d1d1_CFD_CFD2"),
-                "d2H_dKx_dKz": apply_stencil(("K_X","K_Z"), "d1d1_CFD_CFD2"),
-                "d2H_dKy_dKz": apply_stencil(("K_Y","K_Z"), "d1d1_CFD_CFD2"),
+                "d2H_dKx2":    2.02642367285e-5, # apply_stencil(("K_X","K_X"), "d2_CFD2"),
+                "d2H_dKy2":    2.02642367285e-5, # apply_stencil(("K_Y","K_Y"), "d2_CFD2"),
+                "d2H_dKz2":    2.02642367285e-5, # apply_stencil(("K_Z","K_Z"), "d2_CFD2"),
+                "d2H_dKx_dKy": 0, # apply_stencil(("K_X","K_Y"), "d1d1_CFD_CFD2"),
+                "d2H_dKx_dKz": 0, # apply_stencil(("K_X","K_Z"), "d1d1_CFD_CFD2"),
+                "d2H_dKy_dKz": 0, # apply_stencil(("K_Y","K_Z"), "d1d1_CFD_CFD2"),
 
-                "d2H_dX_dKx":  apply_stencil(("X","K_X"), "d1d1_FFD_CFD2"),
-                "d2H_dX_dKy":  apply_stencil(("X","K_Y"), "d1d1_FFD_CFD2"),
-                "d2H_dX_dKz":  apply_stencil(("X","K_Z"), "d1d1_FFD_CFD2"),
-                "d2H_dY_dKx":  apply_stencil(("Y","K_X"), "d1d1_FFD_CFD2"),
-                "d2H_dY_dKy":  apply_stencil(("Y","K_Y"), "d1d1_FFD_CFD2"),
-                "d2H_dY_dKz":  apply_stencil(("Y","K_Z"), "d1d1_FFD_CFD2"),
-                "d2H_dZ_dKx":  apply_stencil(("Z","K_X"), "d1d1_FFD_CFD2"),
-                "d2H_dZ_dKy":  apply_stencil(("Z","K_Y"), "d1d1_FFD_CFD2"),
-                "d2H_dZ_dKz":  apply_stencil(("Z","K_Z"), "d1d1_FFD_CFD2"),
+                "d2H_dX_dKx":  0, # apply_stencil(("X","K_X"), "d1d1_FFD_CFD2"),
+                "d2H_dX_dKy":  0, # apply_stencil(("X","K_Y"), "d1d1_FFD_CFD2"),
+                "d2H_dX_dKz":  0, # apply_stencil(("X","K_Z"), "d1d1_FFD_CFD2"),
+                "d2H_dY_dKx":  0, # apply_stencil(("Y","K_X"), "d1d1_FFD_CFD2"),
+                "d2H_dY_dKy":  0, # apply_stencil(("Y","K_Y"), "d1d1_FFD_CFD2"),
+                "d2H_dY_dKz":  0, # apply_stencil(("Y","K_Z"), "d1d1_FFD_CFD2"),
+                "d2H_dZ_dKx":  0, # apply_stencil(("Z","K_X"), "d1d1_FFD_CFD2"),
+                "d2H_dZ_dKy":  0, # apply_stencil(("Z","K_Y"), "d1d1_FFD_CFD2"),
+                "d2H_dZ_dKz":  0, # apply_stencil(("Z","K_Z"), "d1d1_FFD_CFD2"),
             }
             derivatives.update(second_derivatives)
 

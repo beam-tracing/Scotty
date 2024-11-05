@@ -101,33 +101,6 @@ def beam_evolution_fun_3D(tau, beam_parameters, hamiltonian: Hamiltonian_3D):
     dH_dKy = dH["dH_dKy"]
     dH_dKz = dH["dH_dKz"]
 
-    # to remove
-    d2H = {
-        "d2H_dX2":     dH["d2H_dX2"],
-        "d2H_dY2":     dH["d2H_dY2"],
-        "d2H_dZ2":     dH["d2H_dZ2"],
-        "d2H_dX_dY":   dH["d2H_dX_dY"],
-        "d2H_dX_dZ":   dH["d2H_dX_dZ"],
-        "d2H_dY_dZ":   dH["d2H_dY_dZ"],
-
-        "d2H_dKx2":    dH["d2H_dKx2"],
-        "d2H_dKy2":    dH["d2H_dKy2"],
-        "d2H_dKz2":    dH["d2H_dKz2"],
-        "d2H_dKx_dKy": dH["d2H_dKx_dKy"],
-        "d2H_dKx_dKz": dH["d2H_dKx_dKz"],
-        "d2H_dKy_dKz": dH["d2H_dKy_dKz"],
-
-        "d2H_dX_dKx":  dH["d2H_dX_dKx"],
-        "d2H_dX_dKy":  dH["d2H_dX_dKy"],
-        "d2H_dX_dKz":  dH["d2H_dX_dKz"],
-        "d2H_dY_dKx":  dH["d2H_dY_dKx"],
-        "d2H_dY_dKy":  dH["d2H_dY_dKy"],
-        "d2H_dY_dKz":  dH["d2H_dY_dKz"],
-        "d2H_dZ_dKx":  dH["d2H_dZ_dKx"],
-        "d2H_dZ_dKy":  dH["d2H_dZ_dKy"],
-        "d2H_dZ_dKz":  dH["d2H_dZ_dKz"],
-    }
-
     d_Psi_d_tau = (
         - np.matmul(np.matmul(Psi, gradK_gradK_H), Psi)
         - np.matmul(Psi, gradK_grad_H)
@@ -151,5 +124,8 @@ def beam_evolution_fun_3D(tau, beam_parameters, hamiltonian: Hamiltonian_3D):
     print()
     print("gradK gradK H")
     print(gradK_gradK_H)
+    print()
+    print()
+    print()
 
     return pack_beam_parameters_3D(dH_dKx, dH_dKy, dH_dKz, -dH_dX, -dH_dY, -dH_dZ, d_Psi_d_tau)
