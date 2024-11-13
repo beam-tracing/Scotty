@@ -101,12 +101,10 @@ def beam_evolution_fun_3D(tau, beam_parameters, hamiltonian: Hamiltonian_3D):
     dH_dKy = dH["dH_dKy"]
     dH_dKz = dH["dH_dKz"]
 
-    d_Psi_d_tau = (
-        - np.matmul(np.matmul(Psi, gradK_gradK_H), Psi)
-        - np.matmul(Psi, gradK_grad_H)
-        - np.matmul(grad_gradK_H, Psi)
-        - grad_grad_H
-    )
+    d_Psi_d_tau = (- np.matmul(np.matmul(Psi, gradK_gradK_H), Psi)
+                   - np.matmul(Psi, gradK_grad_H)
+                   - np.matmul(grad_gradK_H, Psi)
+                   - grad_grad_H)
 
     # to remove
     print("Look here for Psi, 1: ")

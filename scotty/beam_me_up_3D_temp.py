@@ -416,6 +416,7 @@ def beam_me_up_3D(
         plt.tight_layout()
         plt.show()
 
+        """
         ### THIS IS TO SEE HOW WIDTH CHANGES AS PSI EVOLVES
         widths1 = []
         widths2 = []
@@ -447,6 +448,16 @@ def beam_me_up_3D(
                 widths1.append(min(valid_widths))
                 widths2.append(max(valid_widths))
                 widths3.append(nan_widths[0])
+            else:
+                valid_widths.sort()
+                widths1.append(valid_widths[0])
+                widths2.append(valid_widths[1])
+                widths3.append(valid_widths[2])
+            
+            # Print each Psi
+            counter = 0
+            print("tau", counter, ": ")
+            print(eachPsi)
         
         counter = 1
         for graph in [widths1, widths2, widths3]:
@@ -456,20 +467,21 @@ def beam_me_up_3D(
             plt.title(f"beam width{counter} changing along tau")
             plt.show()
             counter += 1
+        """
 
-        ### THIS IS TO SEE HOW d2H_dKz2 changes w.r.t to Kx, Ky, Kz
+        ### THIS IS TO SEE HOW d2H_dKy2 changes w.r.t to Kx, Ky, Kz
         for graph, graphname in [(K_X_array, "K_X"), (K_Y_array, "K_Y"), (K_Z_array, "K_Z")]:
-            plt.plot(graph, second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dKz2"], marker='o')
+            plt.plot(graph, second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dKy2"], marker='o')
             plt.xlabel(f"{graphname} values")
-            plt.ylabel("d2H_dKz2 values")
-            plt.title(f"{graphname} vs d2H_dKz2")
+            plt.ylabel("d2H_dKy2 values")
+            plt.title(f"{graphname} vs d2H_dKy2")
             plt.show()
 
         ### THIS IS TO SEE IF MY INTERPOLATION FUNCTION IS WORKING CORRECTLY
         num_points = 100
         x_samples = np.random.uniform(0, 1, num_points)
-        y_samples = np.random.uniform(0, 1, num_points)
-        z_samples = np.random.uniform(-0.1, 0.1, num_points)
+        y_samples = np.random.uniform(-0.1, 0.1, num_points)
+        z_samples = np.random.uniform(0, 1, num_points)
         points_to_sample = np.column_stack((x_samples, y_samples, z_samples))
         for point in points_to_sample:
             x_point, y_point, z_point = point
@@ -492,13 +504,35 @@ def beam_me_up_3D(
         plt.tight_layout()
         plt.show()
 
-        ### THIS IS TO SEE HOW dH_dKz and d2H_dKz2 changes w.r.t. Kz
-        for graph, graphname in [(first_order_derivative_dicts_to_plot_how_they_evolve["dH_dKz"], "dH_dKz"), (second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dKz2"], "d2H_dKz2")]:
-            plt.plot(K_Z_array, graph, marker='o')
-            plt.xlabel("K_Z values")
+        ### THIS IS TO SEE HOW dH_dKy and d2H_dKy2 changes w.r.t. Ky
+        for graph, graphname in [(first_order_derivative_dicts_to_plot_how_they_evolve["dH_dKy"], "dH_dKy"), (second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dKy2"], "d2H_dKy2")]:
+            plt.plot(K_Y_array, graph, marker='o')
+            plt.xlabel("K_Y values")
             plt.ylabel(graphname)
-            plt.title(f"K_Z vs {graphname}")
+            plt.title(f"K_Y vs {graphname}")
             plt.show()
+    
+    # TO REMOVE
+    if solver_status == -1: print("Solver did not reach completion.")
+    else:
+        pointwise_data = [[q_X_array[i],
+                           q_Y_array[i],
+                           q_Z_array[i],
+                           K_X_array[i],
+                           K_Y_array[i],
+                           K_Z_array[i],
+                           Psi_3D_output[i],
+                           tau_array[i],
+                           first_order_derivative_dicts_to_plot_how_they_evolve["dH_dX"][i],  # dH_dX
+                           first_order_derivative_dicts_to_plot_how_they_evolve["dH_dY"][i],  # dH_dY
+                           first_order_derivative_dicts_to_plot_how_they_evolve["dH_dZ"][i],  # dH_dZ
+                           first_order_derivative_dicts_to_plot_how_they_evolve["dH_dKx"][i], # dH_dKx
+                           first_order_derivative_dicts_to_plot_how_they_evolve["dH_dKy"][i], # dH_dKy
+                           first_order_derivative_dicts_to_plot_how_they_evolve["dH_dKz"][i]] # dH_dKz
+                           for i in range(len(tau_array))]
+    
+    return pointwise_data # TO REMOVE
+
 
 
 
