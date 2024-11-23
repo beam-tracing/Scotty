@@ -2,6 +2,11 @@ import numpy as np
 from scotty.fun_general import read_floats_into_list_until
 
 
+"""
+Define two classes that reads the output from Torbeam: Torbeam_output and y_LIB
+The naming of variables matches that of Scotty
+"""
+
 class Torbeam_output:
     # expected output files: t1_LIB.dat, t2_new_LIB.dat, t2_LIB.dat, reflout (if flavour == D)
     def __init__(self, path, flavour):
@@ -38,11 +43,7 @@ class Torbeam_output:
         self.enclosed_area = t2[1]
         self.enclosed_volume = t2[2]
 
-
-# work in progress
 class y_LIB:
-    
-    # work in progress
     def __init__(self, path):
         self.y_LIB = np.fromfile(path + '\\y_LIB.dat',dtype=float, sep='   ')
         y = self.y_LIB.reshape(int(len(self.y_LIB) / 19), 19).T
@@ -52,19 +53,22 @@ class y_LIB:
         self.N_R = y[3]
         self.N_zeta = y[4]
         self.N_Z = y[5]
-        self.y6 = y[6]
-        self.y7 = y[7]
-        self.y8 = y[8]
-        self.y9 = y[9]
-        self.y10 = y[10]
-        self.y11 = y[11]
-        self.y12 = y[12]
-        self.y13 = y[13]
-        self.y14 = y[14]
-        self.y15 = y[15]
-        self.y16 = y[16]
-        self.y17 = y[17]
+        self.s_xx = y[6]
+        self.s_xy = y[7]
+        self.s_xz = y[8]
+        self.s_yy = y[9]
+        self.s_yz = y[10]
+        self.s_zz = y[11]
+        self.phi_xx = y[12]
+        self.phi_xy = y[13]
+        self.phi_xz = y[14]
+        self.phi_yy = y[15]
+        self.phi_yz = y[16]
+        self.phi_zz = y[17]
         self.y18 = y[18]
+
+        self.s = np.array([[self.s_xx, self.s_xy, self.s_xz], [self.s_xy, self.s_yy, self.s_yz], [self.s_xz, self.s_yz, self.s_zz]]).transpose(2, 0, 1)
+        self.phi = np.array([[self.phi_xx, self.phi_xy, self.phi_xz], [self.phi_xy, self.phi_yy, self.phi_yz], [self.phi_xz, self.phi_yz, self.phi_zz]]).transpose(2, 0, 1)
     
     def __repr__(self):
         return f"y_LIB(path={self.path})"

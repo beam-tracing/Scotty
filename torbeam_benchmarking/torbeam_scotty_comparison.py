@@ -5,6 +5,13 @@ from torbeam_output import Torbeam_output
 import scotty.plotting as plotting
 
 
+"""
+Functions in this file
+1. power_deposition_comparison: compare power deposition between Scotty and Torbeam
+2. current_drive_comparison: compare current drive between Scotty and Torbeam
+3. beam_path_comparison: compare beam path between Scotty and Torbeam
+"""
+
 def power_deposition_comparison(scotty_filepath: str, Torbeam_output: Torbeam_output):
     power_depo_scotty = np.loadtxt(scotty_filepath, dtype=float)
     rho = np.arange(0, 1, 1 / len(power_depo_scotty))
@@ -39,25 +46,3 @@ def beam_path_comparison(dt: datatree, Torbeam_output: Torbeam_output, x_range =
     plt.xlim(x_range)
     plt.ylim(y_range)
     # plt.savefig('beam path comparison', dpi=1200)
-
-
-def beam_length(x, y):
-    z = [0.0]
-    for i in range(1, len(x)):
-        z.append(np.sqrt((x[i] - x[i-1]) ** 2 + (y[i] - y[i-1]) ** 2))
-    for i in range(1, len(z)):
-        z[i] += z[i-1]
-    return np.array(z)
-
-
-def Te_scaling(filename, scaling_factor: float):
-    Te = np.fromfile(filename, dtype=float, sep="   ")
-    
-    format_string = "{:.12f}"
-    for i in range(2, len(Te), 2):
-        Te[i] *= scaling_factor
-    f = open('Te.dat', 'w')
-    f.writelines(['    ', str(int(Te[0])), '\n'])
-    for i in range(1, len(Te), 2):
-        f.writelines([format_string.format(Te[i]), '  ', str(Te[i + 1]), '\n'])
-    f.close()

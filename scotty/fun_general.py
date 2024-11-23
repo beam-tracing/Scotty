@@ -233,7 +233,7 @@ def find_K_lab_Cartesian(K_lab, q_lab):
     q_R = q_lab[0]
     q_zeta = q_lab[1]
 
-    K_lab_Cartesian = np.zeros(3)
+    K_lab_Cartesian = np.zeros((3, len(q_lab[0])))
     K_lab_Cartesian[0] = K_R * np.cos(q_zeta) - K_zeta * np.sin(q_zeta) / q_R  # K_X
     K_lab_Cartesian[1] = K_R * np.sin(q_zeta) + K_zeta * np.cos(q_zeta) / q_R  # K_Y
     K_lab_Cartesian[2] = K_Z

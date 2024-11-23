@@ -1,5 +1,16 @@
 import numpy as np
+
 from scotty.fun_general import read_floats_into_list_until
+
+
+"""
+Functions in this file:
+1. psi_rescaling: rescale the poloidal flux to match Scotty format
+2. topfile_reformatting: reformat the topfile to Scotty format
+3. beam_length: calculate the length of the beam (for torbeam)
+4. torbeam_in_plasma: find the entry and exit point of torbeam in the plasma
+5. Te_scaling: rescale the electron temperature profile
+"""
 
 
 def psi_rescaling(input_path, output_path):
@@ -72,6 +83,7 @@ def psi_rescaling(input_path, output_path):
 
 
 def topfile_reformatting(input_path, output_path):
+    # Reformat topfile to Scotty format
     input_file = input_path + "\\topfile"
     output_file = output_path + "\\topfile"
     
@@ -84,7 +96,7 @@ def topfile_reformatting(input_path, output_path):
             return False
 
 
-    # Replace all texts with Scotty format
+    # Replace all texts
     separation_lines = ['Number of radial and vertical grid points', 'Inside and Outside radius and psi_sep', 'X-coordinates', 'Z-coordinates', 'B_R', 'B_t', 'B_Z', 'psi','you fall asleep']
     separation_index = 0
     with open(input_file, 'r') as infile, open(output_file, 'w') as outfile:
@@ -104,5 +116,38 @@ def topfile_reformatting(input_path, output_path):
                 outfile.write(separation_lines[separation_index] + '\n')
                 separation_index += 1
         outfile.write(separation_lines[-1])
+
+
+def beam_length(q_R, q_Z):
+    d_length = np.sqrt(np.diff(q_R) ** 2 + np.diff(q_Z) ** 2)
+    length = np.cumsum(d_length)
+    length = np.insert(length, 0, 0) # ensure that the length of the array is the same as input
+    return np.array(length)
+
+
+def torbeam_in_plasma(data):
+    # find the entry and exit point of torbeam in the plasma
+    start, end = 0, -1
+    for i in range(len(data)):
+        if data[i+1] - data[i] == 0 and start !=0 and end == -1:
+            end = i
+            break 
+        if data[i] - data[i-1] != 0 and i != 0 and start == 0:
+            start = i
+    return start, end
+
+
+def Te_scaling(filename, scaling_factor: float):
+    # Rescale the electron temperature profile
+    Te = np.fromfile(filename, dtype=float, sep="   ")
+    
+    format_string = "{:.12f}"
+    for i in range(2, len(Te), 2):
+        Te[i] *= scaling_factor
+    f = open('Te.dat', 'w')
+    f.writelines(['    ', str(int(Te[0])), '\n'])
+    for i in range(1, len(Te), 2):
+        f.writelines([format_string.format(Te[i]), '  ', str(Te[i + 1]), '\n'])
+    f.close()
 
 
