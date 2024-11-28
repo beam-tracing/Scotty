@@ -384,6 +384,7 @@ def propagate_ray(
     
 
     # TO REMOVE -- for debugging only
+    print("ray tracing solution is here")
     print("solution, t: ", solver_ray_output.t)
     print("solution, x,y,z,Kx,Ky,Kz: ", solver_ray_output.y)
 
