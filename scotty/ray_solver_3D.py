@@ -441,4 +441,4 @@ def propagate_ray(
     return solver_ray_output.t, solver_ray_output.y
     """
 
-    return tau_leave, tau_points, solver_ray_output.y # to remove solver_ray_output.y
+    return tau_leave, tau_points
