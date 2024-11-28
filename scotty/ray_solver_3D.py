@@ -379,7 +379,7 @@ def propagate_ray(
         args=solver_arguments,
         rtol=rtol,
         atol=atol,
-        max_step=10, # TO REMOVE -- change this from 5 back to 50 (basically changes the number of steps for solving)
+        max_step=5, # TO REMOVE -- change this from 5 back to 50 (basically changes the number of steps for solving)
     )
     
     """
