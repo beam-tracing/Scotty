@@ -382,11 +382,11 @@ def propagate_ray(
         max_step=5, # TO REMOVE -- change this from 5 back to 50 (basically changes the number of steps for solving)
     )
     
-    """
+
     # TO REMOVE -- for debugging only
     print("solution, t: ", solver_ray_output.t)
     print("solution, x,y,z,Kx,Ky,Kz: ", solver_ray_output.y)
-    """
+
 
     solver_end_time = time()
     if verbose:
