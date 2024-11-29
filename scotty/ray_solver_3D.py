@@ -72,7 +72,7 @@ def make_solver_events(
     @_event(terminal = True, direction = -1.0)
     def event_leave_simulation(tau, ray_parameters_3D, hamiltonian: Hamiltonian_3D):
         q_X, q_Y, q_Z, K_X, K_Y, K_Z = ray_parameters_3D
-        is_inside = ((X_coord_min < q_X < X_coord_max)
+        is_inside = ((X_coord_min < q_X < X_coord_max-0.1) # to remove -0.1
                  and (Y_coord_min < q_Y < Y_coord_max)
                  and (Z_coord_min < q_Z < Z_coord_max))
         return +1 if is_inside else -1
@@ -343,7 +343,7 @@ def propagate_ray(
     atol: float,
     quick_run: bool,
     len_tau: int,
-    tau_max: float = 1,          # TO REMOVE change this back to 1e5 (10,000)
+    tau_max: float = 150,          # TO REMOVE change this back to 1e5 (10,000)
     verbose: bool = True,
 ) -> Union[Tuple[float, FloatArray], K_cutoff_data_cartesian]:
     
@@ -393,11 +393,12 @@ def propagate_ray(
     if verbose:
         print("Time taken (ray solver)", solver_end_time - solver_start_time, "s")
 
+    """ # TO REMOVE un-quotation mark it -- temporarily done this so that the ray data can be passed onto the beam tracing functions
     if solver_ray_output.status == 0:
         raise RuntimeError(
-            "Ray has not left plasma/simulation region. "
-            "Increase tau_max or choose different initial conditions."
+            "Ray has not left plasma/simulation region. Increase tau_max or choose different initial conditions."
         )
+    """
     if solver_ray_output.status == -1:
         raise RuntimeError(
             "Integration step failed. Check density interpolation is not negative"
