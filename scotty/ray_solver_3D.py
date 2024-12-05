@@ -343,7 +343,7 @@ def propagate_ray(
     atol: float,
     quick_run: bool,
     len_tau: int,
-    tau_max: float = 150,          # TO REMOVE change this back to 1e5 (10,000)
+    tau_max: float = 1e5,
     verbose: bool = True,
 ) -> Union[Tuple[float, FloatArray], K_cutoff_data_cartesian]:
     
