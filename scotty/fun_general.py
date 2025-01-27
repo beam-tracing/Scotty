@@ -204,6 +204,7 @@ def find_vec_lab_Cartesian(vec_lab, q_zeta):
 
 
 def find_q_lab(q_lab_Cartesian):
+    """ Cartesian to Cylindrical """
     q_X = q_lab_Cartesian[0]
     q_Y = q_lab_Cartesian[1]
     q_Z = q_lab_Cartesian[2]
@@ -216,17 +217,20 @@ def find_q_lab(q_lab_Cartesian):
 
 
 def find_q_lab_Cartesian(q_lab):
+    """ Cylindrical to Cartesian """
     q_R = q_lab[0]
     q_zeta = q_lab[1]
     q_Z = q_lab[2]
-    q_lab_Cartesian = np.zeros((3, len(q_lab[0])))
-    q_lab_Cartesian[0] = np.array(q_R * np.cos(q_zeta) - q_zeta * np.sin(q_zeta))
-    q_lab_Cartesian[1] = q_R * np.sin(q_zeta) + q_zeta * np.cos(q_zeta)
+
+    q_lab_Cartesian = np.zeros_like(q_lab)
+    q_lab_Cartesian[0] = q_R * np.cos(q_zeta)
+    q_lab_Cartesian[1] = q_R * np.sin(q_zeta)
     q_lab_Cartesian[2] = q_Z
     return q_lab_Cartesian
 
 
 def find_K_lab_Cartesian(K_lab, q_lab):
+    """ Cylindrical to Cartesian """
     K_R = K_lab[0]
     K_zeta = K_lab[1]
     K_Z = K_lab[2]
@@ -241,6 +245,7 @@ def find_K_lab_Cartesian(K_lab, q_lab):
 
 
 def find_K_lab(K_lab_Cartesian, q_lab_Cartesian):
+    """ Cartesian to Cylindrical """
     K_X = K_lab_Cartesian[0]
     K_Y = K_lab_Cartesian[1]
     K_Z = K_lab_Cartesian[2]
