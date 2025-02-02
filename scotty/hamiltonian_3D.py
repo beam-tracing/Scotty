@@ -201,8 +201,9 @@ class Hamiltonian_3D:
 
         H_discriminant = np.maximum(np.zeros_like(Booker_beta), (Booker_beta**2 - 4 * Booker_alpha * Booker_gamma))
 
-        """
         # TO REMOVE in the future -- for debugging only
+        """
+        print()
         print("X, Y, Z: ", X, Y, Z)
         print("Kx, Ky, Kz: ", K_X, K_Y, K_Z)
         print("K: ", K_magnitude)
@@ -212,6 +213,8 @@ class Hamiltonian_3D:
         print("alpha, beta, gamma: ", Booker_alpha, Booker_beta, Booker_gamma)
         print("H_discriminant: ", H_discriminant)
         print("H: ", (K_magnitude / self.wavenumber_K0) ** 2 + (Booker_beta - self.mode_flag * np.sqrt(H_discriminant)) / (2 * Booker_alpha))
+        print("sin_theta_m_sq", sin_theta_m_sq)
+        print()
         """
 
         return (K_magnitude / self.wavenumber_K0) ** 2 + (Booker_beta - self.mode_flag * np.sqrt(H_discriminant)) / (2 * Booker_alpha)
@@ -255,7 +258,7 @@ class Hamiltonian_3D:
 
                 "d2H_dKx2":    apply_stencil(("K_X","K_X"), "d2_CFD2"),
                 "d2H_dKy2":    apply_stencil(("K_Y","K_Y"), "d2_CFD2"),
-                "d2H_dKz2":    2.02642367285e-5, # TO REMOVE and replace with apply_stencil(("K_Z","K_Z"), "d2_CFD2"), 
+                "d2H_dKz2":    apply_stencil(("K_Z","K_Z"), "d2_CFD2"), 
                 "d2H_dKx_dKy": apply_stencil(("K_X","K_Y"), "d1d1_CFD_CFD2"),
                 "d2H_dKx_dKz": apply_stencil(("K_X","K_Z"), "d1d1_CFD_CFD2"),
                 "d2H_dKy_dKz": apply_stencil(("K_Y","K_Z"), "d1d1_CFD_CFD2"),
@@ -271,43 +274,15 @@ class Hamiltonian_3D:
                 "d2H_dZ_dKz":  apply_stencil(("Z","K_Z"), "d1d1_FFD_CFD2"),
             }
             derivatives.update(second_derivatives)
-
-            """ TO REMOVE this is to test derivatives
-        if second_order:
-            second_derivatives = {
-                "d2H_dX2":     0, # apply_stencil(("X","X"), "d2_FFD2"), TO REMOVE
-                "d2H_dY2":     0, # apply_stencil(("Y","Y"), "d2_FFD2"),
-                "d2H_dZ2":     0, # apply_stencil(("Z","Z"), "d2_FFD2"),
-                "d2H_dX_dY":   0, # apply_stencil(("X","Y"), "d1d1_FFD_FFD2"),
-                "d2H_dX_dZ":   0, # apply_stencil(("X","Z"), "d1d1_FFD_FFD2"),
-                "d2H_dY_dZ":   0, # apply_stencil(("Y","Z"), "d1d1_FFD_FFD2"),
-
-                "d2H_dKx2":    2.02642367285e-5, # apply_stencil(("K_X","K_X"), "d2_CFD2"),
-                "d2H_dKy2":    2.02642367285e-5, # apply_stencil(("K_Y","K_Y"), "d2_CFD2"),
-                "d2H_dKz2":    2.02642367285e-5, # apply_stencil(("K_Z","K_Z"), "d2_CFD2"),
-                "d2H_dKx_dKy": 0, # apply_stencil(("K_X","K_Y"), "d1d1_CFD_CFD2"),
-                "d2H_dKx_dKz": 0, # apply_stencil(("K_X","K_Z"), "d1d1_CFD_CFD2"),
-                "d2H_dKy_dKz": 0, # apply_stencil(("K_Y","K_Z"), "d1d1_CFD_CFD2"),
-
-                "d2H_dX_dKx":  0, # apply_stencil(("X","K_X"), "d1d1_FFD_CFD2"),
-                "d2H_dX_dKy":  0, # apply_stencil(("X","K_Y"), "d1d1_FFD_CFD2"),
-                "d2H_dX_dKz":  0, # apply_stencil(("X","K_Z"), "d1d1_FFD_CFD2"),
-                "d2H_dY_dKx":  0, # apply_stencil(("Y","K_X"), "d1d1_FFD_CFD2"),
-                "d2H_dY_dKy":  0, # apply_stencil(("Y","K_Y"), "d1d1_FFD_CFD2"),
-                "d2H_dY_dKz":  0, # apply_stencil(("Y","K_Z"), "d1d1_FFD_CFD2"),
-                "d2H_dZ_dKx":  0, # apply_stencil(("Z","K_X"), "d1d1_FFD_CFD2"),
-                "d2H_dZ_dKy":  0, # apply_stencil(("Z","K_Y"), "d1d1_FFD_CFD2"),
-                "d2H_dZ_dKz":  0, # apply_stencil(("Z","K_Z"), "d1d1_FFD_CFD2"),
-            }
-            derivatives.update(second_derivatives)
-            """
-
+        
+        """
         # TO REMOVE -- for debugging only
         print(np.array((X,Y,Z)))
         print(np.array((K_X,K_Y,K_Z)))
         for key, value in derivatives.items():
             print(key, value)
-        
+        """
+
         return derivatives
 
 
