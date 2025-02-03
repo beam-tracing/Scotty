@@ -336,7 +336,7 @@ def beam_me_up_3D(
         
         ### THIS IS TO SEE HOW THE FIRST AND SECOND DERIVATIVES CHANGE IN INDEXES
         # to remove
-        first_order_derivative_dicts_to_plot_how_they_evolve = {
+        first_order_derivatives_dict = {
             "dH_dX": [],
             "dH_dY": [],
             "dH_dZ": [],
@@ -344,7 +344,7 @@ def beam_me_up_3D(
             "dH_dKy": [],
             "dH_dKz": []
         }
-        second_order_derivative_dicts_to_plot_how_they_evolve = {
+        second_order_derivatives_dict = {
             "d2H_dX2": [],
             "d2H_dY2": [],
             "d2H_dZ2": [],
@@ -369,12 +369,9 @@ def beam_me_up_3D(
         }
     
         # to remove
-        def check_if_derivatives_correct(index):
-
-            from scotty.hamiltonian_3D import hessians_3D
-
+        from scotty.hamiltonian_3D import hessians_3D
+        def calculate_and_store_derivatives(index):
             X, Y, Z, K_X, K_Y, K_Z, Psi_3D, tau = pointwise_data[index]
-            
             derivatives_and_second_derivatives_dict = hamiltonian.derivatives(X, Y, Z, K_X, K_Y, K_Z, second_order = True)
 
             grad_grad_H, grad_gradK_H, gradK_gradK_H = hessians_3D(derivatives_and_second_derivatives_dict)
@@ -399,12 +396,12 @@ def beam_me_up_3D(
             """
 
             for key, value in derivatives_and_second_derivatives_dict.items():
-                if key in ["dH_dX", "dH_dY", "dH_dZ", "dH_dKx", "dH_dKy", "dH_dKz"]: first_order_derivative_dicts_to_plot_how_they_evolve[key].append(value)
-                else: second_order_derivative_dicts_to_plot_how_they_evolve[key].append(value)
+                if key in ["dH_dX", "dH_dY", "dH_dZ", "dH_dKx", "dH_dKy", "dH_dKz"]: first_order_derivatives_dict[key].append(value)
+                else: second_order_derivatives_dict[key].append(value)
 
         # to remove
         for index in range(len(tau_array)):
-            check_if_derivatives_correct(index)
+            calculate_and_store_derivatives(index)
         
         import matplotlib.pyplot as plt
         from matplotlib.ticker import MultipleLocator
@@ -412,22 +409,22 @@ def beam_me_up_3D(
         def plot_how_first_derivatives_evolve(dictionary):
             counter = 0
             for key, value in dictionary.items():
-                xmin, xmax = 0, 900
-                ymin, ymax = min(value[xmin:xmax+1]), max(value[xmin:xmax+1])
-                axs[counter].plot(value) #, marker='o')
-                axs[counter].set_xlabel("tau index")
+                # xmin, xmax = 0, 900
+                # ymin, ymax = min(value[xmin:xmax+1]), max(value[xmin:xmax+1])
+                # axs[counter].set_xlim(xmin, xmax)
+                # axs[counter].set_ylim(ymin, ymax)
+                axs[counter].plot(tau_array, value) #, marker='o')
+                axs[counter].set_xlabel("tau")
                 axs[counter].set_ylabel(key)
                 axs[counter].set_title(f"{key} changing along tau")
                 axs[counter].xaxis.set_major_locator(MultipleLocator(75))
                 # axs[counter].xaxis.set_minor_locator(MultipleLocator(25))
                 axs[counter].grid(True, which="both", axis="x")
-                axs[counter].set_xlim(xmin, xmax)
-                axs[counter].set_ylim(ymin, ymax)
                 counter += 1
 
         fig, axs = plt.subplots(2, 3, figsize=(15, 5))
         axs = axs.flatten()
-        plot_how_first_derivatives_evolve(first_order_derivative_dicts_to_plot_how_they_evolve)
+        plot_how_first_derivatives_evolve(first_order_derivatives_dict)
         plt.tight_layout()
         plt.show()
 
@@ -435,22 +432,22 @@ def beam_me_up_3D(
         def plot_how_second_derivatives_evolve(dictionary):
             counter = 0
             for key, value in dictionary.items():
-                xmin, xmax = 0, 1002 # 0, 900
-                ymin, ymax = min(value[xmin:xmax+1]), max(value[xmin:xmax+1])
-                axs[counter].plot(value) #, marker='o')
-                axs[counter].set_xlabel("tau index")
+                # xmin, xmax = 0, 1002 # 0, 900
+                # ymin, ymax = min(value[xmin:xmax+1]), max(value[xmin:xmax+1])
+                # axs[counter].set_xlim(xmin, xmax)
+                # axs[counter].set_ylim(ymin, ymax)
+                axs[counter].plot(tau_array, value) #, marker='o')
+                axs[counter].set_xlabel("tau")
                 axs[counter].set_ylabel(key)
                 axs[counter].set_title(f"{key} changing along tau")
                 axs[counter].xaxis.set_major_locator(MultipleLocator(75))
                 # axs[counter].xaxis.set_minor_locator(MultipleLocator(25))
                 axs[counter].grid(True, which="both", axis="x")
-                axs[counter].set_xlim(xmin, xmax)
-                axs[counter].set_ylim(ymin, ymax)
                 counter += 1
 
         fig, axs = plt.subplots(7, 3, figsize=(15, 15))
         axs = axs.flatten()
-        plot_how_second_derivatives_evolve(second_order_derivative_dicts_to_plot_how_they_evolve)
+        plot_how_second_derivatives_evolve(second_order_derivatives_dict)
         plt.tight_layout()
         plt.show()
 
@@ -462,33 +459,33 @@ def beam_me_up_3D(
                            K_Z_array[i],
                            Psi_3D_output[i],
                            tau_array[i],
-                           first_order_derivative_dicts_to_plot_how_they_evolve["dH_dX"][i],
-                           first_order_derivative_dicts_to_plot_how_they_evolve["dH_dY"][i],
-                           first_order_derivative_dicts_to_plot_how_they_evolve["dH_dZ"][i],
-                           first_order_derivative_dicts_to_plot_how_they_evolve["dH_dKx"][i],
-                           first_order_derivative_dicts_to_plot_how_they_evolve["dH_dKy"][i],
-                           first_order_derivative_dicts_to_plot_how_they_evolve["dH_dKz"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dX2"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dY2"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dZ2"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dX_dY"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dX_dZ"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dY_dZ"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dKx2"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dKy2"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dKz2"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dKx_dKy"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dKx_dKz"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dKy_dKz"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dX_dKx"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dX_dKy"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dX_dKz"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dY_dKx"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dY_dKy"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dY_dKz"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dZ_dKx"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dZ_dKy"][i],
-                           second_order_derivative_dicts_to_plot_how_they_evolve["d2H_dZ_dKz"][i]]
+                           first_order_derivatives_dict["dH_dX"][i],
+                           first_order_derivatives_dict["dH_dY"][i],
+                           first_order_derivatives_dict["dH_dZ"][i],
+                           first_order_derivatives_dict["dH_dKx"][i],
+                           first_order_derivatives_dict["dH_dKy"][i],
+                           first_order_derivatives_dict["dH_dKz"][i],
+                           second_order_derivatives_dict["d2H_dX2"][i],
+                           second_order_derivatives_dict["d2H_dY2"][i],
+                           second_order_derivatives_dict["d2H_dZ2"][i],
+                           second_order_derivatives_dict["d2H_dX_dY"][i],
+                           second_order_derivatives_dict["d2H_dX_dZ"][i],
+                           second_order_derivatives_dict["d2H_dY_dZ"][i],
+                           second_order_derivatives_dict["d2H_dKx2"][i],
+                           second_order_derivatives_dict["d2H_dKy2"][i],
+                           second_order_derivatives_dict["d2H_dKz2"][i],
+                           second_order_derivatives_dict["d2H_dKx_dKy"][i],
+                           second_order_derivatives_dict["d2H_dKx_dKz"][i],
+                           second_order_derivatives_dict["d2H_dKy_dKz"][i],
+                           second_order_derivatives_dict["d2H_dX_dKx"][i],
+                           second_order_derivatives_dict["d2H_dX_dKy"][i],
+                           second_order_derivatives_dict["d2H_dX_dKz"][i],
+                           second_order_derivatives_dict["d2H_dY_dKx"][i],
+                           second_order_derivatives_dict["d2H_dY_dKy"][i],
+                           second_order_derivatives_dict["d2H_dY_dKz"][i],
+                           second_order_derivatives_dict["d2H_dZ_dKx"][i],
+                           second_order_derivatives_dict["d2H_dZ_dKy"][i],
+                           second_order_derivatives_dict["d2H_dZ_dKz"][i]]
                            for i in range(len(tau_array))]
     
     return pointwise_data # TO REMOVE
