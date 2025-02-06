@@ -188,7 +188,7 @@ class Hamiltonian_3D:
             sin_theta_m_sq = np.dot(b_hat, K_hat)**2
         else:
             b_hat = b_hat.T
-            K_hat = K_hat.all
+            K_hat = K_hat.T
             sin_theta_m_sq = dot(b_hat, K_hat)**2
         
         epsilon = DielectricTensor_3D(electron_density, self.angular_frequency, B_magnitude, temperature)
