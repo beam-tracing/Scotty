@@ -301,7 +301,7 @@ def _interp_mesh3D_data1D(
         interp_order: int,
 ) -> Tuple[Callable[[ArrayLike, ArrayLike, ArrayLike], [FloatArray, FloatArray, FloatArray]]]:
     
-    if interp_order == 1:   interp_order_str = "linear"
+    if   interp_order == 1: interp_order_str = "linear"
     elif interp_order == 3: interp_order_str = "cubic"
     elif interp_order == 5: interp_order_str = "quintic"
     else:

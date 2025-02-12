@@ -64,17 +64,17 @@ class DielectricTensor_3D:
 
     @property
     def e_bb(self):
-        r"""The :math:`\epsilon_{bb}` component"""
+        r"""The :math:`\epsilon_{bb}` component; also called epsilon_para"""
         return self._epsilon_bb
 
     @property
     def e_11(self):
-        r"""The :math:`\epsilon_{11}` component"""
+        r"""The :math:`\epsilon_{11}` component; also called epsilon_perp"""
         return self._epsilon_11
 
     @property
     def e_12(self):
-        r"""The :math:`\epsilon_{12}` component"""
+        r"""The :math:`\epsilon_{12}` component; also called epsilon_g"""
         return self._epsilon_12
 
 
