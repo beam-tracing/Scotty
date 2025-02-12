@@ -10,7 +10,7 @@ from scotty.geometry_3D import MagneticField_3D_Cartesian, InterpolatedField_3D_
 from scotty.hamiltonian_3D import Hamiltonian_3D
 from scotty.profile_fit import ProfileFitLike, profile_fit
 from scotty.ray_solver_3D import propagate_ray
-from scotty.typing import FloatArray, PathLike
+from scotty.typing import ArrayLike, FloatArray, PathLike
 from scotty._version import __version__
 import time
 from typing import cast, Optional, Sequence, Union
@@ -53,6 +53,8 @@ def beam_me_up_3D(
     len_tau: int = 102,
     rtol: float = 1e-3,  # for solve_ivp of the beam solver
     atol: float = 1e-6,  # for solve_ivp of the beam solver
+    tau_eval: type = None, # To remove
+    points_from_2d_scotty_to_eval: ArrayLike = None, # To remove
 
     # Input and output settings
     ne_data_path = pathlib.Path("."),
@@ -240,86 +242,103 @@ def beam_me_up_3D(
     # -------------------
     # Propagate the ray
 
-    print("Starting the solvers")
-    ray_solver_output = propagate_ray(
-        poloidal_flux_enter,
-        launch_angular_frequency,
-        field,
-        initial_position,
-        K_initial_cartesian,
-        hamiltonian,
-        rtol,
-        atol,
-        quick_run,
-        len_tau,
-    )
-    if quick_run:
-        return ray_solver_output
+    if points_from_2d_scotty_to_eval is None: # TO REMOVE this entire if-else block
+        print("Starting the solvers")
+        ray_solver_output = propagate_ray(
+            poloidal_flux_enter,
+            launch_angular_frequency,
+            field,
+            initial_position,
+            K_initial_cartesian,
+            hamiltonian,
+            rtol,
+            atol,
+            quick_run,
+            len_tau,
+            tau_eval, # TO REMOVE
+        )
+        if quick_run:
+            return ray_solver_output
 
-    tau_leave, tau_points = cast(tuple, ray_solver_output)
+        tau_leave, tau_points = cast(tuple, ray_solver_output)
 
-    # return ray_solver_output # TO REMOVE -- for debugging purposes only
+        # return ray_solver_output # TO REMOVE -- for debugging purposes only
 
-    # -------------------
-    # Propagate the beam
+        # -------------------
+        # Propagate the beam
 
-    # Initial conditions for the solver
-    beam_parameters_initial = pack_beam_parameters_3D(
-        initial_position[0],
-        initial_position[1],
-        initial_position[2],
-        K_initial_cartesian[0],
-        K_initial_cartesian[1],
-        K_initial_cartesian[2],
-        Psi_3D_lab_initial_cartesian,
-    )
+        # Initial conditions for the solver
+        beam_parameters_initial = pack_beam_parameters_3D(
+            initial_position[0],
+            initial_position[1],
+            initial_position[2],
+            K_initial_cartesian[0],
+            K_initial_cartesian[1],
+            K_initial_cartesian[2],
+            Psi_3D_lab_initial_cartesian,
+        )
 
-    print("Psi: ") # TO REMOVE
-    print("Psi_xx: ", beam_parameters_initial[6], beam_parameters_initial[12])
-    print("Psi_yy: ", beam_parameters_initial[7], beam_parameters_initial[13])
-    print("Psi_zz: ", beam_parameters_initial[8], beam_parameters_initial[14])
+        print("Psi: ") # TO REMOVE
+        print("Psi_xx: ", beam_parameters_initial[6], beam_parameters_initial[12])
+        print("Psi_yy: ", beam_parameters_initial[7], beam_parameters_initial[13])
+        print("Psi_zz: ", beam_parameters_initial[8], beam_parameters_initial[14])
 
-    print("Psi_xy: ", beam_parameters_initial[9], beam_parameters_initial[15])
-    print("Psi_xz: ", beam_parameters_initial[10], beam_parameters_initial[16])
-    print("Psi_yz: ", beam_parameters_initial[11], beam_parameters_initial[17])
+        print("Psi_xy: ", beam_parameters_initial[9], beam_parameters_initial[15])
+        print("Psi_xz: ", beam_parameters_initial[10], beam_parameters_initial[16])
+        print("Psi_yz: ", beam_parameters_initial[11], beam_parameters_initial[17])
 
-    solver_start_time = time.time()
+        solver_start_time = time.time()
 
-    # TO REMOVE
-    tau_points = list(tau_points)
-    tau_points = dict.fromkeys(tau_points)
-    tau_points = list(tau_points)
-    tau_points = np.array(tau_points)
-    print(tau_points)
+        # TO REMOVE
+        tau_points = list(tau_points)
+        tau_points = dict.fromkeys(tau_points)
+        tau_points = list(tau_points)
+        tau_points = np.array(tau_points)
+        print(tau_points)
 
-    solver_beam_output = solve_ivp(
-        beam_evolution_fun_3D,
-        [0, tau_leave],
-        beam_parameters_initial,
-        method="RK45",
-        t_eval=tau_points,
-        dense_output=False,
-        events=None,
-        vectorized=False,
-        args=(hamiltonian,),
-        rtol=rtol,
-        atol=atol,
-    )
+        solver_beam_output = solve_ivp(
+            beam_evolution_fun_3D,
+            [0, tau_leave],
+            beam_parameters_initial,
+            method="RK45",
+            t_eval=tau_points,
+            dense_output=False,
+            events=None,
+            vectorized=False,
+            args=(hamiltonian,),
+            rtol=rtol,
+            atol=atol,
+        )
 
-    solver_end_time = time.time()
-    solver_time = solver_end_time - solver_start_time
-    print(f"Time taken (beam solver) {solver_time}s")
-    print(f"Number of beam evolution evaluations: {solver_beam_output.nfev}")
-    print(f"Time per beam evolution evaluation: {solver_time / solver_beam_output.nfev}")
+        solver_end_time = time.time()
+        solver_time = solver_end_time - solver_start_time
+        print(f"Time taken (beam solver) {solver_time}s")
+        print(f"Number of beam evolution evaluations: {solver_beam_output.nfev}")
+        print(f"Time per beam evolution evaluation: {solver_time / solver_beam_output.nfev}")
 
-    tau_array = solver_beam_output.t
-    beam_parameters_final = solver_beam_output.y
-    solver_status = solver_beam_output.status
+        tau_array = solver_beam_output.t
+        beam_parameters_final = solver_beam_output.y
+        solver_status = solver_beam_output.status
 
-    q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, Psi_3D_output = unpack_beam_parameters_3D(beam_parameters_final)
+        q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, Psi_3D_output = unpack_beam_parameters_3D(beam_parameters_final)
 
-    print("Main loop complete")
-    # -------------------
+        print("Main loop complete")
+        # -------------------
+    else:
+        solver_status = 1
+        q_X_array     = points_from_2d_scotty_to_eval[0]
+        q_Y_array     = points_from_2d_scotty_to_eval[1]
+        q_Z_array     = points_from_2d_scotty_to_eval[2]
+        K_X_array     = points_from_2d_scotty_to_eval[3]
+        K_Y_array     = points_from_2d_scotty_to_eval[4]
+        K_Z_array     = points_from_2d_scotty_to_eval[5]
+        Psi_3D_output = points_from_2d_scotty_to_eval[6]
+        tau_array     = points_from_2d_scotty_to_eval[7]
+
+        polflux_values = points_from_2d_scotty_to_eval[8]
+        theta_m_array  = points_from_2d_scotty_to_eval[9]
+
+
 
     # TO REMOVE
     if solver_status == -1: print("Solver did not reach completion.")
@@ -334,7 +353,41 @@ def beam_me_up_3D(
                            tau_array[i]]
                            for i in range(len(tau_array))]
         
-        ### THIS IS TO SEE HOW THE FIRST AND SECOND DERIVATIVES CHANGE IN INDEXES
+        ### THIS IS TO SEE HOW POLFLUX, ELECTRON DENSITY, AND H CHANGE W.R.T. TAU
+        # to remove
+        if points_from_2d_scotty_to_eval is None or polflux_values is None: polflux_values = field.polflux(q_X_array, q_Y_array, q_Z_array)
+        ne_values = find_density_1D(polflux_values)
+        H_values = hamiltonian(q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array)
+
+        ### THIS IS TO SEE HOW B_MAGNITUDE, K_MAGNITUDE, THETA_M, THE EPSILONS, AND THE BOOKER TERMS CHANGE W.R.T TAU
+        # to remove
+        from scotty.fun_general import dot, angular_frequency_to_wavenumber
+        from scotty.hamiltonian_3D import DielectricTensor_3D
+        _B_X, _B_Y, _B_Z = np.squeeze(field.B_X(q_X_array, q_Y_array, q_Z_array)), np.squeeze(field.B_Y(q_X_array, q_Y_array, q_Z_array)), np.squeeze(field.B_Z(q_X_array, q_Y_array, q_Z_array))
+        B_magnitude = np.sqrt(_B_X**2 + _B_Y**2 + _B_Z**2)
+        _b_hat = np.array([_B_X, _B_Y, _B_Z]) / B_magnitude
+        _K_X, _K_Y, _K_Z = np.array(K_X_array), np.array(K_Y_array), np.array(K_Z_array)
+        K_magnitude = np.sqrt(_K_X**2 + _K_Y**2 + _K_Z**2)
+        _K_hat = np.array([_K_X, _K_Y, _K_Z]) / K_magnitude
+        if points_from_2d_scotty_to_eval is None or theta_m_array is None:
+            theta_m = np.arcsin(dot(_b_hat.T, _K_hat.T))
+            _sin_theta_m_sq = dot(_b_hat.T, _K_hat.T)**2
+        else:
+            theta_m = theta_m_array
+            _sin_theta_m_sq = np.sin(theta_m)**2
+        _epsilon = DielectricTensor_3D(ne_values, launch_angular_frequency, B_magnitude)
+        epsilon_para = _epsilon.e_bb
+        epsilon_perp = _epsilon.e_11
+        epsilon_g    = _epsilon.e_12
+        Booker_alpha = (_epsilon.e_bb * _sin_theta_m_sq) + _epsilon.e_11 * (1 - _sin_theta_m_sq)
+        Booker_beta  = (-_epsilon.e_11 * _epsilon.e_bb * (1 + _sin_theta_m_sq)) - (_epsilon.e_11**2 - _epsilon.e_12**2) * (1 - _sin_theta_m_sq)
+        Booker_gamma = _epsilon.e_bb * (_epsilon.e_11**2 - _epsilon.e_12**2)
+        H_discriminant = np.maximum(np.zeros_like(Booker_beta), (Booker_beta**2 - 4 * Booker_alpha * Booker_gamma))
+        H_first_term  = (K_magnitude / angular_frequency_to_wavenumber(launch_angular_frequency))**2
+        H_second_term = (Booker_beta - (-1)*np.sqrt(H_discriminant)) / (2*Booker_alpha)
+        H_first_second_term = H_first_term + H_second_term
+
+        ### THIS IS TO SEE HOW THE FIRST AND SECOND DERIVATIVES CHANGE W.R.T. TAU
         # to remove
         first_order_derivatives_dict = {
             "dH_dX": [],
@@ -405,7 +458,7 @@ def beam_me_up_3D(
         
         import matplotlib.pyplot as plt
         from matplotlib.ticker import MultipleLocator
-        ### THIS IS TO SEE HOW THE FIRST DERIVATIVES CHANGE IN INDEXES
+        ### THIS IS TO SEE HOW THE FIRST DERIVATIVES CHANGE W.R.T. TAU
         def plot_how_first_derivatives_evolve(dictionary):
             counter = 0
             for key, value in dictionary.items():
@@ -428,7 +481,7 @@ def beam_me_up_3D(
         plt.tight_layout()
         plt.show()
 
-        # THIS IS TO SEE HOW THE SECOND DERIVATIVES CHANGE IN INDEXES
+        # THIS IS TO SEE HOW THE SECOND DERIVATIVES CHANGE W.R.T. TAU
         def plot_how_second_derivatives_evolve(dictionary):
             counter = 0
             for key, value in dictionary.items():
@@ -485,10 +538,41 @@ def beam_me_up_3D(
                            second_order_derivatives_dict["d2H_dY_dKz"][i],
                            second_order_derivatives_dict["d2H_dZ_dKx"][i],
                            second_order_derivatives_dict["d2H_dZ_dKy"][i],
-                           second_order_derivatives_dict["d2H_dZ_dKz"][i]]
+                           second_order_derivatives_dict["d2H_dZ_dKz"][i],
+                           H_values[i],
+                           polflux_values[i],
+                           ne_values[i],
+                           B_magnitude[i],
+                           K_magnitude[i],
+                           theta_m[i],
+                           epsilon_para[i],
+                           epsilon_perp[i],
+                           epsilon_g[i],
+                           Booker_alpha[i],
+                           Booker_beta[i],
+                           Booker_gamma[i],
+                           H_discriminant[i],
+                           H_first_term[i],
+                           H_second_term[i],
+                           H_first_second_term[i]]
                            for i in range(len(tau_array))]
+        
+        # TO REMOVE
+        # This is to analytically calculate H as a function of Kz and tau
+        # specifically only for the 2d slab geometry, for which we know
+        # the analytical expression for H
+        _Kz_array_for_H = np.linspace(start=-1, stop=1, num=201)
+        _numerical_H_values_for_heatmap = []
+        for i in range(len(pointwise_data)):
+            _H_values_row = []
+            for Kz in _Kz_array_for_H:
+                _H_values_single_point = hamiltonian(q_X_array[i], q_Y_array[i], q_Z_array[i], K_X_array[i], K_Y_array[i], Kz)
+                _H_values_row.append(_H_values_single_point)
+            _H_values_row = np.array(_H_values_row)
+            _numerical_H_values_for_heatmap.append(_H_values_row)
+        _numerical_H_values_for_heatmap = np.array(_numerical_H_values_for_heatmap)
     
-    return pointwise_data # TO REMOVE
+    return pointwise_data, _numerical_H_values_for_heatmap # TO REMOVE
 
 
 

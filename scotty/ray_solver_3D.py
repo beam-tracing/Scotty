@@ -343,6 +343,7 @@ def propagate_ray(
     atol: float,
     quick_run: bool,
     len_tau: int,
+    tau_eval: FloatArray,
     tau_max: float = 1e5,
     verbose: bool = True,
 ) -> Union[Tuple[float, FloatArray], K_cutoff_data_cartesian]:
@@ -372,7 +373,7 @@ def propagate_ray(
         [0, tau_max],
         ray_parameters_3D_initial,
         method="RK45",
-        t_eval=None,
+        t_eval=tau_eval, # TO REMOVE -- change this back to None
         dense_output=False,
         events=solver_ray_events.values(),
         vectorized=False,
