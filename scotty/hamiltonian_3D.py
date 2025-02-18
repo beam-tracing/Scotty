@@ -202,20 +202,25 @@ class Hamiltonian_3D:
         H_discriminant = np.maximum(np.zeros_like(Booker_beta), (Booker_beta**2 - 4 * Booker_alpha * Booker_gamma))
 
         # TO REMOVE in the future -- for debugging only
-        """
-        print()
+        
+        # print()
         print("X, Y, Z: ", X, Y, Z)
         print("Kx, Ky, Kz: ", K_X, K_Y, K_Z)
-        print("K: ", K_magnitude)
-        print("polflux: ", polflux)
-        print("electron density: ", electron_density)
-        print("epsilon e11, e12, ebb: ", epsilon.e_11, epsilon.e_12, epsilon.e_bb)
-        print("alpha, beta, gamma: ", Booker_alpha, Booker_beta, Booker_gamma)
-        print("H_discriminant: ", H_discriminant)
+        # print("K: ", K_magnitude)
+        print("K_hat: ", K_hat)
+        print("Bx, By, Bz: ", B_X, B_Y, B_Z)
+        # print("B: ", B_magnitude)
+        print("b_hat: ", b_hat)
+        # print("polflux: ", polflux)
+        # print("electron density: ", electron_density)
+        # print("epsilon e11, e12, ebb: ", epsilon.e_11, epsilon.e_12, epsilon.e_bb)
+        # print("alpha, beta, gamma: ", Booker_alpha, Booker_beta, Booker_gamma)
+        # print("H_discriminant: ", H_discriminant)
         print("H: ", (K_magnitude / self.wavenumber_K0) ** 2 + (Booker_beta - self.mode_flag * np.sqrt(H_discriminant)) / (2 * Booker_alpha))
-        print("sin_theta_m_sq", sin_theta_m_sq)
-        print()
-        """
+        # print("sin_theta_m_sq", sin_theta_m_sq)
+        print("theta_m", np.arcsin(np.sqrt(sin_theta_m_sq)))
+        # print()
+        
 
         return (K_magnitude / self.wavenumber_K0) ** 2 + (Booker_beta - self.mode_flag * np.sqrt(H_discriminant)) / (2 * Booker_alpha)
     
@@ -283,6 +288,10 @@ class Hamiltonian_3D:
             print(key, value)
         """
 
+        # TO REMOVE -- for debugging dH/dY and dH/dKy
+        print("dH/dY from scotty.drv", derivatives["dH_dY"])
+        # print("dH/dKy from scotty.drv", derivatives["dH_dKy"])
+        
         return derivatives
 
 
