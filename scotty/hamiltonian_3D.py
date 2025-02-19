@@ -203,23 +203,23 @@ class Hamiltonian_3D:
 
         # TO REMOVE in the future -- for debugging only
         
-        # print()
-        print("X, Y, Z: ", X, Y, Z)
-        print("Kx, Ky, Kz: ", K_X, K_Y, K_Z)
-        # print("K: ", K_magnitude)
-        print("K_hat: ", K_hat)
-        print("Bx, By, Bz: ", B_X, B_Y, B_Z)
-        # print("B: ", B_magnitude)
-        print("b_hat: ", b_hat)
-        # print("polflux: ", polflux)
-        # print("electron density: ", electron_density)
-        # print("epsilon e11, e12, ebb: ", epsilon.e_11, epsilon.e_12, epsilon.e_bb)
-        # print("alpha, beta, gamma: ", Booker_alpha, Booker_beta, Booker_gamma)
-        # print("H_discriminant: ", H_discriminant)
-        print("H: ", (K_magnitude / self.wavenumber_K0) ** 2 + (Booker_beta - self.mode_flag * np.sqrt(H_discriminant)) / (2 * Booker_alpha))
-        # print("sin_theta_m_sq", sin_theta_m_sq)
-        print("theta_m", np.arcsin(np.sqrt(sin_theta_m_sq)))
-        # print()
+        # # print()
+        # print("X, Y, Z: ", X, Y, Z)
+        # print("Kx, Ky, Kz: ", K_X, K_Y, K_Z)
+        # # print("K: ", K_magnitude)
+        # print("K_hat: ", K_hat)
+        # print("Bx, By, Bz: ", B_X, B_Y, B_Z)
+        # # print("B: ", B_magnitude)
+        # print("b_hat: ", b_hat)
+        # # print("polflux: ", polflux)
+        # # print("electron density: ", electron_density)
+        # # print("epsilon e11, e12, ebb: ", epsilon.e_11, epsilon.e_12, epsilon.e_bb)
+        # # print("alpha, beta, gamma: ", Booker_alpha, Booker_beta, Booker_gamma)
+        # # print("H_discriminant: ", H_discriminant)
+        # print("H: ", (K_magnitude / self.wavenumber_K0) ** 2 + (Booker_beta - self.mode_flag * np.sqrt(H_discriminant)) / (2 * Booker_alpha))
+        # # print("sin_theta_m_sq", sin_theta_m_sq)
+        # print("theta_m", np.arcsin(np.sqrt(sin_theta_m_sq)))
+        # # print()
         
 
         return (K_magnitude / self.wavenumber_K0) ** 2 + (Booker_beta - self.mode_flag * np.sqrt(H_discriminant)) / (2 * Booker_alpha)
@@ -347,7 +347,7 @@ def hessians_3D(dH: dict):
         [d2H_dX_dZ,     d2H_dY_dZ,     d2H_dZ2  ]
     ]))
 
-    grad_gradK_H = reshape(np.array([
+    gradK_grad_H = reshape(np.array([
         [d2H_dX_dKx,    d2H_dY_dKx,    d2H_dZ_dKx],
         [d2H_dX_dKy,    d2H_dY_dKy,    d2H_dZ_dKy],
         [d2H_dX_dKz,    d2H_dY_dKz,    d2H_dZ_dKz]
@@ -359,4 +359,4 @@ def hessians_3D(dH: dict):
         [d2H_dKx_dKz,   d2H_dKy_dKz,   d2H_dKz2   ]
     ]))
 
-    return grad_grad_H, grad_gradK_H, gradK_gradK_H
+    return grad_grad_H, gradK_grad_H, gradK_gradK_H

@@ -91,8 +91,8 @@ def beam_evolution_fun_3D(tau, beam_parameters, hamiltonian: Hamiltonian_3D):
     # Find derivatives of H
     dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z, second_order = True)
 
-    grad_grad_H, grad_gradK_H, gradK_gradK_H = hessians_3D(dH)
-    gradK_grad_H = np.transpose(grad_gradK_H)
+    grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians_3D(dH)
+    grad_gradK_H = np.transpose(gradK_grad_H)
 
     dH_dX = dH["dH_dX"]
     dH_dY = dH["dH_dY"]

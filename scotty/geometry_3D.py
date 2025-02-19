@@ -285,7 +285,7 @@ class InterpolatedField_3D_Cartesian(MagneticField_3D_Cartesian):
         return scotty.derivatives.derivative(self.polflux,
                                              ("Y","Z"),
                                              {"X":X, "Y":Y, "Z":Z},
-                                             {"Y":delta_Z, "Z":delta_Z})
+                                             {"Y":delta_Y, "Z":delta_Z})
 
 
 
@@ -298,8 +298,8 @@ class InterpolatedField_3D_Cartesian(MagneticField_3D_Cartesian):
 def _interp_mesh3D_data1D(
         X_grid, Y_grid, Z_grid,
         data_array,
-        interp_order: int,
-) -> Tuple[Callable[[ArrayLike, ArrayLike, ArrayLike], [FloatArray, FloatArray, FloatArray]]]:
+        interp_order: int):
+# ) -> Tuple[Callable[[ArrayLike, ArrayLike, ArrayLike], [FloatArray, FloatArray, FloatArray]]]:
     
     if   interp_order == 1: interp_order_str = "linear"
     elif interp_order == 3: interp_order_str = "cubic"

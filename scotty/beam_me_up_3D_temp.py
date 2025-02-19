@@ -427,8 +427,8 @@ def beam_me_up_3D(
             X, Y, Z, K_X, K_Y, K_Z, Psi_3D, tau = pointwise_data[index]
             derivatives_and_second_derivatives_dict = hamiltonian.derivatives(X, Y, Z, K_X, K_Y, K_Z, second_order = True)
 
-            grad_grad_H, grad_gradK_H, gradK_gradK_H = hessians_3D(derivatives_and_second_derivatives_dict)
-            gradK_grad_H = np.transpose(grad_gradK_H)
+            grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians_3D(derivatives_and_second_derivatives_dict)
+            gradK_grad_H = np.transpose(gradK_grad_H)
 
             """
             print()
