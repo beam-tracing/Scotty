@@ -8,6 +8,7 @@ from scotty.fun_evolution_3D import pack_beam_parameters_3D, unpack_beam_paramet
 from scotty.fun_general import freq_GHz_to_angular_frequency
 from scotty.geometry_3D import MagneticField_3D_Cartesian, InterpolatedField_3D_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
+from scotty.launch_3D import launch_beam_3D
 from scotty.profile_fit import ProfileFitLike, profile_fit
 from scotty.ray_solver_3D import propagate_ray
 from scotty.typing import ArrayLike, FloatArray, PathLike
@@ -87,6 +88,10 @@ def beam_me_up_3D(
 
     # INSERT LONG LIST OF EXPLANATIONS
     """
+
+    # To delete
+    print("tau_eval:", tau_eval)
+    print("points_from_2d_scotty_to_eval:", points_from_2d_scotty_to_eval)
 
     print("Beam trace me up, Scotty!")
     print(f"scotty version {__version__}")
@@ -231,13 +236,25 @@ def beam_me_up_3D(
         """
     else:
         print("Beam launched from inside the plasma")
-        Psi_3D_lab_initial_cartesian = plasmaLaunch_Psi_3D_lab_cartesian
-        K_initial_cartesian = plasmaLaunch_K_cartesian
-        initial_position = launch_position_cartesian
-        launch_K = None
-        Psi_3D_lab_launch_cartesian = None
-        Psi_3D_lab_entry_cartersian = None
-        distance_from_launch_to_entry = None
+        initial_position_cartesian, initial_K_cartesian, initial_Psi_3D_lab_cartesian = launch_beam_3D(
+            toroidal_launch_angle_Torbeam,
+            poloidal_launch_angle_Torbeam,
+            launch_beam_width,
+            launch_beam_curvature,
+            launch_position_cartesian,
+            launch_angular_frequency,
+            mode_flag,
+            field,
+            hamiltonian,
+            vacuumLaunch_flag,
+            vacuum_propagation_flag,
+            Psi_BC_flag,
+            poloidal_flux_enter,
+            delta_X,
+            delta_Y,
+            delta_Z,
+            None, # temperature
+        )
 
     # -------------------
     # Propagate the ray
@@ -248,8 +265,8 @@ def beam_me_up_3D(
             poloidal_flux_enter,
             launch_angular_frequency,
             field,
-            initial_position,
-            K_initial_cartesian,
+            initial_position_cartesian,
+            initial_K_cartesian,
             hamiltonian,
             rtol,
             atol,
@@ -269,13 +286,13 @@ def beam_me_up_3D(
 
         # Initial conditions for the solver
         beam_parameters_initial = pack_beam_parameters_3D(
-            initial_position[0],
-            initial_position[1],
-            initial_position[2],
-            K_initial_cartesian[0],
-            K_initial_cartesian[1],
-            K_initial_cartesian[2],
-            Psi_3D_lab_initial_cartesian,
+            initial_position_cartesian[0],
+            initial_position_cartesian[1],
+            initial_position_cartesian[2],
+            initial_K_cartesian[0],
+            initial_K_cartesian[1],
+            initial_K_cartesian[2],
+            initial_Psi_3D_lab_cartesian,
         )
 
         print("Psi: ") # TO REMOVE
@@ -572,101 +589,86 @@ def beam_me_up_3D(
             _numerical_H_values_for_heatmap.append(_H_values_row)
         _numerical_H_values_for_heatmap = np.array(_numerical_H_values_for_heatmap)
     
-    return pointwise_data, _numerical_H_values_for_heatmap # TO REMOVE
 
 
-
-
-
-
-
-
-
-
-    """
     inputs = xr.Dataset(
         {
-            "B_T_axis": B_T_axis,
-            "B_p_a": B_p_a,
-            "K_initial": (["col"], K_initial_cartesian),
-            "Psi_BC_flag": Psi_BC_flag,
-            "R_axis": R_axis,
-            "atol": atol,
+            # Data pathways
+            "ne_data_path": str(ne_data_path),
+            "magnetic_data_path": str(magnetic_data_path),
+            "Te_data_path": str(Te_data_path),
+            "output_path": str(output_path),
+            "input_filename_suffix": str(input_filename_suffix),
+            "output_filename_suffix": str(output_filename_suffix),
+            
+            # Important ray/beam stuff
+            "poloidal_launch_angle_Torbeam": poloidal_launch_angle_Torbeam,
+            "toroidal_launch_angle_Torbeam": toroidal_launch_angle_Torbeam,
+            "launch_freq_GHz": launch_freq_GHz,
+            "launch_beam_width": launch_beam_width,
+            "launch_beam_curvature": launch_beam_curvature,
+            "mode_flag": mode_flag,
+            "initial_position_cartesian": (["col"], initial_position_cartesian),
+            "initial_K_cartesian": (["col"], initial_K_cartesian),
+            "initial_Psi_3D_lab_cartesian": (["row","col"], initial_Psi_3D_lab_cartesian),
             "delta_X": delta_X,
             "delta_Y": delta_Y,
             "delta_Z": delta_Z,
             "delta_K_X": delta_K_X,
             "delta_K_Y": delta_K_Y,
             "delta_K_Z": delta_K_Z,
-            "density_fit_method": str(density_fit_method),
-            "density_fit_parameters": str(density_fit_parameters),
-            "detailed_analysis_flag": detailed_analysis_flag,
-            "equil_time": (equil_time),
-            "figure_flag": figure_flag,
-            "find_B_method": str(find_B_method),
-            "initial_position": (["col"], initial_position),
-            "input_filename_suffix": input_filename_suffix,
             "interp_order": interp_order,
-            # "interp_smoothing": interp_smoothing,
-            "launch_K": (launch_K),
-            "launch_angular_frequency": launch_angular_frequency,
-            "launch_beam_curvature": launch_beam_curvature,
-            "launch_beam_width": launch_beam_width,
-            "launch_freq_GHz": launch_freq_GHz,
-            "launch_position": (["col"], launch_position_cartesian),
+            "interp_smoothing": interp_smoothing,
             "len_tau": len_tau,
-            "magnetic_data_path": str(magnetic_data_path),
-            "minor_radius_a": minor_radius_a,
-            "mode_flag": mode_flag,
-            "ne_data_density_array": (ne_data_density_array),
-            "ne_data_path": str(ne_data_path),
-            "ne_data_radialcoord_array": (ne_data_radialcoord_array),
-            "output_filename_suffix": output_filename_suffix,
-            "output_path": str(output_path),
-            "plasmaLaunch_K": plasmaLaunch_K_cartesian,
-            "plasmaLaunch_Psi_3D_lab_Cartesian": (
-                ["row", "col"],
-                plasmaLaunch_Psi_3D_lab_cartesian,
-            ),
-            "poloidalFlux_grid": (["R", "Z"], field.polflux_grid),
-            "poloidal_flux_enter": poloidal_flux_enter,
-            "poloidal_launch_angle_Torbeam": poloidal_launch_angle_Torbeam,
-            "Psi_3D_lab_initial": (
-                ["row", "col"],
-                Psi_3D_lab_initial_cartesian,
-            ),
-            "quick_run": quick_run,
             "rtol": rtol,
-            "shot": shot,
-            "toroidal_launch_angle_Torbeam": toroidal_launch_angle_Torbeam,
+            "atol": atol,
+
+            # Poloidal flux parameters
+            "poloidal_flux_enter": poloidal_flux_enter,
+            "poloidal_flux_zero_density": poloidal_flux_zero_density,
+            "poloidal_flux_zero_temperature": poloidal_flux_zero_temperature,
+
+            # Flags
             "vacuumLaunch_flag": vacuumLaunch_flag,
             "vacuum_propagation_flag": vacuum_propagation_flag,
+            "relativistic_flag": relativistic_flag,
+            "Psi_BC_flag": Psi_BC_flag,
+            "quick_run": quick_run,
+            "figure_flag": figure_flag,
+            "detailed_analysis_flag": detailed_analysis_flag,
+
+            # Miscellaneous
+            "find_B_method": find_B_method,
+            "density_fit_parameters": density_fit_parameters,
+            "temperature_fit_parameters": temperature_fit_parameters,
+            "shot": shot,
+            "equil_time": equil_time,
         },
         coords = {
             "X": field.X_coord,
             "Y": field.Y_coord,
             "Z": field.Z_coord,
-            "row": ["X", "Y", "Z"],
-            "col": ["X", "Y", "Z"],
+            "row": ["X","Y","Z"],
+            "col": ["X","Y","Z"],
         },
     )
 
     solver_output = xr.Dataset(
         {
+            # "name": data,
             "solver_status": solver_status,
             "q_X": (["tau"], q_X_array, {"long_name": "X", "units": "m"}),
             "q_Y": (["tau"], q_Y_array, {"long_name": "Y", "units": "m"}),
             "q_Z": (["tau"], q_Z_array, {"long_name": "Z", "units": "m"}),
-
             "K_X": (["tau"], K_X_array),
             "K_Y": (["tau"], K_Y_array),
             "K_Z": (["tau"], K_Z_array),
-            "Psi_3D": (["tau", "row", "col"], Psi_3D_output)
+            "Psi_3D_cartesian": (["tau","row","col"], Psi_3D_output),
         },
         coords = {
             "tau": tau_array,
-            "row": ["X", "Y", "Z"],
-            "col": ["X", "Y", "Z"],
+            "row": ["X","Y","Z"],
+            "col": ["X","Y","Z"],
         },
     )
 
@@ -687,12 +689,7 @@ def beam_me_up_3D(
     # -------------------
     # Process the data from the main loop to give a bunch of useful stuff
     # -------------------
-
     print("Analysing data")
-    dH = hamiltonian.derivatives(q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, second_order = True)
-
-    # df = immediate_analysis
-    """
 
 
 
@@ -700,6 +697,12 @@ def beam_me_up_3D(
 
 
 
+
+
+
+
+    
+    return pointwise_data, _numerical_H_values_for_heatmap # TO REMOVE
 
 
 

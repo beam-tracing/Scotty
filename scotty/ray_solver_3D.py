@@ -326,6 +326,9 @@ def ray_evolution_3D_fun(tau, ray_parameters_3D, hamiltonian: Hamiltonian_3D):
     # indexes 3, 4, 5 correspond to d(K_X)/d(tau), d(K_Y)/d(tau), d(K_Z)/d(tau)y
     d_ray_parameters_3D_d_tau = np.array([dH["dH_dKx"], dH["dH_dKy"], dH["dH_dKz"], -dH["dH_dX"], -dH["dH_dY"], -dH["dH_dZ"]])
 
+    print("d_ray_param_dtau from ray_evo_fun", d_ray_parameters_3D_d_tau)
+    print("its shape is", d_ray_parameters_3D_d_tau.shape)
+
     return d_ray_parameters_3D_d_tau
 
 
