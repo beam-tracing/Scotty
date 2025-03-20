@@ -108,7 +108,9 @@ def plot(suffix=""):
     Booker_beta = -epsilon_perp_output * epsilon_para_output * (1 + sin_theta_m_sq) - (
         epsilon_perp_output**2 - epsilon_g_output**2
     ) * (1 - sin_theta_m_sq)
-    Booker_gamma = epsilon_para_output * (epsilon_perp_output**2 - epsilon_g_output**2)
+    Booker_gamma = epsilon_para_output * (
+        epsilon_perp_output**2 - epsilon_g_output**2
+    )
 
     N_X = find_N(Booker_alpha, Booker_beta, Booker_gamma, -1)
     N_O = find_N(Booker_alpha, Booker_beta, Booker_gamma, 1)

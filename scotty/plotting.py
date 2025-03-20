@@ -790,7 +790,6 @@ def plot_3D_beam_profile_3D_plotting(
 
     for idx1 in range(numberOfDataPoints):
         for idx2 in range(ellipse_resolution + 1):
-
             w1 = pvec1[idx1] * cos_theta_array[idx2]
             w2 = pvec2[idx1] * sin_theta_array[idx2]
 
@@ -999,7 +998,6 @@ def plot_3D_beam_profile_3D_plotting(
     ellipse_init_pos_y = np.zeros(ellipse_resolution + 1)
 
     for idx in range(ellipse_resolution + 1):
-
         ellipse_init_pos_x[idx] = (
             cos_theta_array[idx] * pvec1_2d[0] + sin_theta_array[idx] * pvec2_2d[0]
         )
@@ -1164,7 +1162,6 @@ def plot_3D_beam_profile_3D_plotting(
         ellipse_2d_y = np.zeros(ellipse_resolution + 1)
 
         for i in range(ellipse_resolution + 1):
-
             ellipse_2d_x[i] = (
                 cos_theta_array[i] * pvec1_2d_pos(idx)[0]
                 + sin_theta_array[i] * pvec2_2d_pos(idx)[0]
