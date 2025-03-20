@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import xarray as xr
-from datatree import DataTree
+from xarray import DataTree
 from scipy.interpolate import CubicSpline
 
 from .analysis import beam_width
@@ -17,7 +17,6 @@ from scotty.typing import FloatArray, PathLike
 
 from matplotlib.widgets import Slider
 from scotty.fun_general import find_q_lab_Cartesian
-import datatree
 
 
 def maybe_make_axis(ax: Optional[plt.Axes], *args, **kwargs) -> plt.Axes:
