@@ -655,7 +655,7 @@ def beam_me_up_3D(
 
     solver_output = xr.Dataset(
         {
-            # "name": data,
+            # Solver output
             "solver_status": solver_status,
             "q_X": (["tau"], q_X_array, {"long_name": "X", "units": "m"}),
             "q_Y": (["tau"], q_Y_array, {"long_name": "Y", "units": "m"}),
@@ -690,6 +690,9 @@ def beam_me_up_3D(
     # Process the data from the main loop to give a bunch of useful stuff
     # -------------------
     print("Analysing data")
+    dH = hamiltonian.derivatives(q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, second_order=True)
+
+    # df = 
 
 
 
