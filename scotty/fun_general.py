@@ -112,6 +112,7 @@ def find_x0(xs, ys, y0):
         assume_sorted=False,
     )
 
+    xs = np.asarray(xs)
     if index_guess == 0:
         xs_fine = np.linspace(xs[0], xs[index_guess + 1], 101)
     elif index_guess == len(xs) - 1:

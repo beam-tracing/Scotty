@@ -14,7 +14,7 @@ readme = "README.md"
 authors = [{name = "Valerian Hall-Chen"}]
 urls = {project = "https://github.com/valerian-chen/Scotty"}
 dependencies = [
-    "numpy~=1.20",
+    "numpy>=2.0",
     "scipy~=1.7",
     "matplotlib~=3.3",
     "freeqdsk==0.1.0",

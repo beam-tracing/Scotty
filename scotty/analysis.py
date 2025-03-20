@@ -152,7 +152,7 @@ def immediate_analysis(
         delta_K_Z,
     )(q_R.data, q_Z.data, K_R.data, K_zeta_initial, K_Z.data)
 
-    electron_density = np.asfarray(find_density_1D(poloidal_flux))
+    electron_density = np.asarray(find_density_1D(poloidal_flux))
     temperature = find_temperature_1D(poloidal_flux) if find_temperature_1D else None
 
     epsilon = DielectricTensor(
@@ -259,7 +259,7 @@ def further_analysis(
 
     # Calculates the index of the minimum magnitude of K
     # That is, finds when the beam hits the cut-off
-    K_magnitude_array = np.asfarray(
+    K_magnitude_array = np.asarray(
         K_magnitude(df.K_R, df.K_zeta_initial, df.K_Z, df.q_R)
     )
 
@@ -764,7 +764,7 @@ def mean_l_lc(
 
 def mean_kperp(k_perp: xr.DataArray, array: xr.DataArray) -> xr.DataArray:
     """Mean kperp1 for backscattering"""
-    return np.trapz(array * k_perp, k_perp) / np.trapz(array, k_perp)
+    return np.trapezoid(array * k_perp, k_perp) / np.trapezoid(array, k_perp)
 
 
 def localisation_analysis(df: xr.Dataset, cutoff_index: int, wavenumber_K0: float):

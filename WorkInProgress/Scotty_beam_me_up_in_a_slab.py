@@ -1475,8 +1475,8 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
     loc_b_r_max_l_lc = distance_along_line[loc_b_r_max_index] - distance_along_line[cutoff_index]
     
         # Gives the mean l-lc for backscattering    
-    cum_loc_b_r_s_mean_l_lc = np.trapz(loc_b_r_s*distance_along_line, distance_along_line) / np.trapz(loc_b_r_s, distance_along_line) - distance_along_line[cutoff_index]
-    cum_loc_b_r_mean_l_lc = np.trapz(loc_b_r*distance_along_line, distance_along_line) / np.trapz(loc_b_r, distance_along_line) - distance_along_line[cutoff_index]
+    cum_loc_b_r_s_mean_l_lc = np.trapezoid(loc_b_r_s*distance_along_line, distance_along_line) / np.trapezoid(loc_b_r_s, distance_along_line) - distance_along_line[cutoff_index]
+    cum_loc_b_r_mean_l_lc = np.trapezoid(loc_b_r*distance_along_line, distance_along_line) / np.trapezoid(loc_b_r, distance_along_line) - distance_along_line[cutoff_index]
 
         # Gives the median l-lc for backscattering
     cum_loc_b_r_s_delta_l_0 = find_x0(l_lc, cum_loc_b_r_s, 0) 
@@ -1485,8 +1485,8 @@ def beam_me_up(poloidal_launch_angle_Torbeam,
         # Due to the divergency of the ray piece, the mode kperp1 for backscattering is exactly that at the cut-off
 
         # Gives the mean kperp1 for backscattering    
-    cum_loc_b_r_s_mean_kperp1 = np.trapz(loc_b_r_s*k_perp_1_bs, k_perp_1_bs) / np.trapz(loc_b_r_s, k_perp_1_bs)
-    cum_loc_b_r_mean_kperp1   = np.trapz(loc_b_r  *k_perp_1_bs, k_perp_1_bs) / np.trapz(loc_b_r  , k_perp_1_bs)
+    cum_loc_b_r_s_mean_kperp1 = np.trapezoid(loc_b_r_s*k_perp_1_bs, k_perp_1_bs) / np.trapezoid(loc_b_r_s, k_perp_1_bs)
+    cum_loc_b_r_mean_kperp1   = np.trapezoid(loc_b_r  *k_perp_1_bs, k_perp_1_bs) / np.trapezoid(loc_b_r  , k_perp_1_bs)
 
         # Gives the median kperp1 for backscattering
     cum_loc_b_r_s_delta_kperp1_0 = find_x0(k_perp_1_bs, cum_loc_b_r_s, 0)    
