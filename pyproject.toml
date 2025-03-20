@@ -17,7 +17,7 @@ dependencies = [
     "numpy>=2.0",
     "scipy~=1.7",
     "matplotlib~=3.3",
-    "freeqdsk==0.1.0",
+    "freeqdsk>=0.1.0",
     "xarray>=2024.10.0",
     "h5netcdf",
 ]
