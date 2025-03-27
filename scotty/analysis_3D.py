@@ -98,6 +98,12 @@ def immediate_analysis_3D(
     # H_Cardano: H is the zero eigenvalue of the dispersion tensor D. Calculated using Cardano's formula
     # Here, we find H_Booker for both mode flags corresponding to 1 and -1
     H_Booker = hamiltonian(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
+    print("q_X", q_X)
+    print("q_Y", q_Y)
+    print("q_Z", q_Z)
+    print("K_X", K_X)
+    print("K_Y", K_Y)
+    print("K_Z", K_Z)
     H_Booker_other = Hamiltonian_3D(field,
                                     launch_angular_frequency,
                                     -mode_flag,
