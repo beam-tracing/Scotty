@@ -53,7 +53,7 @@ def launch_beam_3D(
     q_R_launch = np.sqrt(q_X_launch**2 + q_Y_launch**2)
 
     toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam)
-    poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_Torbeam + np.pi)
+    poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_Torbeam) + np.pi
 
     # Finding K_launch
     wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
@@ -73,13 +73,13 @@ def launch_beam_3D(
     toroidal_rotation_angle = toroidal_launch_angle
     sin_tor = np.sin(toroidal_rotation_angle)
     cos_tor = np.cos(toroidal_rotation_angle)
-    poloidal_rotation_angle = np.deg2rad(poloidal_launch_angle_Torbeam + np.pi/2)
+    poloidal_rotation_angle = np.deg2rad(poloidal_launch_angle_Torbeam) + np.pi/2
     sin_pol = np.sin(poloidal_rotation_angle)
     cos_pol = np.cos(poloidal_rotation_angle)
 
     toroidal_rotation_matrix = np.array([[ cos_tor, sin_tor,       0],
                                          [-sin_tor, cos_tor,       0],
-                                         [       0,       0,       0]])
+                                         [       0,       0,       1]])
     poloidal_rotation_matrix = np.array([[ cos_pol,       0, sin_pol],
                                          [       0,       1,       0],
                                          [-sin_pol,       0, cos_pol]])
