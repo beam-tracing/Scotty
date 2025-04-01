@@ -52,18 +52,19 @@ def immediate_analysis_3D(
     output_filename_suffix: str,
     dH: Dict[str, ArrayLike]):
 
-    q_X = solver_output.q_X
-    q_Y = solver_output.q_Y
-    q_Z = solver_output.q_Z
-    dH_dX  = dH["dH_dX"]
-    dH_dY  = dH["dH_dY"]
-    dH_dZ  = dH["dH_dZ"]
-    K_X = solver_output.K_X
-    K_Y = solver_output.K_Y
-    K_Z = solver_output.K_Z
+    q_X = np.array(solver_output.q_X)
+    q_Y = np.array(solver_output.q_Y)
+    q_Z = np.array(solver_output.q_Z)
+    dH_dX = dH["dH_dX"]
+    dH_dY = dH["dH_dY"]
+    dH_dZ = dH["dH_dZ"]
+    K_X = np.array(solver_output.K_X)
+    K_Y = np.array(solver_output.K_Y)
+    K_Z = np.array(solver_output.K_Z)
     dH_dKx = dH["dH_dKx"]
     dH_dKy = dH["dH_dKy"]
     dH_dKz = dH["dH_dKz"]
+    Psi_3D_labframe_cartesian = np.array(solver_output.Psi_3D_labframe_cartesian)
     polflux = field.polflux(q_X, q_Y, q_Z)
     dpolflux_dX = field.d_polflux_dX(q_X, q_Y, q_Z, delta_X)
     dpolflux_dY = field.d_polflux_dY(q_X, q_Y, q_Z, delta_Y)
@@ -132,9 +133,9 @@ def immediate_analysis_3D(
     df = xr.Dataset(
         {
             # Position and its derivatives
-            "q_X":    (["tau"], q_X),
-            "q_Y":    (["tau"], q_Y),
-            "q_Z":    (["tau"], q_Z),
+            # "q_X":    (["tau"], q_X),
+            # "q_Y":    (["tau"], q_Y),
+            # "q_Z":    (["tau"], q_Z),
             "dH_dX":  (["tau"], dH_dX),
             "dH_dY":  (["tau"], dH_dY),
             "dH_dZ":  (["tau"], dH_dZ),
@@ -146,6 +147,9 @@ def immediate_analysis_3D(
             "dH_dKx": (["tau"], dH_dKx),
             "dH_dKy": (["tau"], dH_dKy),
             "dH_dKz": (["tau"], dH_dKz),
+
+            # Psi
+            "Psi_3D_labframe_cartesian": solver_output.Psi_3D_labframe_cartesian,
 
             # Poloidal flux and its derivatives
             "polflux":     (["tau"], polflux),
@@ -251,16 +255,15 @@ def further_analysis_3D(
 
     # Find theta_m
     b_hat = np.array(df.b_hat)
-    b_hat_T = b_hat.T # tranposed so that it is the same shape as K_hat
     K_hat = np.column_stack((K_X, K_Y, K_Z)) / K_magnitude[:, np.newaxis]
-    sin_theta_m = np.sum(b_hat_T * K_hat, axis=1)
+    sin_theta_m = np.sum(b_hat * K_hat, axis=1)
     theta_m = np.sign(sin_theta_m) * np.arcsin(np.abs(sin_theta_m))
 
     # Find the backscattered stuff
     dpolflux_dX, dpolflux_dY, dpolflux_dZ = np.array(df.dpolflux_dX), np.array(df.dpolflux_dY), np.array(df.dpolflux_dZ)
     dpolflux_magnitudes = np.sqrt(dpolflux_dX**2 + dpolflux_dY**2 + dpolflux_dZ**2)
     normal_hat = np.column_stack((dpolflux_dX, dpolflux_dY, dpolflux_dZ)) / dpolflux_magnitudes[:, np.newaxis]
-    binormal_hat = make_unit_vector_from_cross_product(b_hat_T, normal_hat)
+    binormal_hat = make_unit_vector_from_cross_product(b_hat, normal_hat)
     kperp1_bs = -2 * K_magnitude * np.cos(theta + theta_m) / cos_theta
     kperp1_bs_normal   = kperp1_bs * dot(kperp1_hat, normal_hat)   # TODO: Check that this works correctly
     kperp1_bs_binormal = kperp1_bs * dot(kperp1_hat, binormal_hat) # TODO: Check that this works correctly
@@ -278,15 +281,49 @@ def further_analysis_3D(
     Psi_gg_beamframe_cartesian = dot(g_hat, dot(Psi_3D_labframe_cartesian, g_hat))
 
     # Find the entries of Psi_3D_entry_labframe_cartesian in the beam frame
-    Psi_xx_entry_beamframe_cartesian = dot(x_hat[0,:], dot(Psi_3D_entry_labframe_cartesian, x_hat[0,:]))
-    Psi_xy_entry_beamframe_cartesian = dot(x_hat[0,:], dot(Psi_3D_entry_labframe_cartesian, y_hat[0,:]))
-    Psi_yy_entry_beamframe_cartesian = dot(y_hat[0,:], dot(Psi_3D_entry_labframe_cartesian, y_hat[0,:]))
+    Psi_xx_entry_beamframe_cartesian = dot([x_hat[0,:]], dot([Psi_3D_entry_labframe_cartesian], [x_hat[0,:]]))
+    Psi_xy_entry_beamframe_cartesian = dot([x_hat[0,:]], dot([Psi_3D_entry_labframe_cartesian], [y_hat[0,:]]))
+    Psi_yy_entry_beamframe_cartesian = dot([y_hat[0,:]], dot([Psi_3D_entry_labframe_cartesian], [y_hat[0,:]]))
+
+    # TO REMOVE
+    # print("Psi_3D_labframe_cartesian type", type(Psi_3D_labframe_cartesian))
+    # print("Psi_3D_labframe_cartesian shape", Psi_3D_labframe_cartesian.shape)
+    # print()
+    # print("Psi_xx_beamframe_cartesian type", type(Psi_xx_beamframe_cartesian))
+    # print("Psi_xx_beamframe_cartesian shape", Psi_xx_beamframe_cartesian.shape)
+    # print()
+    # print("Psi_xx_entry_beamframe_cartesian type", type(Psi_xx_entry_beamframe_cartesian))
+    # print("Psi_xx_entry_beamframe_cartesian shape", Psi_xx_entry_beamframe_cartesian.shape)
+    # print()
+    # print("x_hat[0,:]", x_hat[0,:])
+    # print("Psi_3D_entry_labframe_cartesian", Psi_3D_entry_labframe_cartesian)
+    # print("Psi_xx_entry_beamframe_cartesian", Psi_xx_entry_beamframe_cartesian)
+    # print("Psi_yy_entry_beamframe_cartesian", Psi_yy_entry_beamframe_cartesian)
+    # print("Psi_xy_entry_beamframe_cartesian", Psi_xy_entry_beamframe_cartesian)
+    print("Psi_xx_beamframe_cartesian[0]", Psi_xx_beamframe_cartesian[0])
+    print("Psi_xx_entry_beamframe_cartesian", Psi_xx_entry_beamframe_cartesian)
+    print()
+    print("Psi_xy_beamframe_cartesian[0]", Psi_xy_beamframe_cartesian[0])
+    print("Psi_xy_entry_beamframe_cartesian", Psi_xy_entry_beamframe_cartesian)
+    print()
+    print("Psi_yy_beamframe_cartesian[0]", Psi_yy_beamframe_cartesian[0])
+    print("Psi_yy_entry_beamframe_cartesian", Psi_yy_entry_beamframe_cartesian)
+    print()
+    print("Psi_3D_entry_labframe_cartesian")
+    print(Psi_3D_entry_labframe_cartesian)
+    print()
+    print("Psi_3D_labframe_cartesian[0]")
+    print(Psi_3D_labframe_cartesian[0])
+    print()
+    print("g_hat[0]")
+    print(g_hat[0])
+
 
     # Finding the entries of the modified matrix M of Psi
     xhat_dot_grad_bhat_dot_ghat = dot(x_hat, dot(df.grad_bhat, g_hat))
     yhat_dot_grad_bhat_dot_ghat = dot(y_hat, dot(df.grad_bhat, g_hat))
     M_xx_beamframe_cartesian = Psi_xx_beamframe_cartesian + (kperp1_bs / 2)*xhat_dot_grad_bhat_dot_ghat
-    M_xy_beamframe_cartesian = Psi_xx_beamframe_cartesian + (kperp1_bs / 2)*yhat_dot_grad_bhat_dot_ghat
+    M_xy_beamframe_cartesian = Psi_xy_beamframe_cartesian + (kperp1_bs / 2)*yhat_dot_grad_bhat_dot_ghat
     M_yy_beamframe_cartesian = Psi_yy_beamframe_cartesian
 
     """
@@ -302,8 +339,8 @@ def further_analysis_3D(
     Finding the the polarisation piece (loc_p) along the ray
     """
     H_eigvals, e_eigvecs = dispersion_eigenvalues(K_magnitude, inputs.launch_angular_frequency.data, df, numberOfDataPoints, theta_m)
-    H_1_eigval, H_2_eigval, H_3_eigval = H_eigvals
-    e_1_eigvec, e_2_eigvec, e_3_eigvec = e_eigvecs
+    # H_1_eigval, H_2_eigval, H_3_eigval = H_eigvals
+    # e_1_eigvec, e_2_eigvec, e_3_eigvec = e_eigvecs
 
     # In my experience, H_eigvals[:,1] corresponds to the O mode, and H_eigvals[:,0] corresponds to the X-mode
     # ALERT: This may not always be the case! Check the output figure to make sure that the appropriate solution is indeed 0 along the ray
@@ -335,13 +372,13 @@ def further_analysis_3D(
     """
     H_1_Cardano, H_2_Cardano, H_3_Cardano = find_H_Cardano(
         K_magnitude,
-        inputs.launch_angular_frequench.data,
+        inputs.launch_angular_frequency.data,
         df.epsilon_para.data,
         df.epsilon_perp.data,
         df.epsilon_g.data,
         theta_m)
 
-    def H_cardano(K_magnitude_array):
+    def H_cardano(Kx, Ky, Kz):
         # In my experience, the H_3_Cardano expression corresponds to
         # the O mode, and the H_2_Cardano expression corresponds to
         # the X-mode.
@@ -350,31 +387,46 @@ def further_analysis_3D(
         # figure to make sure that the appropriate solution is indeed
         # 0 along the ray
         result = find_H_Cardano(
-            K_magnitude,
-            inputs.launch_angular_frequench.data,
+            np.sqrt(Kx**2 + Ky**2 + Kz**2),
+            inputs.launch_angular_frequency.data,
             df.epsilon_para.data,
             df.epsilon_perp.data,
             df.epsilon_g.data,
             theta_m)
         
-        if inputs.mode_flag == 1: return result[2]
-        else:                     return result[1]
+        if inputs.mode_flag == 1: return result[2] # X-mode; should return H_3_Cardano
+        else:                     return result[1] # O-mode; should return H_2_Cardano
     
     def grad_H_cardano(direction: str, spacing: float):
-        return derivative(H_cardano, direction, args={"K_X": df.K_X, "K_Y": df.K_Y, "K_Z": df.K_Z}, spacings=spacing)
+        return derivative(H_cardano, direction, args={"Kx": K_X, "Ky": K_Y, "Kz": K_Z}, spacings=spacing,)
     
-    g_X_Cardano = grad_H_cardano("K_X", inputs.delta_K_X)
-    g_Y_Cardano = grad_H_cardano("K_X", inputs.delta_K_Y)
-    g_Z_Cardano = grad_H_cardano("K_X", inputs.delta_K_Z)
+    g_X_Cardano = grad_H_cardano("Kx", inputs.delta_K_X.data)
+    g_Y_Cardano = grad_H_cardano("Ky", inputs.delta_K_Y.data)
+    g_Z_Cardano = grad_H_cardano("Kz", inputs.delta_K_Z.data)
     g_magnitude_Cardano = np.sqrt(g_X_Cardano**2 + g_Y_Cardano**2 + g_Z_Cardano**2)
-    loc_r = (2*constants.c / inputs.launch_angular_frequency)**2 / g_magnitude_Cardano**2
+
+    # # TO REMOVE
+    # # g_magnitude_Cardano all have small Im parts (like e-16)
+    # print("g_magnitude_Cardano", g_magnitude_Cardano)
+    # print("g_magnitude_Cardano type", type(g_magnitude_Cardano))
+    # print("g_magnitude_Cardano shape", g_magnitude_Cardano.shape)
+    # print()
+    # print("inputs.launch_angular_frequency", inputs.launch_angular_frequency)
+    # print("inputs.launch_angular_frequency type", type(inputs.launch_angular_frequency))
+    # print()
+    # loc_r_numerator = (2*constants.c / inputs.launch_angular_frequency.data)**2
+    # print("loc_r numerator", loc_r_numerator)
+    # print("loc_r numerator type", type(loc_r_numerator))
+
+    loc_r = (2*constants.c / inputs.launch_angular_frequency.data)**2 / g_magnitude_Cardano**2
 
     """
     Finding the beam piece (loc_b) along the ray
     """
+    wavenumber_K0 = angular_frequency_to_wavenumber(inputs.launch_angular_frequency.data)
     det_Im_Psi_w = np.imag(Psi_xx_beamframe_cartesian)*np.imag(Psi_yy_beamframe_cartesian) - np.imag(Psi_xy_beamframe_cartesian)**2
     beam_waist = find_waist(inputs.launch_beam_width.data, wavenumber_K0, inputs.launch_beam_curvature.data)
-    loc_b = (beam_waist * det_Im_Psi_w) / (np.sqrt(2) * det_M_w * np.sqrt(-np.imag(M_w_inv_yy)))
+    loc_b = (beam_waist * det_Im_Psi_w) / (np.sqrt(2) * np.abs(det_M_w) * np.sqrt(-np.imag(M_w_inv_yy)))
 
 
     """
@@ -387,7 +439,6 @@ def further_analysis_3D(
     Finding the spectrum piece (loc_s) along the ray
     """
     spectrum_power_law_coefficient = -13/3 # Turbulence cascade
-    wavenumber_K0 = angular_frequency_to_wavenumber(inputs.launch_angular_frequency.data)
     loc_s = (kperp1_bs / (-2*wavenumber_K0)) ** (spectrum_power_law_coefficient)
 
     # Combining the localisation pieces to get some overall localisation
@@ -398,7 +449,7 @@ def further_analysis_3D(
 
     further_df = {
         # Important stuff
-        "cutoff_index": (["tau"], index_of_cutoff),
+        "cutoff_index": index_of_cutoff,
         "arc_length": (["tau"], distance_along_line),
         "arc_length_relative_to_cutoff": (["tau"], l_lc),
 
@@ -410,7 +461,7 @@ def further_analysis_3D(
         # Additional vector stuff
         "xhat_dot_grad_bhat_dot_ghat": (["tau"], xhat_dot_grad_bhat_dot_ghat),
         "yhat_dot_grad_bhat_dot_ghat": (["tau"], yhat_dot_grad_bhat_dot_ghat),
-        "normal_hat": (["tau","row","col"], normal_hat),
+        # "normal_hat": (["tau","row","col"], normal_hat), # dimension mismatch, apparently
 
         # Hessians
         "grad_grad_H":   (["tau","row","col"], grad_grad_H),
@@ -424,18 +475,15 @@ def further_analysis_3D(
         "Psi_yy": (["tau"], Psi_yy_beamframe_cartesian),
         "Psi_yg": (["tau"], Psi_yg_beamframe_cartesian),
         "Psi_gg": (["tau"], Psi_gg_beamframe_cartesian),
-        "Psi_xx": Psi_xx_entry_beamframe_cartesian,
-        "Psi_xy": Psi_xy_entry_beamframe_cartesian,
-        "Psi_yy": Psi_yy_entry_beamframe_cartesian,
+        "Psi_xx_entry": Psi_xx_entry_beamframe_cartesian,
+        "Psi_xy_entry": Psi_xy_entry_beamframe_cartesian,
+        "Psi_yy_entry": Psi_yy_entry_beamframe_cartesian,
         "Psi_3D_labframe_cartesian": (["tau","row","col"], Psi_3D_labframe_cartesian),
-        "Psi_xx_entry": (["tau"], Psi_xx_entry_beamframe_cartesian),
-        "Psi_xy_entry": (["tau"], Psi_xy_entry_beamframe_cartesian),
-        "Psi_yy_entry": (["tau"], Psi_yy_entry_beamframe_cartesian),
 
         # M in beam frame cartesian
         "M_xx": (["tau"], M_xx_beamframe_cartesian),
-        "M_xy": (["tau"], M_xx_beamframe_cartesian),
-        "M_yy": (["tau"], M_xx_beamframe_cartesian),
+        "M_xy": (["tau"], M_xy_beamframe_cartesian),
+        "M_yy": (["tau"], M_yy_beamframe_cartesian),
         "det_M_w": (["tau"], det_M_w),
         "M_w_inv_xx": (["tau"], M_w_inv_xx),
         "M_w_inv_xy": (["tau"], M_w_inv_xy),
@@ -446,13 +494,13 @@ def further_analysis_3D(
         "H_2_Cardano": (["tau"], H_2_Cardano),
         "H_3_Cardano": (["tau"], H_3_Cardano),
         "H_eigvals":  (["tau","col"], H_eigvals),       # TODO the second index should be 1,2,3; not "col" which is X,Y,Z
-        "H_1_eigval": (["tau"], H_1_eigval),
-        "H_2_eigval": (["tau"], H_2_eigval),
-        "H_3_eigval": (["tau"], H_3_eigval),
+        # "H_1_eigval": (["tau"], H_1_eigval),
+        # "H_2_eigval": (["tau"], H_2_eigval),
+        # "H_3_eigval": (["tau"], H_3_eigval),
         "e_eigvecs":  (["tau","row","col"], e_eigvecs), # TODO the third index should be 1,2,3; not "col" which is X,Y,Z
-        "e_1_eigvec": (["tau","col"], e_1_eigvec),
-        "e_2_eigvec": (["tau","col"], e_2_eigvec),
-        "e_3_eigvec": (["tau","col"], e_3_eigvec),
+        # "e_1_eigvec": (["tau","col"], e_1_eigvec),
+        # "e_2_eigvec": (["tau","col"], e_2_eigvec),
+        # "e_3_eigvec": (["tau","col"], e_3_eigvec),
         "e_hat":      (["tau","col"], e_hat),
 
         # Localisation stuff

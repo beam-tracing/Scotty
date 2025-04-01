@@ -23,7 +23,7 @@ def plot_dispersion_relation(
 
     ## The title of 'col' in H_eigvals is a misnomer
     ax.plot(
-        analysis.l_lc,
+        analysis.arc_length_relative_to_cutoff,
         abs(analysis.H_eigvals.sel(col="X")),
         color="pink",
         linestyle="-",
@@ -31,7 +31,7 @@ def plot_dispersion_relation(
         label="H_eigvals_1 (X?)",
     )
     ax.plot(
-        analysis.l_lc,
+        analysis.arc_length_relative_to_cutoff,
         abs(analysis.H_eigvals.sel(col="Y")),
         color="lightgreen",
         linestyle="-",
@@ -39,7 +39,7 @@ def plot_dispersion_relation(
         label="H_eigvals_2 (O?)",
     )
     ax.plot(
-        analysis.l_lc,
+        analysis.arc_length_relative_to_cutoff,
         abs(analysis.H_eigvals.sel(col="Z")),
         color="gray",
         linestyle="-",
@@ -48,7 +48,7 @@ def plot_dispersion_relation(
     )
 
     ax.plot(
-        analysis.l_lc,
+        analysis.arc_length_relative_to_cutoff,
         abs(analysis.H_1_Cardano),
         color="k",
         linestyle=":",
@@ -56,7 +56,7 @@ def plot_dispersion_relation(
         label="H_1_Cardano",
     )
     ax.plot(
-        analysis.l_lc,
+        analysis.arc_length_relative_to_cutoff,
         abs(analysis.H_2_Cardano),
         color="r",
         linestyle=":",
@@ -64,7 +64,7 @@ def plot_dispersion_relation(
         label="H_2_Cardano (X?)",
     )
     ax.plot(
-        analysis.l_lc,
+        analysis.arc_length_relative_to_cutoff,
         abs(analysis.H_3_Cardano),
         color="g",
         linestyle=":",
