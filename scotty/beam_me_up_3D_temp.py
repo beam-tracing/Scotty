@@ -4,11 +4,13 @@ import json
 import numpy as np
 import pathlib
 from scipy.integrate import solve_ivp
+from scotty.analysis_3D import immediate_analysis_3D, further_analysis_3D
 from scotty.fun_evolution_3D import pack_beam_parameters_3D, unpack_beam_parameters_3D, beam_evolution_fun_3D
 from scotty.fun_general import freq_GHz_to_angular_frequency
 from scotty.geometry_3D import MagneticField_3D_Cartesian, InterpolatedField_3D_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
 from scotty.launch_3D import launch_beam_3D
+from scotty.plotting_3D import plot_dispersion_relation
 from scotty.profile_fit import ProfileFitLike, profile_fit
 from scotty.ray_solver_3D import propagate_ray
 from scotty.typing import ArrayLike, FloatArray, PathLike
@@ -81,6 +83,10 @@ def beam_me_up_3D(
     B_p_a = None,
     R_axis = None,
     minor_radius_a = None,
+
+    # TO REMOVE
+    field = None, # this is so that I dont have to keep loading the huge files
+    further_analysis_flag = False,
 ) -> datatree.DataTree:
     
     """
@@ -138,14 +144,15 @@ def beam_me_up_3D(
     """
     find_temperature_1D = None
     
-    field = create_magnetic_geometry_3D(
-        find_B_method,
-        magnetic_data_path,
-        input_filename_suffix,
-        interp_order,
-        shot,
-        equil_time
-    )
+    if field is None:
+        field = create_magnetic_geometry_3D(
+            find_B_method,
+            magnetic_data_path,
+            input_filename_suffix,
+            interp_order,
+            shot,
+            equil_time
+        )
 
     """
     # TO DO THIS SOON
@@ -236,25 +243,31 @@ def beam_me_up_3D(
         """
     else:
         print("Beam launched from inside the plasma")
-        initial_position_cartesian, initial_K_cartesian, initial_Psi_3D_lab_cartesian = launch_beam_3D(
-            toroidal_launch_angle_Torbeam,
-            poloidal_launch_angle_Torbeam,
-            launch_beam_width,
-            launch_beam_curvature,
-            launch_position_cartesian,
-            launch_angular_frequency,
-            mode_flag,
-            field,
-            hamiltonian,
-            vacuumLaunch_flag,
-            vacuum_propagation_flag,
-            Psi_BC_flag,
-            poloidal_flux_enter,
-            delta_X,
-            delta_Y,
-            delta_Z,
-            None, # temperature
-        )
+        # TO REMOVE -- remove this if-else block
+        if (plasmaLaunch_K_cartesian == np.zeros(3)).all() and (plasmaLaunch_Psi_3D_lab_cartesian == np.zeros([3, 3])).all():
+            initial_position_cartesian, initial_K_cartesian, initial_Psi_3D_lab_cartesian = launch_beam_3D(
+                toroidal_launch_angle_Torbeam,
+                poloidal_launch_angle_Torbeam,
+                launch_beam_width,
+                launch_beam_curvature,
+                launch_position_cartesian,
+                launch_angular_frequency,
+                mode_flag,
+                field,
+                hamiltonian,
+                vacuumLaunch_flag,
+                vacuum_propagation_flag,
+                Psi_BC_flag,
+                poloidal_flux_enter,
+                delta_X,
+                delta_Y,
+                delta_Z,
+                None, # temperature
+            )
+        else:
+            initial_position_cartesian = launch_position_cartesian
+            initial_K_cartesian = plasmaLaunch_K_cartesian
+            initial_Psi_3D_lab_cartesian = plasmaLaunch_Psi_3D_lab_cartesian
 
     # -------------------
     # Propagate the ray
@@ -605,6 +618,7 @@ def beam_me_up_3D(
             "poloidal_launch_angle_Torbeam": poloidal_launch_angle_Torbeam,
             "toroidal_launch_angle_Torbeam": toroidal_launch_angle_Torbeam,
             "launch_freq_GHz": launch_freq_GHz,
+            "launch_angular_frequency": launch_angular_frequency,
             "launch_beam_width": launch_beam_width,
             "launch_beam_curvature": launch_beam_curvature,
             "mode_flag": mode_flag,
@@ -638,9 +652,9 @@ def beam_me_up_3D(
             "detailed_analysis_flag": detailed_analysis_flag,
 
             # Miscellaneous
-            "find_B_method": find_B_method,
-            "density_fit_parameters": density_fit_parameters,
-            "temperature_fit_parameters": temperature_fit_parameters,
+            "find_B_method": str(find_B_method),
+            "density_fit_parameters": str(density_fit_parameters),
+            "temperature_fit_parameters": str(temperature_fit_parameters),
             "shot": shot,
             "equil_time": equil_time,
         },
@@ -663,7 +677,7 @@ def beam_me_up_3D(
             "K_X": (["tau"], K_X_array),
             "K_Y": (["tau"], K_Y_array),
             "K_Z": (["tau"], K_Z_array),
-            "Psi_3D_cartesian": (["tau","row","col"], Psi_3D_output),
+            "Psi_3D_labframe_cartesian": (["tau","row","col"], Psi_3D_output),
         },
         coords = {
             "tau": tau_array,
@@ -692,20 +706,60 @@ def beam_me_up_3D(
     print("Analysing data")
     dH = hamiltonian.derivatives(q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, second_order=True)
 
-    # df = 
+    df = immediate_analysis_3D(
+        solver_output,
+        field,
+        find_density_1D,
+        find_temperature_1D,
+        hamiltonian,
+        launch_angular_frequency,
+        mode_flag,
+        delta_X,
+        delta_Y,
+        delta_Z,
+        delta_K_X,
+        delta_K_Y,
+        delta_K_Z,
+        Psi_3D_lab_launch = None,             # Not used yet, so set vacuumLaunch_flag = False
+        Psi_3D_lab_entry  = None,             # Not used yet, so set vacuumLaunch_flag = False
+        distance_from_launch_to_entry = None, # Not used yet, so set vacuumLaunch_flag = False
+        vacuumLaunch_flag = False,
+        output_path = output_path,
+        output_filename_suffix = output_filename_suffix,
+        dH = dH,
+    )
 
+    if further_analysis_flag:
+        analysis = further_analysis_3D(
+            inputs,
+            df,
+            Psi_3D_entry_labframe_cartesian = Psi_3D_output[0], # TO DELETE : this is only temporary, because vacuumLaunch_flag = False
+            output_path = output_path,
+            output_filename_suffix = output_filename_suffix,
+            field = field,
+            detailed_analysis_flag = False, # Set to False to disable localisation analysis (not implemented with 3D Scotty anyway)
+            dH = dH,
+        )
 
+        df.update(analysis)
+        dt["analysis"] = datatree.DataTree(df)
 
+    # We need to use h5netcdf and invalid_netcdf in order to easily
+    # write complex numbers
+    dt.to_netcdf(
+        output_path / f"scotty_output{output_filename_suffix}.h5",
+        engine="h5netcdf",
+        invalid_netcdf=True,
+    )
 
+    if further_analysis_flag and figure_flag:
+        plot_dispersion_relation(dt.analysis, filename=(output_path / f"H_{output_filename_suffix}.png"))
 
-
-
-
-
-
-
+    return dt, pointwise_data, field
     
-    return pointwise_data, _numerical_H_values_for_heatmap # TO REMOVE
+    # return inputs, df, Psi_3D_output[0], dH # TO REMOVE -- after testing further_analysis
+
+    # return pointwise_data, _numerical_H_values_for_heatmap # TO REMOVE; this is for the tokamak benchmak case
 
 
 
