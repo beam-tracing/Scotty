@@ -289,7 +289,7 @@ class Hamiltonian_3D:
         """
 
         # TO REMOVE -- for debugging dH/dY and dH/dKy
-        print("dH/dY from scotty.drv", derivatives["dH_dY"])
+        # print("dH/dY from scotty.drv", derivatives["dH_dY"])
         # print("dH/dKy from scotty.drv", derivatives["dH_dKy"])
         
         return derivatives
