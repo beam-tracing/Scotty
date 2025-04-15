@@ -439,13 +439,19 @@ def further_analysis_3D(
     Finding the spectrum piece (loc_s) along the ray
     """
     spectrum_power_law_coefficient = -13/3 # Turbulence cascade
-    loc_s = (kperp1_bs / (-2*wavenumber_K0)) ** (spectrum_power_law_coefficient)
+    loc_s_13_3 = (kperp1_bs / (-2*wavenumber_K0)) ** (spectrum_power_law_coefficient)
+    loc_s_10_3 = (kperp1_bs / (-2*wavenumber_K0)) ** (-10/3)
 
     # Combining the localisation pieces to get some overall localisation
     l_lc = distance_along_line - distance_along_line[index_of_cutoff]
-    loc_r_b   = loc_r * loc_b
-    loc_r_b_s = loc_r * loc_b * loc_s
+    loc_all_13_3 = loc_p * loc_r * loc_b * loc_m * loc_s_13_3
+    loc_all_10_3 = loc_p * loc_r * loc_b * loc_m * loc_s_10_3
     grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians_3D(dH)
+
+    # Integrating the localisations to get the backscattered power due to the dominant k_perp
+    loc_coeff = 1 # (np.pi**(3/2) * constants.e**4) / ( 2*(constants.c**2)*(inputs.launch_angular_frequency.data**2)*(constants.epsilon_0**2)*(constants.m_e**2)*beam_waist )
+    power_ratio_13_3 = loc_coeff * np.trapz(loc_all_13_3, distance_along_line)
+    power_ratio_10_3 = loc_coeff * np.trapz(loc_all_10_3, distance_along_line)
 
     further_df = {
         # Important stuff
@@ -511,11 +517,18 @@ def further_analysis_3D(
         "delta_kperp2": (["tau"], delta_kperp2),
         "theta": (["tau"], theta),
         "theta_m": (["tau"], theta_m),
+        "delta_theta_m": delta_theta_m,
         "loc_p": loc_p,
         "loc_r": loc_r,
         "loc_b": loc_b,
         "loc_m": loc_m,
-        "loc_s": loc_s,
+        "loc_s_13_3": loc_s_13_3,
+        "loc_s_10_3": loc_s_10_3,
+        "loc_all_13_3": loc_all_13_3,
+        "loc_all_10_3": loc_all_10_3,
+        "power_ratio_13_3": power_ratio_13_3,
+        "power_ratio_10_3": power_ratio_10_3,
+        "dominant_kperp1_bs": kperp1_bs[index_of_cutoff],
     }
 
     # Assign the new coordinates used in further_df to the original df

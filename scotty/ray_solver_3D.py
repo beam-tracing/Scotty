@@ -72,7 +72,7 @@ def make_solver_events(
     @_event(terminal = True, direction = -1.0)
     def event_leave_simulation(tau, ray_parameters_3D, hamiltonian: Hamiltonian_3D):
         q_X, q_Y, q_Z, K_X, K_Y, K_Z = ray_parameters_3D
-        is_inside = ((X_coord_min < q_X < X_coord_max-0.1) # to remove -0.1
+        is_inside = ((X_coord_min < q_X < X_coord_max)
                  and (Y_coord_min < q_Y < Y_coord_max)
                  and (Z_coord_min < q_Z < Z_coord_max))
         return +1 if is_inside else -1

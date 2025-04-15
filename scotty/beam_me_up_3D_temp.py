@@ -10,7 +10,15 @@ from scotty.fun_general import freq_GHz_to_angular_frequency
 from scotty.geometry_3D import MagneticField_3D_Cartesian, InterpolatedField_3D_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
 from scotty.launch_3D import launch_beam_3D
-from scotty.plotting_3D import plot_dispersion_relation
+from scotty.plotting_3D import (
+    plot_delta_theta_m,
+    plot_dispersion_relation,
+    plot_localisations,
+    plot_theta_m,
+    plot_trajectory,
+    plot_trajectories_individually,
+    plot_wavevector
+)
 from scotty.profile_fit import ProfileFitLike, profile_fit
 from scotty.ray_solver_3D import propagate_ray
 from scotty.typing import ArrayLike, FloatArray, PathLike
@@ -753,13 +761,31 @@ def beam_me_up_3D(
     )
 
     if further_analysis_flag and figure_flag:
-        plot_dispersion_relation(dt.analysis, filename=(output_path / f"H_{output_filename_suffix}.png"))
+        plot_delta_theta_m(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"delta_theta_m{output_filename_suffix}.png"))
+        plot_dispersion_relation(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"H{output_filename_suffix}.png"))
+        plot_localisations(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"localisations{output_filename_suffix}.png"))
+        plot_theta_m(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"theta_m{output_filename_suffix}.png"))
+        plot_trajectory(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"trajectory{output_filename_suffix}.png"))
+        plot_trajectories_individually(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"trajectories{output_filename_suffix}.png"))
+        plot_wavevector(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"wavevector{output_filename_suffix}.png"))
 
-    return dt, pointwise_data, field
+    # TO REMOVE
+    helpful_dict = {
+        "pol_angle":   poloidal_launch_angle_Torbeam,
+        "tor_angle":   toroidal_launch_angle_Torbeam,
+        # "loc_all":     analysis.loc_all,
+        "power_ratio_10_3": analysis.power_ratio_10_3,
+        "power_ratio_13_3": analysis.power_ratio_13_3,
+        "dominant_kperp1_bs":analysis.dominant_kperp1_bs,
+    }
+
+    # return dt, pointwise_data, field, helpful_dict # actual correct output
     
     # return inputs, df, Psi_3D_output[0], dH # TO REMOVE -- after testing further_analysis
 
-    # return pointwise_data, _numerical_H_values_for_heatmap # TO REMOVE; this is for the tokamak benchmak case
+    # return pointwise_data, _numerical_H_values_for_heatmap # TO REMOVE -- this is for the tokamak benchmak case
+
+    return dt, field
 
 
 
