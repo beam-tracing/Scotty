@@ -770,22 +770,22 @@ def beam_me_up_3D(
         plot_wavevector(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"wavevector{output_filename_suffix}.png"))
 
     # TO REMOVE
-    helpful_dict = {
-        "pol_angle":   poloidal_launch_angle_Torbeam,
-        "tor_angle":   toroidal_launch_angle_Torbeam,
-        # "loc_all":     analysis.loc_all,
-        "power_ratio_10_3": analysis.power_ratio_10_3,
-        "power_ratio_13_3": analysis.power_ratio_13_3,
-        "dominant_kperp1_bs":analysis.dominant_kperp1_bs,
-    }
+    # helpful_dict = {
+    #     "pol_angle":   poloidal_launch_angle_Torbeam,
+    #     "tor_angle":   toroidal_launch_angle_Torbeam,
+    #     # "loc_all":     analysis.loc_all,
+    #     "power_ratio_10_3": analysis.power_ratio_10_3,
+    #     "power_ratio_13_3": analysis.power_ratio_13_3,
+    #     "dominant_kperp1_bs":analysis.dominant_kperp1_bs,
+    # }
 
     # return dt, pointwise_data, field, helpful_dict # actual correct output
     
     # return inputs, df, Psi_3D_output[0], dH # TO REMOVE -- after testing further_analysis
 
-    # return pointwise_data, _numerical_H_values_for_heatmap # TO REMOVE -- this is for the tokamak benchmak case
+    return pointwise_data, _numerical_H_values_for_heatmap # TO REMOVE -- this is for the slab and tokamak benchmak case
 
-    return dt, field
+    # return dt, field
 
 
 
