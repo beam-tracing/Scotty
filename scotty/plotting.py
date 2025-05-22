@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import xarray as xr
 from xarray import DataTree
 from scipy.interpolate import CubicSpline
+import pyvista as pv
 
 from .analysis import beam_width
 from .geometry import MagneticField
@@ -1219,3 +1220,133 @@ def plot_psi(dt: DataTree, filename: Optional[PathLike] = None):
 
     if filename:
         plt.savefig(f"{filename}.png", dpi=1200)  # save figure
+
+
+def visualise_interactive_3D_beam(path):
+    """Visualises the 3D beam path using PyVista
+    
+    Parameters
+    ----------
+    path : str
+        Path to data set in an HDF5 format
+    -------
+    Displays an interactive 3D visualization of the beam profile.
+    
+    """
+    # Load the data
+    dt = datatree.open_datatree(path, engine="h5netcdf")
+
+    # Extract necessary data
+    q_R_array = dt.analysis.q_R.data
+    q_zeta_array = dt.analysis.q_zeta.data
+    q_Z_array = dt.analysis.q_Z.data
+    distance_along_line = dt.analysis.distance_along_line.data
+
+    Psi_xx_output = dt.analysis.Psi_xx.data
+    Psi_xy_output = dt.analysis.Psi_xy.data
+    Psi_yy_output = dt.analysis.Psi_yy.data
+    x_hat_Cartesian = dt.analysis.x_hat_Cartesian.data
+    y_hat_Cartesian = dt.analysis.y_hat_Cartesian.data
+    g_hat_output = dt.analysis.g_hat.data
+
+
+    q_X_array, q_Y_array, q_Z_array = find_q_lab_Cartesian(
+        np.array([q_R_array, q_zeta_array, q_Z_array])
+        )
+
+    # Calculate beam widths and principal vectors
+    numberOfDataPoints = len(q_R_array)
+    ellipse_resolution = 30
+    step = max(1, numberOfDataPoints // 50)  # Show every nth beam cross-section
+
+    # Psi_w arrays
+    Psi_w_imag = np.array(np.imag(
+        [[Psi_xx_output, Psi_xy_output], [Psi_xy_output, Psi_yy_output]]
+        ))
+
+    eigvals_im, eigvecs_im = np.linalg.eigh(np.moveaxis(Psi_w_imag, -1, 0))
+    widths = np.sqrt(2 / eigvals_im)
+    width1 = widths[:, 0]  # Green beam width
+    width2 = widths[:, 1]  # Red beam width
+
+    eigvec1_x = eigvecs_im[:, 0, 0]
+    eigvec1_y = eigvecs_im[:, 0, 1]
+    eigvec2_x = eigvecs_im[:, 1, 0]
+    eigvec2_y = eigvecs_im[:, 1, 1]
+
+    # Principal vectors in Cartesian coordinates
+    pvec1 = np.zeros((numberOfDataPoints, 3))  # Green axis
+    pvec2 = np.zeros((numberOfDataPoints, 3))  # Red axis
+
+    for i in range(numberOfDataPoints):
+        pvec1[i] = width1[i] * (eigvec1_x[i] * x_hat_Cartesian[i] + eigvec1_y[i] * y_hat_Cartesian[i])
+        pvec2[i] = width2[i] * (eigvec2_x[i] * x_hat_Cartesian[i] + eigvec2_y[i] * y_hat_Cartesian[i])
+
+    # Create beam surface points
+    theta = np.linspace(0, 2*np.pi, ellipse_resolution + 1)
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
+
+    # Create a PyVista plotter
+    plotter = pv.Plotter()
+
+    # Create a tube for the central ray
+    central_ray_points = np.column_stack((q_X_array, q_Y_array, q_Z_array))
+    central_ray = pv.Spline(central_ray_points)
+    tube = central_ray.tube(radius=0.002)
+    plotter.add_mesh(tube, color='blue', opacity=0.7)
+
+    # Add starting point
+    plotter.add_mesh(pv.Sphere(0.005, (q_X_array[0], q_Y_array[0], q_Z_array[0])), color='black')
+
+    # Create the beam surface with principal axes
+    for i in range(0, numberOfDataPoints, step):
+        # Position of cross-section
+        pos = np.array([q_X_array[i], q_Y_array[i], q_Z_array[i]])
+        
+        # Create ellipse points at this position
+        ellipse_points = np.zeros((ellipse_resolution + 1, 3))
+        for j in range(ellipse_resolution + 1):
+            w1 = pvec1[i] * cos_theta[j]
+            w2 = pvec2[i] * sin_theta[j]
+            ellipse_points[j] = pos + w1 + w2
+        
+        # Create a polyline for this ellipse
+        poly = pv.Spline(ellipse_points)
+        plotter.add_mesh(poly, color='royalblue', line_width=2, opacity=0.8)
+        
+        # Add green principal axis (width 1)
+        green_line = pv.Line(pos - pvec1[i], pos + pvec1[i])
+        plotter.add_mesh(green_line, color='green', line_width=3)
+        
+        # Add red principal axis (width 2)
+        red_line = pv.Line(pos - pvec2[i], pos + pvec2[i])
+        plotter.add_mesh(red_line, color='red', line_width=3)
+        
+        # Add small spheres at the ends of the principal axes
+        plotter.add_mesh(pv.Sphere(0.003, pos + pvec1[i]), color='green')
+        plotter.add_mesh(pv.Sphere(0.003, pos - pvec1[i]), color='green')
+        plotter.add_mesh(pv.Sphere(0.003, pos + pvec2[i]), color='red')
+        plotter.add_mesh(pv.Sphere(0.003, pos - pvec2[i]), color='red')
+
+    # Add axes
+    plotter.add_axes()
+    plotter.show_bounds(grid='front', location='outer', fmt="%.2f", use_3d_text=True)
+
+    # Add legend
+    labels = [
+        ("Central Ray" , "blue"),
+        ("Cross Section of beam", "royalblue"),
+        ("Principal Vector 1", "green"),
+        ("Principal Vector 2", "red")
+    ]
+    plotter.add_legend(labels)
+
+    # Set camera position to show the beam nicely
+    plotter.camera_position = 'yz'
+    plotter.camera.azimuth = 30
+    plotter.camera.elevation = 20
+    
+    # Show the plot
+    plotter.show()
+
