@@ -2,8 +2,7 @@
 # Copyright 2018 - 2023, Valerian Hall-Chen and the Scotty contributors
 # SPDX-License-Identifier: GPL-3.0
 
-"""Functions for Scotty (excluding functions for finding derivatives of H).
-"""
+"""Functions for Scotty (excluding functions for finding derivatives of H)."""
 
 import numpy as np
 from scipy import constants as constants
@@ -112,6 +111,7 @@ def find_x0(xs, ys, y0):
         assume_sorted=False,
     )
 
+    xs = np.asarray(xs)
     if index_guess == 0:
         xs_fine = np.linspace(xs[0], xs[index_guess + 1], 101)
     elif index_guess == len(xs) - 1:

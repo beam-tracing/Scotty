@@ -36,8 +36,8 @@ class ProfileFit:
     def __call__(self, poloidal_flux: ArrayLike) -> ArrayLike:
         """Returns the interpolated profile at ``poloidal_flux`` points."""
 
-        poloidal_flux = np.asfarray(poloidal_flux)
-        profile = np.asfarray(self._fit_impl(poloidal_flux))
+        poloidal_flux = np.asarray(poloidal_flux)
+        profile = np.asarray(self._fit_impl(poloidal_flux))
         # Mask density inside plasma
         is_inside = poloidal_flux <= self.poloidal_flux_zero_profile
         return is_inside * profile
@@ -76,7 +76,7 @@ class LinearFit(ProfileFit):
                 )
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
-        poloidal_flux = np.asfarray(poloidal_flux)
+        poloidal_flux = np.asarray(poloidal_flux)
         return self.ne_0 - (
             (self.ne_0 / self.poloidal_flux_zero_profile) * poloidal_flux
         )
@@ -133,7 +133,7 @@ class QuadraticFit(ProfileFit):
                 )
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
-        poloidal_flux = np.asfarray(poloidal_flux)
+        poloidal_flux = np.asarray(poloidal_flux)
         return self.ne_0 - (
             (self.ne_0 / self.poloidal_flux_zero_profile) * poloidal_flux**2
         )
@@ -188,7 +188,7 @@ class TanhFit(ProfileFit):
                 )
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
-        poloidal_flux = np.asfarray(poloidal_flux)
+        poloidal_flux = np.asarray(poloidal_flux)
         return self.ne_0 * np.tanh(
             self.ne_1 * (poloidal_flux - self.poloidal_flux_zero_profile)
         )
@@ -219,7 +219,7 @@ class PolynomialFit(ProfileFit):
         self.coefficients = coefficients
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
-        poloidal_flux = np.asfarray(poloidal_flux)
+        poloidal_flux = np.asarray(poloidal_flux)
         return np.polyval(self.coefficients, poloidal_flux)
 
     def __repr__(self):
@@ -282,7 +282,7 @@ class StefanikovaFit(ProfileFit):
         return (self.b_height - self.b_SOL) / 2 * (mth + 1) + self.b_SOL
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
-        poloidal_flux = np.asfarray(poloidal_flux)
+        poloidal_flux = np.asarray(poloidal_flux)
         fp = self._f_ped(poloidal_flux)
         return (
             fp

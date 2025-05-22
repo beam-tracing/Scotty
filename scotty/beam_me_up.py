@@ -56,7 +56,6 @@ import time
 import json
 import pathlib
 import xarray as xr
-import datatree
 import datetime
 import uuid
 
@@ -151,7 +150,7 @@ def beam_me_up(
     B_p_a=None,
     R_axis=None,
     minor_radius_a=None,
-) -> datatree.DataTree:
+) -> xr.DataTree:
     r"""Run the beam tracer
 
     Overview
@@ -662,7 +661,7 @@ def beam_me_up(
         },
     )
 
-    dt = datatree.DataTree.from_dict({"inputs": inputs, "solver_output": solver_output})
+    dt = xr.DataTree.from_dict({"inputs": inputs, "solver_output": solver_output})
     dt.attrs = {
         "title": output_filename_suffix,
         "software_name": "scotty-beam-tracing",
@@ -717,7 +716,7 @@ def beam_me_up(
         dH,
     )
     df.update(analysis)
-    dt["analysis"] = datatree.DataTree(df)
+    dt["analysis"] = xr.DataTree(df)
 
     # We need to use h5netcdf and invalid_netcdf in order to easily
     # write complex numbers
@@ -734,7 +733,7 @@ def beam_me_up(
 
 
 def default_plots(
-    dt: datatree.DataTree, field: MagneticField, output_path: pathlib.Path, suffix: str
+    dt: xr.DataTree, field: MagneticField, output_path: pathlib.Path, suffix: str
 ) -> None:
     """Save some simple figures
 

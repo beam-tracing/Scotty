@@ -141,11 +141,11 @@ class CircularCrossSectionField(MagneticField):
         )
 
     def rho(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
         return np.sqrt((q_R - self.R_axis) ** 2 + q_Z**2)
 
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
         return np.where(
             abs(q_Z) < 1e-12,
             0.0,
@@ -153,11 +153,11 @@ class CircularCrossSectionField(MagneticField):
         )
 
     def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
         return self.B_T_axis * (self.R_axis / q_R)
 
     def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
         return np.where(
             abs(q_R - self.R_axis) < 1e-12,
             0.0,
@@ -167,7 +167,7 @@ class CircularCrossSectionField(MagneticField):
         )
 
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
         return self.rho(q_R, q_Z) / self.minor_radius_a
 
 
@@ -218,23 +218,23 @@ class ConstantCurrentDensityField(MagneticField):
         )
 
     def rho(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
         return np.sqrt((q_R - self.R_axis) ** 2 + q_Z**2)
 
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
         return self.B_p_a * q_Z / self.rho(q_R, q_Z)
 
     def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
         return self.B_T_axis * (self.R_axis / q_R)
 
     def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
         return -self.B_p_a * (q_R - self.R_axis) / self.rho(q_R, q_Z)
 
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
         return self.rho(q_R, q_Z) / self.minor_radius_a
 
 
@@ -246,15 +246,15 @@ class CurvySlabField(MagneticField):
         self.R_axis = R_axis
 
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
         return np.zeros_like(q_R)
 
     def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
         return self.B_T_axis * self.R_axis / q_R
 
     def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asfarray(q_R), np.asfarray(q_Z)
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
         return np.zeros_like(q_R)
 
 

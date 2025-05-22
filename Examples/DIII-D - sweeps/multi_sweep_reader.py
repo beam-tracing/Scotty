@@ -9,7 +9,6 @@ Created on Wed Aug 14 00:53:03 2024
 from matplotlib.ticker import FormatStrFormatter
 import xarray as xr
 import numpy as np
-import datatree
 import matplotlib.pyplot as plt
 from math import *
 import scipy
@@ -18,7 +17,7 @@ from scipy import constants
 
 # extract out sweep file
 path = 'C:/Users/matth/Downloads/Scotty/Examples/DIII-D - sweeps/sweep_main.h5'
-dt = datatree.open_datatree(path, engine="h5netcdf")
+dt = xr.open_datatree(path, engine="h5netcdf")
 
 # Example poloidal angle you want to select
 selected_pol_angle = -11.4 
