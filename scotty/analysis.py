@@ -40,6 +40,7 @@ from scotty.typing import ArrayLike, FloatArray, PathLike
 
 CYLINDRICAL_VECTOR_COMPONENTS = ["R", "zeta", "Z"]
 CARTESIAN_VECTOR_COMPONENTS = ["X", "Y", "Z"]
+SOLUTION_COMPONENTS = ["solution_1", "solution_2", "solution_3"]
 
 
 def set_vector_components_long_name(df: Union[xr.Dataset, xr.DataArray]) -> None:
@@ -51,6 +52,8 @@ def set_vector_components_long_name(df: Union[xr.Dataset, xr.DataArray]) -> None
         df.col_cart.attrs["long_name"] = "Vector/matrix column component"
     if "row_cart" in df.coords:
         df.row_cart.attrs["long_name"] = "Matrix row component"
+    if "solution" in df.coords:
+        df.solution.attrs["long_name"] = "Solution/root number"
 
 
 def save_npz(filename: Path, df: xr.Dataset) -> None:
@@ -219,6 +222,7 @@ def immediate_analysis(
             "tau": tau,
             "row": CYLINDRICAL_VECTOR_COMPONENTS,
             "col": CYLINDRICAL_VECTOR_COMPONENTS,
+            "solution": SOLUTION_COMPONENTS,
             "q_R": q_R,
             "q_Z": q_Z,
             "q_zeta": solver_output.q_zeta,
@@ -614,14 +618,15 @@ def further_analysis(
         "b_hat": df.b_hat,
         "g_hat": df.g_hat,
         "e_hat": (["tau", "col"], e_hat),
-        "H_eigvals": (
-            ["tau", "col"],
-            H_eigvals,
-        ),  ##TODO: the second index should be 1,2,3. Not 'col', which is R, zeta, Z
-        "e_eigvecs": (["tau", "row", "col"], e_eigvecs),
-        "H_1_Cardano": (["tau"], H_1_Cardano),
-        "H_2_Cardano": (["tau"], H_2_Cardano),
-        "H_3_Cardano": (["tau"], H_3_Cardano),
+        "H_eigvals": (["tau", "solution"], H_eigvals),
+        "e_eigvecs": (["tau", "col", "solution"], e_eigvecs),
+        "H_Cardano": (
+            ["tau", "solution"],
+            np.vstack([H_1_Cardano, H_2_Cardano, H_3_Cardano]).T,
+        ),
+        # "H_1_Cardano": (["tau"], H_1_Cardano),
+        # "H_2_Cardano": (["tau"], H_2_Cardano),
+        # "H_3_Cardano": (["tau"], H_3_Cardano),
         "kperp1_hat": (["tau", "col"], kperp1_hat),
         "theta": (["tau"], theta),
         "g_magnitude_Cardano": g_magnitude_Cardano,
