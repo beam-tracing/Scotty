@@ -253,7 +253,7 @@ def plot_dispersion_relation(
     ## The title of 'col' in H_eigvals is a misnomer
     ax.plot(
         analysis.l_lc,
-        abs(analysis.H_eigvals.sel(col="R")),
+        abs(analysis.H_eigvals.sel(solution="solution_1")),
         color="pink",
         linestyle="-",
         linewidth=4,
@@ -261,7 +261,7 @@ def plot_dispersion_relation(
     )
     ax.plot(
         analysis.l_lc,
-        abs(analysis.H_eigvals.sel(col="zeta")),
+        abs(analysis.H_eigvals.sel(solution="solution_2")),
         color="lightgreen",
         linestyle="-",
         linewidth=4,
@@ -269,7 +269,7 @@ def plot_dispersion_relation(
     )
     ax.plot(
         analysis.l_lc,
-        abs(analysis.H_eigvals.sel(col="Z")),
+        abs(analysis.H_eigvals.sel(solution="solution_3")),
         color="gray",
         linestyle="-",
         linewidth=4,
@@ -278,7 +278,7 @@ def plot_dispersion_relation(
 
     ax.plot(
         analysis.l_lc,
-        abs(analysis.H_1_Cardano),
+        abs(analysis.H_Cardano.sel(solution="solution_1")),
         color="k",
         linestyle=":",
         linewidth=4,
@@ -286,7 +286,7 @@ def plot_dispersion_relation(
     )
     ax.plot(
         analysis.l_lc,
-        abs(analysis.H_2_Cardano),
+        abs(analysis.H_Cardano.sel(solution="solution_2")),
         color="r",
         linestyle=":",
         linewidth=4,
@@ -294,7 +294,7 @@ def plot_dispersion_relation(
     )
     ax.plot(
         analysis.l_lc,
-        abs(analysis.H_3_Cardano),
+        abs(analysis.H_Cardano.sel(solution="solution_3")),
         color="g",
         linestyle=":",
         linewidth=4,

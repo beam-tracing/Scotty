@@ -115,8 +115,8 @@ def beam_me_up(
     vacuum_propagation_flag: bool = False,
     Psi_BC_flag: Union[bool, str, None] = None,
     poloidal_flux_enter: float = 1.0,
-    poloidal_flux_zero_density: float = 1.0,  ## When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
-    poloidal_flux_zero_temperature: float = 1.0,  ## temperature analogue of poloidal_flux_zero_density
+    poloidal_flux_zero_density: float = 1.01,  ## When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
+    poloidal_flux_zero_temperature: float = 1.01,  ## temperature analogue of poloidal_flux_zero_density
     # Finite-difference and solver parameters
     auto_delta_sign=True,  # For flipping signs to maintain forward difference. Applies to delta_R and delta_Z
     delta_R: float = -0.0001,  # in the same units as data_R_coord
