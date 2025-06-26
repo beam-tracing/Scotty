@@ -25,6 +25,7 @@ from scotty.fun_general import (
     find_normalised_plasma_freq,
     make_unit_vector_from_cross_product,
     find_Psi_3D_lab_Cartesian,
+    find_Psi_3D_lab,
     find_H_Cardano,
     angular_frequency_to_wavenumber,
     find_waist,
@@ -252,10 +253,12 @@ def further_analysis(
     output_filename_suffix: str,
     field: MagneticField,
     detailed_analysis_flag: bool,
+    reflectometry_flag: bool,
     dH: Dict[str, ArrayLike],
 ):
     # Calculates various useful stuff
     q_X, q_Y, _ = cylindrical_to_cartesian(df.q_R, df.q_zeta, df.q_Z)
+
     point_spacing = np.sqrt(
         np.diff(q_X) ** 2 + np.diff(q_Y) ** 2 + np.diff(df.q_Z) ** 2
     )
@@ -370,6 +373,7 @@ def further_analysis(
     ).T
 
     grad_x_hat = df.x_hat.differentiate("tau")
+
     d_xhat_d_tau = np.block(
         [
             [grad_x_hat.sel(col="R") - df.x_hat.sel(col="zeta") * df.dH_dKzeta],
@@ -663,8 +667,9 @@ def further_analysis(
     set_vector_components_long_name(df)
     df.update(further_df)
 
-    if detailed_analysis_flag and (cutoff_index + 1 != len(df.tau)):
-        df.update(localisation_analysis(df, cutoff_index, wavenumber_K0))
+    if not reflectometry_flag:
+        if detailed_analysis_flag and (cutoff_index + 1 != len(df.tau)):
+            df.update(localisation_analysis(df, cutoff_index, wavenumber_K0))
 
     return df
 
