@@ -5,11 +5,12 @@ import numpy as np
 import pathlib
 from scipy.integrate import solve_ivp
 from scotty.analysis_3D import immediate_analysis_3D, further_analysis_3D
+from scotty.check_input import check_input
 from scotty.fun_evolution_3D import pack_beam_parameters_3D, unpack_beam_parameters_3D, beam_evolution_fun_3D
 from scotty.fun_general import freq_GHz_to_angular_frequency
 from scotty.geometry_3D import MagneticField_3D_Cartesian, InterpolatedField_3D_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
-from scotty.launch_3D import launch_beam_3D
+from scotty.launch_3D import launch_beam_3D, find_entry_point_3D
 from scotty.plotting_3D import (
     plot_delta_theta_m,
     plot_dispersion_relation,
@@ -29,33 +30,51 @@ import uuid
 import xarray as xr
 
 def beam_me_up_3D(
+    # General launch parameters
     poloidal_launch_angle_Torbeam: float,
     toroidal_launch_angle_Torbeam: float,
     launch_freq_GHz: float,
-    mode_flag: int,
     launch_beam_width: float,
     launch_beam_curvature: float,
     launch_position_cartesian: FloatArray,
+    mode_flag: int,
 
-    # keyword arguments begin
-    vacuumLaunch_flag: bool = True,
-    relativistic_flag: bool = False,  # includes relativistic corrections to electron mass when set to True
+    # Launch parameters (only used if ray propagation begins in the plasma)
+    plasmaLaunch_K_cartesian = np.zeros(3),
+    plasmaLaunch_Psi_3D_lab_cartesian = np.zeros([3, 3]),
+    density_fit_method: Optional[Union[str, ProfileFitLike]] = None,
+    temperature_fit_method: Optional[Union[str, ProfileFitLike]] = None,
+
+    # Input, output, and plotting arguments
+    ne_data_path = pathlib.Path("."),
+    magnetic_data_path = pathlib.Path("."),
+    Te_data_path = pathlib.Path("."),
+    input_filename_suffix = "",
+    field = None,
+    output_path = pathlib.Path("."),
+    output_filename_suffix = "",
+    figure_flag = True,
+    detailed_analysis_flag = True,
+
+    # Solver arguments
+    shot=None,
+    equil_time=None,
     find_B_method: Union[str, MagneticField_3D_Cartesian] = "torbeam",
     density_fit_parameters: Optional[Sequence] = None,
     temperature_fit_parameters: Optional[Sequence] = None,
-    shot=None,
-    equil_time=None,
+    vacuumLaunch_flag: bool = True,
+    relativistic_flag: bool = False, # includes relativistic corrections to electron mass when set to True
     vacuum_propagation_flag: bool = False,
     Psi_BC_flag: Union[bool, str, None] = None,
     poloidal_flux_enter: float = 1.0,
-    poloidal_flux_zero_density: float = 1.0,  ## When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
-    poloidal_flux_zero_temperature: float = 1.0,  ## temperature analogue of poloidal_flux_zero_density
+    poloidal_flux_zero_density: float = 1.0, # When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
+    poloidal_flux_zero_temperature: float = 1.0, # Temperature analogue of poloidal_flux_zero_density
 
     # Finite-difference and solver parameters
-    auto_delta_sign = True,  # For flipping signs to maintain forward difference. Applies to delta_R and delta_Z
-    delta_X: float = -0.0001, # in the same units as data_X_coord
-    delta_Y: float = 0.0001,  # in the same units as data_Y_coord
-    delta_Z: float = 0.0001,  # in the same units as data_Z_coord
+    auto_delta_sign = True,  # For flipping signs to maintain forward difference. Applies to delta_X, delta_Y, delta_Z
+    delta_X: float = 0.0001, # in the same units as data_X_coord
+    delta_Y: float = 0.0001, # in the same units as data_Y_coord
+    delta_Z: float = 0.0001, # in the same units as data_Z_coord
     delta_K_X: float = 0.1,  # in the same units as K_X
     delta_K_Y: float = 0.1,  # in the same units as K_Y
     delta_K_Z: float = 0.1,  # in the same units as K_Z
@@ -64,48 +83,16 @@ def beam_me_up_3D(
     len_tau: int = 102,
     rtol: float = 1e-3,  # for solve_ivp of the beam solver
     atol: float = 1e-6,  # for solve_ivp of the beam solver
-    tau_eval: type = None, # To remove
-    points_from_2d_scotty_to_eval: ArrayLike = None, # To remove
-
-    # Input and output settings
-    ne_data_path = pathlib.Path("."),
-    magnetic_data_path = pathlib.Path("."),
-    Te_data_path = pathlib.Path("."),
-    output_path = pathlib.Path("."),
-    input_filename_suffix = "",
-    output_filename_suffix = "",
-    figure_flag = True,
-    detailed_analysis_flag = True,
 
     # For quick runs (only ray tracing)
     quick_run: bool = False,
 
-    # For launching within the plasma
-    plasmaLaunch_K_cartesian = np.zeros(3),
-    plasmaLaunch_Psi_3D_lab_cartesian = np.zeros([3, 3]),
-    density_fit_method: Optional[Union[str, ProfileFitLike]] = None,
-    temperature_fit_method: Optional[Union[str, ProfileFitLike]] = None,
-
-    # For circular flux surfaces
+    # Only used for circular flux surfaces
     B_T_axis = None,
     B_p_a = None,
     R_axis = None,
     minor_radius_a = None,
-
-    # TO REMOVE
-    field = None, # this is so that I dont have to keep loading the huge files
-    further_analysis_flag = False,
 ) -> datatree.DataTree:
-    
-    """
-    # TO DO THIS SOON
-
-    # INSERT LONG LIST OF EXPLANATIONS
-    """
-
-    # To delete
-    print("tau_eval:", tau_eval)
-    print("points_from_2d_scotty_to_eval:", points_from_2d_scotty_to_eval)
 
     print("Beam trace me up, Scotty!")
     print(f"scotty version {__version__}")
@@ -113,10 +100,9 @@ def beam_me_up_3D(
     print(f"Run ID: {run_id}")
 
     # ------------------------------
-    # Input data #
+    # Starting Routine
     # ------------------------------
 
-    # Tidying up the input data
     launch_angular_frequency = freq_GHz_to_angular_frequency(launch_freq_GHz)
 
     # Ensure paths are `pathlib.Path`
@@ -125,10 +111,8 @@ def beam_me_up_3D(
     Te_data_path = pathlib.Path(Te_data_path)
     output_path = pathlib.Path(output_path)
 
-    # Experimental Profile ----------
-    if density_fit_parameters is None and (
-        density_fit_method in [None, "smoothing-spline-file"]
-    ):
+    # Setting experimental profiles
+    if density_fit_parameters is None and (density_fit_method in [None, "smoothing-spline-file"]):
         ne_filename = ne_data_path / f"ne{input_filename_suffix}.dat"
         density_fit_parameters = [ne_filename, interp_order, interp_smoothing]
 
@@ -136,9 +120,11 @@ def beam_me_up_3D(
         ne_data = np.fromfile(ne_filename, dtype=float, sep="   ")
         # ne_data_density_array = ne_data[2::2]
         # ne_data_radialcoord_array = ne_data[1::2]
-    else:
-        ne_filename = None
+    else: ne_filename = None
 
+    # Using the electron density data, create a spline fit as a
+    # function of poloidal flux, i.e.:
+    # find_density_1D(poloidal_flux) = electron_density
     find_density_1D = make_fit(
         density_fit_method,
         poloidal_flux_zero_density,
@@ -146,12 +132,12 @@ def beam_me_up_3D(
         ne_filename,
     )
 
-    """
-    # TO DO THIS SOON
+    # TODO THIS SOON
     # INSERT RELATIVISTIC_FLAG STUFF
-    """
     find_temperature_1D = None
     
+    # If the user has already pre-loaded a field, use it
+    # Otherwise, create a new one from the specified data pathway
     if field is None:
         field = create_magnetic_geometry_3D(
             find_B_method,
@@ -159,39 +145,31 @@ def beam_me_up_3D(
             input_filename_suffix,
             interp_order,
             shot,
-            equil_time
+            equil_time,
         )
-
-    """
-    # TO DO THIS SOON
-    # Currently this does so in cylindrical -- to convert to cartesian
-    # See def poloidal_flux_boundary_along_line (launch.py)
-
-    # Flips the sign of delta_Z depending on the orientation of the poloidal flux surface at the point which the ray enters the plasma.
-    # This is to ensure a forward difference across the plasma boundary. We expect poloidal flux to decrease in the direction of the plasma.
+    
+    # Flips the sign of any of the delta_X, delta_Y, delta_Z
+    # depending on the orientation of the flux surface. This
+    # is to ensure a forward difference across the plasma boundary.
     if auto_delta_sign:
-        entry_coords = find_entry_point(
+        entry_coords = find_entry_point_3D(
             launch_position_cartesian,
             np.deg2rad(poloidal_launch_angle_Torbeam),
             np.deg2rad(toroidal_launch_angle_Torbeam),
             poloidal_flux_enter,
             field,
         )
-        entry_X, entry_Y, entry_Z = cylindrical_to_cartesian(entry_coords[0], entry_coords[1], entry_coords[2])
 
-        d_polflux_dX = field.d_polflux_dX(entry_X, entry_Y, entry_Z, delta_X)
-        d_polflux_dY = field.d_polflux_dY(entry_X, entry_Y, entry_Z, delta_Y)
-        d_polflux_dZ = field.d_polflux_dZ(entry_X, entry_Y, entry_Z, delta_Z)
+        entry_X, entry_Y, entry_Z = entry_coords
 
-        if d_polflux_dX > 0: delta_X = -1 * abs(delta_X)
+        if field.d_polflux_dX(entry_X, entry_Y, entry_Z) > 0: delta_X = -1 * abs(delta_X)
         else: delta_X = abs(delta_X)
-        
-        if d_polflux_dY > 0: delta_Y = -1 * abs(delta_Y)
+
+        if field.d_polflux_dY(entry_X, entry_Y, entry_Z) > 0: delta_Y = -1 * abs(delta_Y)
         else: delta_Y = abs(delta_Y)
-        
-        if d_polflux_dZ > 0: delta_Z = -1 * abs(delta_Z)
+
+        if field.d_polflux_dZ(entry_X, entry_Y, entry_Z) > 0: delta_Z = -1 * abs(delta_Z)
         else: delta_Z = abs(delta_Z)
-    """
     
     # Initialises the Hamiltonian H
     hamiltonian = Hamiltonian_3D(
@@ -208,58 +186,63 @@ def beam_me_up_3D(
         find_temperature_1D
     )
 
-    """
-    # TO DO THIS SOON
-
-    # Checking input data
-    # Temporarily removed (see check_input.py)
-    """
+    # Checking validity of user-specified arguments
+    check_input(
+        mode_flag,
+        poloidal_flux_enter,
+        launch_position_cartesian,
+        field,
+        poloidal_flux_zero_density,
+    )
 
     # ------------------------------
-    # Launch parameters #
+    # Launch parameters
     # ------------------------------
     if vacuumLaunch_flag:
-        pass
-        """
-        # TO DO THIS SOON
-
         print("Beam launched from outside the plasma")
-        (K_initial_cylindrical,
-         initial_position,
-         launch_K,
-         Psi_3D_lab_initial,
-         Psi_3D_lab_launch,
-         Psi_3D_lab_entry,
-         Psi_3D_lab_entry_cartersian,
-         distance_from_launch_to_entry,
-        ) = launch_beam(
-            toroidal_launch_angle_Torbeam = toroidal_launch_angle_Torbeam,
-            poloidal_launch_angle_Torbeam = poloidal_launch_angle_Torbeam,
-            launch_beam_width = launch_beam_width,
-            launch_beam_curvature = launch_beam_curvature,
-            launch_position = launch_position_cylindrical, # because the original function takes in cylindrical coordinates only
-            launch_angular_frequency = launch_angular_frequency,
-            mode_flag = mode_flag,
-            field = field,
-            hamiltonian = hamiltonian,
-            vacuum_propagation_flag = vacuum_propagation_flag,
-            Psi_BC_flag = Psi_BC_flag,
-            poloidal_flux_enter = poloidal_flux_enter,
-            delta_R = delta_X,
-            delta_Z = delta_Z,
-        )
-        """
+        (
+            q_launch_cartesian,
+            q_entry_cartesian,
+            distance_from_launch_to_entry,
+            K_launch_cartesian,
+            K_entry_cartesian,
+            K_initial_cartesian,
+            Psi_3D_launch_labframe_cartesian,
+            Psi_3D_entry_labframe_cartesian,
+            Psi_3D_initial_labframe_cartesian,
+        ) = launch_beam_3D(
+            poloidal_launch_angle_Torbeam,
+            toroidal_launch_angle_Torbeam,
+            launch_angular_frequency,
+            launch_beam_width,
+            launch_beam_curvature,
+            launch_position_cartesian,
+            mode_flag,
+            field,
+            hamiltonian,
+            vacuumLaunch_flag,
+            vacuum_propagation_flag,
+            Psi_BC_flag,
+            poloidal_flux_enter,
+            delta_X,
+            delta_Y,
+            delta_Z,
+            )
     else:
         print("Beam launched from inside the plasma")
         # TO REMOVE -- remove this if-else block
-        if (plasmaLaunch_K_cartesian == np.zeros(3)).all() and (plasmaLaunch_Psi_3D_lab_cartesian == np.zeros([3, 3])).all():
-            initial_position_cartesian, initial_K_cartesian, initial_Psi_3D_lab_cartesian = launch_beam_3D(
-                toroidal_launch_angle_Torbeam,
+        (
+            initial_position_cartesian,
+            initial_K_cartesian,
+            initial_Psi_3D_lab_cartesian,
+
+        ) = launch_beam_3D(
                 poloidal_launch_angle_Torbeam,
+                toroidal_launch_angle_Torbeam,
+                launch_angular_frequency,
                 launch_beam_width,
                 launch_beam_curvature,
                 launch_position_cartesian,
-                launch_angular_frequency,
                 mode_flag,
                 field,
                 hamiltonian,
@@ -270,12 +253,11 @@ def beam_me_up_3D(
                 delta_X,
                 delta_Y,
                 delta_Z,
-                None, # temperature
             )
-        else:
-            initial_position_cartesian = launch_position_cartesian
-            initial_K_cartesian = plasmaLaunch_K_cartesian
-            initial_Psi_3D_lab_cartesian = plasmaLaunch_Psi_3D_lab_cartesian
+        # else:
+        #     initial_position_cartesian = launch_position_cartesian
+        #     initial_K_cartesian = plasmaLaunch_K_cartesian
+        #     initial_Psi_3D_lab_cartesian = plasmaLaunch_Psi_3D_lab_cartesian
 
     # -------------------
     # Propagate the ray
