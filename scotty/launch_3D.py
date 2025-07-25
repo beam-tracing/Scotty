@@ -1,6 +1,11 @@
 from scipy.interpolate import CubicSpline
 from scipy.optimize import minimize_scalar, root_scalar
-from scotty.fun_general import angular_frequency_to_wavenumber, toroidal_to_cartesian
+from scotty.fun_general import (
+    angular_frequency_to_wavenumber,
+    find_inverse_2D,
+    make_array_3x3,
+    toroidal_to_cartesian,
+)
 from scotty.geometry_3D import MagneticField_3D_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
 from scotty.typing import FloatArray
@@ -9,12 +14,12 @@ import numpy as np
 import warnings
 
 def launch_beam_3D(
-    toroidal_launch_angle_Torbeam: float,
     poloidal_launch_angle_Torbeam: float,
+    toroidal_launch_angle_Torbeam: float,
+    launch_angular_frequency: float,
     launch_beam_width: float,
     launch_beam_curvature: float,
     launch_position_cartesian: FloatArray,
-    launch_angular_frequency: float,
     mode_flag: int,
     field: MagneticField_3D_Cartesian,
     hamiltonian: Hamiltonian_3D,
@@ -51,27 +56,39 @@ def launch_beam_3D(
             f"Unexpected value for `Psi_BC_flag` ({Psi_BC_flag}), expected one of None, 'continuous, or 'discontinuous'"
         )
     
-    q_X_launch, q_Y_launch, q_Z_launch = launch_position_cartesian
-    q_R_launch = np.sqrt(q_X_launch**2 + q_Y_launch**2)
+    q_launch_cartesian = launch_position_cartesian
+    # q_X_launch, q_Y_launch, q_Z_launch = q_launch_cartesian
+    # q_R_launch = np.sqrt(q_X_launch**2 + q_Y_launch**2)
 
     toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam)
     poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_Torbeam) + np.pi
 
     # Finding K_launch
     wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
-    K_R_launch    = wavenumber_K0 * np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
-    K_zeta_launch = wavenumber_K0 * np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle) * q_R_launch
-    K_X_launch = K_R_launch*(q_X_launch / q_R_launch) - K_zeta_launch*(q_Y_launch/q_R_launch**2)
-    K_Y_launch = K_R_launch*(q_Y_launch / q_R_launch) + K_zeta_launch*(q_X_launch/q_R_launch**2)
-    K_Z_launch    = wavenumber_K0 * np.sin(poloidal_launch_angle)
+    K_X_launch = wavenumber_K0 * np.cos(2*toroidal_launch_angle) * np.cos(poloidal_launch_angle)
+    K_Y_launch = wavenumber_K0 * np.sin(2*toroidal_launch_angle) * np.cos(poloidal_launch_angle)
+    K_Z_launch = wavenumber_K0 * np.sin(poloidal_launch_angle)
     K_launch_cartesian = np.array([K_X_launch, K_Y_launch, K_Z_launch])
+    # K_R_launch    = wavenumber_K0 * np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
+    # K_zeta_launch = wavenumber_K0 * np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle) * q_R_launch
+    # K_X_launch = K_R_launch*(q_X_launch / q_R_launch) - K_zeta_launch*(q_Y_launch/q_R_launch**2)
+    # K_Y_launch = K_R_launch*(q_Y_launch / q_R_launch) + K_zeta_launch*(q_X_launch/q_R_launch**2)
+    # K_Z_launch = wavenumber_K0 * np.sin(poloidal_launch_angle)
+    # K_launch_cartesian = np.array([K_X_launch, K_Y_launch, K_Z_launch])
 
-    # Finding Psi_3D_launch_labframe_cartesian
-    diag = wavenumber_K0*launch_beam_curvature + 2j/launch_beam_width**2 # K_0/R + 2i/W^2
-    Psi_3D_launch_beamframe = np.array([[diag, 0,    0],
-                                        [0,    diag, 0],
-                                        [0,    0,    0]])
+    # Finding Psi_w_launch_beamframe_cartesian and Psi_3D_launch_beamframe_cartesian
+    # Entries on the off-diagonal = 0, because beamframe
+    # Entries on the diagonal = K_0/R + 2i/W^2, where:
+    #    R is beam radius of curvature (in metres); and
+    #    W is beam width (in metres)
+    # First row/column is y-direction; second is x-direction; third is g-direction (beamframe)
+    # Not to be confused with X-, Y-, Z-directions (labframe)
+    diag = wavenumber_K0*launch_beam_curvature + 2j/launch_beam_width**2
+    Psi_w_launch_beamframe_cartesian = diag * np.eye(2)
+    Psi_3D_launch_beamframe_cartesian = make_array_3x3(Psi_w_launch_beamframe_cartesian)
     
+    # Setting up the rotation matrices, so that we can convert
+    # Psi_3D_launch_beamframe_cartesian into Psi_3D_launch_labframe_cartesian
     toroidal_rotation_angle = toroidal_launch_angle
     sin_tor = np.sin(toroidal_rotation_angle)
     cos_tor = np.cos(toroidal_rotation_angle)
@@ -88,11 +105,78 @@ def launch_beam_3D(
     rotation_matrix = np.matmul(poloidal_rotation_matrix, toroidal_rotation_matrix)
     rotation_matrix_inverse = np.transpose(rotation_matrix)
 
-    # Psi_labframe = R^-1 * Psi_beamframe * R
-    Psi_3D_launch_labframe_cartesian = np.matmul(rotation_matrix_inverse, np.matmul(Psi_3D_launch_beamframe, rotation_matrix))
+    # Finding Psi_3D_launch_labframe_cartesian using:
+    # Psi_labframe = R^-1 * Psi_beamframe * R, where
+    #    R is the rotation matrix to convert a vector from beamframe to labframe
+    Psi_3D_launch_labframe_cartesian = np.matmul(rotation_matrix_inverse, np.matmul(Psi_3D_launch_beamframe_cartesian, rotation_matrix))
 
-    if vacuum_propagation_flag: print("Not done yet! Only vacuum_propagation_flag = False is supported.")
-    else: return launch_position_cartesian, K_launch_cartesian, Psi_3D_launch_labframe_cartesian
+    # If vacuum_propagation_flag is False, that most likely means
+    # we want to start the propagation from just outside the plasma
+    if not vacuum_propagation_flag:
+        return (q_launch_cartesian, # q_launch_cartesian,
+                None,               # q_initial_cartesian,
+                None, # distance_from_launch_to_entry,
+                K_launch_cartesian, # K_launch_cartesian,
+                K_launch_cartesian, # K_initial_cartesian,
+                Psi_3D_launch_labframe_cartesian, # Psi_3D_launch_labframe_cartesian,
+                None,                             # Psi_3D_entry_labframe_cartesian,
+                Psi_3D_launch_labframe_cartesian, # Psi_3D_initial_labframe_cartesian,
+                )
+
+    # If vacuum_propagation_flag is True, then the beam is launched
+    # from outside the plasma, and now we have to propagate the beam
+    # until it reaches the plasma boundary, and then apply either the
+    # continuous or discontinuous boundary conditions to find K_entry
+    # and Psi_entry when the beam enters the plasma
+    Psi_w_inverse_launch_beamframe_cartesian = find_inverse_2D(Psi_w_launch_beamframe_cartesian)
+    q_initial_cartesian = find_entry_point_3D(
+        q_launch_cartesian,
+        poloidal_launch_angle,
+        toroidal_launch_angle,
+        poloidal_flux_enter,
+        field,
+    )
+    distance_from_launch_to_entry = np.sqrt(
+        (q_initial_cartesian[0] - q_initial_cartesian[0])**2 
+        + (q_initial_cartesian[1] - q_initial_cartesian[1])**2
+        + (q_initial_cartesian[2] - q_initial_cartesian[2])**2
+    )
+    Psi_w_inverse_entry_beamframe_cartesian = (
+        distance_from_launch_to_entry / wavenumber_K0 * np.eye(2)
+        + Psi_w_inverse_launch_beamframe_cartesian)
+    
+    # 'Psi_3D_entry' is still in vacuum, so the components of Psi in the
+    # beam frame along g are all zero (since grad_H = 0)
+    Psi_3D_entry_beamframe_cartesian = make_array_3x3(find_inverse_2D(Psi_w_inverse_entry_beamframe_cartesian))
+    Psi_3D_entry_labframe_cartesian = np.matmul(rotation_matrix_inverse, np.matmul(Psi_3D_entry_beamframe_cartesian, rotation_matrix))
+
+    # Now we have the Psi at the plasma boundary, so we apply the
+    # continuous or discontinuous boundary conditions to find K_entry
+    # and Psi_entry when the beam enters the plasma. Here, we use
+    # K_entry and Psi_entry (without boundary conditions) and get
+    # K_initial and Psi_initial (with boundary conditions) which are
+    # later fed into the `solve_ivp` as the initial values
+    if Psi_BC_flag == "discontinuous":
+        K_initial_cartesian, Psi_3D_initial_labframe_cartesian = apply_discontinuous_BC_3D(
+            # to do
+        )
+    elif Psi_BC_flag == "continuous":
+        K_initial_cartesian, Psi_3D_initial_labframe_cartesian = apply_continuous_BC_3D(
+            # to do
+        )
+    else: # No BC case
+        K_initial_cartesian = K_launch_cartesian
+        Psi_3D_initial_labframe_cartesian = Psi_3D_entry_labframe_cartesian
+
+    return (q_launch_cartesian,  # q_launch_cartesian,
+            q_initial_cartesian, # q_initial_cartesian,
+            distance_from_launch_to_entry, # distance_from_launch_to_entry,
+            K_launch_cartesian,  # K_launch_cartesian,
+            K_initial_cartesian, # K_initial_cartesian,
+            Psi_3D_launch_labframe_cartesian,  # Psi_3D_launch_labframe_cartesian,
+            Psi_3D_entry_labframe_cartesian,   # Psi_3D_entry_labframe_cartesian,
+            Psi_3D_initial_labframe_cartesian, # Psi_3D_initial_labframe_cartesian,
+            )
 
 
 
