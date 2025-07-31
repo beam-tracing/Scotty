@@ -1,40 +1,73 @@
+from scipy.optimize import newton
 import numpy as np
-from scotty.fun_general import find_normalised_gyro_freq, find_normalised_plasma_freq, find_mode_flag_sign
+from scotty.fun_general import (
+    angular_frequency_to_wavenumber,
+    find_Booker_alpha,
+    find_Booker_beta,
+    find_Booker_gamma,
+    find_mode_flag_sign,
+    find_normalised_gyro_freq,
+    find_normalised_plasma_freq,
+)
 
-def find_Psi_3D_plasma_with_continuous_BC(
+from scotty.geometry_3D import MagneticField_3D_Cartesian
+from scotty.typing import FloatArray
+
+def check_vector_pointing_into_plasma(q_X: float, q_Y: float, q_Z: float, vector: FloatArray, field: MagneticField_3D_Cartesian):
+    if np.size(vector) != 3: raise ValueError(f"The vector provided must only be 3-D!")
+    else: unitvector = vector / np.sqrt(vector[0]**2 + vector[1]**2 + vector[2]**2)
+
+    q_X_minus, q_Y_minus, q_Z_minus = (q_X, q_Y, q_Z) - 0.01*unitvector
+    q_X_plus,  q_Y_plus,  q_Z_plus  = (q_X, q_Y, q_Z) + 0.01*unitvector
+
+    polflux_at_q_minus = field.polflux(q_X_minus, q_Y_minus, q_Z_minus)
+    polflux_at_q = field.polflux(q_X, q_Y, q_Z)
+    polflux_at_q_plus = field.polflux(q_X_plus, q_Y_plus, q_Z_plus)
+
+    if polflux_at_q_minus < polflux_at_q < polflux_at_q_plus: raise ValueError(f"K_plasma is pointing out of the plasma!")
+    elif polflux_at_q_plus < polflux_at_q < polflux_at_q_minus: pass
+    else: raise ValueError(f"Unable to check if K_plasma is pointing in or out of the plasma!")
+
+
+
+def apply_continuous_BC_3D(
+        q_X, q_Y, q_Z,
+        K_X, K_Y, K_Z,
         Psi_3D_vacuum_labframe_cartesian,
-        dH_dX,
-        dH_dY,
-        dH_dZ,
-        dH_dKx,
-        dH_dKy,
-        dH_dKz,
-        dp_dX,  # d_polflux_dX
-        dp_dY,  # d_polflux_dY
-        dp_dZ): # d_polflux_dZ
+        field,
+        hamiltonian,
+        delta_X, delta_Y, delta_Z):
     
     # For continuous n_e across the plasma-vacuum boundary,
     # but discontinuous grad(n_e).
+    #
+    # In the continuous boundary condition case, the
+    # continuity of the electron density means that the
+    # K_plasma = K_vacuum. Hence we only concern ourselves
+    # with finding Psi_3D_plasma
     #
     # Comments from the original function code:
         # Potential future improvement: write wrapper function
         # to wrap find_Psi_3D_plasma_continuous and
         # find_Psi_3D_plasma_discontinuous
+    
+    # Getting important quantities
+    dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
+    dH_dX = dH["dH_dX"]
+    dH_dY = dH["dH_dY"]
+    dH_dZ = dH["dH_dZ"]
+    dH_dKx = dH["dH_dKx"]
+    dH_dKy = dH["dH_dKy"]
+    dH_dKz = dH["dH_dKz"]
+    dp_dX = field.d_polflux_dX(q_X, q_Y, q_Z, delta_X)
+    dp_dY = field.d_polflux_dY(q_X, q_Y, q_Z, delta_Y)
+    dp_dZ = field.d_polflux_dZ(q_X, q_Y, q_Z, delta_Z)
 
     # Gradients at the plasma-vacuum boundary can be
     # finnicky, so it's good to check
-    if np.isnan(dH_dX):
-        raise ValueError("Error, dH_dX is NaN when applying continuous boundary conditions in \n `apply_continuous_BC_to_Psi_3D_cartesian`")
-    elif np.isnan(dH_dY):
-        raise ValueError("Error, dH_dY is NaN when applying continuous boundary conditions in \n `apply_continuous_BC_to_Psi_3D_cartesian`")
-    elif np.isnan(dH_dZ):
-        raise ValueError("Error, dH_dZ is NaN when applying continuous boundary conditions in \n `apply_continuous_BC_to_Psi_3D_cartesian`")
-    elif np.isnan(dH_dKx):
-        raise ValueError("Error, dH_dKx is NaN when applying continuous boundary conditions in \n `apply_continuous_BC_to_Psi_3D_cartesian`")
-    elif np.isnan(dH_dKy):
-        raise ValueError("Error, dH_dKy is NaN when applying continuous boundary conditions in \n `apply_continuous_BC_to_Psi_3D_cartesian`")
-    elif np.isnan(dH_dKz):
-        raise ValueError("Error, dH_dKz is NaN when applying continuous boundary conditions in \n `apply_continuous_BC_to_Psi_3D_cartesian`")
+    for gradient in dH.keys():
+        if np.isnan(dH[gradient]):
+            raise ValueError(f"Error: {gradient} is NaN when applying continuous boundary conditions in \n `apply_continuous_BC_3D`")
     
     # At the plasma-vacuum boundary, we have two Psi matrices:
     # one corresponding to Psi in the plasma, and the other
@@ -103,38 +136,6 @@ def find_Psi_3D_plasma_with_continuous_BC(
     Psi_3D_plasma_labframe_cartesian[1, 2] = Psi_YZ_p
     Psi_3D_plasma_labframe_cartesian[2, 1] = Psi_3D_plasma_labframe_cartesian[1, 2]
 
-    return Psi_3D_plasma_labframe_cartesian
-
-
-
-def apply_continuous_BC_3D(
-        q_X, q_Y, q_Z,
-        K_X, K_Y, K_Z,
-        Psi_3D_vacuum_labframe_cartesian,
-        field,
-        hamiltonian,
-        delta_X, delta_Y, delta_Z):
-    
-    # In the continuous boundary condition case,
-    # the continuity of the electron density means
-    # that the K_plasma = K_vacuum. Hence we only
-    # concern ourselves with finding Psi_3D_plasma
-    
-    dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
-
-    Psi_3D_plasma_labframe_cartesian = find_Psi_3D_plasma_with_continuous_BC(
-        Psi_3D_vacuum_labframe_cartesian,
-        dH["dH_dX"],
-        dH["dH_dY"],
-        dH["dH_dZ"],
-        dH["dH_dKx"],
-        dH["dH_dKy"],
-        dH["dH_dKz"],
-        field.dpolflux_dX(q_X, q_Y, q_Z, delta_X),
-        field.dpolflux_dY(q_X, q_Y, q_Z, delta_Y),
-        field.dpolflux_dZ(q_X, q_Y, q_Z, delta_Z),
-    )
-
     return [K_X, K_Y, K_Z], Psi_3D_plasma_labframe_cartesian
 
 
@@ -147,13 +148,51 @@ def apply_continuous_BC_3D(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+def find_H_bar_3D(
+        K_parallel, K_binormal, K_normal,
+        parallel_unitvector, binormal_unitvector, normal_unitvector,
+        B_X, B_Y, B_Z,
+        electron_density, launch_angular_frequency, temperature, mode_flag, mode_flag_sign):
+    
+    K_0 = angular_frequency_to_wavenumber(launch_angular_frequency)
+    K_cartesian = K_parallel*parallel_unitvector + K_binormal*binormal_unitvector + K_normal*normal_unitvector
+    K_X, K_Y, K_Z = K_cartesian
+    K_magnitude = np.sqrt(K_X**2 + K_Y**2 + K_Z**2)
+    B_magnitude = np.sqrt(B_X**2 + B_Y**2 + B_Z**2)
+    sin_theta_m = (K_X*B_X + K_Y*B_Y + K_Z*B_Z) / (K_magnitude*B_magnitude)
+    sin_theta_m_sq = sin_theta_m**2
+
+    Booker_alpha = find_Booker_alpha(electron_density, B_magnitude, sin_theta_m_sq, launch_angular_frequency, temperature)
+    Booker_beta  = find_Booker_beta(electron_density, B_magnitude, sin_theta_m_sq, launch_angular_frequency, temperature)
+    Booker_gamma = find_Booker_gamma(electron_density, B_magnitude, launch_angular_frequency, temperature)
+
+    H_bar = K_magnitude**2 + K_0**2 * (
+        (Booker_beta + mode_flag*mode_flag_sign*np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma))
+        / (2*Booker_alpha)
+    )
+
+    return H_bar
+
+
+
 def find_K_plasma_with_discontinuous_BC(
     q_X, q_Y, q_Z,
     K_X, K_Y, K_Z,
-    B_X, B_Y, B_Z,
-    electron_density_p, launch_angular_frequency, temperature, mode_flag,
-    dp_dX, dp_dY, dp_dZ
-    ):
+    field,
+    electron_density_p, launch_angular_frequency, temperature, mode_flag):
 
     # For discontinuous n_e across the plasma-vacuum boundary
     #
@@ -161,6 +200,14 @@ def find_K_plasma_with_discontinuous_BC(
         # I'm not sure if this works when the mismatch angle is close to 90deg
         # In my experience, it's difficult to reach such a situation
         # Seems to work for a mismatch angle up to 50ish deg
+    
+    # Getting important quantities
+    B_X = field.B_X(q_X, q_Y, q_Z)
+    B_Y = field.B_Y(q_X, q_Y, q_Z)
+    B_Z = field.B_Z(q_X, q_Y, q_Z)
+    dp_dX = field.d_polflux_dX(q_X, q_Y, q_Z)
+    dp_dY = field.d_polflux_dY(q_X, q_Y, q_Z)
+    dp_dZ = field.d_polflux_dZ(q_X, q_Y, q_Z)
     
     # Checks the plasma density
     B_magnitude = np.sqrt(B_X**2 + B_Y**2 + B_Z**2)
@@ -189,26 +236,196 @@ def find_K_plasma_with_discontinuous_BC(
     # component (normal to the surface) can then be found by solving
     # the dispersion relation H = 0
 
-    # parallel_vector1 corresponds to delta_X = 0
-    # parallel_vector2 corresponds to delta_Y = 0
-    # normal vector = parallel_vector1 x parallel_vector2
-    parallel_vector1 = np.array([0, -dp_dZ, dp_dY]) / np.sqrt(dp_dY**2 + dp_dZ**2)
-    parallel_vector2 = np.array([-dp_dZ, 0, dp_dX]) / np.sqrt(dp_dX**2 + dp_dZ**2)
-    normal_vector = np.array([-dp_dX*dp_dZ, dp_dY*dp_dZ, -dp_dZ**2]) / np.sqrt((dp_dX*dp_dZ)**2 + (dp_dY*dp_dZ)**2 + dp_dZ**4)
-    binormal_vector = None # finish on Tuesday
+    # parallel_vector1 corresponds to delta_X = 0 and is equal to
+        # np.array([0, -dp_dZ, dp_dY]) / np.sqrt( dp_dY**2 + dp_dZ**2 )
+    # parallel_vector2 corresponds to delta_Y = 0 and is equal to
+        # np.array([-dp_dZ, 0, dp_dX]) / np.sqrt( dp_dX**2 + dp_dZ**2 )
+    # normal_vector = parallel_vector1 x parallel_vector2 and is equal to
+        # np.array([-dp_dX*dp_dZ, dp_dY*dp_dZ, -dp_dZ**2]) / np.sqrt( (dp_dX*dp_dZ)**2 + (dp_dY*dp_dZ)**2 + (dp_dZ**2)**2 )
+    # binormal_vector = parallel_vector1 x normal_vector
+    parallel_unitvector1 = np.array([0, -dp_dZ, dp_dY]) / np.sqrt( dp_dY**2 + dp_dZ**2 )
+    normal_unitvector = np.array([-dp_dX*dp_dZ, dp_dY*dp_dZ, -dp_dZ**2]) / np.sqrt( (dp_dX*dp_dZ)**2 + (dp_dY*dp_dZ)**2 + (dp_dZ**2)**2 )
+    binormal_unitvector = np.array([dp_dZ**3-dp_dY**2*dp_dZ, -dp_dX*dp_dY*dp_dZ, -dp_dX*dp_dZ**2]) / np.sqrt( (dp_dZ**3-dp_dY**2*dp_dZ)**2 + (dp_dX*dp_dY*dp_dZ)**2 + (dp_dX*dp_dZ**2)**2 )
 
+    # Checking to see if the normal vector points into or out of
+    # the plasma by comparing the poloidal flux value at (q_X, q_Y, q_Z)
+    # and at a point in the direction of the normal vector away from
+    # (q_X, q_Y, q_Z). This makes sure that the normal vector points
+    # into the plasma
+    polflux_at_boundary = field.polflux(q_X, q_Y, q_Z)
+    new_q_X, new_q_Y, new_q_Z = (q_X, q_Y, q_Z) + 0.01*normal_unitvector
+    polflux_at_new_point = field.polflux(new_q_X, new_q_Y, new_q_Z)
+    if polflux_at_boundary < polflux_at_new_point: normal_unitvector = -normal_unitvector
 
+    # We project K_vacuum onto parallel_vector1 and binormal_vector
+    # to find K_parallel and K_binormal
+    K_vacuum = np.array([K_X, K_Y, K_Z])
+    K_parallel = np.dot(K_vacuum, parallel_unitvector1)
+    K_binormal = np.dot(K_vacuum, binormal_unitvector)
 
-
-
-
-
-
-    find_normalised_gyro_freq
+    # Now we find the component of K_plasma normal to the flux surface
+    # by using the dispersion relation H = 0. We first guess what it
+    # could be, and then use that to numerically compute what it
+    # actually is. This guess will be exact if theta_m = 0
+    K_0 = angular_frequency_to_wavenumber(launch_angular_frequency)
+    K_magnitude = np.sqrt(K_X**2 + K_Y**2 + K_Z**2)
+    sin_theta_m = (K_X*B_X + K_Y*B_Y + K_Z*B_Z) / (K_magnitude*B_magnitude)
+    sin_theta_m_sq = sin_theta_m**2
+    Booker_alpha = find_Booker_alpha(electron_density_p, B_magnitude, sin_theta_m_sq, launch_angular_frequency, temperature)
+    Booker_beta  = find_Booker_beta(electron_density_p, B_magnitude, sin_theta_m_sq, launch_angular_frequency, temperature)
+    Booker_gamma = find_Booker_gamma(electron_density_p, B_magnitude, launch_angular_frequency, temperature)
+    K_normal_plasma_initial_guess = np.sqrt(
+        abs(K_parallel**2 + K_binormal**2 + K_0**2 * (
+                (Booker_beta + mode_flag*mode_flag_sign*np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma))
+                / (2*Booker_alpha)
+                )
+            )
+        )
     
+    def find_H_bar_3D_wrapper(K_normal_plasma_initial_guess):
+        return find_H_bar_3D(
+            K_parallel, K_binormal, K_normal_plasma_initial_guess,
+            parallel_unitvector1, normal_unitvector, binormal_unitvector,
+            B_X, B_Y, B_Z,
+            electron_density_p, launch_angular_frequency, temperature, mode_flag, mode_flag_sign)
     
+    # Comments from the original function code:
+        # This will fail if the beam is too glancing such that there
+        # is no possible K_normal_plasma that satisfies H = 0
+    K_normal_plasma = newton(find_H_bar_3D_wrapper, K_normal_plasma_initial_guess, tol=1e-6, maxiter=1000)
+
+    # After finding K_normal_plasma, we now find K_plasma
+    K_plasma = K_parallel*parallel_unitvector1 + K_binormal*binormal_unitvector + K_normal_plasma*normal_unitvector
+
+    # To make sure K_plasma is valid, we
+        # i) check if it points into the plasma; and
+        # ii) check if it satisfies H = 0
+    check_vector_pointing_into_plasma(q_X, q_Y, q_Z, K_plasma, field)
+
+    H_bar_check = find_H_bar_3D(
+        K_plasma[0],       K_plasma[1],       K_plasma[2],
+        np.array([1,0,0]), np.array([0,1,0]), np.array([0,0,1]),
+        B_X,               B_Y,               B_Z,
+        electron_density_p, launch_angular_frequency, temperature, mode_flag, mode_flag_sign)
+
+    if abs(H_bar_check) > 1e-3:
+        raise ValueError(f"Unable to find K_plasma with discontinuous boundary conditions! \n H_bar_check = {H_bar_check}")
     
+    return K_plasma
+
+
+
+
+
+
+
+
+
+
+
+def find_Psi_3D_plasma_with_discontinuous_BC(
+        q_X, q_Y, q_Z,
+        K_X, K_Y, K_Z,
+        Psi_3D_vacuum_labframe_cartesian,
+        field,
+        hamiltonian,
+        delta_X, delta_Y, delta_Z):
     
+    # For discontinuous n_e across the plasma-vacuum boundary
     
+    # Getting important quantities
+    dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
+    dH_dX = dH["dH_dX"]
+    dH_dY = dH["dH_dY"]
+    dH_dZ = dH["dH_dZ"]
+    dH_dKx = dH["dH_dKx"]
+    dH_dKy = dH["dH_dKy"]
+    dH_dKz = dH["dH_dKz"]
+    dp_dX = field.d_polflux_dX(q_X, q_Y, q_Z, delta_X)
+    dp_dY = field.d_polflux_dY(q_X, q_Y, q_Z, delta_Y)
+    dp_dZ = field.d_polflux_dZ(q_X, q_Y, q_Z, delta_Z)
+    d2p_dX2  = field.d2_polflux_dX2(q_X, q_Y, q_Z, delta_X)
+    d2p_dY2  = field.d2_polflux_dY2(q_X, q_Y, q_Z, delta_Y)
+    d2p_dZ2  = field.d2_polflux_dZ2(q_X, q_Y, q_Z, delta_Z)
+    d2p_dXdY = field.d2_polflux_dXdY(q_X, q_Y, q_Z, delta_X, delta_Y)
+    d2p_dXdZ = field.d2_polflux_dXdZ(q_X, q_Y, q_Z, delta_X, delta_Z)
+    d2p_dYdZ = field.d2_polflux_dYdZ(q_X, q_Y, q_Z, delta_Y, delta_Z)
+
+    # At the plasma-vacuum boundary, we have two Psi matrices:
+    # one corresponding to Psi in the plasma, and the other
+    # corresponding to Psi in the vacuum. We denote these by
+    # the subscripts 'p' and 'v' respectively
+    Psi_XX_v = Psi_3D_vacuum_labframe_cartesian[0, 0]
+    Psi_XY_v = Psi_3D_vacuum_labframe_cartesian[0, 1]
+    Psi_XZ_v = Psi_3D_vacuum_labframe_cartesian[0, 2]
+    Psi_YY_v = Psi_3D_vacuum_labframe_cartesian[1, 1]
+    Psi_YZ_v = Psi_3D_vacuum_labframe_cartesian[1, 2]
+    Psi_ZZ_v = Psi_3D_vacuum_labframe_cartesian[2, 2]
+
+    # Now we set up the interface matrix using 6 linearly
+    # independent equations to obtain a relation between the
+    # entries of "Psi_v" and "Psi_p"
+    interface_matrix = np.zeros([6, 6])
+    interface_matrix[0, 0] = dp_dY**2
+    interface_matrix[0, 1] = -2 * dp_dX * dp_dY
+    interface_matrix[0, 3] = dp_dX**2
+    interface_matrix[1, 0] = dp_dZ**2
+    interface_matrix[1, 2] = -2 * dp_dX * dp_dZ
+    interface_matrix[1, 5] = dp_dX**2
+    interface_matrix[2, 3] = dp_dZ**2
+    interface_matrix[2, 4] = -2 * dp_dY * dp_dZ
+    interface_matrix[2, 5] = dp_dY**2
+    interface_matrix[3, 0] = dH_dKx
+    interface_matrix[3, 1] = dH_dKy
+    interface_matrix[3, 2] = dH_dKz
+    interface_matrix[4, 1] = dH_dKx
+    interface_matrix[4, 3] = dH_dKy
+    interface_matrix[4, 4] = dH_dKz
+    interface_matrix[5, 2] = dH_dKx
+    interface_matrix[5, 4] = dH_dKy
+    interface_matrix[5, 5] = dH_dKz
+
+    # For the discontinuous boundary conditions,
+    # K_vacuum =/= K_plasma in general, and this introduces
+    # an `eta` term for each case delta_X, delta_Y, delta_Z = 0
+    # corresponding to displacements in the YZ, XZ, and XY-planes,
+    # respectively, which also corresponds to eta_YZ, eta_XZ,
+    # and eta_XY respectively
+    eta_YZ = -0.5 * (d2p_dY2*dp_dZ**2 + 2*d2p_dYdZ*dp_dY*dp_dZ + d2p_dZ2*dp_dY**2) / (dp_dY**2 + dp_dZ**2)
+    eta_XZ = -0.5 * (d2p_dX2*dp_dZ**2 + 2*d2p_dXdZ*dp_dX*dp_dZ + d2p_dZ2*dp_dX**2) / (dp_dX**2 + dp_dZ**2)
+    eta_XY = -0.5 * (d2p_dX2*dp_dY**2 + 2*d2p_dXdY*dp_dX*dp_dY + d2p_dY2*dp_dX**2) / (dp_dX**2 + dp_dY**2)
     
-    find_normalised_plasma_freq, find_mode_flag_sign
+    # Comment from the original function code:
+        # interface_matrix will be singular if one tries to
+        # transition while still in vacuum (and there's no
+        # plasma at all); at least that's what happens in
+        # my experience
+    interface_matrix_inverse = np.linalg.inv(interface_matrix)
+
+    RHS_vector = [(Psi_XX_v * dp_dY**2) + (Psi_YY_v * dp_dX**2) - (2 * Psi_XY_v * dp_dX * dp_dY),
+                  (Psi_XX_v * dp_dZ**2) + (Psi_ZZ_v * dp_dX**2) - (2 * Psi_XZ_v * dp_dX * dp_dZ),
+                  (Psi_YY_v * dp_dZ**2) + (Psi_ZZ_v * dp_dY**2) - (2 * Psi_YZ_v * dp_dY * dp_dZ),
+                  -dH_dX,
+                  -dH_dY,
+                  -dH_dZ]
+
+    [Psi_XX_p,
+     Psi_XY_p,
+     Psi_XZ_p,
+     Psi_YY_p,
+     Psi_YZ_p,
+     Psi_ZZ_p] = np.matmul(interface_matrix_inverse, RHS_vector)
+
+    # Forming back up to get Psi in the plasma
+    Psi_3D_plasma_labframe_cartesian = np.zeros([3, 3], dtype="complex128")
+    Psi_3D_plasma_labframe_cartesian[0, 0] = Psi_XX_p
+    Psi_3D_plasma_labframe_cartesian[1, 1] = Psi_YY_p
+    Psi_3D_plasma_labframe_cartesian[2, 2] = Psi_ZZ_p
+    Psi_3D_plasma_labframe_cartesian[0, 1] = Psi_XY_p
+    Psi_3D_plasma_labframe_cartesian[1, 0] = Psi_3D_plasma_labframe_cartesian[0, 1]
+    Psi_3D_plasma_labframe_cartesian[0, 2] = Psi_XZ_p
+    Psi_3D_plasma_labframe_cartesian[2, 0] = Psi_3D_plasma_labframe_cartesian[0, 2]
+    Psi_3D_plasma_labframe_cartesian[1, 2] = Psi_YZ_p
+    Psi_3D_plasma_labframe_cartesian[2, 1] = Psi_3D_plasma_labframe_cartesian[1, 2]
+
+    return [K_X, K_Y, K_Z], Psi_3D_plasma_labframe_cartesian
