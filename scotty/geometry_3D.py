@@ -99,7 +99,7 @@ class MagneticField_3D_Cartesian(ABC):
                      Y: ArrayLike,
                      Z: ArrayLike,
                      delta_X: float,
-                     delta_Y: float) -> FloatArray:
+                     delta_Z: float) -> FloatArray:
         raise NotImplementedError
     
     def d2_polflux_dYdZ(self,
