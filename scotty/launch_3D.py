@@ -6,6 +6,7 @@ from scotty.fun_general import (
     make_array_3x3,
     toroidal_to_cartesian,
 )
+from scotty.fun_general_3D import apply_BC_3D
 from scotty.geometry_3D import MagneticField_3D_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
 from scotty.typing import FloatArray
@@ -34,27 +35,17 @@ def launch_beam_3D(
 ):
     
     if Psi_BC_flag is True:
-        warnings.warn(
-            "Boolean `Psi_BC_flag` is deprecated, please use None, 'continuous', or 'discontinuous'",
-            DeprecationWarning,
-        )
+        warnings.warn("Boolean `Psi_BC_flag` is deprecated, please use None, 'continuous', or 'discontinuous'", DeprecationWarning)
         print("Setting Psi_BC_flag = 'continuous' for backward compatibility")
         Psi_BC_flag = "continuous"
     elif Psi_BC_flag is False:
-        warnings.warn(
-            "Boolean `Psi_BC_flag` is deprecated, please use None, 'continuous', or 'discontinuous'",
-            DeprecationWarning,
-        )
-        print("Setting Psi_BC_flag = None for backward compatibility ")
+        warnings.warn("Boolean `Psi_BC_flag` is deprecated, please use None, 'continuous', or 'discontinuous'", DeprecationWarning)
+        print("Setting Psi_BC_flag = None for backward compatibility")
         Psi_BC_flag = None
-    elif (
-        (Psi_BC_flag is not None)
-        and (Psi_BC_flag != "continuous")
-        and (Psi_BC_flag != "discontinuous")
-    ):
-        raise ValueError(
-            f"Unexpected value for `Psi_BC_flag` ({Psi_BC_flag}), expected one of None, 'continuous, or 'discontinuous'"
-        )
+    elif ( (Psi_BC_flag is not None) and
+           (Psi_BC_flag != "continuous") and
+           (Psi_BC_flag != "discontinuous") ):
+        raise ValueError(f"Unexpected value for `Psi_BC_flag` ({Psi_BC_flag}), expected one of None, 'continuous, or 'discontinuous'")
     
     q_launch_cartesian = launch_position_cartesian
     # q_X_launch, q_Y_launch, q_Z_launch = q_launch_cartesian
@@ -64,7 +55,7 @@ def launch_beam_3D(
     poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_Torbeam) + np.pi
 
     # Finding K_launch
-    wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
+    wavenumber_K0 = hamiltonian.wavenumber_K0
     K_X_launch = wavenumber_K0 * np.cos(2*toroidal_launch_angle) * np.cos(poloidal_launch_angle)
     K_Y_launch = wavenumber_K0 * np.sin(2*toroidal_launch_angle) * np.cos(poloidal_launch_angle)
     K_Z_launch = wavenumber_K0 * np.sin(poloidal_launch_angle)
@@ -156,13 +147,14 @@ def launch_beam_3D(
     # K_entry and Psi_entry (without boundary conditions) and get
     # K_initial and Psi_initial (with boundary conditions) which are
     # later fed into the `solve_ivp` as the initial values
-    if Psi_BC_flag == "discontinuous":
-        K_initial_cartesian, Psi_3D_initial_labframe_cartesian = apply_discontinuous_BC_3D(
-            # to do
-        )
-    elif Psi_BC_flag == "continuous":
-        K_initial_cartesian, Psi_3D_initial_labframe_cartesian = apply_continuous_BC_3D(
-            # to do
+    if (Psi_BC_flag == "discontinuous") or (Psi_BC_flag == "continuous"):
+        K_initial_cartesian, Psi_3D_initial_labframe_cartesian = apply_BC_3D(
+            q_initial_cartesian[0], q_initial_cartesian[1], q_initial_cartesian[2], # q_X, q_Y, q_Z
+            K_X_launch, K_Y_launch, K_Z_launch,
+            Psi_3D_entry_labframe_cartesian,
+            field,
+            hamiltonian,
+            Psi_BC_flag,
         )
     else: # No BC case
         K_initial_cartesian = K_launch_cartesian

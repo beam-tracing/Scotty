@@ -9,9 +9,10 @@ from scotty.fun_general import (
     find_normalised_gyro_freq,
     find_normalised_plasma_freq,
 )
-
 from scotty.geometry_3D import MagneticField_3D_Cartesian
+from scotty.hamiltonian_3D import Hamiltonian_3D
 from scotty.typing import FloatArray
+from typing import Union
 
 def check_vector_pointing_into_plasma(q_X: float, q_Y: float, q_Z: float, vector: FloatArray, field: MagneticField_3D_Cartesian):
     if np.size(vector) != 3: raise ValueError(f"The vector provided must only be 3-D!")
@@ -31,12 +32,11 @@ def check_vector_pointing_into_plasma(q_X: float, q_Y: float, q_Z: float, vector
 
 
 def apply_continuous_BC_3D(
-        q_X, q_Y, q_Z,
-        K_X, K_Y, K_Z,
-        Psi_3D_vacuum_labframe_cartesian,
-        field,
-        hamiltonian,
-        delta_X, delta_Y, delta_Z):
+    q_X: float, q_Y: float, q_Z: float,
+    K_X: float, K_Y: float, K_Z: float,
+    Psi_3D_vacuum_labframe_cartesian: FloatArray,
+    field: MagneticField_3D_Cartesian,
+    hamiltonian: Hamiltonian_3D):
     
     # For continuous n_e across the plasma-vacuum boundary,
     # but discontinuous grad(n_e).
@@ -52,6 +52,7 @@ def apply_continuous_BC_3D(
         # find_Psi_3D_plasma_discontinuous
     
     # Getting important quantities
+    delta_X, delta_Y, delta_Z = hamiltonian.spacings["delta_X"], hamiltonian.spacings["delta_Y"], hamiltonian.spacings["delta_Z"]
     dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
     dH_dX = dH["dH_dX"]
     dH_dY = dH["dH_dY"]
@@ -140,32 +141,11 @@ def apply_continuous_BC_3D(
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def find_H_bar_3D(
-        K_parallel, K_binormal, K_normal,
-        parallel_unitvector, binormal_unitvector, normal_unitvector,
-        B_X, B_Y, B_Z,
-        electron_density, launch_angular_frequency, temperature, mode_flag, mode_flag_sign):
+    K_parallel, K_binormal, K_normal,
+    parallel_unitvector, binormal_unitvector, normal_unitvector,
+    B_X, B_Y, B_Z,
+    electron_density, launch_angular_frequency, temperature, mode_flag, mode_flag_sign):
     
     K_0 = angular_frequency_to_wavenumber(launch_angular_frequency)
     K_cartesian = K_parallel*parallel_unitvector + K_binormal*binormal_unitvector + K_normal*normal_unitvector
@@ -315,26 +295,19 @@ def find_K_plasma_with_discontinuous_BC(
 
 
 
-
-
-
-
-
-
-
-
 def find_Psi_3D_plasma_with_discontinuous_BC(
-        q_X, q_Y, q_Z,
-        K_X, K_Y, K_Z,
-        Psi_3D_vacuum_labframe_cartesian,
-        field,
-        hamiltonian,
-        delta_X, delta_Y, delta_Z):
+    q_X, q_Y, q_Z,
+    K_X_v, K_Y_v, K_Z_v,
+    K_X_p, K_Y_p, K_Z_p,
+    Psi_3D_vacuum_labframe_cartesian,
+    field,
+    hamiltonian):
     
     # For discontinuous n_e across the plasma-vacuum boundary
     
     # Getting important quantities
-    dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
+    delta_X, delta_Y, delta_Z = hamiltonian.spacings["delta_X"], hamiltonian.spacings["delta_Y"], hamiltonian.spacings["delta_Z"]
+    dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X_v, K_Y_v, K_Z_v)
     dH_dX = dH["dH_dX"]
     dH_dY = dH["dH_dY"]
     dH_dZ = dH["dH_dZ"]
@@ -402,19 +375,19 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
         # my experience
     interface_matrix_inverse = np.linalg.inv(interface_matrix)
 
-    RHS_vector = [(Psi_XX_v * dp_dY**2) + (Psi_YY_v * dp_dX**2) - (2 * Psi_XY_v * dp_dX * dp_dY),
-                  (Psi_XX_v * dp_dZ**2) + (Psi_ZZ_v * dp_dX**2) - (2 * Psi_XZ_v * dp_dX * dp_dZ),
-                  (Psi_YY_v * dp_dZ**2) + (Psi_ZZ_v * dp_dY**2) - (2 * Psi_YZ_v * dp_dY * dp_dZ),
-                  -dH_dX,
-                  -dH_dY,
-                  -dH_dZ]
+    RHS_vector = [(Psi_XX_v*dp_dY**2) + (Psi_YY_v*dp_dX**2) - (2*Psi_XY_v*dp_dX*dp_dY) + 2*(K_Y_v-K_Y_p)*dp_dY*eta_YZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_YZ,
+                (Psi_XX_v*dp_dZ**2) + (Psi_ZZ_v*dp_dX**2) - (2*Psi_XZ_v*dp_dX*dp_dZ) + 2*(K_X_v-K_X_p)*dp_dX*eta_XZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_XZ,
+                (Psi_YY_v*dp_dZ**2) + (Psi_ZZ_v*dp_dY**2) - (2*Psi_YZ_v*dp_dY*dp_dZ) + 2*(K_X_v-K_X_p)*dp_dX*eta_XY + 2*(K_Y_v-K_Y_p)*dp_dY*eta_XY,
+                -dH_dX,
+                -dH_dY,
+                -dH_dZ]
 
     [Psi_XX_p,
-     Psi_XY_p,
-     Psi_XZ_p,
-     Psi_YY_p,
-     Psi_YZ_p,
-     Psi_ZZ_p] = np.matmul(interface_matrix_inverse, RHS_vector)
+    Psi_XY_p,
+    Psi_XZ_p,
+    Psi_YY_p,
+    Psi_YZ_p,
+    Psi_ZZ_p] = np.matmul(interface_matrix_inverse, RHS_vector)
 
     # Forming back up to get Psi in the plasma
     Psi_3D_plasma_labframe_cartesian = np.zeros([3, 3], dtype="complex128")
@@ -428,4 +401,63 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     Psi_3D_plasma_labframe_cartesian[1, 2] = Psi_YZ_p
     Psi_3D_plasma_labframe_cartesian[2, 1] = Psi_3D_plasma_labframe_cartesian[1, 2]
 
-    return [K_X, K_Y, K_Z], Psi_3D_plasma_labframe_cartesian
+    return Psi_3D_plasma_labframe_cartesian
+
+
+
+def apply_discontinuous_BC_3D(
+    q_X: float,   q_Y: float,   q_Z: float,
+    K_X_v: float, K_Y_v: float, K_Z_v: float,
+    Psi_3D_vacuum_labframe_cartesian: FloatArray,
+    field: MagneticField_3D_Cartesian,
+    hamiltonian: Hamiltonian_3D):
+    
+    polflux_at_boundary = field.polflux(q_X, q_Y, q_Z)
+    electron_density_p = hamiltonian.density(polflux_at_boundary)
+    launch_angular_frequency = hamiltonian.angular_frequency
+    temperature = hamiltonian.temperature
+    mode_flag = hamiltonian.mode_flag
+
+    K_plasma = find_K_plasma_with_discontinuous_BC(
+        q_X, q_Y, q_Z,
+        K_X_v, K_Y_v, K_Z_v,
+        field,
+        electron_density_p, launch_angular_frequency, temperature, mode_flag)
+    
+    Psi_3D_plasma_labframe_cartesian = find_Psi_3D_plasma_with_discontinuous_BC(
+        q_X, q_Y, q_Z,
+        K_X_v, K_Y_v, K_Z_v,
+        K_plasma[0], K_plasma[1], K_plasma[2],
+        Psi_3D_vacuum_labframe_cartesian,
+        field,
+        hamiltonian)
+    
+    return K_plasma, Psi_3D_plasma_labframe_cartesian
+
+
+
+def apply_BC_3D(
+    q_X: float, q_Y: float, q_Z: float,
+    K_X: float, K_Y: float, K_Z: float,
+    Psi_3D_vacuum_labframe_cartesian: FloatArray,
+    field: MagneticField_3D_Cartesian,
+    hamiltonian: Hamiltonian_3D,
+    Psi_BC_flag: str):
+
+    if Psi_BC_flag == "continuous":
+        K_plasma, Psi_3D_plasma_labframe_cartesian = apply_continuous_BC_3D(
+            q_X, q_Y, q_Z,
+            K_X, K_Y, K_Z,
+            Psi_3D_vacuum_labframe_cartesian,
+            field,
+            hamiltonian)
+    elif Psi_BC_flag == "discontinuous":
+        K_plasma, Psi_3D_plasma_labframe_cartesian = apply_discontinuous_BC_3D(
+            q_X, q_Y, q_Z,
+            K_X, K_Y, K_Z,
+            Psi_3D_vacuum_labframe_cartesian,
+            field,
+            hamiltonian)
+    else: raise ValueError(f"Psi_BC_flag is invalid! Only 'discontinuous', 'continuous' or None is accepted")
+    
+    return K_plasma, Psi_3D_plasma_labframe_cartesian
