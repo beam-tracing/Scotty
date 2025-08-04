@@ -327,20 +327,6 @@ def ray_evolution_3D_fun(tau, ray_parameters_3D, hamiltonian: Hamiltonian_3D):
 
 ### Declaring def propagate_ray
 
-
-propagate_ray(
-        poloidal_flux_enter,
-        launch_angular_frequency,
-        field,
-        q_initial_cartesian,
-        K_initial_cartesian,
-        hamiltonian,
-        rtol,
-        atol,
-        quick_run,
-        len_tau,
-    )
-
 def propagate_ray(
     poloidal_flux_enter: float,
     launch_angular_frequency: float,

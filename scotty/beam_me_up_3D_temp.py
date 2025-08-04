@@ -163,13 +163,13 @@ def beam_me_up_3D(
 
         entry_X, entry_Y, entry_Z = entry_coords
 
-        if field.d_polflux_dX(entry_X, entry_Y, entry_Z) > 0: delta_X = -1 * abs(delta_X)
+        if field.d_polflux_dX(entry_X, entry_Y, entry_Z, delta_X) > 0: delta_X = -1 * abs(delta_X)
         else: delta_X = abs(delta_X)
 
-        if field.d_polflux_dY(entry_X, entry_Y, entry_Z) > 0: delta_Y = -1 * abs(delta_Y)
+        if field.d_polflux_dY(entry_X, entry_Y, entry_Z, delta_Y) > 0: delta_Y = -1 * abs(delta_Y)
         else: delta_Y = abs(delta_Y)
 
-        if field.d_polflux_dZ(entry_X, entry_Y, entry_Z) > 0: delta_Z = -1 * abs(delta_Z)
+        if field.d_polflux_dZ(entry_X, entry_Y, entry_Z, delta_Z) > 0: delta_Z = -1 * abs(delta_Z)
         else: delta_Z = abs(delta_Z)
     
     # Initialises the Hamiltonian H

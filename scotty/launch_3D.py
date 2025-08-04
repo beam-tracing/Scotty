@@ -52,7 +52,7 @@ def launch_beam_3D(
     # q_R_launch = np.sqrt(q_X_launch**2 + q_Y_launch**2)
 
     toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam)
-    poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_Torbeam) + np.pi
+    poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_Torbeam)
 
     # Finding K_launch
     wavenumber_K0 = hamiltonian.wavenumber_K0
@@ -228,10 +228,24 @@ def find_entry_point_3D(
     Ny_steps = int(10 * max_length / (field.Y_coord.max() - field.Y_coord.min()))
     Nz_steps = int(10 * max_length / (field.Z_coord.max() - field.Z_coord.min()))
     tau = np.linspace(0, 1, max(100, Nx_steps, Ny_steps, Nz_steps))
-    print(tau) # TO REMOVE
-    spline = CubicSpline(tau, [poloidal_flux_boundary_along_ray_line(t) for t in tau], extrapolate=False)
+    # spline = CubicSpline(tau, [poloidal_flux_boundary_along_ray_line(t) for t in tau], extrapolate=False)
+    # spline_roots = spline.roots()
+    import math
+    print("TO REMOVE: launch position", launch_position) # TO REMOVE
+    print()
+    print("TO REMOVE: XYZ_array (steps)", XYZ_array)
+    print()
+    print("TO REMOVE: tau", tau) # TO REMOVE
+    print()
+    temp_poloidal_flux_boundary_along_ray_line = [poloidal_flux_boundary_along_ray_line(t) for t in tau]
+    print("TO REMOVE: pol_flux_bd_along_ray_line", temp_poloidal_flux_boundary_along_ray_line)
+    print()
+    temp_temp_poloidal_flux_boundary_along_ray_line = [1 if math.isnan(x) else x for x in temp_poloidal_flux_boundary_along_ray_line]
+    print("TO REMOVE: fixed? pol_flux_bd_along_ray_line", temp_temp_poloidal_flux_boundary_along_ray_line)
+    print()
+    spline = CubicSpline(tau, temp_temp_poloidal_flux_boundary_along_ray_line, extrapolate=False)
     spline_roots = spline.roots()
-
+    
     # If there are no roots, then the beam never actually enters the
     # plasma, and we should abort. We also get an idea of where the
     # closest encounter the ray line makes with the plasma is.

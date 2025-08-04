@@ -51,7 +51,7 @@ def apply_continuous_BC_3D(
         # find_Psi_3D_plasma_discontinuous
     
     # Getting important quantities
-    delta_X, delta_Y, delta_Z = hamiltonian.spacings["delta_X"], hamiltonian.spacings["delta_Y"], hamiltonian.spacings["delta_Z"]
+    delta_X, delta_Y, delta_Z = hamiltonian.spacings["X"], hamiltonian.spacings["Y"], hamiltonian.spacings["Z"]
     dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
     dH_dX = dH["dH_dX"]
     dH_dY = dH["dH_dY"]
@@ -171,6 +171,7 @@ def find_K_plasma_with_discontinuous_BC(
     q_X, q_Y, q_Z,
     K_X, K_Y, K_Z,
     field,
+    hamiltonian,
     electron_density_p, launch_angular_frequency, temperature, mode_flag):
 
     # For discontinuous n_e across the plasma-vacuum boundary
@@ -181,12 +182,13 @@ def find_K_plasma_with_discontinuous_BC(
         # Seems to work for a mismatch angle up to 50ish deg
     
     # Getting important quantities
+    delta_X, delta_Y, delta_Z = hamiltonian.spacings["X"], hamiltonian.spacings["Y"], hamiltonian.spacings["Z"]
     B_X = field.B_X(q_X, q_Y, q_Z)
     B_Y = field.B_Y(q_X, q_Y, q_Z)
     B_Z = field.B_Z(q_X, q_Y, q_Z)
-    dp_dX = field.d_polflux_dX(q_X, q_Y, q_Z)
-    dp_dY = field.d_polflux_dY(q_X, q_Y, q_Z)
-    dp_dZ = field.d_polflux_dZ(q_X, q_Y, q_Z)
+    dp_dX = field.d_polflux_dX(q_X, q_Y, q_Z, delta_X)
+    dp_dY = field.d_polflux_dY(q_X, q_Y, q_Z, delta_Y)
+    dp_dZ = field.d_polflux_dZ(q_X, q_Y, q_Z, delta_Z)
     
     # Checks the plasma density
     B_magnitude = np.sqrt(B_X**2 + B_Y**2 + B_Z**2)
@@ -253,9 +255,11 @@ def find_K_plasma_with_discontinuous_BC(
     Booker_alpha = find_Booker_alpha(electron_density_p, B_magnitude, sin_theta_m_sq, launch_angular_frequency, temperature)
     Booker_beta  = find_Booker_beta(electron_density_p, B_magnitude, sin_theta_m_sq, launch_angular_frequency, temperature)
     Booker_gamma = find_Booker_gamma(electron_density_p, B_magnitude, launch_angular_frequency, temperature)
+    print("TO REMOVE: Booker discriminant for K_normal_plasma_initial_guess", Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
+    print()
     K_normal_plasma_initial_guess = np.sqrt(
         abs(K_parallel**2 + K_binormal**2 + K_0**2 * (
-                (Booker_beta + mode_flag*mode_flag_sign*np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma))
+                (Booker_beta + mode_flag*mode_flag_sign*np.sqrt(max(0, Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
                 / (2*Booker_alpha)
                 )
             )
@@ -305,7 +309,7 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     # For discontinuous n_e across the plasma-vacuum boundary
     
     # Getting important quantities
-    delta_X, delta_Y, delta_Z = hamiltonian.spacings["delta_X"], hamiltonian.spacings["delta_Y"], hamiltonian.spacings["delta_Z"]
+    delta_X, delta_Y, delta_Z = hamiltonian.spacings["X"], hamiltonian.spacings["Y"], hamiltonian.spacings["Z"]
     dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X_v, K_Y_v, K_Z_v)
     dH_dX = dH["dH_dX"]
     dH_dY = dH["dH_dY"]
@@ -421,6 +425,7 @@ def apply_discontinuous_BC_3D(
         q_X, q_Y, q_Z,
         K_X_v, K_Y_v, K_Z_v,
         field,
+        hamiltonian,
         electron_density_p, launch_angular_frequency, temperature, mode_flag)
     
     Psi_3D_plasma_labframe_cartesian = find_Psi_3D_plasma_with_discontinuous_BC(
