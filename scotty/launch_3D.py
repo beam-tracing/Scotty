@@ -228,6 +228,7 @@ def find_entry_point_3D(
     Ny_steps = int(10 * max_length / (field.Y_coord.max() - field.Y_coord.min()))
     Nz_steps = int(10 * max_length / (field.Z_coord.max() - field.Z_coord.min()))
     tau = np.linspace(0, 1, max(100, Nx_steps, Ny_steps, Nz_steps))
+    print(tau) # TO REMOVE
     spline = CubicSpline(tau, [poloidal_flux_boundary_along_ray_line(t) for t in tau], extrapolate=False)
     spline_roots = spline.roots()
 
