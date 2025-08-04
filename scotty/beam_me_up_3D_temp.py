@@ -55,6 +55,7 @@ def beam_me_up_3D(
     output_filename_suffix = "",
     figure_flag = True,
     detailed_analysis_flag = True,
+    further_analysis_flag = False,
 
     # Solver arguments
     shot=None,
@@ -201,15 +202,14 @@ def beam_me_up_3D(
     if vacuumLaunch_flag:
         print("Beam launched from outside the plasma")
         (
-            q_launch_cartesian,
-            q_entry_cartesian,
-            distance_from_launch_to_entry,
-            K_launch_cartesian,
-            K_entry_cartesian,
-            K_initial_cartesian,
-            Psi_3D_launch_labframe_cartesian,
-            Psi_3D_entry_labframe_cartesian,
-            Psi_3D_initial_labframe_cartesian,
+            q_launch_cartesian,  # q_launch_cartesian,
+            q_initial_cartesian, # q_initial_cartesian,
+            distance_from_launch_to_entry, # distance_from_launch_to_entry,
+            K_launch_cartesian,  # K_launch_cartesian,
+            K_initial_cartesian, # K_initial_cartesian,
+            Psi_3D_launch_labframe_cartesian,  # Psi_3D_launch_labframe_cartesian,
+            Psi_3D_entry_labframe_cartesian,   # Psi_3D_entry_labframe_cartesian,
+            Psi_3D_initial_labframe_cartesian, # Psi_3D_initial_labframe_cartesian,
         ) = launch_beam_3D(
             poloidal_launch_angle_Torbeam,
             toroidal_launch_angle_Torbeam,
@@ -227,372 +227,103 @@ def beam_me_up_3D(
             delta_X,
             delta_Y,
             delta_Z,
-            )
+        )
     else:
         print("Beam launched from inside the plasma")
-        # TO REMOVE -- remove this if-else block
-        (
-            initial_position_cartesian,
-            initial_K_cartesian,
-            initial_Psi_3D_lab_cartesian,
+        q_launch_cartesian = launch_position_cartesian
+        q_initial_cartesian = launch_position_cartesian
+        distance_from_launch_to_entry = None
+        K_launch_cartesian = None
+        K_initial_cartesian = plasmaLaunch_K_cartesian
+        Psi_3D_launch_labframe_cartesian = None
+        Psi_3D_entry_labframe_cartesian = None
+        Psi_3D_initial_labframe_cartesian = plasmaLaunch_Psi_3D_lab_cartesian
+    
+    # ------------------------------
+    # Propagating the ray
+    # ------------------------------
+    print("Starting the solvers")
+    ray_solver_output = propagate_ray(
+        poloidal_flux_enter,
+        launch_angular_frequency,
+        field,
+        q_initial_cartesian,
+        K_initial_cartesian,
+        hamiltonian,
+        rtol,
+        atol,
+        quick_run,
+        len_tau,
+    )
 
-        ) = launch_beam_3D(
-                poloidal_launch_angle_Torbeam,
-                toroidal_launch_angle_Torbeam,
-                launch_angular_frequency,
-                launch_beam_width,
-                launch_beam_curvature,
-                launch_position_cartesian,
-                mode_flag,
-                field,
-                hamiltonian,
-                vacuumLaunch_flag,
-                vacuum_propagation_flag,
-                Psi_BC_flag,
-                poloidal_flux_enter,
-                delta_X,
-                delta_Y,
-                delta_Z,
-            )
-        # else:
-        #     initial_position_cartesian = launch_position_cartesian
-        #     initial_K_cartesian = plasmaLaunch_K_cartesian
-        #     initial_Psi_3D_lab_cartesian = plasmaLaunch_Psi_3D_lab_cartesian
+    if quick_run:
+        return ray_solver_output
 
-    # -------------------
-    # Propagate the ray
+    tau_leave, tau_points = cast(tuple, ray_solver_output)
 
-    if points_from_2d_scotty_to_eval is None: # TO REMOVE this entire if-else block
-        print("Starting the solvers")
-        ray_solver_output = propagate_ray(
-            poloidal_flux_enter,
-            launch_angular_frequency,
-            field,
-            initial_position_cartesian,
-            initial_K_cartesian,
-            hamiltonian,
-            rtol,
-            atol,
-            quick_run,
-            len_tau,
-            tau_eval, # TO REMOVE
-        )
-        if quick_run:
-            return ray_solver_output
+    # return ray_solver_output # TO REMOVE -- for debugging purposes only
 
-        tau_leave, tau_points = cast(tuple, ray_solver_output)
+    # ------------------------------
+    # Propagating the beam
+    # ------------------------------
 
-        # return ray_solver_output # TO REMOVE -- for debugging purposes only
-
-        # -------------------
-        # Propagate the beam
-
-        # Initial conditions for the solver
-        beam_parameters_initial = pack_beam_parameters_3D(
-            initial_position_cartesian[0],
-            initial_position_cartesian[1],
-            initial_position_cartesian[2],
-            initial_K_cartesian[0],
-            initial_K_cartesian[1],
-            initial_K_cartesian[2],
-            initial_Psi_3D_lab_cartesian,
-        )
-
-        print("Psi: ") # TO REMOVE
-        print("Psi_xx: ", beam_parameters_initial[6], beam_parameters_initial[12])
-        print("Psi_yy: ", beam_parameters_initial[7], beam_parameters_initial[13])
-        print("Psi_zz: ", beam_parameters_initial[8], beam_parameters_initial[14])
-
-        print("Psi_xy: ", beam_parameters_initial[9], beam_parameters_initial[15])
-        print("Psi_xz: ", beam_parameters_initial[10], beam_parameters_initial[16])
-        print("Psi_yz: ", beam_parameters_initial[11], beam_parameters_initial[17])
-
-        solver_start_time = time.time()
-
-        # TO REMOVE
-        tau_points = list(tau_points)
-        tau_points = dict.fromkeys(tau_points)
-        tau_points = list(tau_points)
-        tau_points = np.array(tau_points)
-        print(tau_points)
-
-        solver_beam_output = solve_ivp(
-            beam_evolution_fun_3D,
-            [0, tau_leave],
-            beam_parameters_initial,
-            method="RK45",
-            t_eval=tau_points,
-            dense_output=False,
-            events=None,
-            vectorized=False,
-            args=(hamiltonian,),
-            rtol=rtol,
-            atol=atol,
-        )
-
-        solver_end_time = time.time()
-        solver_time = solver_end_time - solver_start_time
-        print(f"Time taken (beam solver) {solver_time}s")
-        print(f"Number of beam evolution evaluations: {solver_beam_output.nfev}")
-        print(f"Time per beam evolution evaluation: {solver_time / solver_beam_output.nfev}")
-
-        tau_array = solver_beam_output.t
-        beam_parameters_final = solver_beam_output.y
-        solver_status = solver_beam_output.status
-
-        q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, Psi_3D_output = unpack_beam_parameters_3D(beam_parameters_final)
-
-        print("Main loop complete")
-        # -------------------
-    else:
-        solver_status = 1
-        q_X_array     = points_from_2d_scotty_to_eval[0]
-        q_Y_array     = points_from_2d_scotty_to_eval[1]
-        q_Z_array     = points_from_2d_scotty_to_eval[2]
-        K_X_array     = points_from_2d_scotty_to_eval[3]
-        K_Y_array     = points_from_2d_scotty_to_eval[4]
-        K_Z_array     = points_from_2d_scotty_to_eval[5]
-        Psi_3D_output = points_from_2d_scotty_to_eval[6]
-        tau_array     = points_from_2d_scotty_to_eval[7]
-
-        polflux_values = points_from_2d_scotty_to_eval[8]
-        theta_m_array  = points_from_2d_scotty_to_eval[9]
-
-
+    # Initial conditions for the solver
+    beam_parameters_initial = pack_beam_parameters_3D(
+        q_initial_cartesian[0],
+        q_initial_cartesian[1],
+        q_initial_cartesian[2],
+        K_initial_cartesian[0],
+        K_initial_cartesian[1],
+        K_initial_cartesian[2],
+        Psi_3D_initial_labframe_cartesian,
+    )
 
     # TO REMOVE
-    if solver_status == -1: print("Solver did not reach completion.")
-    else:
-        pointwise_data = [[q_X_array[i],
-                           q_Y_array[i],
-                           q_Z_array[i],
-                           K_X_array[i],
-                           K_Y_array[i],
-                           K_Z_array[i],
-                           Psi_3D_output[i],
-                           tau_array[i]]
-                           for i in range(len(tau_array))]
-        
-        ### THIS IS TO SEE HOW POLFLUX, ELECTRON DENSITY, AND H CHANGE W.R.T. TAU
-        # to remove
-        if points_from_2d_scotty_to_eval is None or polflux_values is None: polflux_values = field.polflux(q_X_array, q_Y_array, q_Z_array)
-        ne_values = find_density_1D(polflux_values)
-        H_values = hamiltonian(q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array)
+    # print("Psi: ")
+    # print("Psi_xx: ", beam_parameters_initial[6], beam_parameters_initial[12])
+    # print("Psi_yy: ", beam_parameters_initial[7], beam_parameters_initial[13])
+    # print("Psi_zz: ", beam_parameters_initial[8], beam_parameters_initial[14])
 
-        ### THIS IS TO SEE HOW B_MAGNITUDE, K_MAGNITUDE, THETA_M, THE EPSILONS, AND THE BOOKER TERMS CHANGE W.R.T TAU
-        # to remove
-        from scotty.fun_general import dot, angular_frequency_to_wavenumber
-        from scotty.hamiltonian_3D import DielectricTensor_3D
-        _B_X, _B_Y, _B_Z = np.squeeze(field.B_X(q_X_array, q_Y_array, q_Z_array)), np.squeeze(field.B_Y(q_X_array, q_Y_array, q_Z_array)), np.squeeze(field.B_Z(q_X_array, q_Y_array, q_Z_array))
-        B_magnitude = np.sqrt(_B_X**2 + _B_Y**2 + _B_Z**2)
-        _b_hat = np.array([_B_X, _B_Y, _B_Z]) / B_magnitude
-        _K_X, _K_Y, _K_Z = np.array(K_X_array), np.array(K_Y_array), np.array(K_Z_array)
-        K_magnitude = np.sqrt(_K_X**2 + _K_Y**2 + _K_Z**2)
-        _K_hat = np.array([_K_X, _K_Y, _K_Z]) / K_magnitude
-        if points_from_2d_scotty_to_eval is None or theta_m_array is None:
-            theta_m = np.arcsin(dot(_b_hat.T, _K_hat.T))
-            _sin_theta_m_sq = dot(_b_hat.T, _K_hat.T)**2
-        else:
-            theta_m = theta_m_array
-            _sin_theta_m_sq = np.sin(theta_m)**2
-        _epsilon = DielectricTensor_3D(ne_values, launch_angular_frequency, B_magnitude)
-        epsilon_para = _epsilon.e_bb
-        epsilon_perp = _epsilon.e_11
-        epsilon_g    = _epsilon.e_12
-        Booker_alpha = (_epsilon.e_bb * _sin_theta_m_sq) + _epsilon.e_11 * (1 - _sin_theta_m_sq)
-        Booker_beta  = (-_epsilon.e_11 * _epsilon.e_bb * (1 + _sin_theta_m_sq)) - (_epsilon.e_11**2 - _epsilon.e_12**2) * (1 - _sin_theta_m_sq)
-        Booker_gamma = _epsilon.e_bb * (_epsilon.e_11**2 - _epsilon.e_12**2)
-        H_discriminant = np.maximum(np.zeros_like(Booker_beta), (Booker_beta**2 - 4 * Booker_alpha * Booker_gamma))
-        H_first_term  = (K_magnitude / angular_frequency_to_wavenumber(launch_angular_frequency))**2
-        H_second_term = (Booker_beta - (-1)*np.sqrt(H_discriminant)) / (2*Booker_alpha)
-        H_first_second_term = H_first_term + H_second_term
+    # print("Psi_xy: ", beam_parameters_initial[9], beam_parameters_initial[15])
+    # print("Psi_xz: ", beam_parameters_initial[10], beam_parameters_initial[16])
+    # print("Psi_yz: ", beam_parameters_initial[11], beam_parameters_initial[17])
 
-        ### THIS IS TO SEE HOW THE FIRST AND SECOND DERIVATIVES CHANGE W.R.T. TAU
-        # to remove
-        first_order_derivatives_dict = {
-            "dH_dX": [],
-            "dH_dY": [],
-            "dH_dZ": [],
-            "dH_dKx": [],
-            "dH_dKy": [],
-            "dH_dKz": []
-        }
-        second_order_derivatives_dict = {
-            "d2H_dX2": [],
-            "d2H_dY2": [],
-            "d2H_dZ2": [],
-            "d2H_dX_dY": [],
-            "d2H_dX_dZ": [],
-            "d2H_dY_dZ": [],
-            "d2H_dKx2": [],
-            "d2H_dKy2": [],
-            "d2H_dKz2": [],
-            "d2H_dKx_dKy": [],
-            "d2H_dKx_dKz": [],
-            "d2H_dKy_dKz": [],
-            "d2H_dX_dKx": [],
-            "d2H_dX_dKy": [],
-            "d2H_dX_dKz": [],
-            "d2H_dY_dKx": [],
-            "d2H_dY_dKy": [],
-            "d2H_dY_dKz": [],
-            "d2H_dZ_dKx": [],
-            "d2H_dZ_dKy": [],
-            "d2H_dZ_dKz": [],
-        }
-    
-        # to remove
-        from scotty.hamiltonian_3D import hessians_3D
-        def calculate_and_store_derivatives(index):
-            X, Y, Z, K_X, K_Y, K_Z, Psi_3D, tau = pointwise_data[index]
-            derivatives_and_second_derivatives_dict = hamiltonian.derivatives(X, Y, Z, K_X, K_Y, K_Z, second_order = True)
+    solver_start_time = time.time()
 
-            grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians_3D(derivatives_and_second_derivatives_dict)
-            gradK_grad_H = np.transpose(gradK_grad_H)
+    # TO REMOVE
+    # tau_points = list(tau_points)
+    # tau_points = dict.fromkeys(tau_points)
+    # tau_points = list(tau_points)
+    # tau_points = np.array(tau_points)
+    # print(tau_points)
 
-            """
-            print()
-            print("grad_grad_H should = 0")
-            print(grad_grad_H)
-            print()
-            print("grad_gradK_H should = 0")
-            print(grad_gradK_H)
-            print()
-            print("gradK_grad_H should = 0")
-            print(gradK_grad_H)
-            print()
-            print("gradK_gradK_H should = 0")
-            print(gradK_gradK_H)
-            print()
-            print()
-            print()
-            """
+    solver_beam_output = solve_ivp(
+        beam_evolution_fun_3D,
+        [0, tau_leave],
+        beam_parameters_initial,
+        method="RK45",
+        t_eval=tau_points,
+        dense_output=False,
+        events=None,
+        vectorized=False,
+        args=(hamiltonian,),
+        rtol=rtol,
+        atol=atol,
+    )
 
-            for key, value in derivatives_and_second_derivatives_dict.items():
-                if key in ["dH_dX", "dH_dY", "dH_dZ", "dH_dKx", "dH_dKy", "dH_dKz"]: first_order_derivatives_dict[key].append(value)
-                else: second_order_derivatives_dict[key].append(value)
+    solver_end_time = time.time()
+    solver_time = solver_end_time - solver_start_time
+    print(f"Time taken (beam solver) {solver_time}s")
+    print(f"Number of beam evolution evaluations: {solver_beam_output.nfev}")
+    print(f"Time per beam evolution evaluation: {solver_time / solver_beam_output.nfev}")
 
-        # to remove
-        for index in range(len(tau_array)):
-            calculate_and_store_derivatives(index)
-        
-        import matplotlib.pyplot as plt
-        from matplotlib.ticker import MultipleLocator
-        ### THIS IS TO SEE HOW THE FIRST DERIVATIVES CHANGE W.R.T. TAU
-        def plot_how_first_derivatives_evolve(dictionary):
-            counter = 0
-            for key, value in dictionary.items():
-                # xmin, xmax = 0, 900
-                # ymin, ymax = min(value[xmin:xmax+1]), max(value[xmin:xmax+1])
-                # axs[counter].set_xlim(xmin, xmax)
-                # axs[counter].set_ylim(ymin, ymax)
-                axs[counter].plot(tau_array, value) #, marker='o')
-                axs[counter].set_xlabel("tau")
-                axs[counter].set_ylabel(key)
-                axs[counter].set_title(f"{key} changing along tau")
-                axs[counter].xaxis.set_major_locator(MultipleLocator(75))
-                # axs[counter].xaxis.set_minor_locator(MultipleLocator(25))
-                axs[counter].grid(True, which="both", axis="x")
-                counter += 1
+    tau_array = solver_beam_output.t
+    beam_parameters_final = solver_beam_output.y
+    solver_status = solver_beam_output.status
 
-        fig, axs = plt.subplots(2, 3, figsize=(15, 5))
-        axs = axs.flatten()
-        plot_how_first_derivatives_evolve(first_order_derivatives_dict)
-        plt.tight_layout()
-        plt.show()
+    q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, Psi_3D_output = unpack_beam_parameters_3D(beam_parameters_final)
 
-        # THIS IS TO SEE HOW THE SECOND DERIVATIVES CHANGE W.R.T. TAU
-        def plot_how_second_derivatives_evolve(dictionary):
-            counter = 0
-            for key, value in dictionary.items():
-                # xmin, xmax = 0, 1002 # 0, 900
-                # ymin, ymax = min(value[xmin:xmax+1]), max(value[xmin:xmax+1])
-                # axs[counter].set_xlim(xmin, xmax)
-                # axs[counter].set_ylim(ymin, ymax)
-                axs[counter].plot(tau_array, value) #, marker='o')
-                axs[counter].set_xlabel("tau")
-                axs[counter].set_ylabel(key)
-                axs[counter].set_title(f"{key} changing along tau")
-                axs[counter].xaxis.set_major_locator(MultipleLocator(75))
-                # axs[counter].xaxis.set_minor_locator(MultipleLocator(25))
-                axs[counter].grid(True, which="both", axis="x")
-                counter += 1
-
-        fig, axs = plt.subplots(7, 3, figsize=(15, 15))
-        axs = axs.flatten()
-        plot_how_second_derivatives_evolve(second_order_derivatives_dict)
-        plt.tight_layout()
-        plt.show()
-
-        pointwise_data = [[q_X_array[i],
-                           q_Y_array[i],
-                           q_Z_array[i],
-                           K_X_array[i],
-                           K_Y_array[i],
-                           K_Z_array[i],
-                           Psi_3D_output[i],
-                           tau_array[i],
-                           first_order_derivatives_dict["dH_dX"][i],
-                           first_order_derivatives_dict["dH_dY"][i],
-                           first_order_derivatives_dict["dH_dZ"][i],
-                           first_order_derivatives_dict["dH_dKx"][i],
-                           first_order_derivatives_dict["dH_dKy"][i],
-                           first_order_derivatives_dict["dH_dKz"][i],
-                           second_order_derivatives_dict["d2H_dX2"][i],
-                           second_order_derivatives_dict["d2H_dY2"][i],
-                           second_order_derivatives_dict["d2H_dZ2"][i],
-                           second_order_derivatives_dict["d2H_dX_dY"][i],
-                           second_order_derivatives_dict["d2H_dX_dZ"][i],
-                           second_order_derivatives_dict["d2H_dY_dZ"][i],
-                           second_order_derivatives_dict["d2H_dKx2"][i],
-                           second_order_derivatives_dict["d2H_dKy2"][i],
-                           second_order_derivatives_dict["d2H_dKz2"][i],
-                           second_order_derivatives_dict["d2H_dKx_dKy"][i],
-                           second_order_derivatives_dict["d2H_dKx_dKz"][i],
-                           second_order_derivatives_dict["d2H_dKy_dKz"][i],
-                           second_order_derivatives_dict["d2H_dX_dKx"][i],
-                           second_order_derivatives_dict["d2H_dX_dKy"][i],
-                           second_order_derivatives_dict["d2H_dX_dKz"][i],
-                           second_order_derivatives_dict["d2H_dY_dKx"][i],
-                           second_order_derivatives_dict["d2H_dY_dKy"][i],
-                           second_order_derivatives_dict["d2H_dY_dKz"][i],
-                           second_order_derivatives_dict["d2H_dZ_dKx"][i],
-                           second_order_derivatives_dict["d2H_dZ_dKy"][i],
-                           second_order_derivatives_dict["d2H_dZ_dKz"][i],
-                           H_values[i],
-                           polflux_values[i],
-                           ne_values[i],
-                           B_magnitude[i],
-                           K_magnitude[i],
-                           theta_m[i],
-                           epsilon_para[i],
-                           epsilon_perp[i],
-                           epsilon_g[i],
-                           Booker_alpha[i],
-                           Booker_beta[i],
-                           Booker_gamma[i],
-                           H_discriminant[i],
-                           H_first_term[i],
-                           H_second_term[i],
-                           H_first_second_term[i]]
-                           for i in range(len(tau_array))]
-        
-        # TO REMOVE
-        # This is to analytically calculate H as a function of Kz and tau
-        # specifically only for the 2d slab geometry, for which we know
-        # the analytical expression for H
-        _Kz_array_for_H = np.linspace(start=-1, stop=1, num=201)
-        _numerical_H_values_for_heatmap = []
-        for i in range(len(pointwise_data)):
-            _H_values_row = []
-            for Kz in _Kz_array_for_H:
-                _H_values_single_point = hamiltonian(q_X_array[i], q_Y_array[i], q_Z_array[i], K_X_array[i], K_Y_array[i], Kz)
-                _H_values_row.append(_H_values_single_point)
-            _H_values_row = np.array(_H_values_row)
-            _numerical_H_values_for_heatmap.append(_H_values_row)
-        _numerical_H_values_for_heatmap = np.array(_numerical_H_values_for_heatmap)
-    
-
+    print("Main loop complete")
 
     inputs = xr.Dataset(
         {
@@ -612,9 +343,9 @@ def beam_me_up_3D(
             "launch_beam_width": launch_beam_width,
             "launch_beam_curvature": launch_beam_curvature,
             "mode_flag": mode_flag,
-            "initial_position_cartesian": (["col"], initial_position_cartesian),
-            "initial_K_cartesian": (["col"], initial_K_cartesian),
-            "initial_Psi_3D_lab_cartesian": (["row","col"], initial_Psi_3D_lab_cartesian),
+            "initial_position_cartesian": (["col"], q_initial_cartesian),
+            "initial_K_cartesian": (["col"], K_initial_cartesian),
+            "initial_Psi_3D_lab_cartesian": (["row","col"], Psi_3D_initial_labframe_cartesian),
             "delta_X": delta_X,
             "delta_Y": delta_Y,
             "delta_Z": delta_Z,
@@ -751,23 +482,7 @@ def beam_me_up_3D(
         plot_trajectories_individually(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"trajectories{output_filename_suffix}.png"))
         plot_wavevector(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"wavevector{output_filename_suffix}.png"))
 
-    # TO REMOVE
-    # helpful_dict = {
-    #     "pol_angle":   poloidal_launch_angle_Torbeam,
-    #     "tor_angle":   toroidal_launch_angle_Torbeam,
-    #     # "loc_all":     analysis.loc_all,
-    #     "power_ratio_10_3": analysis.power_ratio_10_3,
-    #     "power_ratio_13_3": analysis.power_ratio_13_3,
-    #     "dominant_kperp1_bs":analysis.dominant_kperp1_bs,
-    # }
-
-    # return dt, pointwise_data, field, helpful_dict # actual correct output
-    
-    # return inputs, df, Psi_3D_output[0], dH # TO REMOVE -- after testing further_analysis
-
-    return pointwise_data, _numerical_H_values_for_heatmap # TO REMOVE -- this is for the slab and tokamak benchmak case
-
-    # return dt, field
+    return dt, field
 
 
 

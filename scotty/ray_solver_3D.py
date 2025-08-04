@@ -309,11 +309,6 @@ class K_cutoff_data_cartesian:
 ### Declaring def ray_evolution_3D_fun
 
 def ray_evolution_3D_fun(tau, ray_parameters_3D, hamiltonian: Hamiltonian_3D):
-    
-    """
-    # TO REMOVE -- for debugging only
-    print(np.array((ray_parameters_3D[0], ray_parameters_3D[1], ray_parameters_3D[2])))
-    """
 
     # Saving the coordinates
     q_X, q_Y, q_Z, K_X, K_Y, K_Z = ray_parameters_3D
@@ -326,15 +321,25 @@ def ray_evolution_3D_fun(tau, ray_parameters_3D, hamiltonian: Hamiltonian_3D):
     # indexes 3, 4, 5 correspond to d(K_X)/d(tau), d(K_Y)/d(tau), d(K_Z)/d(tau)y
     d_ray_parameters_3D_d_tau = np.array([dH["dH_dKx"], dH["dH_dKy"], dH["dH_dKz"], -dH["dH_dX"], -dH["dH_dY"], -dH["dH_dZ"]])
 
-    # TO REMOVE
-    # print("d_ray_param_dtau from ray_evo_fun", d_ray_parameters_3D_d_tau)
-    # print("its shape is", d_ray_parameters_3D_d_tau.shape)
-
     return d_ray_parameters_3D_d_tau
 
 
 
 ### Declaring def propagate_ray
+
+
+propagate_ray(
+        poloidal_flux_enter,
+        launch_angular_frequency,
+        field,
+        q_initial_cartesian,
+        K_initial_cartesian,
+        hamiltonian,
+        rtol,
+        atol,
+        quick_run,
+        len_tau,
+    )
 
 def propagate_ray(
     poloidal_flux_enter: float,
@@ -347,7 +352,6 @@ def propagate_ray(
     atol: float,
     quick_run: bool,
     len_tau: int,
-    tau_eval: FloatArray,
     tau_max: float = 1e5,
     verbose: bool = True,
 ) -> Union[Tuple[float, FloatArray], K_cutoff_data_cartesian]:
@@ -377,37 +381,22 @@ def propagate_ray(
         [0, tau_max],
         ray_parameters_3D_initial,
         method="RK45",
-        t_eval=tau_eval, # TO REMOVE -- change this back to None
+        t_eval=None,
         dense_output=False,
         events=solver_ray_events.values(),
         vectorized=False,
         args=solver_arguments,
         rtol=rtol,
         atol=atol,
-        max_step=5, # TO REMOVE -- change this from 5 back to 50 (basically changes the number of steps for solving)
+        max_step=50,
     )
-    
-
-    # TO REMOVE -- for debugging only
-    print("ray tracing solution is here")
-    print("solution, t: ", solver_ray_output.t)
-    print("solution, x,y,z,Kx,Ky,Kz: ", solver_ray_output.y)
-
 
     solver_end_time = time()
     if verbose:
         print("Time taken (ray solver)", solver_end_time - solver_start_time, "s")
 
-    """ # TO REMOVE un-quotation mark it -- temporarily done this so that the ray data can be passed onto the beam tracing functions
-    if solver_ray_output.status == 0:
-        raise RuntimeError(
-            "Ray has not left plasma/simulation region. Increase tau_max or choose different initial conditions."
-        )
-    """
-    if solver_ray_output.status == -1:
-        raise RuntimeError(
-            "Integration step failed. Check density interpolation is not negative"
-        )
+    if solver_ray_output.status == 0:  raise RuntimeError("Ray has not left plasma/simulation region. Increase tau_max or choose different initial conditions.")
+    if solver_ray_output.status == -1: raise RuntimeError("Integration step failed. Check density interpolation is not negative")
 
     # tau_events is a list with the same order as the values of
     # solver_ray_events, so we can use the names from that dict
@@ -442,10 +431,5 @@ def propagate_ray(
             solver_arguments,
             solver_ray_events["leave_plasma"],
         )
-    
-    """
-    # TO REMOVE -- for debugging only
-    return solver_ray_output.t, solver_ray_output.y
-    """
 
     return tau_leave, tau_points

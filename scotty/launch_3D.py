@@ -28,9 +28,9 @@ def launch_beam_3D(
     vacuum_propagation_flag: bool = True,
     Psi_BC_flag: Union[bool, str, None] = True,
     poloidal_flux_enter: float = 1.0,
-    delta_X: float = -1e-4,
-    delta_Y: float = 1e-4,
-    delta_Z: float = 1e-4,
+    delta_X: float = -1e-3,
+    delta_Y: float = 1e-3,
+    delta_Z: float = 1e-3,
     temperature=None,
 ):
     

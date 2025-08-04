@@ -12,7 +12,6 @@ from scotty.fun_general import (
 from scotty.geometry_3D import MagneticField_3D_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
 from scotty.typing import FloatArray
-from typing import Union
 
 def check_vector_pointing_into_plasma(q_X: float, q_Y: float, q_Z: float, vector: FloatArray, field: MagneticField_3D_Cartesian):
     if np.size(vector) != 3: raise ValueError(f"The vector provided must only be 3-D!")
@@ -376,11 +375,11 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     interface_matrix_inverse = np.linalg.inv(interface_matrix)
 
     RHS_vector = [(Psi_XX_v*dp_dY**2) + (Psi_YY_v*dp_dX**2) - (2*Psi_XY_v*dp_dX*dp_dY) + 2*(K_Y_v-K_Y_p)*dp_dY*eta_YZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_YZ,
-                (Psi_XX_v*dp_dZ**2) + (Psi_ZZ_v*dp_dX**2) - (2*Psi_XZ_v*dp_dX*dp_dZ) + 2*(K_X_v-K_X_p)*dp_dX*eta_XZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_XZ,
-                (Psi_YY_v*dp_dZ**2) + (Psi_ZZ_v*dp_dY**2) - (2*Psi_YZ_v*dp_dY*dp_dZ) + 2*(K_X_v-K_X_p)*dp_dX*eta_XY + 2*(K_Y_v-K_Y_p)*dp_dY*eta_XY,
-                -dH_dX,
-                -dH_dY,
-                -dH_dZ]
+                  (Psi_XX_v*dp_dZ**2) + (Psi_ZZ_v*dp_dX**2) - (2*Psi_XZ_v*dp_dX*dp_dZ) + 2*(K_X_v-K_X_p)*dp_dX*eta_XZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_XZ,
+                  (Psi_YY_v*dp_dZ**2) + (Psi_ZZ_v*dp_dY**2) - (2*Psi_YZ_v*dp_dY*dp_dZ) + 2*(K_X_v-K_X_p)*dp_dX*eta_XY + 2*(K_Y_v-K_Y_p)*dp_dY*eta_XY,
+                  -dH_dX,
+                  -dH_dY,
+                  -dH_dZ]
 
     [Psi_XX_p,
     Psi_XY_p,
