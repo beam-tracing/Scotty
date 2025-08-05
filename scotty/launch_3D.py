@@ -56,9 +56,9 @@ def launch_beam_3D(
 
     # Finding K_launch
     wavenumber_K0 = hamiltonian.wavenumber_K0
-    K_X_launch = wavenumber_K0 * np.cos(2*toroidal_launch_angle) * np.cos(poloidal_launch_angle)
-    K_Y_launch = wavenumber_K0 * np.sin(2*toroidal_launch_angle) * np.cos(poloidal_launch_angle)
-    K_Z_launch = wavenumber_K0 * np.sin(poloidal_launch_angle)
+    K_X_launch = -wavenumber_K0 * np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
+    K_Y_launch = -wavenumber_K0 * np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
+    K_Z_launch = -wavenumber_K0 * np.sin(poloidal_launch_angle)
     K_launch_cartesian = np.array([K_X_launch, K_Y_launch, K_Z_launch])
     # K_R_launch    = wavenumber_K0 * np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
     # K_zeta_launch = wavenumber_K0 * np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle) * q_R_launch
@@ -128,9 +128,9 @@ def launch_beam_3D(
         field,
     )
     distance_from_launch_to_entry = np.sqrt(
-        (q_initial_cartesian[0] - q_initial_cartesian[0])**2 
-        + (q_initial_cartesian[1] - q_initial_cartesian[1])**2
-        + (q_initial_cartesian[2] - q_initial_cartesian[2])**2
+        (q_launch_cartesian[0] - q_initial_cartesian[0])**2 
+        + (q_launch_cartesian[1] - q_initial_cartesian[1])**2
+        + (q_launch_cartesian[2] - q_initial_cartesian[2])**2
     )
     Psi_w_inverse_entry_beamframe_cartesian = (
         distance_from_launch_to_entry / wavenumber_K0 * np.eye(2)
@@ -178,7 +178,7 @@ def find_entry_point_3D(
     toroidal_launch_angle: float,
     poloidal_flux_enter: float,
     field: MagneticField_3D_Cartesian,
-    boundary_adjust: float = 1e-8,
+    boundary_adjust: float = 1e-6,
 ) -> FloatArray:
     
     # The plasma is contained entirely in the boundaries of ``field``,
@@ -227,7 +227,7 @@ def find_entry_point_3D(
     Nx_steps = int(10 * max_length / (field.X_coord.max() - field.X_coord.min()))
     Ny_steps = int(10 * max_length / (field.Y_coord.max() - field.Y_coord.min()))
     Nz_steps = int(10 * max_length / (field.Z_coord.max() - field.Z_coord.min()))
-    tau = np.linspace(0, 1, max(100, Nx_steps, Ny_steps, Nz_steps))
+    tau = np.linspace(-1, 1, max(100, Nx_steps, Ny_steps, Nz_steps)) # TO REMOVE -- original is linspace(0,1), but this was set to -1 temporarily because the ray was going in the opposite direction of the plasma (possibly because I didnt define my launch angles correctly? Like I'm missing a minus sign or a pi somewhere)
     # spline = CubicSpline(tau, [poloidal_flux_boundary_along_ray_line(t) for t in tau], extrapolate=False)
     # spline_roots = spline.roots()
     import math
@@ -268,6 +268,10 @@ def find_entry_point_3D(
     # is definitely inside.
     boundary_tau = boundary.root
     X_boundary, Y_boundary, Z_boundary = ray_line(boundary_tau)
-    if field.polflux(X_boundary, Y_boundary, Z_boundary) > poloidal_flux_enter: boundary_tau += boundary_adjust
+    # TO REMOVE: temporarily removed to see if we are inside the boundary or not
+    # if field.polflux(X_boundary, Y_boundary, Z_boundary) > poloidal_flux_enter: boundary_tau += boundary_adjust
+
+    print("TO REMOVE: boundary coordinates", X_boundary, Y_boundary, Z_boundary)
+    print("TO REMOVE: boundary polflux", field.polflux(X_boundary, Y_boundary, Z_boundary))
 
     return np.array(ray_line(boundary_tau))

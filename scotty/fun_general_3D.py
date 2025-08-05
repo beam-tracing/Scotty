@@ -102,6 +102,16 @@ def apply_continuous_BC_3D(
     interface_matrix[5, 2] = dH_dKx
     interface_matrix[5, 4] = dH_dKy
     interface_matrix[5, 5] = dH_dKz
+
+    # TO REMOVE: Testing another derivation instead
+    # dx0 = dy0 = -dp_dZ
+    # dz0 = dp_dX + dp_dY
+    # interface_matrix[2, 0] = dx0**2
+    # interface_matrix[2, 1] = 2*dx0*dy0
+    # interface_matrix[2, 2] = 2*dx0*dz0
+    # interface_matrix[2, 3] = dy0**2
+    # interface_matrix[2, 4] = 2*dy0*dz0
+    # interface_matrix[2, 5] = dz0**2
     
     # Comment from the original function code:
         # interface_matrix will be singular if one tries to
@@ -116,6 +126,13 @@ def apply_continuous_BC_3D(
                   -dH_dX,
                   -dH_dY,
                   -dH_dZ]
+    # TO REMOVE: the below RHS_vector is for the new derivation; above for the old
+    # RHS_vector = [(Psi_XX_v * dp_dY**2) + (Psi_YY_v * dp_dX**2) - (2 * Psi_XY_v * dp_dX * dp_dY),
+    #               (Psi_XX_v * dp_dZ**2) + (Psi_ZZ_v * dp_dX**2) - (2 * Psi_XZ_v * dp_dX * dp_dZ),
+    # Psi_XX_v*dx0**2 + Psi_YY_v*dy0**2 + Psi_ZZ_v*dz0**2 + 2*Psi_XY_v*dx0*dy0 + 2*Psi_XZ_v*dx0*dz0 + 2*Psi_YZ_v*dy0*dz0,
+    #               -dH_dX,
+    #               -dH_dY,
+    #               -dH_dZ]
 
     [Psi_XX_p,
      Psi_XY_p,
@@ -159,7 +176,7 @@ def find_H_bar_3D(
     Booker_gamma = find_Booker_gamma(electron_density, B_magnitude, launch_angular_frequency, temperature)
 
     H_bar = K_magnitude**2 + K_0**2 * (
-        (Booker_beta + mode_flag*mode_flag_sign*np.sqrt(Booker_beta**2 - 4*Booker_alpha*Booker_gamma))
+        (Booker_beta + mode_flag*mode_flag_sign*np.sqrt(max(0, Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
         / (2*Booker_alpha)
     )
 
@@ -360,6 +377,9 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     interface_matrix[5, 2] = dH_dKx
     interface_matrix[5, 4] = dH_dKy
     interface_matrix[5, 5] = dH_dKz
+
+    # TO REMOVE
+    print("TO REMOVE: interface matrix", interface_matrix)
 
     # For the discontinuous boundary conditions,
     # K_vacuum =/= K_plasma in general, and this introduces

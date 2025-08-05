@@ -631,6 +631,14 @@ def beam_me_up(
                 ["row", "col"],
                 Psi_3D_lab_initial,
             ),
+            "Psi_3D_lab_entry": (
+                ["row", "col"],
+                Psi_3D_lab_entry,
+            ),
+            "Psi_3D_lab_launch": (
+                ["row", "col"],
+                Psi_3D_lab_launch,
+            ),
             "quick_run": quick_run,
             "rtol": rtol,
             "shot": shot,

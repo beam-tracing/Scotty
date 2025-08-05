@@ -238,7 +238,7 @@ def beam_me_up_3D(
         Psi_3D_launch_labframe_cartesian = None
         Psi_3D_entry_labframe_cartesian = None
         Psi_3D_initial_labframe_cartesian = plasmaLaunch_Psi_3D_lab_cartesian
-    
+
     # ------------------------------
     # Propagating the ray
     # ------------------------------
@@ -324,6 +324,22 @@ def beam_me_up_3D(
     q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, Psi_3D_output = unpack_beam_parameters_3D(beam_parameters_final)
 
     print("Main loop complete")
+
+    # TO REMOVE
+    print("q_launch_cartesian", q_launch_cartesian)
+    print("q_initial_cartesian", q_initial_cartesian)
+    print()
+    print("K_launch_cartesian", K_launch_cartesian)
+    print("K_initial_cartesian", K_initial_cartesian)
+    print()
+    print("Psi_3D_launch_labframe_cartesian")
+    print(Psi_3D_launch_labframe_cartesian)
+    print()
+    print("Psi_3D_entry_labframe_cartesian")
+    print(Psi_3D_entry_labframe_cartesian)
+    print()
+    print("Psi_3D_initial_labframe_cartesian")
+    print(Psi_3D_initial_labframe_cartesian)
 
     inputs = xr.Dataset(
         {
@@ -482,7 +498,9 @@ def beam_me_up_3D(
         plot_trajectories_individually(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"trajectories{output_filename_suffix}.png"))
         plot_wavevector(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"wavevector{output_filename_suffix}.png"))
 
-    return dt, field
+    # return dt, field
+    return dt, field, q_launch_cartesian, q_initial_cartesian, K_launch_cartesian, K_initial_cartesian, Psi_3D_initial_labframe_cartesian
+    # TO REMOVE
 
 
 
