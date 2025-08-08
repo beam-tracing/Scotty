@@ -134,6 +134,14 @@ def apply_continuous_BC_3D(
     #               -dH_dY,
     #               -dH_dZ]
 
+    print()
+    print("interface matrix")
+    for i in range(6): print(interface_matrix[i])
+    print()
+    print("RHS_vector")
+    for i in range(6): print(RHS_vector[i])
+    print()
+
     [Psi_XX_p,
      Psi_XY_p,
      Psi_XZ_p,
@@ -166,10 +174,14 @@ def find_H_bar_3D(
     K_0 = angular_frequency_to_wavenumber(launch_angular_frequency)
     K_cartesian = K_parallel*parallel_unitvector + K_binormal*binormal_unitvector + K_normal*normal_unitvector
     K_X, K_Y, K_Z = K_cartesian
+    print("K_cartesian", K_cartesian)
     K_magnitude = np.sqrt(K_X**2 + K_Y**2 + K_Z**2)
     B_magnitude = np.sqrt(B_X**2 + B_Y**2 + B_Z**2)
     sin_theta_m = (K_X*B_X + K_Y*B_Y + K_Z*B_Z) / (K_magnitude*B_magnitude)
     sin_theta_m_sq = sin_theta_m**2
+
+    # TO REMOVE
+    print("sin_theta_m", sin_theta_m)
 
     Booker_alpha = find_Booker_alpha(electron_density, B_magnitude, sin_theta_m_sq, launch_angular_frequency, temperature)
     Booker_beta  = find_Booker_beta(electron_density, B_magnitude, sin_theta_m_sq, launch_angular_frequency, temperature)
@@ -273,6 +285,7 @@ def find_K_plasma_with_discontinuous_BC(
     Booker_beta  = find_Booker_beta(electron_density_p, B_magnitude, sin_theta_m_sq, launch_angular_frequency, temperature)
     Booker_gamma = find_Booker_gamma(electron_density_p, B_magnitude, launch_angular_frequency, temperature)
     print("TO REMOVE: Booker discriminant for K_normal_plasma_initial_guess", Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
+    print("TO REMOVE: H_bar", Booker_beta**2 - 4*Booker_alpha*Booker_gamma)
     print()
     K_normal_plasma_initial_guess = np.sqrt(
         abs(K_parallel**2 + K_binormal**2 + K_0**2 * (
@@ -282,20 +295,35 @@ def find_K_plasma_with_discontinuous_BC(
             )
         )
     
-    def find_H_bar_3D_wrapper(K_normal_plasma_initial_guess):
+    def find_H_bar_3D_wrapper(K_normal_plasma_guess):
+        # TO REMOVE
+        print("K_normal_plasma_guessing", K_normal_plasma_guess)
+        print("H_bar_guess", find_H_bar_3D(
+            K_parallel, K_binormal, K_normal_plasma_guess,
+            parallel_unitvector1, binormal_unitvector, normal_unitvector,
+            B_X, B_Y, B_Z,
+            electron_density_p, launch_angular_frequency, temperature, mode_flag, mode_flag_sign))
+        print()
         return find_H_bar_3D(
-            K_parallel, K_binormal, K_normal_plasma_initial_guess,
-            parallel_unitvector1, normal_unitvector, binormal_unitvector,
+            K_parallel, K_binormal, K_normal_plasma_guess,
+            parallel_unitvector1, binormal_unitvector, normal_unitvector,
             B_X, B_Y, B_Z,
             electron_density_p, launch_angular_frequency, temperature, mode_flag, mode_flag_sign)
     
     # Comments from the original function code:
         # This will fail if the beam is too glancing such that there
         # is no possible K_normal_plasma that satisfies H = 0
-    K_normal_plasma = newton(find_H_bar_3D_wrapper, K_normal_plasma_initial_guess, tol=1e-6, maxiter=1000)
+    K_normal_plasma = newton(find_H_bar_3D_wrapper, K_normal_plasma_initial_guess, tol=1e-6, maxiter=5000)
 
     # After finding K_normal_plasma, we now find K_plasma
     K_plasma = K_parallel*parallel_unitvector1 + K_binormal*binormal_unitvector + K_normal_plasma*normal_unitvector
+
+    # TO REMOVE
+    print("FINAL K_normal_plasma_initial_guess", K_normal_plasma_initial_guess)
+    print("FINAL K_normal_plasma", K_normal_plasma)
+    print("FINAL K_vacuum", K_vacuum)
+    print("FINAL K_plasma", K_plasma)
+    print("FINAL H_bar")
 
     # To make sure K_plasma is valid, we
         # i) check if it points into the plasma; and
@@ -307,9 +335,14 @@ def find_K_plasma_with_discontinuous_BC(
         np.array([1,0,0]), np.array([0,1,0]), np.array([0,0,1]),
         B_X,               B_Y,               B_Z,
         electron_density_p, launch_angular_frequency, temperature, mode_flag, mode_flag_sign)
+    
+    # TO REMOVE
+    print("TO REMOVE: K_plasma", K_plasma)
 
     if abs(H_bar_check) > 1e-3:
-        raise ValueError(f"Unable to find K_plasma with discontinuous boundary conditions! \n H_bar_check = {H_bar_check}")
+        # raise ValueError(f"Unable to find K_plasma with discontinuous boundary conditions! \n H_bar_check = {H_bar_check}")
+        # TO REMOVE
+        print(f"Unable to find K_plasma with discontinuous boundary conditions! \n H_bar_check = {H_bar_check}")
     
     return K_plasma
 
@@ -390,6 +423,21 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     eta_YZ = -0.5 * (d2p_dY2*dp_dZ**2 + 2*d2p_dYdZ*dp_dY*dp_dZ + d2p_dZ2*dp_dY**2) / (dp_dY**2 + dp_dZ**2)
     eta_XZ = -0.5 * (d2p_dX2*dp_dZ**2 + 2*d2p_dXdZ*dp_dX*dp_dZ + d2p_dZ2*dp_dX**2) / (dp_dX**2 + dp_dZ**2)
     eta_XY = -0.5 * (d2p_dX2*dp_dY**2 + 2*d2p_dXdY*dp_dX*dp_dY + d2p_dY2*dp_dX**2) / (dp_dX**2 + dp_dY**2)
+
+    # TO REMOVE
+    print("eta_YZ", eta_YZ)
+    print("eta_XZ", eta_XZ)
+    print("eta_XY", eta_XY)
+
+    # TO REMOVE: Testing another derivation instead
+    dx0 = dy0 = -dp_dZ
+    dz0 = dp_dX + dp_dY
+    interface_matrix[2, 0] = dx0**2
+    interface_matrix[2, 1] = 2*dx0*dy0
+    interface_matrix[2, 2] = 2*dx0*dz0
+    interface_matrix[2, 3] = dy0**2
+    interface_matrix[2, 4] = 2*dy0*dz0
+    interface_matrix[2, 5] = dz0**2
     
     # Comment from the original function code:
         # interface_matrix will be singular if one tries to
@@ -398,12 +446,52 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
         # my experience
     interface_matrix_inverse = np.linalg.inv(interface_matrix)
 
+    # RHS_vector = [(Psi_XX_v*dp_dY**2) + (Psi_YY_v*dp_dX**2) - (2*Psi_XY_v*dp_dX*dp_dY) + 2*(K_Y_v-K_Y_p)*dp_dY*eta_YZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_YZ,
+    #               (Psi_XX_v*dp_dZ**2) + (Psi_ZZ_v*dp_dX**2) - (2*Psi_XZ_v*dp_dX*dp_dZ) + 2*(K_X_v-K_X_p)*dp_dX*eta_XZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_XZ,
+    #               (Psi_YY_v*dp_dZ**2) + (Psi_ZZ_v*dp_dY**2) - (2*Psi_YZ_v*dp_dY*dp_dZ) + 2*(K_X_v-K_X_p)*dp_dX*eta_XY + 2*(K_Y_v-K_Y_p)*dp_dY*eta_XY,
+    #               -dH_dX,
+    #               -dH_dY,
+    #               -dH_dZ]
+    # TO REMOVE: the below RHS_vector is for the new derivation; above for the old
+    eta_XYZ = -0.5 * (d2p_dX2*dx0**2 + d2p_dY2*dy0**2 + d2p_dZ2*dz0**2 + 2*d2p_dXdY*dx0*dy0 + 2*d2p_dXdZ*dx0*dz0 + 2*d2p_dYdZ*dy0*dz0) / ( dp_dX**2 + dp_dY**2 + dp_dZ**2 )
     RHS_vector = [(Psi_XX_v*dp_dY**2) + (Psi_YY_v*dp_dX**2) - (2*Psi_XY_v*dp_dX*dp_dY) + 2*(K_Y_v-K_Y_p)*dp_dY*eta_YZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_YZ,
                   (Psi_XX_v*dp_dZ**2) + (Psi_ZZ_v*dp_dX**2) - (2*Psi_XZ_v*dp_dX*dp_dZ) + 2*(K_X_v-K_X_p)*dp_dX*eta_XZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_XZ,
-                  (Psi_YY_v*dp_dZ**2) + (Psi_ZZ_v*dp_dY**2) - (2*Psi_YZ_v*dp_dY*dp_dZ) + 2*(K_X_v-K_X_p)*dp_dX*eta_XY + 2*(K_Y_v-K_Y_p)*dp_dY*eta_XY,
+    Psi_XX_v*dx0**2 + Psi_YY_v*dy0**2 + Psi_ZZ_v*dz0**2 + 2*Psi_XY_v*dx0*dy0 + 2*Psi_XZ_v*dx0*dz0 + 2*Psi_YZ_v*dy0*dz0 + 2*(K_X_v-K_X_p)*dp_dX*eta_XYZ + 2*(K_Y_v-K_Y_p)*dp_dY*eta_XYZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_XYZ,
                   -dH_dX,
                   -dH_dY,
                   -dH_dZ]
+    
+    # TO REMOVE
+    print("this should be 0 for continuous ne?", 2*(K_Y_v-K_Y_p)*dp_dY*eta_YZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_YZ)
+    print("dp_dY", dp_dY)
+    print("dp_dZ", dp_dZ)
+    print("K_Y_v-K_Y_p", K_Y_v-K_Y_p)
+    print("K_Z_v-K_Z_p", K_Z_v-K_Z_p)
+    print("eta_YZ", eta_YZ)
+    print()
+
+    print("this should also be 0 for continuous ne?", 2*(K_X_v-K_X_p)*dp_dX*eta_XZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_XZ)
+    print("dp_dX", dp_dX)
+    print("dp_dZ", dp_dZ)
+    print("K_X_v-K_X_p", K_X_v-K_X_p)
+    print("K_Z_v-K_Z_p", K_Z_v-K_Z_p)
+    print("eta_XZ", eta_XZ)
+    print()
+
+    print("this should also also be 0 for continuous ne?", 2*(K_X_v-K_X_p)*dp_dX*eta_XY + 2*(K_Y_v-K_Y_p)*dp_dY*eta_XY)
+    print("dp_dX", dp_dX)
+    print("dp_dY", dp_dY)
+    print("K_X_v-K_X_p", K_X_v-K_X_p)
+    print("K_Y_v-K_Y_p", K_Y_v-K_Y_p)
+    print("eta_XY", eta_XY)
+    print()
+
+    print("interface matrix")
+    for i in range(6): print(interface_matrix[i])
+    print()
+    print("RHS_vector")
+    for i in range(6): print(RHS_vector[i])
+    print()
 
     [Psi_XX_p,
     Psi_XY_p,
