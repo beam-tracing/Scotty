@@ -63,6 +63,11 @@ def apply_continuous_BC_3D(
     dp_dY = field.d_polflux_dY(q_X, q_Y, q_Z, delta_Y)
     dp_dZ = field.d_polflux_dZ(q_X, q_Y, q_Z, delta_Z)
 
+    # TO REMOVE
+    print("dH_dX", dH_dX)
+    print("dH_dY", dH_dY)
+    print("dH_dZ", dH_dZ)
+
     # Gradients at the plasma-vacuum boundary can be
     # finnicky, so it's good to check
     for gradient in dH.keys():
@@ -104,14 +109,14 @@ def apply_continuous_BC_3D(
     interface_matrix[5, 5] = dH_dKz
 
     # TO REMOVE: Testing another derivation instead
-    # dx0 = dy0 = -dp_dZ
-    # dz0 = dp_dX + dp_dY
-    # interface_matrix[2, 0] = dx0**2
-    # interface_matrix[2, 1] = 2*dx0*dy0
-    # interface_matrix[2, 2] = 2*dx0*dz0
-    # interface_matrix[2, 3] = dy0**2
-    # interface_matrix[2, 4] = 2*dy0*dz0
-    # interface_matrix[2, 5] = dz0**2
+    dx0 = dy0 = -dp_dZ
+    dz0 = dp_dX + dp_dY
+    interface_matrix[2, 0] = dx0**2
+    interface_matrix[2, 1] = 2*dx0*dy0
+    interface_matrix[2, 2] = 2*dx0*dz0
+    interface_matrix[2, 3] = dy0**2
+    interface_matrix[2, 4] = 2*dy0*dz0
+    interface_matrix[2, 5] = dz0**2
     
     # Comment from the original function code:
         # interface_matrix will be singular if one tries to
@@ -120,19 +125,19 @@ def apply_continuous_BC_3D(
         # my experience
     interface_matrix_inverse = np.linalg.inv(interface_matrix)
 
-    RHS_vector = [(Psi_XX_v * dp_dY**2) + (Psi_YY_v * dp_dX**2) - (2 * Psi_XY_v * dp_dX * dp_dY),
-                  (Psi_XX_v * dp_dZ**2) + (Psi_ZZ_v * dp_dX**2) - (2 * Psi_XZ_v * dp_dX * dp_dZ),
-                  (Psi_YY_v * dp_dZ**2) + (Psi_ZZ_v * dp_dY**2) - (2 * Psi_YZ_v * dp_dY * dp_dZ),
-                  -dH_dX,
-                  -dH_dY,
-                  -dH_dZ]
-    # TO REMOVE: the below RHS_vector is for the new derivation; above for the old
     # RHS_vector = [(Psi_XX_v * dp_dY**2) + (Psi_YY_v * dp_dX**2) - (2 * Psi_XY_v * dp_dX * dp_dY),
     #               (Psi_XX_v * dp_dZ**2) + (Psi_ZZ_v * dp_dX**2) - (2 * Psi_XZ_v * dp_dX * dp_dZ),
-    # Psi_XX_v*dx0**2 + Psi_YY_v*dy0**2 + Psi_ZZ_v*dz0**2 + 2*Psi_XY_v*dx0*dy0 + 2*Psi_XZ_v*dx0*dz0 + 2*Psi_YZ_v*dy0*dz0,
+    #               (Psi_YY_v * dp_dZ**2) + (Psi_ZZ_v * dp_dY**2) - (2 * Psi_YZ_v * dp_dY * dp_dZ),
     #               -dH_dX,
     #               -dH_dY,
     #               -dH_dZ]
+    # TO REMOVE: the below RHS_vector is for the new derivation; above for the old
+    RHS_vector = [(Psi_XX_v * dp_dY**2) + (Psi_YY_v * dp_dX**2) - (2 * Psi_XY_v * dp_dX * dp_dY),
+                  (Psi_XX_v * dp_dZ**2) + (Psi_ZZ_v * dp_dX**2) - (2 * Psi_XZ_v * dp_dX * dp_dZ),
+    Psi_XX_v*dx0**2 + Psi_YY_v*dy0**2 + Psi_ZZ_v*dz0**2 + 2*Psi_XY_v*dx0*dy0 + 2*Psi_XZ_v*dx0*dz0 + 2*Psi_YZ_v*dy0*dz0,
+                  -dH_dX,
+                  -dH_dY,
+                  -dH_dZ]
 
     print()
     print("interface matrix")
@@ -251,11 +256,22 @@ def find_K_plasma_with_discontinuous_BC(
     # parallel_vector2 corresponds to delta_Y = 0 and is equal to
         # np.array([-dp_dZ, 0, dp_dX]) / np.sqrt( dp_dX**2 + dp_dZ**2 )
     # normal_vector = parallel_vector1 x parallel_vector2 and is equal to
-        # np.array([-dp_dX*dp_dZ, dp_dY*dp_dZ, -dp_dZ**2]) / np.sqrt( (dp_dX*dp_dZ)**2 + (dp_dY*dp_dZ)**2 + (dp_dZ**2)**2 )
+        # np.array([-dp_dX*dp_dZ, -dp_dY*dp_dZ, -dp_dZ**2]) / np.sqrt( (dp_dX*dp_dZ)**2 + (dp_dY*dp_dZ)**2 + (dp_dZ**2)**2 )
     # binormal_vector = parallel_vector1 x normal_vector
-    parallel_unitvector1 = np.array([0, -dp_dZ, dp_dY]) / np.sqrt( dp_dY**2 + dp_dZ**2 )
-    normal_unitvector = np.array([-dp_dX*dp_dZ, dp_dY*dp_dZ, -dp_dZ**2]) / np.sqrt( (dp_dX*dp_dZ)**2 + (dp_dY*dp_dZ)**2 + (dp_dZ**2)**2 )
-    binormal_unitvector = np.array([dp_dZ**3-dp_dY**2*dp_dZ, -dp_dX*dp_dY*dp_dZ, -dp_dX*dp_dZ**2]) / np.sqrt( (dp_dZ**3-dp_dY**2*dp_dZ)**2 + (dp_dX*dp_dY*dp_dZ)**2 + (dp_dX*dp_dZ**2)**2 )
+    parallel_vector1 = np.array([0, -dp_dZ, dp_dY])
+    normal_vector    = np.array([-dp_dX*dp_dZ, -dp_dY*dp_dZ, -dp_dZ**2])
+    binormal_vector  = np.array([dp_dZ**3+dp_dY**2*dp_dZ, -dp_dX*dp_dY*dp_dZ, -dp_dX*dp_dZ**2])
+
+    parallel_unitvector1 = parallel_vector1 / np.sqrt(np.dot(parallel_vector1, parallel_vector1))
+    normal_unitvector = normal_vector / np.sqrt(np.dot(normal_vector, normal_vector))
+    binormal_unitvector = binormal_vector / np.sqrt(np.dot(binormal_vector, binormal_vector))
+
+    # TO REMOVE
+    print()
+    print("parallel_unitvector1", parallel_unitvector1)
+    print("normal_unitvector", normal_unitvector)
+    print("binormal_unitvector", binormal_unitvector)
+    print()
 
     # Checking to see if the normal vector points into or out of
     # the plasma by comparing the poloidal flux value at (q_X, q_Y, q_Z)
@@ -272,6 +288,14 @@ def find_K_plasma_with_discontinuous_BC(
     K_vacuum = np.array([K_X, K_Y, K_Z])
     K_parallel = np.dot(K_vacuum, parallel_unitvector1)
     K_binormal = np.dot(K_vacuum, binormal_unitvector)
+
+    # TO REMOVE
+    K_normal = np.dot(K_vacuum, normal_unitvector)
+    print()
+    print("K_parallel", K_parallel)
+    print("K_normal", K_normal)
+    print("K_binormal", K_binormal)
+    print()
 
     # Now we find the component of K_plasma normal to the flux surface
     # by using the dispersion relation H = 0. We first guess what it
@@ -377,6 +401,13 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     d2p_dXdZ = field.d2_polflux_dXdZ(q_X, q_Y, q_Z, delta_X, delta_Z)
     d2p_dYdZ = field.d2_polflux_dYdZ(q_X, q_Y, q_Z, delta_Y, delta_Z)
 
+    # TO REMOVE -- just forcing our Psi to match the one from cyl Scotty, for debugging
+    # Psi_3D_vacuum_labframe_cartesian = np.array(
+    #     [[-6.62804095e-30+7.05949757e-31j, -2.24962293e-16-2.82933013e-31j, -1.08282224e-13+1.15290345e-14j],
+    #      [-2.24962293e-16-2.82933013e-31j, -1.74669066e+03+1.88283421e+02j, -1.75162308e-46+0.00000000e+00j],
+    #      [-1.08282224e-13+1.15290345e-14j, -1.75162308e-46+0.00000000e+00j, -1.76838292e+03+1.88283421e+02j]]
+    # )
+
     # At the plasma-vacuum boundary, we have two Psi matrices:
     # one corresponding to Psi in the plasma, and the other
     # corresponding to Psi in the vacuum. We denote these by
@@ -398,9 +429,9 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     interface_matrix[1, 0] = dp_dZ**2
     interface_matrix[1, 2] = -2 * dp_dX * dp_dZ
     interface_matrix[1, 5] = dp_dX**2
-    interface_matrix[2, 3] = dp_dZ**2
-    interface_matrix[2, 4] = -2 * dp_dY * dp_dZ
-    interface_matrix[2, 5] = dp_dY**2
+    # interface_matrix[2, 3] = dp_dZ**2
+    # interface_matrix[2, 4] = -2 * dp_dY * dp_dZ
+    # interface_matrix[2, 5] = dp_dY**2
     interface_matrix[3, 0] = dH_dKx
     interface_matrix[3, 1] = dH_dKy
     interface_matrix[3, 2] = dH_dKz
@@ -420,14 +451,9 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     # corresponding to displacements in the YZ, XZ, and XY-planes,
     # respectively, which also corresponds to eta_YZ, eta_XZ,
     # and eta_XY respectively
-    eta_YZ = -0.5 * (d2p_dY2*dp_dZ**2 + 2*d2p_dYdZ*dp_dY*dp_dZ + d2p_dZ2*dp_dY**2) / (dp_dY**2 + dp_dZ**2)
-    eta_XZ = -0.5 * (d2p_dX2*dp_dZ**2 + 2*d2p_dXdZ*dp_dX*dp_dZ + d2p_dZ2*dp_dX**2) / (dp_dX**2 + dp_dZ**2)
-    eta_XY = -0.5 * (d2p_dX2*dp_dY**2 + 2*d2p_dXdY*dp_dX*dp_dY + d2p_dY2*dp_dX**2) / (dp_dX**2 + dp_dY**2)
-
-    # TO REMOVE
-    print("eta_YZ", eta_YZ)
-    print("eta_XZ", eta_XZ)
-    print("eta_XY", eta_XY)
+    eta_YZ = -0.5 * (d2p_dY2*dp_dZ**2 - 2*d2p_dYdZ*dp_dY*dp_dZ + d2p_dZ2*dp_dY**2) / (dp_dY**2 + dp_dZ**2)
+    eta_XZ = -0.5 * (d2p_dX2*dp_dZ**2 - 2*d2p_dXdZ*dp_dX*dp_dZ + d2p_dZ2*dp_dX**2) / (dp_dX**2 + dp_dZ**2)
+    eta_XY = -0.5 * (d2p_dX2*dp_dY**2 - 2*d2p_dXdY*dp_dX*dp_dY + d2p_dY2*dp_dX**2) / (dp_dX**2 + dp_dY**2)
 
     # TO REMOVE: Testing another derivation instead
     dx0 = dy0 = -dp_dZ
@@ -438,6 +464,77 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     interface_matrix[2, 3] = dy0**2
     interface_matrix[2, 4] = 2*dy0*dz0
     interface_matrix[2, 5] = dz0**2
+
+    eta_XYZ = -0.5 * (d2p_dX2*dx0**2 + d2p_dY2*dy0**2 + d2p_dZ2*dz0**2 + 2*d2p_dXdY*dx0*dy0 + 2*d2p_dXdZ*dx0*dz0 + 2*d2p_dYdZ*dy0*dz0) / ( dp_dX**2 + dp_dY**2 + dp_dZ**2 )
+    RHS_vector_2 = Psi_XX_v*dx0**2 + Psi_YY_v*dy0**2 + Psi_ZZ_v*dz0**2 + 2*Psi_XY_v*dx0*dy0 + 2*Psi_XZ_v*dx0*dz0 + 2*Psi_YZ_v*dy0*dz0 + 2*(K_X_v-K_X_p)*dp_dX*eta_XYZ + 2*(K_Y_v-K_Y_p)*dp_dY*eta_XYZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_XYZ
+
+    # TO REMOVE
+    print("eta_YZ", eta_YZ)
+    print("eta_XZ", eta_XZ)
+    print("eta_XY", eta_XY)
+    print("eta_XYZ", eta_XYZ)
+    print()
+    parameter = 0.01
+    print("polflux:", field.polflux(q_X,
+                                        q_Y,
+                                        q_Z))
+
+    print("polflux, YZ:", field.polflux(q_X,
+                                        q_Y - dp_dZ*parameter + eta_YZ*dp_dY*parameter**2,
+                                        q_Z + dp_dY*parameter + eta_YZ*dp_dZ*parameter**2))
+    
+    print("polflux, XZ:", field.polflux(q_X - dp_dZ*parameter + eta_XZ*dp_dX*parameter**2,
+                                        q_Y,
+                                        q_Z + dp_dX*parameter + eta_XZ*dp_dZ*parameter**2))
+    
+    print("polflux, XY:", field.polflux(q_X - dp_dY*parameter + eta_XY*dp_dX*parameter**2,
+                                        q_Y + dp_dX*parameter + eta_XY*dp_dY*parameter**2,
+                                        q_Z))
+    
+    print("polflux, XYZ:", field.polflux(q_X - dp_dZ*parameter + eta_XYZ*dp_dX*parameter**2,
+                                         q_Y - dp_dZ*parameter + eta_XYZ*dp_dY*parameter**2,
+                                         q_Z + (dp_dX+dp_dY)*parameter + eta_XYZ*dp_dZ*parameter**2))
+    print()
+
+
+
+
+
+    # # TO REMOVE: Testing an even more contrived derivation method
+    # dx0 = -2*dp_dZ
+    # dy0 = -  dp_dZ
+    # dz0 = 2*dp_dX + dp_dY
+    # interface_matrix[4, 0] = dx0**2
+    # interface_matrix[4, 1] = 2*dx0*dy0
+    # interface_matrix[4, 2] = 2*dx0*dz0
+    # interface_matrix[4, 3] = dy0**2
+    # interface_matrix[4, 4] = 2*dy0*dz0
+    # interface_matrix[4, 5] = dz0**2
+
+    # eta_2XYZ = -0.5 * (d2p_dX2*dx0**2 + d2p_dY2*dy0**2 + d2p_dZ2*dz0**2 + 2*d2p_dXdY*dx0*dy0 + 2*d2p_dXdZ*dx0*dz0 + 2*d2p_dYdZ*dy0*dz0) / ( dp_dX**2 + dp_dY**2 + dp_dZ**2 )
+    # RHS_vector_4 = Psi_XX_v*dx0**2 + Psi_YY_v*dy0**2 + Psi_ZZ_v*dz0**2 + 2*Psi_XY_v*dx0*dy0 + 2*Psi_XZ_v*dx0*dz0 + 2*Psi_YZ_v*dy0*dz0 + 2*(K_X_v-K_X_p)*dp_dX*eta_2XYZ + 2*(K_Y_v-K_Y_p)*dp_dY*eta_2XYZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_2XYZ
+
+    # dx0 = -3*dp_dZ
+    # dy0 = -  dp_dZ
+    # dz0 = 3*dp_dX + dp_dY
+    # interface_matrix[5, 0] = dx0**2
+    # interface_matrix[5, 1] = 2*dx0*dy0
+    # interface_matrix[5, 2] = 2*dx0*dz0
+    # interface_matrix[5, 3] = dy0**2
+    # interface_matrix[5, 4] = 2*dy0*dz0
+    # interface_matrix[5, 5] = dz0**2
+
+    # eta_3XYZ = -0.5 * (d2p_dX2*dx0**2 + d2p_dY2*dy0**2 + d2p_dZ2*dz0**2 + 2*d2p_dXdY*dx0*dy0 + 2*d2p_dXdZ*dx0*dz0 + 2*d2p_dYdZ*dy0*dz0) / ( dp_dX**2 + dp_dY**2 + dp_dZ**2 )
+    # RHS_vector_5 = Psi_XX_v*dx0**2 + Psi_YY_v*dy0**2 + Psi_ZZ_v*dz0**2 + 2*Psi_XY_v*dx0*dy0 + 2*Psi_XZ_v*dx0*dz0 + 2*Psi_YZ_v*dy0*dz0 + 2*(K_X_v-K_X_p)*dp_dX*eta_3XYZ + 2*(K_Y_v-K_Y_p)*dp_dY*eta_3XYZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_3XYZ
+
+
+
+
+    
+    # TO REMOVE
+    print("TO REMOVE: interface matrix")
+    for i in range(6):
+        print(interface_matrix[i][0], interface_matrix[i][1], interface_matrix[i][2], interface_matrix[i][3], interface_matrix[i][4], interface_matrix[i][5])
     
     # Comment from the original function code:
         # interface_matrix will be singular if one tries to
@@ -453,8 +550,7 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     #               -dH_dY,
     #               -dH_dZ]
     # TO REMOVE: the below RHS_vector is for the new derivation; above for the old
-    eta_XYZ = -0.5 * (d2p_dX2*dx0**2 + d2p_dY2*dy0**2 + d2p_dZ2*dz0**2 + 2*d2p_dXdY*dx0*dy0 + 2*d2p_dXdZ*dx0*dz0 + 2*d2p_dYdZ*dy0*dz0) / ( dp_dX**2 + dp_dY**2 + dp_dZ**2 )
-    RHS_vector = [(Psi_XX_v*dp_dY**2) + (Psi_YY_v*dp_dX**2) - (2*Psi_XY_v*dp_dX*dp_dY) + 2*(K_Y_v-K_Y_p)*dp_dY*eta_YZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_YZ,
+    RHS_vector = [(Psi_XX_v*dp_dY**2) + (Psi_YY_v*dp_dX**2) - (2*Psi_XY_v*dp_dX*dp_dY) + 2*(K_X_v-K_X_p)*dp_dX*eta_XY + 2*(K_Y_v-K_Y_p)*dp_dY*eta_XY,
                   (Psi_XX_v*dp_dZ**2) + (Psi_ZZ_v*dp_dX**2) - (2*Psi_XZ_v*dp_dX*dp_dZ) + 2*(K_X_v-K_X_p)*dp_dX*eta_XZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_XZ,
     Psi_XX_v*dx0**2 + Psi_YY_v*dy0**2 + Psi_ZZ_v*dz0**2 + 2*Psi_XY_v*dx0*dy0 + 2*Psi_XZ_v*dx0*dz0 + 2*Psi_YZ_v*dy0*dz0 + 2*(K_X_v-K_X_p)*dp_dX*eta_XYZ + 2*(K_Y_v-K_Y_p)*dp_dY*eta_XYZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_XYZ,
                   -dH_dX,
@@ -500,6 +596,54 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     Psi_YZ_p,
     Psi_ZZ_p] = np.matmul(interface_matrix_inverse, RHS_vector)
 
+
+
+
+
+
+
+    # TO REMOVE; just matching with cyl Scotty for debugging
+    # test_interface_matrix = np.zeros([6, 6])
+    # test_interface_matrix[0][3] = 1
+    # test_interface_matrix[1][0] = dp_dZ**2
+    # test_interface_matrix[1][2] = -2 * dp_dX * dp_dZ
+    # test_interface_matrix[1][5] = dp_dX**2
+    # test_interface_matrix[2][1] = -dp_dZ
+    # test_interface_matrix[2][4] = dp_dX
+    # test_interface_matrix[3][0] = dH_dKx
+    # test_interface_matrix[3][1] = dH_dKy
+    # test_interface_matrix[3][2] = dH_dKz
+    # test_interface_matrix[4][1] = dH_dKx
+    # test_interface_matrix[4][3] = dH_dKy
+    # test_interface_matrix[4][4] = dH_dKz
+    # test_interface_matrix[5][2] = dH_dKx
+    # test_interface_matrix[5][4] = dH_dKy
+    # test_interface_matrix[5][5] = dH_dKz
+
+    # test_interface_matrix_inverse = np.linalg.inv(test_interface_matrix)
+
+    # test_RHS_vector = [Psi_YY_v,
+    #                    Psi_XX_v*dp_dZ**2 - 2*Psi_XZ_v*dp_dX*dp_dZ + Psi_ZZ_v*dp_dX**2 + 2*(K_X_v-K_X_p)*dp_dX*eta_XZ + 2*(K_Z_v-K_Z_p)*dp_dZ*eta_XZ,
+    #                    -Psi_XY_v*dp_dZ + Psi_YZ_v*dp_dX,
+    #                    -dH_dX,
+    #                    -dH_dY,
+    #                    -dH_dZ]
+    
+    # [Psi_XX_p,
+    # Psi_XY_p,
+    # Psi_XZ_p,
+    # Psi_YY_p,
+    # Psi_YZ_p,
+    # Psi_ZZ_p] = np.matmul(test_interface_matrix_inverse, test_RHS_vector)
+    
+
+
+
+
+
+
+
+
     # Forming back up to get Psi in the plasma
     Psi_3D_plasma_labframe_cartesian = np.zeros([3, 3], dtype="complex128")
     Psi_3D_plasma_labframe_cartesian[0, 0] = Psi_XX_p
@@ -511,6 +655,21 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     Psi_3D_plasma_labframe_cartesian[2, 0] = Psi_3D_plasma_labframe_cartesian[0, 2]
     Psi_3D_plasma_labframe_cartesian[1, 2] = Psi_YZ_p
     Psi_3D_plasma_labframe_cartesian[2, 1] = Psi_3D_plasma_labframe_cartesian[1, 2]
+
+    # TO REMOVE
+    print("Checking Psi \cdot gradK(H) + grad(H) = 0")
+    print(np.dot(Psi_3D_plasma_labframe_cartesian, np.array(([dH_dKx],[dH_dKy],[dH_dKz]))))
+    print(np.array(([dH_dX],[dH_dY],[dH_dZ])))
+    print()
+    print(np.dot(Psi_3D_plasma_labframe_cartesian, np.array(([dH_dKx],[dH_dKy],[dH_dKz]))) + np.array(([dH_dX],[dH_dY],[dH_dZ])))
+    print()
+    print("dH_dX", dH_dX)
+    print("dH_dY", dH_dY)
+    print("dH_dZ", dH_dZ)
+    print("dH_dKx", dH_dKx)
+    print("dH_dKy", dH_dKy)
+    print("dH_dKz", dH_dKz)
+    print()
 
     return Psi_3D_plasma_labframe_cartesian
 

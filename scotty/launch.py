@@ -252,6 +252,7 @@ def launch_beam(
     if Psi_BC_flag == "discontinuous":
         K_initial, Psi_3D_lab_initial = apply_discontinuous_BC(
             entry_position[0],
+            entry_position[1], # TO REMOVE
             entry_position[2],
             Psi_3D_lab_entry,
             K_R_entry,
@@ -396,8 +397,13 @@ def find_entry_point(
     # The root might be just outside the plasma due to floating point
     # errors, if so, take small steps until we're definitely inside
     boundary_tau = boundary.root
-    R_boundary, _, Z_boundary = cartesian_to_cylindrical(*beam_line(boundary_tau))
+    R_boundary, zeta_boundary, Z_boundary = cartesian_to_cylindrical(*beam_line(boundary_tau))
     if field.poloidal_flux(R_boundary, Z_boundary) > poloidal_flux_enter:
         boundary_tau += boundary_adjust
+    
+    # TO REMOVE: does cyl scotty produce the correct entry point?
+    print()
+    print("boundary point", R_boundary, zeta_boundary, Z_boundary)
+    print()
 
     return np.array(cartesian_to_cylindrical(*beam_line(boundary_tau)))

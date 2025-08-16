@@ -231,7 +231,7 @@ class Hamiltonian_3D:
                     K_X: ArrayLike,
                     K_Y: ArrayLike,
                     K_Z: ArrayLike,
-                    second_order: bool = False) -> Dict[str, ArrayLike]:
+                    second_order: bool = False) -> Dict[str, ArrayLike]: # TO REMOVE
         
         """
         Evaluate the first-order derivative in all directions at the given
@@ -242,7 +242,7 @@ class Hamiltonian_3D:
 
         def apply_stencil(dims: Tuple[str, ...], stencil: str):
             return scotty.derivatives.derivative(self, dims, starts, self.spacings, stencil)
-
+        
         derivatives = {
             "dH_dX":  apply_stencil(("X"), "d1_FFD2"),
             "dH_dY":  apply_stencil(("Y"), "d1_FFD2"),

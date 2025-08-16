@@ -268,10 +268,30 @@ def find_entry_point_3D(
     # is definitely inside.
     boundary_tau = boundary.root
     X_boundary, Y_boundary, Z_boundary = ray_line(boundary_tau)
-    # TO REMOVE: temporarily removed to see if we are inside the boundary or not
-    # if field.polflux(X_boundary, Y_boundary, Z_boundary) > poloidal_flux_enter: boundary_tau += boundary_adjust
-
     print("TO REMOVE: boundary coordinates", X_boundary, Y_boundary, Z_boundary)
     print("TO REMOVE: boundary polflux", field.polflux(X_boundary, Y_boundary, Z_boundary))
 
+    # TO REMOVE: change 1.0 back to poloidal_flux_enter
+    if field.polflux(X_boundary, Y_boundary, Z_boundary) > 1.0:
+        boundary_tau += boundary_adjust
+        X_boundary, Y_boundary, Z_boundary = ray_line(boundary_tau)
+        print("TO REMOVE: adjusted boundary coordinates", X_boundary, Y_boundary, Z_boundary)
+        print("TO REMOVE: adjusted boundary polflux", field.polflux(X_boundary, Y_boundary, Z_boundary))
+
+    # TO REMOVE: this is to prevent issues with the boundary derivative
+    # for iteration in range(10000):
+    #     if ((field.polflux(X_boundary-1e-3, Y_boundary, Z_boundary) > poloidal_flux_enter) or
+    #         (field.polflux(X_boundary, Y_boundary+1e-3, Z_boundary) > poloidal_flux_enter) or
+    #         (field.polflux(X_boundary, Y_boundary, Z_boundary+1e-3) > poloidal_flux_enter)):
+    #         boundary_tau += boundary_adjust
+    #         X_boundary, Y_boundary, Z_boundary = ray_line(boundary_tau)
+    #     else:
+    #         print()
+    #         print("NEW BOUNDARY:", X_boundary, Y_boundary, Z_boundary)
+    #         print("polflux at NEW BOUNDARY", field.polflux(X_boundary, Y_boundary, Z_boundary))
+    #         print("polflux at NEW BOUNDARY+deltas", field.polflux(X_boundary-1e-3, Y_boundary+1e-3, Z_boundary+1e-3))
+    #         print("iteration", iteration)
+    #         print()
+    #         return np.array(ray_line(boundary_tau))
+    
     return np.array(ray_line(boundary_tau))

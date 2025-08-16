@@ -635,6 +635,10 @@ def beam_me_up(
                 ["row", "col"],
                 Psi_3D_lab_entry,
             ),
+            "Psi_3D_lab_entry_cartesian": (
+                ["row", "col"],
+                Psi_3D_lab_entry_cartersian,
+            ),
             "Psi_3D_lab_launch": (
                 ["row", "col"],
                 Psi_3D_lab_launch,
@@ -738,7 +742,7 @@ def beam_me_up(
     if figure_flag:
         default_plots(dt, field, output_path, output_filename_suffix)
 
-    return dt
+    return dt, field, hamiltonian
 
 
 def default_plots(
