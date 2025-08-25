@@ -193,6 +193,11 @@ class Hamiltonian_3D:
         
         epsilon = DielectricTensor_3D(electron_density, self.angular_frequency, B_magnitude, temperature)
 
+        # TO REMOVE
+        # self.dielectrictensor = epsilon
+        # try: self.dielectrictensor = epsilon
+        # except: 
+
         Booker_alpha = (epsilon.e_bb * sin_theta_m_sq) + epsilon.e_11 * (1 - sin_theta_m_sq)
 
         Booker_beta = (-epsilon.e_11 * epsilon.e_bb * (1 + sin_theta_m_sq)) - (epsilon.e_11**2 - epsilon.e_12**2) * (1 - sin_theta_m_sq)

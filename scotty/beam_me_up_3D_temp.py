@@ -93,6 +93,11 @@ def beam_me_up_3D(
     B_p_a = None,
     R_axis = None,
     minor_radius_a = None,
+
+    # TO REMOVE -- only for debugging
+    from_cyl_scotty___q_entry_cartesian = None,
+    from_cyl_scotty___K_entry_cartesian = None,
+    from_cyl_scotty___Psi_3D_entry_labframe_cartesian = None,
 ) -> datatree.DataTree:
 
     print("Beam trace me up, Scotty!")
@@ -155,8 +160,8 @@ def beam_me_up_3D(
     if auto_delta_sign:
         entry_coords = find_entry_point_3D(
             launch_position_cartesian,
-            np.deg2rad(poloidal_launch_angle_Torbeam),
-            np.deg2rad(toroidal_launch_angle_Torbeam),
+            poloidal_launch_angle_Torbeam,
+            toroidal_launch_angle_Torbeam,
             poloidal_flux_enter,
             field,
         )
@@ -200,21 +205,6 @@ def beam_me_up_3D(
     # Launch parameters
     # ------------------------------
     if vacuumLaunch_flag:
-        # TO REMOVE: the hamiltonian to reduce the delta size due to boundary derivative issues
-        hamiltonian_for_launch = Hamiltonian_3D(
-            field,
-            launch_angular_frequency,
-            mode_flag,
-            find_density_1D,
-            -1e-3, # delta_X,
-             1e-3, # delta_Y,
-             1e-3, # delta_Z,
-            delta_K_X,
-            delta_K_Y,
-            delta_K_Z,
-            find_temperature_1D
-        )
-
         print("Beam launched from outside the plasma")
         (
             q_launch_cartesian,  # q_launch_cartesian,
@@ -234,7 +224,7 @@ def beam_me_up_3D(
             launch_position_cartesian,
             mode_flag,
             field,
-            hamiltonian, # hamiltonian_for_launch,
+            hamiltonian,
             vacuumLaunch_flag,
             vacuum_propagation_flag,
             Psi_BC_flag,
@@ -242,6 +232,10 @@ def beam_me_up_3D(
             delta_X,
             delta_Y,
             delta_Z,
+            None,
+            from_cyl_scotty___q_entry_cartesian,
+            from_cyl_scotty___K_entry_cartesian,
+            from_cyl_scotty___Psi_3D_entry_labframe_cartesian,
         )
     else:
         print("Beam launched from inside the plasma")
@@ -355,6 +349,10 @@ def beam_me_up_3D(
     q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, Psi_3D_output = unpack_beam_parameters_3D(beam_parameters_final)
 
     print("Main loop complete")
+
+    # TO REMOVE
+    if from_cyl_scotty___K_entry_cartesian is not None:
+        K_launch_cartesian = from_cyl_scotty___K_entry_cartesian
 
     inputs = xr.Dataset(
         {
@@ -514,8 +512,8 @@ def beam_me_up_3D(
         plot_wavevector(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"wavevector{output_filename_suffix}.png"))
 
     # return dt, field
-    return dt, field, hamiltonian, q_launch_cartesian, q_initial_cartesian, K_launch_cartesian, K_initial_cartesian, Psi_3D_initial_labframe_cartesian
     # TO REMOVE
+    return dt, field, hamiltonian, q_launch_cartesian, q_initial_cartesian, K_launch_cartesian, K_initial_cartesian, Psi_3D_initial_labframe_cartesian
 
 
 

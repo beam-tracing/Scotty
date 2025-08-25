@@ -268,6 +268,11 @@ def find_K_plasma_with_discontinuous_BC(
 
     # TO REMOVE
     print()
+    print("K_vacuum, before anything is calculated")
+    print("K_X", K_X)
+    print("K_Y", K_Y)
+    print("K_Z", K_Z)
+    print()
     print("parallel_unitvector1", parallel_unitvector1)
     print("normal_unitvector", normal_unitvector)
     print("binormal_unitvector", binormal_unitvector)
@@ -337,7 +342,7 @@ def find_K_plasma_with_discontinuous_BC(
     # Comments from the original function code:
         # This will fail if the beam is too glancing such that there
         # is no possible K_normal_plasma that satisfies H = 0
-    K_normal_plasma = newton(find_H_bar_3D_wrapper, K_normal_plasma_initial_guess, tol=1e-6, maxiter=5000)
+    K_normal_plasma = newton(find_H_bar_3D_wrapper, K_normal_plasma_initial_guess, tol=1e-10, maxiter=5000)
 
     # After finding K_normal_plasma, we now find K_plasma
     K_plasma = K_parallel*parallel_unitvector1 + K_binormal*binormal_unitvector + K_normal_plasma*normal_unitvector
@@ -364,9 +369,9 @@ def find_K_plasma_with_discontinuous_BC(
     print("TO REMOVE: K_plasma", K_plasma)
 
     if abs(H_bar_check) > 1e-3:
-        # raise ValueError(f"Unable to find K_plasma with discontinuous boundary conditions! \n H_bar_check = {H_bar_check}")
+        raise ValueError(f"Unable to find K_plasma with discontinuous boundary conditions! \n H_bar_check = {H_bar_check}")
         # TO REMOVE
-        print(f"Unable to find K_plasma with discontinuous boundary conditions! \n H_bar_check = {H_bar_check}")
+        # print(f"Unable to find K_plasma with discontinuous boundary conditions! \n H_bar_check = {H_bar_check}")
     
     return K_plasma
 
@@ -384,13 +389,13 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     
     # Getting important quantities
     delta_X, delta_Y, delta_Z = hamiltonian.spacings["X"], hamiltonian.spacings["Y"], hamiltonian.spacings["Z"]
-    dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X_v, K_Y_v, K_Z_v)
-    dH_dX = dH["dH_dX"]
-    dH_dY = dH["dH_dY"]
-    dH_dZ = dH["dH_dZ"]
-    dH_dKx = dH["dH_dKx"]
-    dH_dKy = dH["dH_dKy"]
-    dH_dKz = dH["dH_dKz"]
+    dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X_p, K_Y_p, K_Z_p)
+    dH_dX = dH["dH_dX"] # -22.113073049545815 # 
+    dH_dY = dH["dH_dY"] # 0.8681728701766835 # 
+    dH_dZ = dH["dH_dZ"] # 8.8676362186359 # 
+    dH_dKx = dH["dH_dKx"] # 
+    dH_dKy = dH["dH_dKy"] # 
+    dH_dKz = dH["dH_dKz"] # 
     dp_dX = field.d_polflux_dX(q_X, q_Y, q_Z, delta_X)
     dp_dY = field.d_polflux_dY(q_X, q_Y, q_Z, delta_Y)
     dp_dZ = field.d_polflux_dZ(q_X, q_Y, q_Z, delta_Z)
@@ -407,6 +412,34 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     #      [-2.24962293e-16-2.82933013e-31j, -1.74669066e+03+1.88283421e+02j, -1.75162308e-46+0.00000000e+00j],
     #      [-1.08282224e-13+1.15290345e-14j, -1.75162308e-46+0.00000000e+00j, -1.76838292e+03+1.88283421e+02j]]
     # )
+
+    # TO REMOVE -- analytically calculating derivatives
+    # import scipy.constants as cte
+    # e_bb = hamiltonian.dielectrictensor.e_bb
+    # e_11 = hamiltonian.dielectrictensor.e_11
+    # e_12 = hamiltonian.dielectrictensor.e_12
+    # omega = hamiltonian.angular_frequency
+    # Bx, By, Bz = field.B_X(q_X, q_Y, q_Z), field.B_Y(q_X, q_Y, q_Z), field.B_Z(q_X, q_Y, q_Z)
+    # K = np.sqrt(K_X_v**2 + K_Y_v**2 + K_Z_v**2)
+    # B = np.sqrt(Bx**2 + By**2 + Bz**2)
+    # K_dot_B = K_X_v*Bx + K_Y_v*By + K_Z_v*Bz
+
+    # d_sin2_theta_m_dKx = Bx / (K**2 * B**2) - 2*K_X_v*K_dot_B / (K**4 * B**4)
+    # d_sin2_theta_m_dKy = By / (K**2 * B**2) - 2*K_Y_v*K_dot_B / (K**4 * B**4)
+    # d_sin2_theta_m_dKz = Bz / (K**2 * B**2) - 2*K_Z_v*K_dot_B / (K**4 * B**4)
+
+    # d_alpha_dKx = (e_bb - e_11)*d_sin2_theta_m_dKx
+    # d_alpha_dKy = (e_bb - e_11)*d_sin2_theta_m_dKy
+    # d_alpha_dKz = (e_bb - e_11)*d_sin2_theta_m_dKz
+
+    # d_beta_dKx = (e_11**2 - e_12**2 - e_11*e_bb)*d_sin2_theta_m_dKx
+    # d_beta_dKx = (e_11**2 - e_12**2 - e_11*e_bb)*d_sin2_theta_m_dKy
+    # d_beta_dKx = (e_11**2 - e_12**2 - e_11*e_bb)*d_sin2_theta_m_dKz
+
+    # dH_dKx = cte.speed_of_light**2 / omega**2 * (2*K_X_v) + 
+
+
+
 
     # At the plasma-vacuum boundary, we have two Psi matrices:
     # one corresponding to Psi in the plasma, and the other
@@ -663,6 +696,7 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     print()
     print(np.dot(Psi_3D_plasma_labframe_cartesian, np.array(([dH_dKx],[dH_dKy],[dH_dKz]))) + np.array(([dH_dX],[dH_dY],[dH_dZ])))
     print()
+    print("derivatives at X, Y, Z=", q_X, q_Y, q_Z)
     print("dH_dX", dH_dX)
     print("dH_dY", dH_dY)
     print("dH_dZ", dH_dZ)

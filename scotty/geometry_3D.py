@@ -152,16 +152,17 @@ class InterpolatedField_3D_Cartesian(MagneticField_3D_Cartesian):
         self.Z_coord = Z_grid
         self.polflux_grid = psi
         
-        self._interp_B_X, _ = _interp_mesh3D_data1D(
+        # TO REMOVE the spline_B_X, etc.
+        self._interp_B_X, self.spline_B_X = _interp_mesh3D_data1D(
             X_grid, Y_grid, Z_grid, B_X, interp_order)
         
-        self._interp_B_Y, _ = _interp_mesh3D_data1D(
+        self._interp_B_Y, self.spline_B_Y = _interp_mesh3D_data1D(
             X_grid, Y_grid, Z_grid, B_Y, interp_order)
         
-        self._interp_B_Z, _ = _interp_mesh3D_data1D(
+        self._interp_B_Z, self.spline_B_Z = _interp_mesh3D_data1D(
             X_grid, Y_grid, Z_grid, B_Z, interp_order)
         
-        self._interp_polflux, spline_polflux = _interp_mesh3D_data1D(
+        self._interp_polflux, self.spline_polflux = _interp_mesh3D_data1D(
             X_grid, Y_grid, Z_grid, psi, interp_order)
     
     # Defining the class attributes
@@ -190,6 +191,20 @@ class InterpolatedField_3D_Cartesian(MagneticField_3D_Cartesian):
             Y: ArrayLike,
             Z: ArrayLike) -> FloatArray:
         return self._interp_polflux(X,Y,Z)
+    
+    # TO REMOVE
+    # Defining first order derivatives of B field
+    def d_B_X_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self.spline_B_X((X,Y,Z), nu=[1,0,0])
+    def d_B_X_dY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self.spline_B_X((X,Y,Z), nu=[0,1,0])
+    def d_B_X_dZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self.spline_B_X((X,Y,Z), nu=[0,0,1])
+
+    def d_B_Y_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self.spline_B_Y((X,Y,Z), nu=[1,0,0])
+    def d_B_Y_dY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self.spline_B_Y((X,Y,Z), nu=[0,1,0])
+    def d_B_Y_dZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self.spline_B_Y((X,Y,Z), nu=[0,0,1])
+
+    def d_B_Z_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self.spline_B_Z((X,Y,Z), nu=[1,0,0])
+    def d_B_Z_dY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self.spline_B_Z((X,Y,Z), nu=[0,1,0])
+    def d_B_Z_dZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self.spline_B_Z((X,Y,Z), nu=[0,0,1])
 
     # Defining the class attributes
     # Specifically for the first-order and second-order derivatives of polflux
@@ -312,6 +327,45 @@ def _interp_mesh3D_data1D(
         points = (X_grid, Y_grid, Z_grid),
         values = data_array,
         method = interp_order_str,
+        bounds_error = False,
+    )
+
+    # TO REMOVE
+    # print()
+    # print()
+    # print(spline)
+    # print()
+    # print()
+
+    return lambda X,Y,Z: spline((X,Y,Z)), spline
+
+
+
+
+
+
+
+
+
+
+# TO REMOVE?
+# Testing local grid interpolation instead of entire-field interpolations
+
+def find_local_interp_cube(coord, grid_coord, N_cube=6):
+    left_bound  = np.searchsorted(grid_coord, coord) - 1 - N_cube//2
+    right_bound = np.searchsorted(grid_coord, coord) + 1 + N_cube//2
+    return grid_coord[left_bound:right_bound], left_bound, right_bound
+
+def make_local_interp_cube(q_X, q_Y, q_Z, grid_X, grid_Y, grid_Z, grid_data):
+    local_X_grid, x_lb, x_rb = find_local_interp_cube(q_X, grid_X)
+    local_Y_grid, y_lb, y_rb = find_local_interp_cube(q_Y, grid_Y)
+    local_Z_grid, z_lb, z_rb = find_local_interp_cube(q_Z, grid_Z)
+    local_data_grid = grid_data[x_lb:x_rb, y_lb:y_rb, z_lb:z_rb]
+
+    spline = RegularGridInterpolator(
+        points = (local_X_grid, local_Y_grid, local_Z_grid),
+        values = local_data_grid,
+        method = "quintic",
         bounds_error = False,
     )
 
