@@ -98,6 +98,7 @@ def beam_me_up_3D(
     from_cyl_scotty___q_entry_cartesian = None,
     from_cyl_scotty___K_entry_cartesian = None,
     from_cyl_scotty___Psi_3D_entry_labframe_cartesian = None,
+    from_cyl_scotty___Psi_3D_initial_labframe_cartesian = None,
 ) -> datatree.DataTree:
 
     print("Beam trace me up, Scotty!")
@@ -249,6 +250,8 @@ def beam_me_up_3D(
         Psi_3D_initial_labframe_cartesian = plasmaLaunch_Psi_3D_lab_cartesian
     
     # TO REMOVE
+    if from_cyl_scotty___Psi_3D_initial_labframe_cartesian is not None:
+        Psi_3D_initial_labframe_cartesian = from_cyl_scotty___Psi_3D_initial_labframe_cartesian
     print("q_launch_cartesian", q_launch_cartesian)
     print("q_initial_cartesian", q_initial_cartesian)
     print()
@@ -427,6 +430,9 @@ def beam_me_up_3D(
             "K_X": (["tau"], K_X_array),
             "K_Y": (["tau"], K_Y_array),
             "K_Z": (["tau"], K_Z_array),
+            "Psi_3D_launch_labframe_cartesian": (["row","col"], Psi_3D_launch_labframe_cartesian),
+            "Psi_3D_entry_labframe_cartesian": (["row","col"], Psi_3D_entry_labframe_cartesian),
+            "initial_Psi_3D_lab_cartesian": (["row","col"], Psi_3D_initial_labframe_cartesian),
             "Psi_3D_labframe_cartesian": (["tau","row","col"], Psi_3D_output),
         },
         coords = {

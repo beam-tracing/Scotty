@@ -390,9 +390,9 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     # Getting important quantities
     delta_X, delta_Y, delta_Z = hamiltonian.spacings["X"], hamiltonian.spacings["Y"], hamiltonian.spacings["Z"]
     dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X_p, K_Y_p, K_Z_p)
-    dH_dX = dH["dH_dX"] # -22.113073049545815 # 
-    dH_dY = dH["dH_dY"] # 0.8681728701766835 # 
-    dH_dZ = dH["dH_dZ"] # 8.8676362186359 # 
+    dH_dX = dH["dH_dX"] # -18.49663275913049 # 
+    dH_dY = dH["dH_dY"] # 1.1633453546955554 # 
+    dH_dZ = dH["dH_dZ"] # 3.2903396180238853 # 
     dH_dKx = dH["dH_dKx"] # 
     dH_dKy = dH["dH_dKy"] # 
     dH_dKz = dH["dH_dKz"] # 

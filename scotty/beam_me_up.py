@@ -742,7 +742,8 @@ def beam_me_up(
     if figure_flag:
         default_plots(dt, field, output_path, output_filename_suffix)
 
-    return dt, field, hamiltonian
+    # TO REMOVE everything except dt
+    return dt, field, hamiltonian, initial_position, launch_K, K_initial, Psi_3D_lab_entry_cartersian, Psi_3D_lab_initial
 
 
 def default_plots(

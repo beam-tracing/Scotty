@@ -1019,8 +1019,14 @@ def find_Psi_3D_plasma_discontinuous(
     print("dH_dKzeta", dH_dKzeta)
     print("dH_dKz", dH_dKZ)
     print()
+    print("derivatives at R, zeta, Z =", q_R, q_zeta, q_Z)
+    print("which are at X, Y, Z =", q_R*np.cos(q_zeta), q_R*np.sin(q_zeta), q_Z)
     print("dH_dX from cart Scotty is supposed to be", dH_dR*np.cos(q_zeta))
     print("dH_dY from cart Scotty is supposed to be", dH_dR*np.sin(q_zeta))
+    print("dH_dZ from cart Scotty is supposed to be", dH_dZ)
+    print("dH_dKx from cart Scotty is supposed to be", dH_dKR*np.cos(q_zeta) - dH_dKzeta*q_R*np.sin(q_zeta))
+    print("dH_dKy from cart Scotty is supposed to be", dH_dKR*np.sin(q_zeta) + dH_dKzeta*q_R*np.cos(q_zeta))
+    print("dH_dKz from cart Scotty is supposed to be", dH_dKZ)
     print()
 
     # When beam is entering plasma from vacuum
