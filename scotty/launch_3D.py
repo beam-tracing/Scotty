@@ -231,7 +231,7 @@ def find_entry_point_3D(
     # R_step = np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
     # zeta_step = np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
 
-    # zeta_angle = np.arctan2(Y_start, X_start)
+    zeta_angle = np.arctan2(Y_start, X_start)
 
     # X_step =  R_step * np.cos(zeta_angle + zeta_step)
     # Y_step = -R_step * np.sin(zeta_angle + zeta_step)

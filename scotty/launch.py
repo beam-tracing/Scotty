@@ -352,13 +352,17 @@ def find_entry_point(
     )
     step_array = np.array((X_step, Y_step, Z_step))
 
+    # TO REMOVE -- just seeing what step_array looks like
+    print("step array")
+    print(step_array / np.sqrt( np.dot(step_array, step_array) ))
+
     def beam_line(tau):
         """Parameterised line in beam direction"""
         return launch_position + tau * step_array
 
     def poloidal_flux_boundary_along_line(tau):
         """Signed poloidal flux distance to plasma boundary"""
-        R, _, Z = cartesian_to_cylindrical(*beam_line(tau))
+        R, _, Z = beam_line(tau)
         return field.poloidal_flux(R, Z) - poloidal_flux_enter
 
     # If max_length is *really* big, then our parameterised beam line
@@ -377,7 +381,7 @@ def find_entry_point(
     if len(spline_roots) == 0:
         # Get an idea of the location of the closest point
         minimum = minimize_scalar(poloidal_flux_boundary_along_line)
-        R_miss, zeta_miss, Z_miss = cartesian_to_cylindrical(*beam_line(minimum.x))
+        R_miss, zeta_miss, Z_miss = beam_line(minimum.x)
         miss_coords = f"(R={R_miss}, zeta={zeta_miss}, Z={Z_miss})"
         raise RuntimeError(
             f"Beam does not hit plasma. Closest point is at {miss_coords}, "
@@ -397,13 +401,13 @@ def find_entry_point(
     # The root might be just outside the plasma due to floating point
     # errors, if so, take small steps until we're definitely inside
     boundary_tau = boundary.root
-    R_boundary, zeta_boundary, Z_boundary = cartesian_to_cylindrical(*beam_line(boundary_tau))
+    R_boundary, zeta_boundary, Z_boundary = beam_line(boundary_tau)
     if field.poloidal_flux(R_boundary, Z_boundary) > poloidal_flux_enter:
         boundary_tau += boundary_adjust
     
     # TO REMOVE: does cyl scotty produce the correct entry point?
     print()
-    print("boundary point", R_boundary, zeta_boundary, Z_boundary)
+    print("boundary point X, Y, Z =", cylindrical_to_cartesian(*beam_line(boundary_tau)))
     print()
 
-    return np.array(cartesian_to_cylindrical(*beam_line(boundary_tau)))
+    return np.array(beam_line(boundary_tau)) # - np.array([0, np.arctan2(Y_start, X_start), 0])
