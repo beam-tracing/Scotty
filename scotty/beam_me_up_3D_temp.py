@@ -10,7 +10,7 @@ from scotty.fun_evolution_3D import pack_beam_parameters_3D, unpack_beam_paramet
 from scotty.fun_general import freq_GHz_to_angular_frequency
 from scotty.geometry_3D import MagneticField_3D_Cartesian, InterpolatedField_3D_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
-from scotty.launch_3D import launch_beam_3D, find_entry_point_3D
+from scotty.launch_3D import LaunchParameters # launch_beam_3D, find_entry_point_3D
 from scotty.plotting_3D import (
     plot_delta_theta_m,
     plot_dispersion_relation,
@@ -149,6 +149,102 @@ def beam_me_up_3D(
             equil_time,
         )
     
+
+
+
+
+
+
+
+
+
+    # TO REMOVE -- just trying OOP
+    q_launch_cartesian = launch_position_cartesian
+    params = LaunchParameters(mode_flag,
+                              poloidal_launch_angle_Torbeam,
+                              toroidal_launch_angle_Torbeam,
+                              launch_freq_GHz,
+                              launch_beam_width,
+                              launch_beam_curvature,
+                              q_launch_cartesian,
+                              
+                              # TO REMOVE -- can put back into here when we remove the vacuumLaunch processing below
+                              # None, # K_plasmaLaunch_cartesian
+                              # None, # Psi_3D_plasmaLaunch_labframe_cartesian,
+                              
+                              vacuumLaunch_flag,
+                              vacuum_propagation_flag,
+                              Psi_BC_flag,
+                              
+                              poloidal_flux_enter,
+                              poloidal_flux_zero_density,
+                              auto_delta_sign,
+                              delta_X,
+                              delta_Y,
+                              delta_Z,
+                              delta_K_X,
+                              delta_K_Y,
+                              delta_K_Z)
+    
+    # Calculating the entry position and auto_delta_sign
+    params.calculate_entry_position(field)
+
+    # Initialises the Hamiltonian H
+    hamiltonian = Hamiltonian_3D(
+        field,
+        launch_angular_frequency,
+        mode_flag,
+        find_density_1D,
+        delta_X,
+        delta_Y,
+        delta_Z,
+        delta_K_X,
+        delta_K_Y,
+        delta_K_Z,
+        find_temperature_1D
+    )
+
+    # TO REMOVE -- should put this in its own file
+    # also should update this to make it cleaner? using OOP
+    # Checking validity of user-specified arguments
+    check_input(
+        mode_flag,
+        poloidal_flux_enter,
+        q_launch_cartesian,
+        field,
+        poloidal_flux_zero_density,
+    )
+
+    # ------------------------------
+    # Launch parameters
+    # ------------------------------
+    if params.vacuumLaunch_flag:
+        print("Beam launched from outside the plasma")
+        params.calculate_beam_launch(field, hamiltonian, temperature=None)
+    else:
+        print("Beam launched from inside the plasma")
+        params.q_initial_cartesian = q_launch_cartesian # TO REMOVE -- put this directly in calculate_entry_position?
+                                                        # by inserting : if vacuumLaunch: self.q_initial_cartesian = q_launch_cartesian?
+                                                        # around line 183
+        # TO REMOVE -- can put the vacuumLaunch processing from the main beam_me_up_3D routine into launch_3D.py?
+        params.K_launch_cartesian = None
+        params.K_initial_cartesian = plasmaLaunch_K_cartesian
+        params.Psi_3D_launch_labframe_cartesian = None
+        params.Psi_3D_entry_labframe_cartesian = None
+        params.Psi_3D_initial_labframe_cartesian = plasmaLaunch_Psi_3D_lab_cartesian
+        params.distance_from_launch_to_entry = None
+    
+
+
+
+
+
+
+
+
+
+    # Old code -- TO REMOVE -- when updating overhauling OOP?
+    """
     # Flips the sign of any of the delta_X, delta_Y, delta_Z
     # depending on the orientation of the flux surface. This
     # is to ensure a forward difference across the plasma boundary.
@@ -204,12 +300,12 @@ def beam_me_up_3D(
         (
             q_launch_cartesian,  # q_launch_cartesian,
             q_initial_cartesian, # q_initial_cartesian,
-            distance_from_launch_to_entry, # distance_from_launch_to_entry,
             K_launch_cartesian,  # K_launch_cartesian,
             K_initial_cartesian, # K_initial_cartesian,
             Psi_3D_launch_labframe_cartesian,  # Psi_3D_launch_labframe_cartesian,
             Psi_3D_entry_labframe_cartesian,   # Psi_3D_entry_labframe_cartesian,
             Psi_3D_initial_labframe_cartesian, # Psi_3D_initial_labframe_cartesian,
+            distance_from_launch_to_entry, # distance_from_launch_to_entry,
         ) = launch_beam_3D(
             poloidal_launch_angle_Torbeam,
             toroidal_launch_angle_Torbeam,
@@ -233,12 +329,22 @@ def beam_me_up_3D(
         print("Beam launched from inside the plasma")
         q_launch_cartesian = launch_position_cartesian
         q_initial_cartesian = launch_position_cartesian
-        distance_from_launch_to_entry = None
         K_launch_cartesian = None
         K_initial_cartesian = plasmaLaunch_K_cartesian
         Psi_3D_launch_labframe_cartesian = None
         Psi_3D_entry_labframe_cartesian = None
         Psi_3D_initial_labframe_cartesian = plasmaLaunch_Psi_3D_lab_cartesian
+        distance_from_launch_to_entry = None
+    """
+
+
+
+
+
+
+
+
+
 
     # ------------------------------
     # Propagating the ray
@@ -248,8 +354,8 @@ def beam_me_up_3D(
         poloidal_flux_enter,
         launch_angular_frequency,
         field,
-        q_initial_cartesian,
-        K_initial_cartesian,
+        params.q_initial_cartesian,
+        params.K_initial_cartesian,
         hamiltonian,
         rtol,
         atol,
@@ -257,6 +363,7 @@ def beam_me_up_3D(
         len_tau,
     )
 
+    # TO REMOVE -- should change quick_run flag into ray_tracing only or something flag
     if quick_run:
         return ray_solver_output
 
@@ -268,13 +375,9 @@ def beam_me_up_3D(
 
     # Initial conditions for the solver
     beam_parameters_initial = pack_beam_parameters_3D(
-        q_initial_cartesian[0],
-        q_initial_cartesian[1],
-        q_initial_cartesian[2],
-        K_initial_cartesian[0],
-        K_initial_cartesian[1],
-        K_initial_cartesian[2],
-        Psi_3D_initial_labframe_cartesian,
+        *params.q_initial_cartesian,
+        *params.K_initial_cartesian,
+        params.Psi_3D_initial_labframe_cartesian
     )
 
     solver_start_time = time.time()
@@ -303,7 +406,7 @@ def beam_me_up_3D(
     beam_parameters_final = solver_beam_output.y
     solver_status = solver_beam_output.status
 
-    q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, Psi_3D_output = unpack_beam_parameters_3D(beam_parameters_final)
+    q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, Psi_3D_output_labframe_cartesian = unpack_beam_parameters_3D(beam_parameters_final)
 
     print("Main loop complete")
 
@@ -325,9 +428,9 @@ def beam_me_up_3D(
             "launch_beam_width": launch_beam_width,
             "launch_beam_curvature": launch_beam_curvature,
             "mode_flag": mode_flag,
-            "initial_position_cartesian": (["col"], q_initial_cartesian),
-            "initial_K_cartesian": (["col"], K_initial_cartesian),
-            "initial_Psi_3D_lab_cartesian": (["row","col"], Psi_3D_initial_labframe_cartesian),
+            "initial_position_cartesian": (["col"], params.q_initial_cartesian),
+            "initial_K_cartesian": (["col"], params.K_initial_cartesian),
+            "initial_Psi_3D_lab_cartesian": (["row","col"], params.Psi_3D_initial_labframe_cartesian),
             "delta_X": delta_X,
             "delta_Y": delta_Y,
             "delta_Z": delta_Z,
@@ -380,10 +483,10 @@ def beam_me_up_3D(
             "K_X": (["tau"], K_X_array),
             "K_Y": (["tau"], K_Y_array),
             "K_Z": (["tau"], K_Z_array),
-            "Psi_3D_launch_labframe_cartesian": (["row","col"], Psi_3D_launch_labframe_cartesian),
-            "Psi_3D_entry_labframe_cartesian": (["row","col"], Psi_3D_entry_labframe_cartesian),
-            "initial_Psi_3D_lab_cartesian": (["row","col"], Psi_3D_initial_labframe_cartesian),
-            "Psi_3D_labframe_cartesian": (["tau","row","col"], Psi_3D_output),
+            "Psi_3D_launch_labframe_cartesian": (["row","col"], params.Psi_3D_launch_labframe_cartesian),
+            "Psi_3D_entry_labframe_cartesian": (["row","col"], params.Psi_3D_entry_labframe_cartesian),
+            "initial_Psi_3D_lab_cartesian": (["row","col"], params.Psi_3D_initial_labframe_cartesian), # TO REMOVE -- change key name?
+            "Psi_3D_labframe_cartesian": (["tau","row","col"], Psi_3D_output_labframe_cartesian), # TO REMOVE -- change key name?
         },
         coords = {
             "tau": tau_array,
@@ -439,7 +542,7 @@ def beam_me_up_3D(
         analysis = further_analysis_3D(
             inputs,
             df,
-            Psi_3D_entry_labframe_cartesian = Psi_3D_output[0], # TO DELETE : this is only temporary, because vacuumLaunch_flag = False
+            Psi_3D_entry_labframe_cartesian = Psi_3D_output_labframe_cartesian[0], # TO DELETE : this is only temporary, because vacuumLaunch_flag = False
             output_path = output_path,
             output_filename_suffix = output_filename_suffix,
             field = field,
@@ -469,7 +572,14 @@ def beam_me_up_3D(
 
     # return dt, field
     # TO REMOVE
-    return dt, field, hamiltonian, q_launch_cartesian, q_initial_cartesian, K_launch_cartesian, K_initial_cartesian, Psi_3D_initial_labframe_cartesian
+    return (dt,
+            field,
+            hamiltonian,
+            params.q_launch_cartesian,
+            params.q_initial_cartesian,
+            params.K_launch_cartesian,
+            params.K_initial_cartesian,
+            params.Psi_3D_initial_labframe_cartesian)
 
 
 

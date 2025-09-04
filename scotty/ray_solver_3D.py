@@ -197,10 +197,19 @@ def handle_leaving_plasma_events(
     if detected("cross_resonance2"):
         return tau_events["cross_resonance2"][0]
     
-    """TO DO, for now we just cut it when Psi = 1.0"""
-    if detected("leave_LCFS"):
+    if not detected("leave_plasma") and detected("leave_LCFS"):
         return tau_events["leave_LCFS"][0]
+    
+    if detected("leave_plasma") and detected("leave_LCFS"):
+        # If both event_leave_plasma and event_leave_LCFS occur
+        K_X_at_LCFS = ray_parameters_3D_events[0][2]
+        if K_X_at_LCFS < 0:
+            # Beam has gone through the plasma, terminate at LCFS
+            return tau_events["leave_LCFS"][0]
 
+        # Beam deflection sufficiently large, terminate at entry poloidal flux
+        return tau_events["leave_plasma"][0]
+    
     # If one ends up here, things aren't going well. I can think of
     # two possible reasons:
     # - The launch conditions are really weird (hasn't happened yet,
