@@ -122,7 +122,8 @@ def launch_beam(
             f"Unexpected value for `Psi_BC_flag` ({Psi_BC_flag}), expected one of None, 'continuous, or 'discontinuous'"
         )
     
-    # TO REMOVE - launch_position[1]
+    # TO REMOVE - launch_position[1] -- this was introduced to account for q_zeta =/= 0
+    # If q_zeta = 0, then this has no effect anyway
     toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam) - launch_position[1]
     poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_Torbeam)
 
@@ -196,9 +197,6 @@ def launch_beam(
 
     Psi_w_beam_inverse_launch_cartersian = find_inverse_2D(Psi_w_beam_launch_cartersian)
 
-    # TO REMOVE
-    toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam)
-
     entry_position = find_entry_point(
         launch_position,
         poloidal_launch_angle,
@@ -259,7 +257,6 @@ def launch_beam(
     if Psi_BC_flag == "discontinuous":
         K_initial, Psi_3D_lab_initial = apply_discontinuous_BC(
             entry_position[0],
-            entry_position[1], # TO REMOVE
             entry_position[2],
             Psi_3D_lab_entry,
             K_R_entry,
@@ -359,10 +356,6 @@ def find_entry_point(
     )
     step_array = np.array((X_step, Y_step, Z_step))
 
-    # TO REMOVE -- just seeing what step_array looks like
-    print("step array")
-    print(step_array / np.sqrt( np.dot(step_array, step_array) ))
-
     def beam_line(tau):
         """Parameterised line in beam direction"""
         return cylindrical_to_cartesian(*launch_position) + tau * step_array
@@ -411,10 +404,5 @@ def find_entry_point(
     R_boundary, zeta_boundary, Z_boundary = cartesian_to_cylindrical(*beam_line(boundary_tau))
     if field.poloidal_flux(R_boundary, Z_boundary) > poloidal_flux_enter:
         boundary_tau += boundary_adjust
-    
-    # TO REMOVE: does cyl scotty produce the correct entry point?
-    print()
-    print("boundary point X, Y, Z =", beam_line(boundary_tau))
-    print()
 
-    return np.array(cartesian_to_cylindrical(*beam_line(boundary_tau))) # - np.array([0, np.arctan2(Y_start, X_start), 0])
+    return np.array(cartesian_to_cylindrical(*beam_line(boundary_tau)))

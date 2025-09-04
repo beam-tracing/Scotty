@@ -635,6 +635,7 @@ def further_analysis(
         "loc_b_r": loc_b_r,
         "beam_cartesian": (["tau", "col_cart"], np.vstack([q_X, q_Y, df.q_Z.data]).T),
         "arc_length": (["tau"], distance_along_line), # TO REMOVE
+        "arc_length_relative_to_cutoff": (["tau"], l_lc), # TO REMOVE
     }
 
     RZ_point_spacing = np.sqrt((np.diff(df.q_Z)) ** 2 + (np.diff(df.q_R)) ** 2)

@@ -974,10 +974,6 @@ def find_Psi_3D_plasma_discontinuous(
     d2polflux_dR2,  # Continuous
     d2polflux_dZ2,  # Continuous
     d2polflux_dRdZ,  # Continuous
-    field, # TO REMOVE
-    q_R, # TO REMOVE
-    q_zeta, # TO REMOVE
-    q_Z, # TO REMOVE
 ):
     ## For discontinuous ne
 
@@ -990,44 +986,6 @@ def find_Psi_3D_plasma_discontinuous(
         )
         / (dpolflux_dR**2 + dpolflux_dZ**2)
     )
-
-    # TO REMOVE
-    parameter = 0.01
-    print()
-    print("polflux", field.poloidal_flux(q_R, q_Z))
-    print("polflux eta 1st ord", field.poloidal_flux(q_R - dpolflux_dZ*parameter,
-                                                     q_Z + dpolflux_dR*parameter))
-    print("polflux eta 2nd ord", field.poloidal_flux(q_R - dpolflux_dZ*parameter + dpolflux_dR*eta*parameter**2,
-                                                     q_Z + dpolflux_dR*parameter + dpolflux_dZ*eta*parameter**2))
-    print()
-    print("this should be 0 for continuous ne?", 2 * (K_v_R - K_p_R) * dpolflux_dR * eta + 2 * (K_v_Z - K_p_Z) * dpolflux_dZ * eta)
-    print("dp_dR", dpolflux_dR)
-    print("dp_dZ", dpolflux_dZ)
-    print("K_v_R - K_p_R", K_v_R - K_p_R)
-    print("K_v_Z - K_p_Z", K_v_Z - K_p_Z)
-    print("eta", eta)
-    print()
-
-    # TO REMOVE
-    from scotty.fun_general import find_Psi_3D_lab_Cartesian
-    print(find_Psi_3D_lab_Cartesian(Psi_vacuum_3D, q_R, 0, K_v_R, K_v_zeta))
-    print()
-    print("dH_dR", dH_dR)
-    print("dH_dzeta", 0)
-    print("dH_dZ", dH_dZ)
-    print("dH_dKR", dH_dKR)
-    print("dH_dKzeta", dH_dKzeta)
-    print("dH_dKz", dH_dKZ)
-    print()
-    print("derivatives at R, zeta, Z =", q_R, q_zeta, q_Z)
-    print("which are at X, Y, Z =", q_R*np.cos(q_zeta), q_R*np.sin(q_zeta), q_Z)
-    print("dH_dX from cart Scotty is supposed to be", dH_dR*np.cos(q_zeta))
-    print("dH_dY from cart Scotty is supposed to be", dH_dR*np.sin(q_zeta))
-    print("dH_dZ from cart Scotty is supposed to be", dH_dZ)
-    print("dH_dKx from cart Scotty is supposed to be", dH_dKR*np.cos(q_zeta) - dH_dKzeta*q_R*np.sin(q_zeta))
-    print("dH_dKy from cart Scotty is supposed to be", dH_dKR*np.sin(q_zeta) + dH_dKzeta*q_R*np.cos(q_zeta))
-    print("dH_dKz from cart Scotty is supposed to be", dH_dKZ)
-    print()
 
     # When beam is entering plasma from vacuum
     Psi_v_R_R = Psi_vacuum_3D[0, 0]
@@ -1103,7 +1061,6 @@ def find_Psi_3D_plasma_discontinuous(
 
 def apply_discontinuous_BC(
     q_R,
-    q_zeta, # TO REMOVE
     q_Z,
     Psi_vacuum_3D,
     K_v_R,
@@ -1173,10 +1130,6 @@ def apply_discontinuous_BC(
         d2_poloidal_flux_dR2_boundary,  # Continuous
         d2_poloidal_flux_dZ2_boundary,  # Continuous
         d2_poloidal_flux_dRdZ_boundary,  # Continuous
-        field, # TO REMOVE, when removed from definition
-        q_R, # TO REMOVE, when removed from definition
-        q_zeta, # TO REMOVE, when removed from definition
-        q_Z, # TO REMOVE, when removed from definition
     )
 
     return K_plasma, Psi_3D_plasma
