@@ -285,40 +285,6 @@ def further_analysis_3D(
     Psi_xy_entry_beamframe_cartesian = dot([x_hat[0,:]], dot([Psi_3D_entry_labframe_cartesian], [y_hat[0,:]]))
     Psi_yy_entry_beamframe_cartesian = dot([y_hat[0,:]], dot([Psi_3D_entry_labframe_cartesian], [y_hat[0,:]]))
 
-    # TO REMOVE
-    # print("Psi_3D_labframe_cartesian type", type(Psi_3D_labframe_cartesian))
-    # print("Psi_3D_labframe_cartesian shape", Psi_3D_labframe_cartesian.shape)
-    # print()
-    # print("Psi_xx_beamframe_cartesian type", type(Psi_xx_beamframe_cartesian))
-    # print("Psi_xx_beamframe_cartesian shape", Psi_xx_beamframe_cartesian.shape)
-    # print()
-    # print("Psi_xx_entry_beamframe_cartesian type", type(Psi_xx_entry_beamframe_cartesian))
-    # print("Psi_xx_entry_beamframe_cartesian shape", Psi_xx_entry_beamframe_cartesian.shape)
-    # print()
-    # print("x_hat[0,:]", x_hat[0,:])
-    # print("Psi_3D_entry_labframe_cartesian", Psi_3D_entry_labframe_cartesian)
-    # print("Psi_xx_entry_beamframe_cartesian", Psi_xx_entry_beamframe_cartesian)
-    # print("Psi_yy_entry_beamframe_cartesian", Psi_yy_entry_beamframe_cartesian)
-    # print("Psi_xy_entry_beamframe_cartesian", Psi_xy_entry_beamframe_cartesian)
-    #
-    # print("Psi_xx_beamframe_cartesian[0]", Psi_xx_beamframe_cartesian[0])
-    # print("Psi_xx_entry_beamframe_cartesian", Psi_xx_entry_beamframe_cartesian)
-    # print()
-    # print("Psi_xy_beamframe_cartesian[0]", Psi_xy_beamframe_cartesian[0])
-    # print("Psi_xy_entry_beamframe_cartesian", Psi_xy_entry_beamframe_cartesian)
-    # print()
-    # print("Psi_yy_beamframe_cartesian[0]", Psi_yy_beamframe_cartesian[0])
-    # print("Psi_yy_entry_beamframe_cartesian", Psi_yy_entry_beamframe_cartesian)
-    # print()
-    # print("Psi_3D_entry_labframe_cartesian")
-    # print(Psi_3D_entry_labframe_cartesian)
-    # print()
-    # print("Psi_3D_labframe_cartesian[0]")
-    # print(Psi_3D_labframe_cartesian[0])
-    # print()
-    # print("g_hat[0]")
-    # print(g_hat[0])
-
     # Finding the entries of the modified matrix M of Psi
     xhat_dot_grad_bhat_dot_ghat = dot(x_hat, dot(df.grad_bhat, g_hat))
     yhat_dot_grad_bhat_dot_ghat = dot(y_hat, dot(df.grad_bhat, g_hat))
@@ -404,19 +370,6 @@ def further_analysis_3D(
     g_Y_Cardano = grad_H_cardano("Ky", inputs.delta_K_Y.data)
     g_Z_Cardano = grad_H_cardano("Kz", inputs.delta_K_Z.data)
     g_magnitude_Cardano = np.sqrt(g_X_Cardano**2 + g_Y_Cardano**2 + g_Z_Cardano**2)
-
-    # # TO REMOVE
-    # # g_magnitude_Cardano all have small Im parts (like e-16)
-    # print("g_magnitude_Cardano", g_magnitude_Cardano)
-    # print("g_magnitude_Cardano type", type(g_magnitude_Cardano))
-    # print("g_magnitude_Cardano shape", g_magnitude_Cardano.shape)
-    # print()
-    # print("inputs.launch_angular_frequency", inputs.launch_angular_frequency)
-    # print("inputs.launch_angular_frequency type", type(inputs.launch_angular_frequency))
-    # print()
-    # loc_r_numerator = (2*constants.c / inputs.launch_angular_frequency.data)**2
-    # print("loc_r numerator", loc_r_numerator)
-    # print("loc_r numerator type", type(loc_r_numerator))
 
     loc_r = (2*constants.c / inputs.launch_angular_frequency.data)**2 / g_magnitude_Cardano**2
 

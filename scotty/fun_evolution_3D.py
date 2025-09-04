@@ -106,25 +106,4 @@ def beam_evolution_fun_3D(tau, beam_parameters, hamiltonian: Hamiltonian_3D):
                    - np.matmul(grad_gradK_H, Psi)
                    - grad_grad_H)
 
-    # TO REMOVE - for debugging only
-    """
-    print("Look here for Psi and grads: ")
-    print(Psi)
-    print()
-    print("grad grad H")
-    print(grad_grad_H)
-    print()
-    print("gradK grad H")
-    print(gradK_grad_H)
-    print()
-    print("grad gradK H")
-    print(grad_gradK_H)
-    print()
-    print("gradK gradK H")
-    print(gradK_gradK_H)
-    print()
-    print()
-    print()
-    """
-
     return pack_beam_parameters_3D(dH_dKx, dH_dKy, dH_dKz, -dH_dX, -dH_dY, -dH_dZ, d_Psi_d_tau)

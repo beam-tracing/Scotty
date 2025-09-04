@@ -11,6 +11,7 @@ from scotty.geometry_3D import MagneticField_3D_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
 from scotty.typing import FloatArray
 from typing import Union
+import math
 import numpy as np
 import warnings
 
@@ -32,9 +33,6 @@ def launch_beam_3D(
     delta_Y: float = 1e-3,
     delta_Z: float = 1e-3,
     temperature=None,
-    from_cyl_scotty___q_entry_cartesian = None,
-    from_cyl_scotty___K_entry_cartesian = None,
-    from_cyl_scotty___Psi_3D_entry_labframe_cartesian = None,
 ):
     
     if Psi_BC_flag is True:
@@ -51,8 +49,6 @@ def launch_beam_3D(
         raise ValueError(f"Unexpected value for `Psi_BC_flag` ({Psi_BC_flag}), expected one of None, 'continuous, or 'discontinuous'")
     
     q_launch_cartesian = launch_position_cartesian
-    # q_X_launch, q_Y_launch, q_Z_launch = q_launch_cartesian
-    # q_R_launch = np.sqrt(q_X_launch**2 + q_Y_launch**2)
 
     toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam)
     poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_Torbeam)
@@ -63,12 +59,6 @@ def launch_beam_3D(
     K_Y_launch = -wavenumber_K0 * np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
     K_Z_launch = -wavenumber_K0 * np.sin(poloidal_launch_angle)
     K_launch_cartesian = np.array([K_X_launch, K_Y_launch, K_Z_launch])
-    # K_R_launch    = wavenumber_K0 * np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
-    # K_zeta_launch = wavenumber_K0 * np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle) * q_R_launch
-    # K_X_launch = K_R_launch*(q_X_launch / q_R_launch) - K_zeta_launch*(q_Y_launch/q_R_launch**2)
-    # K_Y_launch = K_R_launch*(q_Y_launch / q_R_launch) + K_zeta_launch*(q_X_launch/q_R_launch**2)
-    # K_Z_launch = wavenumber_K0 * np.sin(poloidal_launch_angle)
-    # K_launch_cartesian = np.array([K_X_launch, K_Y_launch, K_Z_launch])
 
     # Finding Psi_w_launch_beamframe_cartesian and Psi_3D_launch_beamframe_cartesian
     # Entries on the off-diagonal = 0, because beamframe
@@ -151,20 +141,7 @@ def launch_beam_3D(
     # K_initial and Psi_initial (with boundary conditions) which are
     # later fed into the `solve_ivp` as the initial values
 
-    # TO REMOVE -- this triple if statement only used for temporary debugging
-    if from_cyl_scotty___q_entry_cartesian is not None:
-        q_initial_cartesian = from_cyl_scotty___q_entry_cartesian
-    if from_cyl_scotty___K_entry_cartesian is not None:
-        K_X_launch, K_Y_launch, K_Z_launch = from_cyl_scotty___K_entry_cartesian
-    if from_cyl_scotty___Psi_3D_entry_labframe_cartesian is not None:
-        Psi_3D_entry_labframe_cartesian = from_cyl_scotty___Psi_3D_entry_labframe_cartesian
-
     if (Psi_BC_flag == "discontinuous") or (Psi_BC_flag == "continuous"):
-        # TO REMOVE
-        print()
-        print("seeing what K is passed into BC")
-        print(K_X_launch, K_Y_launch, K_Z_launch)
-        print()
         K_initial_cartesian, Psi_3D_initial_labframe_cartesian = apply_BC_3D(
             q_initial_cartesian[0], q_initial_cartesian[1], q_initial_cartesian[2], # q_X, q_Y, q_Z
             K_X_launch, K_Y_launch, K_Z_launch,
@@ -216,48 +193,16 @@ def find_entry_point_3D(
     # care of the direction of the beam. The poloidal angle is also
     # reversed from its usual sense, so we can just flip it by adding
     # a minus sign in front of the X, Y, Z steps (just like for K_launch)
-
-    """ Wtf there has to be something wrong with cyl Scotty right? """
     poloidal_launch_angle = -np.deg2rad(poloidal_launch_angle_Torbeam)
     toroidal_launch_angle =  np.deg2rad(toroidal_launch_angle_Torbeam) + np.pi
-
-    # zeta = np.arctan2(Y_start, X_start)
-    # X_step = np.cos(np.pi - zeta)
-    # Y_step = np.sin(np.pi - zeta)
-    # Z_step = 0
-
-    # poloidal_launch_angle = -np.deg2rad(poloidal_launch_angle_Torbeam)
-    # toroidal_launch_angle =  np.deg2rad(toroidal_launch_angle_Torbeam) + np.pi # - np.arctan2(Y_start, X_start)
-    # R_step = np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
-    # zeta_step = np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
-
-    zeta_angle = np.arctan2(Y_start, X_start)
-
-    # X_step =  R_step * np.cos(zeta_angle + zeta_step)
-    # Y_step = -R_step * np.sin(zeta_angle + zeta_step)
-    # Z_step = np.sin(poloidal_launch_angle)
-
-    X_step = -np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
-    Y_step = -np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
-    Z_step = -np.sin(poloidal_launch_angle)
-
-    """ # TO REMOVE?
-    This is the old code
-    toroidal_launch_angle = toroidal_launch_angle + np.pi
-    poloidal_launch_angle = -poloidal_launch_angle
 
     # This parametrises the ray in a line normal to the antenna,
     # up to a distance of `max_length`, and we can be sure that
     # the ray will either hit the plasma or miss it entirely.
-    X_step, Y_step, Z_step = toroidal_to_cartesian(max_length, poloidal_launch_angle, toroidal_launch_angle)
-    """
+    X_step = -np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
+    Y_step = -np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle)
+    Z_step = -np.sin(poloidal_launch_angle)
     XYZ_array = np.array((X_step, Y_step, Z_step))
-
-    # TO REMOVE -- just seeing what step_array looks like
-    print()
-    print("step array")
-    print(XYZ_array / np.sqrt( np.dot(XYZ_array, XYZ_array) ))
-    print()
 
     def ray_line(tau):
         """Parameterised line in beam direction"""
@@ -266,7 +211,8 @@ def find_entry_point_3D(
     def poloidal_flux_boundary_along_ray_line(tau):
         """Signed poloidal flux distance to plasma boundary"""
         X, Y, Z = ray_line(tau)
-        return field.polflux(X, Y, Z) - poloidal_flux_enter
+        polflux = 10 if math.isnan(field.polflux(X, Y, Z)) else field.polflux(X, Y, Z)
+        return polflux - poloidal_flux_enter
     
     # Now, we want to create a cubic spline of the poloidal flux
     # coordinates encountered by our ray line. However, if `max_length`
@@ -279,23 +225,13 @@ def find_entry_point_3D(
     Nx_steps = int(10 * max_length / (field.X_coord.max() - field.X_coord.min()))
     Ny_steps = int(10 * max_length / (field.Y_coord.max() - field.Y_coord.min()))
     Nz_steps = int(10 * max_length / (field.Z_coord.max() - field.Z_coord.min()))
-    tau = np.linspace(-1, 1, max(100, Nx_steps, Ny_steps, Nz_steps)) # TO REMOVE -- original is linspace(0,1), but this was set to -1 temporarily because the ray was going in the opposite direction of the plasma (possibly because I didnt define my launch angles correctly? Like I'm missing a minus sign or a pi somewhere)
-    # spline = CubicSpline(tau, [poloidal_flux_boundary_along_ray_line(t) for t in tau], extrapolate=False)
-    # spline_roots = spline.roots()
-    import math
-    print("TO REMOVE: launch position", q_launch_cartesian) # TO REMOVE
-    print()
-    print("TO REMOVE: XYZ_array (steps)", XYZ_array)
-    print()
-    print("TO REMOVE: tau", tau) # TO REMOVE
-    print()
-    temp_poloidal_flux_boundary_along_ray_line = [poloidal_flux_boundary_along_ray_line(t) for t in tau]
-    print("TO REMOVE: pol_flux_bd_along_ray_line", temp_poloidal_flux_boundary_along_ray_line)
-    print()
-    temp_temp_poloidal_flux_boundary_along_ray_line = [1 if math.isnan(x) else x for x in temp_poloidal_flux_boundary_along_ray_line]
-    print("TO REMOVE: fixed? pol_flux_bd_along_ray_line", temp_temp_poloidal_flux_boundary_along_ray_line)
-    print()
-    spline = CubicSpline(tau, temp_temp_poloidal_flux_boundary_along_ray_line, extrapolate=False)
+    
+    # TO REMOVE -- need to find a way to automatically get the correct start and stop for the tau linspace
+    # When doing benchmarking, sometimes the ray line actually exits the plasma from the other (inboard) side,
+    # and thus my solver begins the calculation at the wrong place
+    tau = np.linspace(-1.5, 1.5, max(100, Nx_steps, Ny_steps, Nz_steps))
+    poloidal_flux_boundary_along_ray_line_list = [poloidal_flux_boundary_along_ray_line(t) for t in tau]
+    spline = CubicSpline(tau, poloidal_flux_boundary_along_ray_line_list, extrapolate=False)
     spline_roots = spline.roots()
     
     # If there are no roots, then the beam never actually enters the
@@ -320,30 +256,9 @@ def find_entry_point_3D(
     # is definitely inside.
     boundary_tau = boundary.root
     X_boundary, Y_boundary, Z_boundary = ray_line(boundary_tau)
-    print("TO REMOVE: boundary coordinates", X_boundary, Y_boundary, Z_boundary)
-    print("TO REMOVE: boundary polflux", field.polflux(X_boundary, Y_boundary, Z_boundary))
 
-    # TO REMOVE: change 1.0 back to poloidal_flux_enter
-    if field.polflux(X_boundary, Y_boundary, Z_boundary) > 1.0:
+    if field.polflux(X_boundary, Y_boundary, Z_boundary) > poloidal_flux_enter:
         boundary_tau += boundary_adjust
         X_boundary, Y_boundary, Z_boundary = ray_line(boundary_tau)
-        print("TO REMOVE: adjusted boundary coordinates", X_boundary, Y_boundary, Z_boundary)
-        print("TO REMOVE: adjusted boundary polflux", field.polflux(X_boundary, Y_boundary, Z_boundary))
-
-    # TO REMOVE: this is to prevent issues with the boundary derivative
-    # for iteration in range(10000):
-    #     if ((field.polflux(X_boundary-1e-3, Y_boundary, Z_boundary) > poloidal_flux_enter) or
-    #         (field.polflux(X_boundary, Y_boundary+1e-3, Z_boundary) > poloidal_flux_enter) or
-    #         (field.polflux(X_boundary, Y_boundary, Z_boundary+1e-3) > poloidal_flux_enter)):
-    #         boundary_tau += boundary_adjust
-    #         X_boundary, Y_boundary, Z_boundary = ray_line(boundary_tau)
-    #     else:
-    #         print()
-    #         print("NEW BOUNDARY:", X_boundary, Y_boundary, Z_boundary)
-    #         print("polflux at NEW BOUNDARY", field.polflux(X_boundary, Y_boundary, Z_boundary))
-    #         print("polflux at NEW BOUNDARY+deltas", field.polflux(X_boundary-1e-3, Y_boundary+1e-3, Z_boundary+1e-3))
-    #         print("iteration", iteration)
-    #         print()
-    #         return np.array(ray_line(boundary_tau))
     
     return np.array(ray_line(boundary_tau))

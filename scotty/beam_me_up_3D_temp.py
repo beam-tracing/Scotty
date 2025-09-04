@@ -93,12 +93,6 @@ def beam_me_up_3D(
     B_p_a = None,
     R_axis = None,
     minor_radius_a = None,
-
-    # TO REMOVE -- only for debugging
-    from_cyl_scotty___q_entry_cartesian = None,
-    from_cyl_scotty___K_entry_cartesian = None,
-    from_cyl_scotty___Psi_3D_entry_labframe_cartesian = None,
-    from_cyl_scotty___Psi_3D_initial_labframe_cartesian = None,
 ) -> datatree.DataTree:
 
     print("Beam trace me up, Scotty!")
@@ -234,9 +228,6 @@ def beam_me_up_3D(
             delta_Y,
             delta_Z,
             None,
-            from_cyl_scotty___q_entry_cartesian,
-            from_cyl_scotty___K_entry_cartesian,
-            from_cyl_scotty___Psi_3D_entry_labframe_cartesian,
         )
     else:
         print("Beam launched from inside the plasma")
@@ -248,24 +239,6 @@ def beam_me_up_3D(
         Psi_3D_launch_labframe_cartesian = None
         Psi_3D_entry_labframe_cartesian = None
         Psi_3D_initial_labframe_cartesian = plasmaLaunch_Psi_3D_lab_cartesian
-    
-    # TO REMOVE
-    if from_cyl_scotty___Psi_3D_initial_labframe_cartesian is not None:
-        Psi_3D_initial_labframe_cartesian = from_cyl_scotty___Psi_3D_initial_labframe_cartesian
-    print("q_launch_cartesian", q_launch_cartesian)
-    print("q_initial_cartesian", q_initial_cartesian)
-    print()
-    print("K_launch_cartesian", K_launch_cartesian)
-    print("K_initial_cartesian", K_initial_cartesian)
-    print()
-    print("Psi_3D_launch_labframe_cartesian")
-    print(Psi_3D_launch_labframe_cartesian)
-    print()
-    print("Psi_3D_entry_labframe_cartesian")
-    print(Psi_3D_entry_labframe_cartesian)
-    print()
-    print("Psi_3D_initial_labframe_cartesian")
-    print(Psi_3D_initial_labframe_cartesian)
 
     # ------------------------------
     # Propagating the ray
@@ -289,8 +262,6 @@ def beam_me_up_3D(
 
     tau_leave, tau_points = cast(tuple, ray_solver_output)
 
-    # return ray_solver_output # TO REMOVE -- for debugging purposes only
-
     # ------------------------------
     # Propagating the beam
     # ------------------------------
@@ -306,24 +277,7 @@ def beam_me_up_3D(
         Psi_3D_initial_labframe_cartesian,
     )
 
-    # TO REMOVE
-    # print("Psi: ")
-    # print("Psi_xx: ", beam_parameters_initial[6], beam_parameters_initial[12])
-    # print("Psi_yy: ", beam_parameters_initial[7], beam_parameters_initial[13])
-    # print("Psi_zz: ", beam_parameters_initial[8], beam_parameters_initial[14])
-
-    # print("Psi_xy: ", beam_parameters_initial[9], beam_parameters_initial[15])
-    # print("Psi_xz: ", beam_parameters_initial[10], beam_parameters_initial[16])
-    # print("Psi_yz: ", beam_parameters_initial[11], beam_parameters_initial[17])
-
     solver_start_time = time.time()
-
-    # TO REMOVE
-    # tau_points = list(tau_points)
-    # tau_points = dict.fromkeys(tau_points)
-    # tau_points = list(tau_points)
-    # tau_points = np.array(tau_points)
-    # print(tau_points)
 
     solver_beam_output = solve_ivp(
         beam_evolution_fun_3D,
@@ -352,10 +306,6 @@ def beam_me_up_3D(
     q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, Psi_3D_output = unpack_beam_parameters_3D(beam_parameters_final)
 
     print("Main loop complete")
-
-    # TO REMOVE
-    if from_cyl_scotty___K_entry_cartesian is not None:
-        K_launch_cartesian = from_cyl_scotty___K_entry_cartesian
 
     inputs = xr.Dataset(
         {
