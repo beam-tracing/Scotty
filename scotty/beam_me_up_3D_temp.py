@@ -18,7 +18,8 @@ from scotty.plotting_3D import (
     plot_theta_m,
     plot_trajectory,
     plot_trajectories_individually,
-    plot_wavevector
+    plot_wavevector,
+    plot_widths
 )
 from scotty.profile_fit import ProfileFitLike, profile_fit
 from scotty.ray_solver_3D import propagate_ray
@@ -800,6 +801,7 @@ def beam_me_up_3D(
         plot_trajectory(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"trajectory{output_filename_suffix}.png"))
         plot_trajectories_individually(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"trajectories{output_filename_suffix}.png"))
         plot_wavevector(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"wavevector{output_filename_suffix}.png"))
+        plot_widths(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"widths{output_filename_suffix}.png"))
 
     # return dt, field
     # TO REMOVE
