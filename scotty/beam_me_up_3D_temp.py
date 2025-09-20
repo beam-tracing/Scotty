@@ -335,6 +335,237 @@ def beam_me_up_3D(
         Psi_3D_entry_labframe_cartesian = None
         Psi_3D_initial_labframe_cartesian = plasmaLaunch_Psi_3D_lab_cartesian
         distance_from_launch_to_entry = None
+    
+            # ------------------------------
+    # Propagating the ray
+    # ------------------------------
+    print("Starting the solvers")
+    ray_solver_output = propagate_ray(
+        poloidal_flux_enter,
+        launch_angular_frequency,
+        field,
+        q_initial_cartesian,
+        K_initial_cartesian,
+        hamiltonian,
+        rtol,
+        atol,
+        quick_run,
+        len_tau,
+    )
+
+    if quick_run:
+        return ray_solver_output
+
+    tau_leave, tau_points = cast(tuple, ray_solver_output)
+
+    # ------------------------------
+    # Propagating the beam
+    # ------------------------------
+
+    # Initial conditions for the solver
+    beam_parameters_initial = pack_beam_parameters_3D(
+        q_initial_cartesian[0],
+        q_initial_cartesian[1],
+        q_initial_cartesian[2],
+        K_initial_cartesian[0],
+        K_initial_cartesian[1],
+        K_initial_cartesian[2],
+        Psi_3D_initial_labframe_cartesian,
+    )
+
+    solver_start_time = time.time()
+
+    solver_beam_output = solve_ivp(
+        beam_evolution_fun_3D,
+        [0, tau_leave],
+        beam_parameters_initial,
+        method="RK45",
+        t_eval=tau_points,
+        dense_output=False,
+        events=None,
+        vectorized=False,
+        args=(hamiltonian,),
+        rtol=rtol,
+        atol=atol,
+    )
+
+    solver_end_time = time.time()
+    solver_time = solver_end_time - solver_start_time
+    print(f"Time taken (beam solver) {solver_time}s")
+    print(f"Number of beam evolution evaluations: {solver_beam_output.nfev}")
+    print(f"Time per beam evolution evaluation: {solver_time / solver_beam_output.nfev}")
+
+    tau_array = solver_beam_output.t
+    beam_parameters_final = solver_beam_output.y
+    solver_status = solver_beam_output.status
+
+    q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, Psi_3D_output = unpack_beam_parameters_3D(beam_parameters_final)
+
+    print("Main loop complete")
+
+    inputs = xr.Dataset(
+        {
+            # Data pathways
+            "ne_data_path": str(ne_data_path),
+            "magnetic_data_path": str(magnetic_data_path),
+            "Te_data_path": str(Te_data_path),
+            "output_path": str(output_path),
+            "input_filename_suffix": str(input_filename_suffix),
+            "output_filename_suffix": str(output_filename_suffix),
+            
+            # Important ray/beam stuff
+            "poloidal_launch_angle_Torbeam": poloidal_launch_angle_Torbeam,
+            "toroidal_launch_angle_Torbeam": toroidal_launch_angle_Torbeam,
+            "launch_freq_GHz": launch_freq_GHz,
+            "launch_angular_frequency": launch_angular_frequency,
+            "launch_beam_width": launch_beam_width,
+            "launch_beam_curvature": launch_beam_curvature,
+            "mode_flag": mode_flag,
+            "initial_position_cartesian": (["col"], q_initial_cartesian),
+            "initial_K_cartesian": (["col"], K_initial_cartesian),
+            "initial_Psi_3D_lab_cartesian": (["row","col"], Psi_3D_initial_labframe_cartesian),
+            "delta_X": delta_X,
+            "delta_Y": delta_Y,
+            "delta_Z": delta_Z,
+            "delta_K_X": delta_K_X,
+            "delta_K_Y": delta_K_Y,
+            "delta_K_Z": delta_K_Z,
+            "interp_order": interp_order,
+            "interp_smoothing": interp_smoothing,
+            "len_tau": len_tau,
+            "rtol": rtol,
+            "atol": atol,
+
+            # Poloidal flux parameters
+            "poloidal_flux_enter": poloidal_flux_enter,
+            "poloidal_flux_zero_density": poloidal_flux_zero_density,
+            "poloidal_flux_zero_temperature": poloidal_flux_zero_temperature,
+
+            # Flags
+            "vacuumLaunch_flag": vacuumLaunch_flag,
+            "vacuum_propagation_flag": vacuum_propagation_flag,
+            "relativistic_flag": relativistic_flag,
+            "Psi_BC_flag": Psi_BC_flag,
+            "quick_run": quick_run,
+            "figure_flag": figure_flag,
+            "detailed_analysis_flag": detailed_analysis_flag,
+
+            # Miscellaneous
+            "find_B_method": str(find_B_method),
+            "density_fit_parameters": str(density_fit_parameters),
+            "temperature_fit_parameters": str(temperature_fit_parameters),
+            "shot": shot,
+            "equil_time": equil_time,
+        },
+        coords = {
+            "X": field.X_coord,
+            "Y": field.Y_coord,
+            "Z": field.Z_coord,
+            "row": ["X","Y","Z"],
+            "col": ["X","Y","Z"],
+        },
+    )
+
+    solver_output = xr.Dataset(
+        {
+            # Solver output
+            "solver_status": solver_status,
+            "q_X": (["tau"], q_X_array, {"long_name": "X", "units": "m"}),
+            "q_Y": (["tau"], q_Y_array, {"long_name": "Y", "units": "m"}),
+            "q_Z": (["tau"], q_Z_array, {"long_name": "Z", "units": "m"}),
+            "K_X": (["tau"], K_X_array),
+            "K_Y": (["tau"], K_Y_array),
+            "K_Z": (["tau"], K_Z_array),
+            "Psi_3D_launch_labframe_cartesian": (["row","col"], Psi_3D_launch_labframe_cartesian),
+            "Psi_3D_entry_labframe_cartesian": (["row","col"], Psi_3D_entry_labframe_cartesian),
+            "initial_Psi_3D_lab_cartesian": (["row","col"], Psi_3D_initial_labframe_cartesian),
+            "Psi_3D_labframe_cartesian": (["tau","row","col"], Psi_3D_output),
+        },
+        coords = {
+            "tau": tau_array,
+            "row": ["X","Y","Z"],
+            "col": ["X","Y","Z"],
+        },
+    )
+
+    dt = datatree.DataTree.from_dict({"inputs": inputs, "solver_output": solver_output})
+    dt.attrs = {
+        "title": output_filename_suffix,
+        "software_name": "scotty-beam-tracing",
+        "software_version": __version__,
+        "date_created": str(datetime.datetime.now()),
+        "id": str(run_id),
+    }
+
+    if solver_status == -1:
+        # If the solver doesn't finish, end the function here
+        print("Solver did not reach completion")
+        return
+    
+    # -------------------
+    # Process the data from the main loop to give a bunch of useful stuff
+    # -------------------
+    print("Analysing data")
+    dH = hamiltonian.derivatives(q_X_array, q_Y_array, q_Z_array, K_X_array, K_Y_array, K_Z_array, second_order=True)
+
+    df = immediate_analysis_3D(
+        solver_output,
+        field,
+        find_density_1D,
+        find_temperature_1D,
+        hamiltonian,
+        launch_angular_frequency,
+        mode_flag,
+        delta_X,
+        delta_Y,
+        delta_Z,
+        delta_K_X,
+        delta_K_Y,
+        delta_K_Z,
+        Psi_3D_lab_launch = None,             # Not used yet, so set vacuumLaunch_flag = False
+        Psi_3D_lab_entry  = None,             # Not used yet, so set vacuumLaunch_flag = False
+        distance_from_launch_to_entry = None, # Not used yet, so set vacuumLaunch_flag = False
+        vacuumLaunch_flag = False,
+        output_path = output_path,
+        output_filename_suffix = output_filename_suffix,
+        dH = dH,
+    )
+
+    if further_analysis_flag:
+        analysis = further_analysis_3D(
+            inputs,
+            df,
+            Psi_3D_entry_labframe_cartesian = Psi_3D_output[0], # TO DELETE : this is only temporary, because vacuumLaunch_flag = False
+            output_path = output_path,
+            output_filename_suffix = output_filename_suffix,
+            field = field,
+            detailed_analysis_flag = False, # Set to False to disable localisation analysis (not implemented with 3D Scotty anyway)
+            dH = dH,
+        )
+
+        df.update(analysis)
+        dt["analysis"] = datatree.DataTree(df)
+
+    # We need to use h5netcdf and invalid_netcdf in order to easily
+    # write complex numbers
+    dt.to_netcdf(
+        output_path / f"scotty_output{output_filename_suffix}.h5",
+        engine="h5netcdf",
+        invalid_netcdf=True,
+    )
+
+    if further_analysis_flag and figure_flag:
+        plot_delta_theta_m(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"delta_theta_m{output_filename_suffix}.png"))
+        plot_dispersion_relation(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"H{output_filename_suffix}.png"))
+        plot_localisations(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"localisations{output_filename_suffix}.png"))
+        plot_theta_m(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"theta_m{output_filename_suffix}.png"))
+        plot_trajectory(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"trajectory{output_filename_suffix}.png"))
+        plot_trajectories_individually(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"trajectories{output_filename_suffix}.png"))
+        plot_wavevector(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"wavevector{output_filename_suffix}.png"))
+
+    # return dt, field
+    # TO REMOVE
+    return dt, field, hamiltonian, q_launch_cartesian, q_initial_cartesian, K_launch_cartesian, K_initial_cartesian, Psi_3D_initial_labframe_cartesian
     """
 
 
@@ -564,7 +795,7 @@ def beam_me_up_3D(
     if further_analysis_flag and figure_flag:
         plot_delta_theta_m(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"delta_theta_m{output_filename_suffix}.png"))
         plot_dispersion_relation(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"H{output_filename_suffix}.png"))
-        plot_localisations(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"localisations{output_filename_suffix}.png"))
+        plot_localisations(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"localisations{output_filename_suffix}"))
         plot_theta_m(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"theta_m{output_filename_suffix}.png"))
         plot_trajectory(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"trajectory{output_filename_suffix}.png"))
         plot_trajectories_individually(dt.inputs, dt.solver_output, dt.analysis, filename=(output_path / f"trajectories{output_filename_suffix}.png"))

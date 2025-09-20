@@ -236,6 +236,7 @@ def further_analysis_3D(
     # Getting the important data
     q_X, q_Y, q_Z = np.array(df.q_X), np.array(df.q_Y), np.array(df.q_Z)
     K_X, K_Y, K_Z = np.array(df.K_X), np.array(df.K_Y), np.array(df.K_Z)
+    K = np.stack((K_X, K_Y, K_Z), axis=1)
     K_magnitude = np.sqrt(K_X**2 + K_Y**2 + K_Z**2)
     numberOfDataPoints = len(df.tau)
 
@@ -268,10 +269,15 @@ def further_analysis_3D(
     kperp1_bs_normal   = kperp1_bs * dot(kperp1_hat, normal_hat)   # TODO: Check that this works correctly
     kperp1_bs_binormal = kperp1_bs * dot(kperp1_hat, binormal_hat) # TODO: Check that this works correctly
 
-    # Find the entries of Psi_3D_labframe_cartesian in the beam frame
+    # Find the entries of Psi_3D_entry_labframe_cartesian in the beam frame
     g_hat = np.array(df.g_hat)
     x_hat = np.array(df.x_hat)
     y_hat = np.array(df.y_hat)
+    Psi_xx_entry_beamframe_cartesian = dot([x_hat[0,:]], dot([Psi_3D_entry_labframe_cartesian], [x_hat[0,:]]))
+    Psi_xy_entry_beamframe_cartesian = dot([x_hat[0,:]], dot([Psi_3D_entry_labframe_cartesian], [y_hat[0,:]]))
+    Psi_yy_entry_beamframe_cartesian = dot([y_hat[0,:]], dot([Psi_3D_entry_labframe_cartesian], [y_hat[0,:]]))
+
+    # Find the entries of Psi_3D_labframe_cartesian in the beam frame
     Psi_3D_labframe_cartesian = np.array(df.Psi_3D_labframe_cartesian)
     Psi_xx_beamframe_cartesian = dot(x_hat, dot(Psi_3D_labframe_cartesian, x_hat))
     Psi_xy_beamframe_cartesian = dot(x_hat, dot(Psi_3D_labframe_cartesian, y_hat))
@@ -280,12 +286,7 @@ def further_analysis_3D(
     Psi_yg_beamframe_cartesian = dot(y_hat, dot(Psi_3D_labframe_cartesian, g_hat))
     Psi_gg_beamframe_cartesian = dot(g_hat, dot(Psi_3D_labframe_cartesian, g_hat))
 
-    # Find the entries of Psi_3D_entry_labframe_cartesian in the beam frame
-    Psi_xx_entry_beamframe_cartesian = dot([x_hat[0,:]], dot([Psi_3D_entry_labframe_cartesian], [x_hat[0,:]]))
-    Psi_xy_entry_beamframe_cartesian = dot([x_hat[0,:]], dot([Psi_3D_entry_labframe_cartesian], [y_hat[0,:]]))
-    Psi_yy_entry_beamframe_cartesian = dot([y_hat[0,:]], dot([Psi_3D_entry_labframe_cartesian], [y_hat[0,:]]))
-
-    # Finding the entries of the modified matrix M of Psi
+    # Find the entries of the modified matrix M of Psi
     xhat_dot_grad_bhat_dot_ghat = dot(x_hat, dot(df.grad_bhat, g_hat))
     yhat_dot_grad_bhat_dot_ghat = dot(y_hat, dot(df.grad_bhat, g_hat))
     M_xx_beamframe_cartesian = Psi_xx_beamframe_cartesian + (kperp1_bs / 2)*xhat_dot_grad_bhat_dot_ghat
@@ -293,7 +294,21 @@ def further_analysis_3D(
     M_yy_beamframe_cartesian = Psi_yy_beamframe_cartesian
 
     """
-    Finding the wavenumber resolution and mismatch attenuation along the ray
+    Find the beam width and curvature along the ray
+    """
+    Psi_w = np.zeros((len(Psi_3D_labframe_cartesian), 2, 2), dtype=np.complex128)
+    Psi_w[:, 0, 0] = Psi_xx_beamframe_cartesian
+    Psi_w[:, 0, 1] = Psi_xy_beamframe_cartesian
+    Psi_w[:, 1, 0] = Psi_xy_beamframe_cartesian
+    Psi_w[:, 1, 1] = Psi_yy_beamframe_cartesian
+    Re_Psi_w = np.real(Psi_w)
+    K_g_magnitude = np.sum(K * g_hat, axis=1)
+    curvature1, curvature2 = K_g_magnitude**2 / K_magnitude**3 * np.linalg.eigvals(Re_Psi_w)
+    Im_Psi_w = np.imag(Psi_w)
+    width1, width2 = np.sqrt( 2 / np.linalg.eigvals(Im_Psi_w) )
+
+    """
+    Find the wavenumber resolution and mismatch attenuation along the ray
     """
     det_M_w = M_xx_beamframe_cartesian*M_yy_beamframe_cartesian - M_xy_beamframe_cartesian**2
     M_w_inv_xx =   M_yy_beamframe_cartesian / det_M_w
@@ -302,7 +317,7 @@ def further_analysis_3D(
     delta_kperp2 = 2 * np.sqrt(-1 / np.imag(M_w_inv_yy))
 
     """
-    Finding the the polarisation piece (loc_p) along the ray
+    Find the the polarisation piece (loc_p) along the ray
     """
     H_eigvals, e_eigvecs = dispersion_eigenvalues(K_magnitude, inputs.launch_angular_frequency.data, df, numberOfDataPoints, theta_m)
     # H_1_eigval, H_2_eigval, H_3_eigval = H_eigvals
@@ -334,7 +349,7 @@ def further_analysis_3D(
     loc_p = (inputs.launch_angular_frequency**2 * constants.epsilon_0 * find_electron_mass(df.get("temperature")) / constants.e**2)**2 * loc_p_unnormalised
 
     """
-    Finding the the dispersion relation using Cardano's formula and the ray piece (loc_r) along the ray
+    Find the the dispersion relation using Cardano's formula and the ray piece (loc_r) along the ray
     """
     H_1_Cardano, H_2_Cardano, H_3_Cardano = find_H_Cardano(
         K_magnitude,
@@ -374,22 +389,21 @@ def further_analysis_3D(
     loc_r = (2*constants.c / inputs.launch_angular_frequency.data)**2 / g_magnitude_Cardano**2
 
     """
-    Finding the beam piece (loc_b) along the ray
+    Find the beam piece (loc_b) along the ray
     """
     wavenumber_K0 = angular_frequency_to_wavenumber(inputs.launch_angular_frequency.data)
     det_Im_Psi_w = np.imag(Psi_xx_beamframe_cartesian)*np.imag(Psi_yy_beamframe_cartesian) - np.imag(Psi_xy_beamframe_cartesian)**2
     beam_waist = find_waist(inputs.launch_beam_width.data, wavenumber_K0, inputs.launch_beam_curvature.data)
     loc_b = (beam_waist * det_Im_Psi_w) / (np.sqrt(2) * np.abs(det_M_w) * np.sqrt(-np.imag(M_w_inv_yy)))
 
-
     """
-    Finding the mismatch piece (loc_m) along the ray
+    Find the mismatch piece (loc_m) along the ray
     """
     delta_theta_m = np.sqrt(np.imag(M_w_inv_yy) / ((np.imag(M_w_inv_xy)) ** 2 - np.imag(M_w_inv_xx) * np.imag(M_w_inv_yy))) / K_magnitude
     loc_m = np.exp(-2 * (theta_m / delta_theta_m) ** 2)
 
     """
-    Finding the spectrum piece (loc_s) along the ray
+    Find the spectrum piece (loc_s) along the ray
     """
     spectrum_power_law_coefficient = -13/3 # Turbulence cascade
     loc_s_13_3 = (kperp1_bs / (-2*wavenumber_K0)) ** (spectrum_power_law_coefficient)
@@ -411,6 +425,10 @@ def further_analysis_3D(
         "cutoff_index": index_of_cutoff,
         "arc_length": (["tau"], distance_along_line),
         "arc_length_relative_to_cutoff": (["tau"], l_lc),
+        "beam_width_1": (["tau"], width1),
+        "beam_width_2": (["tau"], width2),
+        "beam_curvature_1": (["tau"], curvature1),
+        "beam_curvature_2": (["tau"], curvature2),
 
         # Basis vectors {y, g, x}
         "x_hat_cartesian": (["tau","col"], x_hat),
