@@ -302,10 +302,12 @@ def further_analysis_3D(
     Psi_w[:, 1, 0] = Psi_xy_beamframe_cartesian
     Psi_w[:, 1, 1] = Psi_yy_beamframe_cartesian
     Re_Psi_w = np.real(Psi_w)
+    Re_Psi_w_eigvals = np.linalg.eigvals(Re_Psi_w)
     K_g_magnitude = np.sum(K * g_hat, axis=1)
-    curvature1, curvature2 = K_g_magnitude**2 / K_magnitude**3 * np.linalg.eigvals(Re_Psi_w)
+    curvature1, curvature2 = K_g_magnitude**2 / K_magnitude**3 * Re_Psi_w_eigvals[:, 0], K_g_magnitude**2 / K_magnitude**3 * Re_Psi_w_eigvals[:, 1]
     Im_Psi_w = np.imag(Psi_w)
-    width1, width2 = np.sqrt( 2 / np.linalg.eigvals(Im_Psi_w) )
+    Im_Psi_w_eigvals = np.linalg.eigvals(Im_Psi_w)
+    width1, width2 = np.sqrt( 2 / Im_Psi_w_eigvals[:, 0] ), np.sqrt( 2 / Im_Psi_w_eigvals[:, 1] )
 
     """
     Find the wavenumber resolution and mismatch attenuation along the ray

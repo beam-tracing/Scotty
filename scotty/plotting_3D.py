@@ -273,7 +273,7 @@ def plot_widths(
     }
 
     # Plotting all widths against l_lc
-    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    fig, axs = plt.subplots(1, 3, figsize=(18, 6))
     axs = axs.flatten()
     for i, key in enumerate(data_Yaxis.keys()):
         axs[i].plot(data_Xaxis["arc_length_relative_to_cutoff"], data_Yaxis[key], linestyle='-', linewidth=2, zorder=1)
@@ -281,6 +281,13 @@ def plot_widths(
         axs[i].set_title(f'{key}, pol {data_misc["poloidal_launch_angle_Torbeam"]}, tor {data_misc["toroidal_launch_angle_Torbeam"]}')
         axs[i].legend(loc="best")
         axs[i].grid(True, which="both")
+    
+    axs[2].plot(data_Xaxis["arc_length_relative_to_cutoff"], data_Yaxis["beam_width_1"], linestyle='-', linewidth=2, zorder=1)
+    axs[2].plot(data_Xaxis["arc_length_relative_to_cutoff"], data_Yaxis["beam_width_2"], linestyle='-', linewidth=2, zorder=1)
+    axs[2].set_xlabel("Arc length from cutoff (m)")
+    axs[2].set_title(f'Both beam widths, pol {data_misc["poloidal_launch_angle_Torbeam"]}, tor {data_misc["toroidal_launch_angle_Torbeam"]}')
+    axs[2].legend(loc="best")
+    axs[2].grid(True, which="both")
 
     plt.tight_layout()
     plt.draw()
