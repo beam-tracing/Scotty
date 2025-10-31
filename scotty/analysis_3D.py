@@ -5,6 +5,7 @@ from scotty.analysis import (
     dispersion_eigenvalues,
     set_vector_components_long_name,
 )
+from scotty.checks_3D import Parameters
 from scotty.check_output import check_output
 from scotty.derivatives import derivative
 from scotty.fun_general import (
@@ -18,6 +19,7 @@ from scotty.fun_general import (
     find_waist,
     make_unit_vector_from_cross_product,
 )
+from scotty.fun_general_3D import find_H_Cardano_eig
 from scotty.geometry_3D import MagneticField_3D_Cartesian
 from scotty.hamiltonian_3D import DielectricTensor_3D, Hamiltonian_3D, hessians_3D
 from scotty.profile_fit import ProfileFitLike
@@ -31,10 +33,11 @@ CARTESIAN_VECTOR_COMPONENTS = ["X", "Y", "Z"]
 
 
 def immediate_analysis_3D(
+    params: Parameters,
     solver_output: xr.Dataset,
     field: MagneticField_3D_Cartesian,
-    find_density_1D: ProfileFitLike,
-    find_temperature_1D: Optional[ProfileFitLike],
+    density_fit: ProfileFitLike,
+    temperature_fit: Optional[ProfileFitLike],
     hamiltonian: Hamiltonian_3D,
     launch_angular_frequency: float,
     mode_flag: int,
@@ -105,21 +108,17 @@ def immediate_analysis_3D(
     # print("K_Y", K_Y)
     # print("K_Z", K_Z)
     H_Booker = hamiltonian(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
-    H_Booker_other = Hamiltonian_3D(field,
-                                    launch_angular_frequency,
-                                    -mode_flag,
-                                    find_density_1D,
-                                    delta_X,
-                                    delta_Y,
-                                    delta_Z,
-                                    delta_K_X,
-                                    delta_K_Y,
-                                    delta_K_Z,
-                                    find_temperature_1D)(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
+    hamiltonian_other = Hamiltonian_3D(params,
+                                       field,
+                                       -mode_flag,
+                                       density_fit,
+                                       temperature_fit)
+
+    H_Booker_other = hamiltonian_other(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
     
     # Calculating electron density, temperature, and epsilon
-    electron_density = np.asfarray(find_density_1D(polflux))
-    temperature = np.asfarray(find_temperature_1D(polflux)) if find_temperature_1D else None
+    electron_density = np.asfarray(density_fit(polflux))
+    temperature = np.asfarray(temperature_fit(polflux)) if temperature_fit else None
     epsilon = DielectricTensor_3D(electron_density, launch_angular_frequency, B_magnitude, temperature)
 
     # Calculating (normalised) gyro freqs and (normalised) plasma freqs
@@ -220,6 +219,7 @@ def immediate_analysis_3D(
 
 
 def further_analysis_3D(
+    params: Parameters,
     inputs: xr.Dataset,
     df: xr.Dataset,
     Psi_3D_entry_labframe_cartesian: FloatArray,
@@ -302,11 +302,11 @@ def further_analysis_3D(
     Psi_w[:, 1, 0] = Psi_xy_beamframe_cartesian
     Psi_w[:, 1, 1] = Psi_yy_beamframe_cartesian
     Re_Psi_w = np.real(Psi_w)
-    Re_Psi_w_eigvals = np.linalg.eigvals(Re_Psi_w)
+    Re_Psi_w_eigvals = np.linalg.eigvalsh(Re_Psi_w)
     K_g_magnitude = np.sum(K * g_hat, axis=1)
     curvature1, curvature2 = K_g_magnitude**2 / K_magnitude**3 * Re_Psi_w_eigvals[:, 0], K_g_magnitude**2 / K_magnitude**3 * Re_Psi_w_eigvals[:, 1]
     Im_Psi_w = np.imag(Psi_w)
-    Im_Psi_w_eigvals = np.linalg.eigvals(Im_Psi_w)
+    Im_Psi_w_eigvals = np.linalg.eigvalsh(Im_Psi_w)
     width1, width2 = np.sqrt( 2 / Im_Psi_w_eigvals[:, 0] ), np.sqrt( 2 / Im_Psi_w_eigvals[:, 1] )
 
     """
@@ -327,9 +327,10 @@ def further_analysis_3D(
 
     # In my experience, H_eigvals[:,1] corresponds to the O mode, and H_eigvals[:,0] corresponds to the X-mode
     # ALERT: This may not always be the case! Check the output figure to make sure that the appropriate solution is indeed 0 along the ray
-    mode_index = 1 if inputs.mode_flag == 1 else 0
+    mode_index = params.mode_index
+    if mode_index == "Not calculated": mode_index = 1 if inputs.mode_flag == 1 else 0
 
-    # e_hat has components e_1,e_2,e_b
+    # e_hat has components e_1, e_2, e_b
     e_hat = e_eigvecs[:, :, mode_index]
 
     # equilibrium dielectric tensor - identity matrix. \bm{\epsilon}_{eq} - \bm{1}
@@ -369,7 +370,7 @@ def further_analysis_3D(
         # ALERT: This may not always be the case! Check the output
         # figure to make sure that the appropriate solution is indeed
         # 0 along the ray
-        result = find_H_Cardano(
+        eigvals = find_H_Cardano(
             np.sqrt(Kx**2 + Ky**2 + Kz**2),
             inputs.launch_angular_frequency.data,
             df.epsilon_para.data,
@@ -377,8 +378,7 @@ def further_analysis_3D(
             df.epsilon_g.data,
             theta_m)
         
-        if inputs.mode_flag == 1: return result[2] # X-mode; should return H_3_Cardano
-        else:                     return result[1] # O-mode; should return H_2_Cardano
+        return eigvals[mode_index]
     
     def grad_H_cardano(direction: str, spacing: float):
         return derivative(H_cardano, direction, args={"Kx": K_X, "Ky": K_Y, "Kz": K_Z}, spacings=spacing,)
@@ -418,9 +418,9 @@ def further_analysis_3D(
     grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians_3D(dH)
 
     # Integrating the localisations to get the backscattered power due to the dominant k_perp
-    loc_coeff = 1 # (np.pi**(3/2) * constants.e**4) / ( 2*(constants.c**2)*(inputs.launch_angular_frequency.data**2)*(constants.epsilon_0**2)*(constants.m_e**2)*beam_waist )
-    power_ratio_13_3 = loc_coeff * np.trapz(loc_all_13_3, distance_along_line)
-    power_ratio_10_3 = loc_coeff * np.trapz(loc_all_10_3, distance_along_line)
+    loc_coeff = 1/inputs.launch_angular_frequency.data**2 # (np.pi**(3/2) * constants.e**4) / ( 2*(constants.c**2)*(inputs.launch_angular_frequency.data**2)*(constants.epsilon_0**2)*(constants.m_e**2)*beam_waist )
+    power_ratio_13_3_arb_units = loc_coeff * np.trapz(loc_all_13_3, distance_along_line)
+    power_ratio_10_3_arb_units = loc_coeff * np.trapz(loc_all_10_3, distance_along_line)
 
     further_df = {
         # Important stuff
@@ -499,8 +499,8 @@ def further_analysis_3D(
         "loc_s_10_3": loc_s_10_3,
         "loc_all_13_3": loc_all_13_3,
         "loc_all_10_3": loc_all_10_3,
-        "power_ratio_13_3": power_ratio_13_3,
-        "power_ratio_10_3": power_ratio_10_3,
+        "power_ratio_13_3_arb_units": power_ratio_13_3_arb_units,
+        "power_ratio_10_3_arb_units": power_ratio_10_3_arb_units,
         "dominant_kperp1_bs": kperp1_bs[index_of_cutoff],
     }
 

@@ -1,14 +1,15 @@
-### Declaring class DielectricTensor_3D
-
 import numpy as np
 import scotty.derivatives
 from scotty.fun_general import (angular_frequency_to_wavenumber,
                                 dot,
                                 find_normalised_gyro_freq,
                                 find_normalised_plasma_freq)
+from scotty.geometry_3D import MagneticField_3D_Cartesian
 from scotty.profile_fit import ProfileFitLike
 from scotty.typing import ArrayLike, FloatArray
-from typing import Dict, Optional, Tuple
+from typing import Dict, Literal, Optional, Tuple
+
+
 
 class DielectricTensor_3D:
     r"""
@@ -54,7 +55,7 @@ class DielectricTensor_3D:
         B_total: ArrayLike,
         temperature: Optional[ArrayLike] = None):
         
-        _plasma_freq_2 = (find_normalised_plasma_freq(electron_density, angular_frequency, temperature)**2)
+        _plasma_freq_2 = find_normalised_plasma_freq(electron_density, angular_frequency, temperature)**2
         _gyro_freq = find_normalised_gyro_freq(B_total, angular_frequency, temperature)
         _gyro_freq_2 = _gyro_freq**2
 
@@ -78,10 +79,6 @@ class DielectricTensor_3D:
         return self._epsilon_12
 
 
-
-
-
-### Declaring class Hamiltonian_3D
 
 class Hamiltonian_3D:
     r"""
@@ -110,14 +107,10 @@ class Hamiltonian_3D:
 
     Parameters
     ----------
-    field
-        An object describing the magnetic field of the plasma
     launch_angular_frequency
         Angular frequency of the beam
     mode_flag
         Either ``+/-1``, used to determine which mode branch to use
-    density_fit
-        Function or ``Callable`` parameterising the density
     delta_X
         Finite difference spacing in the ``X`` direction
     delta_Y
@@ -130,35 +123,41 @@ class Hamiltonian_3D:
         Finite difference spacing in the ``K_Y`` direction
     delta_K_Z
         Finite difference spacing in the ``K_Z`` direction
+    field
+        An object describing the magnetic field of the plasma
+    density_fit
+        Function or ``Callable`` parameterising the density
+    temperature_fit
+        Function or ``Callable`` parameterising the density. Default is None
     """
 
     def __init__(self,
-                 field,
                  launch_angular_frequency: float,
-                 mode_flag: int,
-                 density_fit: ProfileFitLike,
+                 mode_flag: Literal[1, -1],
                  delta_X: float,
                  delta_Y: float,
                  delta_Z: float,
                  delta_K_X: float,
                  delta_K_Y: float,
                  delta_K_Z: float,
+                 field: MagneticField_3D_Cartesian,
+                 density_fit: ProfileFitLike,
                  temperature_fit: Optional[ProfileFitLike] = None):
         
-        self.field = field
         self.angular_frequency = launch_angular_frequency
         self.wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
         self.mode_flag = mode_flag
-        self.density = density_fit
-        self.temperature = temperature_fit
         self.spacings = {
             "X": delta_X,
             "Y": delta_Y,
             "Z": delta_Z,
             "K_X": delta_K_X,
             "K_Y": delta_K_Y,
-            "K_Z": delta_K_Z
+            "K_Z": delta_K_Z,
         }
+        self.field = field
+        self.density = density_fit
+        self.temperature = temperature_fit
     
     def __call__(self,
                  X: ArrayLike,
@@ -178,30 +177,18 @@ class Hamiltonian_3D:
         B_X = np.squeeze(self.field.B_X(X,Y,Z))
         B_Y = np.squeeze(self.field.B_Y(X,Y,Z))
         B_Z = np.squeeze(self.field.B_Z(X,Y,Z))
-
         B_magnitude = np.sqrt(B_X**2 + B_Y**2 + B_Z**2)
         b_hat = np.array([B_X, B_Y, B_Z]) / B_magnitude
         K_hat = np.array([K_X, K_Y, K_Z]) / K_magnitude
 
         # Square of the mismatch angle
-        if np.size(X) == 1:
-            sin_theta_m_sq = np.dot(b_hat, K_hat)**2
-        else:
-            b_hat = b_hat.T
-            K_hat = K_hat.T
-            sin_theta_m_sq = dot(b_hat, K_hat)**2
+        if np.size(X) == 1: sin_theta_m_sq = np.dot(b_hat, K_hat)**2
+        else:               sin_theta_m_sq = dot(b_hat.T, K_hat.T)**2
         
         epsilon = DielectricTensor_3D(electron_density, self.angular_frequency, B_magnitude, temperature)
 
-        # TO REMOVE
-        # self.dielectrictensor = epsilon
-        # try: self.dielectrictensor = epsilon
-        # except: 
-
         Booker_alpha = (epsilon.e_bb * sin_theta_m_sq) + epsilon.e_11 * (1 - sin_theta_m_sq)
-
         Booker_beta = (-epsilon.e_11 * epsilon.e_bb * (1 + sin_theta_m_sq)) - (epsilon.e_11**2 - epsilon.e_12**2) * (1 - sin_theta_m_sq)
-
         Booker_gamma = epsilon.e_bb * (epsilon.e_11**2 - epsilon.e_12**2)
 
         H_discriminant = np.maximum(np.zeros_like(Booker_beta), (Booker_beta**2 - 4 * Booker_alpha * Booker_gamma))
@@ -226,8 +213,7 @@ class Hamiltonian_3D:
         # print("theta_m", np.arcsin(np.sqrt(sin_theta_m_sq)))
         # # print()
         
-
-        return (K_magnitude / self.wavenumber_K0) ** 2 + (Booker_beta - self.mode_flag * np.sqrt(H_discriminant)) / (2 * Booker_alpha)
+        return (K_magnitude / self.wavenumber_K0)**2 + (Booker_beta - self.mode_flag * np.sqrt(H_discriminant)) / (2 * Booker_alpha)
     
     def derivatives(self,
                     X: ArrayLike,
@@ -285,13 +271,11 @@ class Hamiltonian_3D:
             }
             derivatives.update(second_derivatives)
         
-        """
         # TO REMOVE -- for debugging only
-        print(np.array((X,Y,Z)))
-        print(np.array((K_X,K_Y,K_Z)))
-        for key, value in derivatives.items():
-            print(key, value)
-        """
+        # print(np.array((X,Y,Z)))
+        # print(np.array((K_X,K_Y,K_Z)))
+        # for key, value in derivatives.items():
+        #     print(key, value)
 
         # TO REMOVE -- for debugging dH/dY and dH/dKy
         # print("dH/dY from scotty.drv", derivatives["dH_dY"])
@@ -300,10 +284,6 @@ class Hamiltonian_3D:
         return derivatives
 
 
-
-
-
-### Declaring def hessians_3D
 
 def hessians_3D(dH: dict):
     """
@@ -365,3 +345,70 @@ def hessians_3D(dH: dict):
     ]))
 
     return grad_grad_H, gradK_grad_H, gradK_gradK_H
+
+
+
+def initialise_hamiltonians(launch_angular_frequency: float,
+                            delta_X: float,
+                            delta_Y: float,
+                            delta_Z: float,
+                            delta_K_X: float,
+                            delta_K_Y: float,
+                            delta_K_Z: float,
+                            field: MagneticField_3D_Cartesian,
+                            density_fit: ProfileFitLike,
+                            temperature_fit: Optional[ProfileFitLike] = None):
+    
+    hamiltonian_pos1 = Hamiltonian_3D(launch_angular_frequency,
+                                      1, # mode_flag
+                                      delta_X,
+                                      delta_Y,
+                                      delta_Z,
+                                      delta_K_X,
+                                      delta_K_Y,
+                                      delta_K_Z,
+                                      field,
+                                      density_fit,
+                                      temperature_fit)
+    
+    hamiltonian_neg1 = Hamiltonian_3D(launch_angular_frequency,
+                                      -1, # mode_flag
+                                      delta_X,
+                                      delta_Y,
+                                      delta_Z,
+                                      delta_K_X,
+                                      delta_K_Y,
+                                      delta_K_Z,
+                                      field,
+                                      density_fit,
+                                      temperature_fit)
+    
+    return hamiltonian_pos1, hamiltonian_neg1
+
+
+
+def assign_hamiltonians(mode_flag_launch: Literal["O", "X", 1, -1],
+                        mode_flag_initial: Literal[1, -1],
+                        hamiltonian_pos1: Hamiltonian_3D,
+                        hamiltonian_neg1: Hamiltonian_3D,
+                        q_initial_cartesian: FloatArray,
+                        K_initial_cartesian: FloatArray,
+                        tol_H: float = 1e-5,
+                        verbose_run: bool = False):
+    
+    if verbose_run:
+        print(f"Assigning the correct Hamiltonian")
+        print(f"mode_flag is {mode_flag_initial}")
+    
+    H_pos1 = hamiltonian_pos1(*q_initial_cartesian, *K_initial_cartesian)
+    H_neg1 = hamiltonian_neg1(*q_initial_cartesian, *K_initial_cartesian)
+
+    if   abs(H_pos1) < tol_H: H, H_other, new_mode_flag_initial = hamiltonian_pos1, hamiltonian_neg1, 1
+    elif abs(H_neg1) < tol_H: H, H_other, new_mode_flag_initial = hamiltonian_neg1, hamiltonian_pos1, -1
+    else: raise ValueError(f"Neither mode_flag +1 or -1 is correct!")
+
+    if verbose_run: 
+        if mode_flag_initial != new_mode_flag_initial: print(f"mode_flag is now {new_mode_flag_initial}")
+        print(f"Hamiltonian with computed mode_flag {mode_flag_initial} selected for user-passed mode_flag {mode_flag_launch}")
+    
+    return H, H_other, mode_flag_initial

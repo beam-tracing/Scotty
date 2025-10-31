@@ -12,15 +12,14 @@ from typing import Any, Callable, Dict, Protocol, Tuple, Union
 # Decorator event used in make_solver_events()
 
 class _Event(Protocol):
-    """Protocol describing a `scipy.integrate.solve_ivp` event callback"""
 
+    """Protocol describing a `scipy.integrate.solve_ivp` event callback"""
     terminal: bool = False
     direction: float = 0.0
-
-    def __call__(self, *args):
-        pass
+    def __call__(self, *args): pass
 
 def _event(terminal: bool, direction: float):
+
     """Decorator to add the attributes required for `scipy.integrate.solve_ivp` while
     keeping mypy happy
     """
@@ -36,13 +35,9 @@ def _event(terminal: bool, direction: float):
 
 
 
-### Declaring def make_solver_events
-
-def make_solver_events(
-    poloidal_flux_enter: float,
-    launch_angular_frequency: float,
-    field: MagneticField_3D_Cartesian
-) -> Dict[str, Callable]:
+def make_solver_events(poloidal_flux_enter: float,
+                       launch_angular_frequency: float,
+                       field: MagneticField_3D_Cartesian) -> Dict[str, Callable]:
     
     # This event triggers when the beam leaves the same poloidal flux value it entered at
     # Goes from negative to positive when leaving the plasma
@@ -152,9 +147,9 @@ def make_solver_events(
 
 
 
-def handle_leaving_plasma_events(
-    tau_events: Dict[str, FloatArray], ray_parameters_3D_events: FloatArray
-) -> float:
+def handle_leaving_plasma_events(tau_events: Dict[str, FloatArray],
+                                 ray_parameters_3D_events: FloatArray) -> float:
+    
     """Handle events detected by `scipy.integrate.solve_ivp`. This
     only handles events due to the ray leaving the plasma or
     simulation:
@@ -189,15 +184,19 @@ def handle_leaving_plasma_events(
     # Event names here must match those in the `solver_ray_events`
     # dict defined outside this function
     if detected("leave_plasma") and not detected("leave_LCFS"):
+        print("Left plasma") # TO REMOVE
         return tau_events["leave_plasma"][0]
 
     if detected("cross_resonance"):
+        print("Cross resonance") # TO REMOVE
         return tau_events["cross_resonance"][0]
 
     if detected("cross_resonance2"):
+        print("Cross resonance 2") # TO REMOVE
         return tau_events["cross_resonance2"][0]
     
     if not detected("leave_plasma") and detected("leave_LCFS"):
+        print("Left LCFS") # TO REMOVE
         return tau_events["leave_LCFS"][0]
     
     if detected("leave_plasma") and detected("leave_LCFS"):
@@ -224,13 +223,12 @@ def handle_leaving_plasma_events(
 
 
 
-def handle_no_resonance(
-    solver_ray_output,
-    tau_leave: float,
-    tau_points: FloatArray,
-    solver_arguments,
-    event_leave_plasma: Callable,
-) -> FloatArray:
+def handle_no_resonance(solver_ray_output,
+                        tau_leave: float,
+                        tau_points: FloatArray,
+                        solver_arguments,
+                        event_leave_plasma: Callable) -> FloatArray:
+    
     """Add an additional tau point at the cut-off (minimum K) if the
     beam does NOT reach a resonance
 
@@ -295,14 +293,12 @@ class K_cutoff_data:
     theta_m: float
 
 
-""" TO-DO
+""" TO REMOVE -- need to complete this
 def quick_K_cutoff(
     ray_parameters_turning_pt: FloatArray, K_zeta: float, field: MagneticField
 ) -> K_cutoff_data:"""
 
 
-
-### Declaring class K_cutoff_data_cartesian
 
 class K_cutoff_data_cartesian:
     """Properties of :math:`K`-cutoff"""
@@ -315,12 +311,13 @@ class K_cutoff_data_cartesian:
 
 
 
-### Declaring def ray_evolution_3D_fun
-
 def ray_evolution_3D_fun(tau, ray_parameters_3D, hamiltonian: Hamiltonian_3D):
 
     # Saving the coordinates
     q_X, q_Y, q_Z, K_X, K_Y, K_Z = ray_parameters_3D
+
+    print("TO REMOVE ray_evolution_3D_fun")
+    print(q_X, q_Y, q_Z)
 
     # Find the derivatives of H
     dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
@@ -334,63 +331,46 @@ def ray_evolution_3D_fun(tau, ray_parameters_3D, hamiltonian: Hamiltonian_3D):
 
 
 
-### Declaring def propagate_ray
-
-def propagate_ray(
-    poloidal_flux_enter: float,
-    launch_angular_frequency: float,
-    field: MagneticField_3D_Cartesian,
-    initial_position: FloatArray,
-    K_initial: FloatArray,
-    hamiltonian: Hamiltonian_3D,
-    rtol: float,
-    atol: float,
-    quick_run: bool,
-    len_tau: int,
-    tau_max: float = 1e5,
-    verbose: bool = True,
-) -> Union[Tuple[float, FloatArray], K_cutoff_data_cartesian]:
+def propagate_ray(poloidal_flux_enter: float,
+                  launch_angular_frequency: float,
+                  field: MagneticField_3D_Cartesian,
+                  initial_position: FloatArray,
+                  K_initial: FloatArray,
+                  hamiltonian: Hamiltonian_3D,
+                  rtol: float,
+                  atol: float,
+                  quick_run: bool,
+                  len_tau: int,
+                  tau_max: float = 1e5) -> Union[Tuple[float, FloatArray], K_cutoff_data_cartesian]:
     
-    solver_ray_events = make_solver_events(
-        poloidal_flux_enter, launch_angular_frequency, field
-    )
-
-    K_X_initial, K_Y_initial, K_Z_initial = K_initial
-
-    # Ray evolves q_X, q_Y, q_Z, K_X, K_Y, K_Z
-    ray_parameters_3D_initial = [
-        initial_position[0],
-        initial_position[1],
-        initial_position[2],
-        K_X_initial,
-        K_Y_initial,
-        K_Z_initial,
-    ]
+    # Packing the initial q_X, q_Y, q_Z, K_X, K_Y, K_Z
+    ray_parameters_3D_initial = [initial_position[0],
+                                 initial_position[1],
+                                 initial_position[2],
+                                 K_initial[0],
+                                 K_initial[1],
+                                 K_initial[2]]
 
     # Additional arguments for solver
+    solver_ray_events = make_solver_events(poloidal_flux_enter, launch_angular_frequency, field)
     solver_arguments = (hamiltonian,)
 
-    solver_start_time = time()
-    solver_ray_output = solve_ivp(
-        ray_evolution_3D_fun,
-        [0, tau_max],
-        ray_parameters_3D_initial,
-        method="RK45",
-        t_eval=None,
-        dense_output=False,
-        events=solver_ray_events.values(),
-        vectorized=False,
-        args=solver_arguments,
-        rtol=rtol,
-        atol=atol,
-        max_step=50,
-    )
+    # Evolving q_X, q_Y, q_Z, K_X, K_Y, K_Z according to the
+    # ray-tracing equations
+    solver_ray_output = solve_ivp(ray_evolution_3D_fun,
+                                  [0, tau_max],
+                                  ray_parameters_3D_initial,
+                                  method="RK45",
+                                  t_eval=None,
+                                  dense_output=False,
+                                  events=solver_ray_events.values(),
+                                  vectorized=False,
+                                  args=solver_arguments,
+                                  rtol=rtol,
+                                  atol=atol,
+                                  max_step=500)
 
-    solver_end_time = time()
-    if verbose:
-        print("Time taken (ray solver)", solver_end_time - solver_start_time, "s")
-
-    if solver_ray_output.status == 0:  raise RuntimeError("Ray has not left plasma/simulation region. Increase tau_max or choose different initial conditions.")
+    if solver_ray_output.status ==  0: raise RuntimeError("Ray has not left plasma/simulation region. Increase tau_max or choose different initial conditions.")
     if solver_ray_output.status == -1: raise RuntimeError("Integration step failed. Check density interpolation is not negative")
 
     # tau_events is a list with the same order as the values of
@@ -415,16 +395,13 @@ def propagate_ray(
     tau_points = np.linspace(0, tau_leave, len_tau - 1, endpoint=False)
 
     # you want no resonance at all, so both must be 0
-    if (
-        len(tau_events["cross_resonance"]) == 0
-        and len(tau_events["cross_resonance2"]) == 0
-    ):
-        tau_points = handle_no_resonance(
-            solver_ray_output,
-            tau_leave,
-            tau_points,
-            solver_arguments,
-            solver_ray_events["leave_plasma"],
-        )
+    if (len(tau_events["cross_resonance"]) == 0 and
+        len(tau_events["cross_resonance2"]) == 0):
+        
+        tau_points = handle_no_resonance(solver_ray_output,
+                                         tau_leave,
+                                         tau_points,
+                                         solver_arguments,
+                                         solver_ray_events["leave_plasma"])
 
     return tau_leave, tau_points
