@@ -1,16 +1,16 @@
 import datetime
 import datatree
-import json
+import logging
 import numpy as np
 import pathlib
 from scipy.integrate import solve_ivp
 from scotty.analysis_3D import immediate_analysis_3D, further_analysis_3D
 from scotty.checks_3D import Parameters, check_user_inputs, check_input_before_ray_tracing
-from scotty.fun_evolution_3D import pack_beam_parameters_3D, unpack_beam_parameters_3D, beam_evolution_fun_3D
-from scotty.fun_general_3D import timer
-from scotty.geometry_3D import MagneticField_3D_Cartesian, InterpolatedField_3D_Cartesian
+from scotty.fun_evolution_3D import evolve_beam
+from scotty.geometry_3D import MagneticField_3D_Cartesian, create_magnetic_geometry_3D
 from scotty.hamiltonian_3D import initialise_hamiltonians, assign_hamiltonians
 from scotty.launch_3D import find_plasma_entry_position, find_auto_delta_signs, find_plasma_entry_parameters
+from scotty.logger_3D import config_logger, timer
 from scotty.plotting_3D import (
     plot_delta_theta_m,
     plot_dispersion_relation,
@@ -61,7 +61,7 @@ def beam_me_up_3D(
     # Solver arguments
     shot=None,
     equil_time=None,
-    find_B_method: Union[str, MagneticField_3D_Cartesian] = "torbeam",
+    find_B_method: Union[str, MagneticField_3D_Cartesian] = "eduard_3D",
     density_fit_parameters: Optional[Sequence] = None,
     temperature_fit_parameters: Optional[Sequence] = None,
     vacuumLaunch_flag: bool = True,
@@ -91,6 +91,8 @@ def beam_me_up_3D(
     quick_run: bool = False,       # For quick runs (only ray tracing)
     verbose_run: bool = False,     # For printing more messages
     return_dt_field: bool = False, # For returning the datatree and the field class
+    console_log_level: Union[str, int] = "INFO", # For returning log messages on console
+    file_log_level: Optional[Union[str, int]] = None,    # For returning log messages on a log file
 
     # Only used for circular flux surfaces
     B_T_axis = None,
@@ -99,32 +101,12 @@ def beam_me_up_3D(
     minor_radius_a = None,
 ) -> datatree.DataTree:
     
-    print(f"##################################################")
-    print(f"#")
-    print(f"# Beam trace me up, Scotty!")
-    print(f"# scotty version {__version__}")
-    print(f"# Run ID: {uuid.uuid4()}")
-    print(f"#")
-    # TO REMOVE ??? idk
-    print(f"##################################################")
-    print(f"#")
-    print(f"# STARTING RUN for")
-    print(f"# pol. angle = {poloidal_launch_angle_Torbeam}")
-    print(f"# tor. angle = {toroidal_launch_angle_Torbeam}")
-    print(f"# launch freq = {launch_freq_GHz} GHz")
-    print(f"#")
-    print(f"##################################################")
-
-
-
     ##################################################
     #
-    # STARTING ROUTINE
+    # INITIALISATION ROUTINE
     #
     ##################################################
-
-    # Loading all the parameters into `params`
-    q_launch_cartesian = launch_position_cartesian # TO REMOVE -- left here for backward compatibility
+    q_launch_cartesian = launch_position_cartesian # This is left here for backward compatibility
     params = Parameters(poloidal_launch_angle_Torbeam,
                         toroidal_launch_angle_Torbeam,
                         mode_flag,
@@ -171,7 +153,7 @@ def beam_me_up_3D(
                         output_path,
                         output_filename_suffix,
 
-                        verbose_run,
+                        # verbose_run,
 
                         plasmaLaunch_K_cartesian,
                         plasmaLaunch_Psi_3D_lab_cartesian,
@@ -180,13 +162,43 @@ def beam_me_up_3D(
     # Checking validity of user-specified inputs
     check_user_inputs(params)
 
-    # Setting experimental profiles
+    # Setting up the logger
+    config_logger(console_log_level, file_log_level, params.output_path, "log")
+    log = logging.getLogger(__name__)
+    log.debug(f"Saved and validated launch parameters")
+    log.debug(f"Initialised logger")
+    
+    log.info(f"""\n
+    ##################################################
+    #
+    # STARTING ROUTINE
+    #
+    ##################################################
+    #
+    # Beam trace me up, Scotty!
+    # scotty version {__version__}
+    # Run ID: {uuid.uuid4()}
+    #
+    ##################################################
+    #
+    # Starting run for:
+    #   - pol. launch angle = {params.poloidal_launch_angle_deg_Torbeam} deg
+    #   - tor. launch angle = {params.toroidal_launch_angle_deg_Torbeam} deg
+    #   - launch frequency = {params.launch_frequency_GHz} GHz
+    #   - mode flag = {params.mode_flag_launch}
+    #   - launch beam width = {params.launch_beam_width} m
+    #   - launch beam curvature = {params.launch_beam_curvature} m^-1
+    #   - launch position [X, Y, Z] = {params.q_launch_cartesian}
+    #
+    ##################################################
+    """)
+    
+    log.debug(f"Setting experimental profiles")
     params.set_experimental_profiles()
 
     # Using the electron density data, create a spline fit as a
     # function of poloidal flux, i.e.:
     # density_fit(poloidal_flux) = electron_density
-    if verbose_run: print(f"Making density fit profile")
     density_fit = make_fit(params.density_fit_method,
                            params.poloidal_flux_zero_density,
                            params.density_fit_parameters,
@@ -196,35 +208,28 @@ def beam_me_up_3D(
     # Using the temperature data, create a spline fit as a
     # function of poloidal flux, i.e.:
     # temperature_fit(poloidal_flux) = temperature
-    if verbose_run: print(f"Making temperature fit profile")
-    if verbose_run: print(f"Skipping temperature fit profile -- code not done yet")
+    log.debug(f"Making temperature fit profile")
+    log.warning(f"Skipping temperature fit profile -- code not done yet")
     temperature_fit = None
 
-
-
+    # If the user has already pre-loaded a field, use it
+    # Otherwise, create a new one from the specified data pathway
+    field = create_magnetic_geometry_3D(find_B_method,
+                                        params.magnetic_data_path,
+                                        params.input_filename_suffix,
+                                        params.interp_order_magnetic_data,
+                                        shot,
+                                        equil_time)
+    
+    log.info(f"""\n
     ##################################################
     #
     # LAUNCH ROUTINE
     #
     ##################################################
+    """)
 
-    # If the user has already pre-loaded a field, use it
-    # Otherwise, create a new one from the specified data pathway
-    if field is None:
-        if verbose_run: print(f"Reading and creating field profile")
-        (field, duration_field_interpolation) = timer(create_magnetic_geometry_3D,
-                                                      find_B_method,
-                                                      params.magnetic_data_path,
-                                                      params.input_filename_suffix,
-                                                      params.interp_order_magnetic_data,
-                                                      shot,
-                                                      equil_time)
-        if verbose_run: print(f"Reading and creating field profile took {duration_field_interpolation} s")
-    else:
-        if verbose_run: print(f"Using existing field profile")
-    
     # Calculating the plasma entry position and auto_delta_sign
-    if verbose_run: print(f"Calculating ray entry position")
     params.q_initial_cartesian = find_plasma_entry_position(params.poloidal_launch_angle_deg_Torbeam,
                                                             params.toroidal_launch_angle_deg_Torbeam,
                                                             params.q_launch_cartesian,
@@ -233,29 +238,32 @@ def beam_me_up_3D(
                                                             boundary_adjust = 1e-6)
 
     # Setting the delta_signs
-    if verbose_run: print(f"Setting delta signs")
-    params.delta_X, params.delta_Y, params.delta_Z = find_auto_delta_signs(params.auto_delta_sign,
-                                                                           params.q_initial_cartesian,
-                                                                           params.delta_X,
-                                                                           params.delta_Y,
-                                                                           params.delta_Z,
-                                                                           field)
+    (params.delta_X,
+     params.delta_Y,
+     params.delta_Z) = find_auto_delta_signs(params.auto_delta_sign,
+                                             params.q_initial_cartesian,
+                                             params.delta_X,
+                                             params.delta_Y,
+                                             params.delta_Z,
+                                             field)
 
     # Initialises the Hamiltonian H for mode_flags +1 and -1
-    if verbose_run: print(f"Initialising the Hamiltonians for `mode_flag` = +1 and -1")
-    hamiltonian_pos1, hamiltonian_neg1 = initialise_hamiltonians(params.launch_angular_frequency,
-                                                                 params.delta_X,
-                                                                 params.delta_Y,
-                                                                 params.delta_Z,
-                                                                 params.delta_K_X,
-                                                                 params.delta_K_Y,
-                                                                 params.delta_K_Z,
-                                                                 field,
-                                                                 density_fit,
-                                                                 temperature_fit)
+    (hamiltonian_pos1,
+     hamiltonian_neg1) = initialise_hamiltonians(params.launch_angular_frequency,
+                                                 params.delta_X,
+                                                 params.delta_Y,
+                                                 params.delta_Z,
+                                                 params.delta_K_X,
+                                                 params.delta_K_Y,
+                                                 params.delta_K_Z,
+                                                 field,
+                                                 density_fit,
+                                                 temperature_fit)
+    
+    # TO REMOVE
+    tol_H = 1e-5
     
     # Calculating the plasma entry parameters
-    print(f"Beam launched from outside the plasma")
     (params.K_launch_cartesian,
      params.K_initial_cartesian,
      params.Psi_3D_launch_labframe_cartesian,
@@ -279,99 +287,75 @@ def beam_me_up_3D(
                                                        params.K_plasmaLaunch_cartesian,
                                                        params.Psi_3D_plasmaLaunch_labframe_cartesian,
                                                        hamiltonian_pos1,
-                                                       hamiltonian_neg1)
+                                                       hamiltonian_neg1,
+                                                       tol_H = tol_H, #1e-5,
+                                                       tol_O_mode_polarisation = 0.25)
     
     # Assigning the correct Hamiltonian
-    hamiltonian, hamiltonian_other, params.mode_flag_initial = assign_hamiltonians(params.mode_flag_launch,
-                                                                                   params.mode_flag_initial,
-                                                                                   hamiltonian_pos1,
-                                                                                   hamiltonian_neg1,
-                                                                                   params.q_initial_cartesian,
-                                                                                   params.K_initial_cartesian,
-                                                                                   tol_H = 1e-5,
-                                                                                   verbose_run = params.verbose_run)
+    (hamiltonian,
+     hamiltonian_other,
+     params.mode_flag_initial) = assign_hamiltonians(params.mode_flag_launch,
+                                                     params.mode_flag_initial,
+                                                     hamiltonian_pos1,
+                                                     hamiltonian_neg1,
+                                                     params.q_initial_cartesian,
+                                                     params.K_initial_cartesian,
+                                                     tol_H = tol_H) #1e-5)
 
     # Checking validity of user-specified arguments
-    # TO REMOVE -- should put this in its own file
-    # also should update this to make it cleaner? using OOP
-    if verbose_run: print(f"Checking validity of user-specified arguments again")
+    # one last time before ray tracing
     check_input_before_ray_tracing(params)
     
-
-
+    log.info(f"""\n
     ##################################################
     #
     # RAY TRACING ROUTINE
     #
     ##################################################
+    """)
 
-    print(f"Starting the ray solver")
-    ray_solver_output, duration_ray_solver = timer(propagate_ray,
-                                                   params.poloidal_flux_enter,
-                                                   params.launch_angular_frequency,
-                                                   field,
-                                                   params.q_initial_cartesian,
-                                                   params.K_initial_cartesian,
-                                                   hamiltonian,
-                                                   params.rtol,
-                                                   params.atol,
-                                                   quick_run,
-                                                   params.len_tau)
-    print(f"Ray solver took {duration_ray_solver} s")
+    ray_solver_output = propagate_ray(params.poloidal_flux_enter,
+                                      params.launch_angular_frequency,
+                                      field,
+                                      params.q_initial_cartesian,
+                                      params.K_initial_cartesian,
+                                      hamiltonian,
+                                      params.rtol,
+                                      params.atol,
+                                      quick_run,
+                                      params.len_tau)
 
     # TO REMOVE -- should change quick_run flag into ray_tracing only or something flag
     if quick_run: return ray_solver_output
 
     tau_leave, tau_points = cast(tuple, ray_solver_output)
 
-
-
+    log.info(f"""\n
     ##################################################
     #
     # BEAM TRACING ROUTINE
     #
     ##################################################
+    """)
 
-    # Packing the initial q_X, q_Y, q_Z, K_X, K_Y, K_Z, and the components of Psi_3D
-    _beam_parameters_initial = pack_beam_parameters_3D(*params.q_initial_cartesian,
-                                                       *params.K_initial_cartesian,
-                                                        params.Psi_3D_initial_labframe_cartesian)
-    
-    print(f"Starting the beam solver")
-    solver_beam_output, duration_beam_solver = timer(solve_ivp,
-                                                     beam_evolution_fun_3D,
-                                                     [0, tau_leave],
-                                                     _beam_parameters_initial,
-                                                     method = "RK45",
-                                                     t_eval = tau_points,
-                                                     dense_output = False,
-                                                     events = None,
-                                                     vectorized = False,
-                                                     args = (hamiltonian,),
-                                                     rtol = params.rtol,
-                                                     atol = params.atol)
-    
-    print(f"Beam solver took {duration_beam_solver} s")
-    print(f"Number of beam evolution evaluations: {solver_beam_output.nfev}")
-    print(f"Time per beam evolution evaluation: {duration_beam_solver / solver_beam_output.nfev}")
+    solver_status, tau_array, (q_X_array, q_Y_array, q_Z_array,
+                               K_X_array, K_Y_array, K_Z_array,
+                               Psi_3D_output_labframe_cartesian) = evolve_beam(params.q_initial_cartesian,
+                                                                               params.K_initial_cartesian,
+                                                                               params.Psi_3D_initial_labframe_cartesian,
+                                                                               tau_leave,
+                                                                               tau_points,
+                                                                               hamiltonian,
+                                                                               params.rtol,
+                                                                               params.atol)
 
-    solver_status = solver_beam_output.status
-    tau_array = solver_beam_output.t
-    _beam_parameters_final = solver_beam_output.y
-
-    (q_X_array, q_Y_array, q_Z_array,
-     K_X_array, K_Y_array, K_Z_array,
-     Psi_3D_output_labframe_cartesian) = unpack_beam_parameters_3D(_beam_parameters_final)
-
-    print(f"Main loop complete")
-
-
-
+    log.info(f"""\n
     ##################################################
     #
     # DATA SAVING ROUTINE
     #
     ##################################################
+    """)
 
     inputs = xr.Dataset(
         {
@@ -502,6 +486,7 @@ def beam_me_up_3D(
         density_fit,
         temperature_fit,
         hamiltonian,
+        hamiltonian_other,
         params.launch_angular_frequency,
         params.mode_flag_initial,
         params.delta_X,
@@ -544,7 +529,7 @@ def beam_me_up_3D(
     )
 
     if further_analysis_flag and figure_flag:
-        if verbose_run: print(f"Plotting and saving data")
+        print(f"Plotting and saving data")
         # plot_curvatures - TO REMOVE: need to complete this
         plot_delta_theta_m          (dt.inputs, dt.solver_output, dt.analysis, filename=(params.output_path / f"delta_theta_m{params.output_filename_suffix}.png"))
         plot_dispersion_relation    (dt.inputs, dt.solver_output, dt.analysis, filename=(params.output_path / f"H_cardano{params.output_filename_suffix}.png"))
@@ -557,7 +542,7 @@ def beam_me_up_3D(
 
         # TO REMOVE -- experimental, need to clean up
         plot_trajectories_poloidal(field, dt.inputs, dt.solver_output, dt.analysis, filename=(params.output_path / f"poloidal_trajectory{params.output_filename_suffix}.png"))
-        if verbose_run: print(f"Figures saved to \n{params.output_path}")
+        print(f"Figures saved to \n{params.output_path}")
     
     # TO REMOVE ??? idk
     print(f"##################################################")
@@ -577,6 +562,9 @@ def make_fit(
     filename: Optional[PathLike]
 ) -> ProfileFitLike:
     
+    log = logging.getLogger(__name__)
+    log.debug(f"Making density fit profile")
+    
     if callable(method):
         return method
     
@@ -591,57 +579,3 @@ def make_fit(
         )
     
     return profile_fit(method, poloidal_flux_zero_density, parameters, filename)
-
-
-
-
-
-def create_magnetic_geometry_3D(
-    find_B_method: Union[str, MagneticField_3D_Cartesian],
-    magnetic_data_path: Optional[pathlib.Path] = None,
-    input_filename_suffix: str = "",
-    interp_order: int = 5,
-    shot: Optional[int] = None,
-    equil_time: Optional[float] = None,
-    **kwargs
-) -> MagneticField_3D_Cartesian:
-    
-    if isinstance(find_B_method, MagneticField_3D_Cartesian): return find_B_method
-
-    def missing_arg(argument: str) -> str:
-        return f"Missing '{argument}' for find_B_method='{find_B_method}'"
-    
-    if find_B_method == "omfit_3D":
-        print("Using OMFIT JSON Torbeam file for B and polflux")
-        topfile_filename = magnetic_data_path / f"topfile{input_filename_suffix}.json"
-
-        with open(topfile_filename) as f:
-            data = json.load(f)
-        
-        X_grid = np.array(data["X"])
-        Y_grid = np.array(data["Y"])
-        Z_grid = np.array(data["Z"])
-
-        try: B_X = np.array(data["Bx"])
-        except KeyError: B_X = np.array(data["B_X"])
-        else: B_X = np.array(data["Bx"])
-
-        try: B_Y = np.array(data["By"])
-        except KeyError: B_Y = np.array(data["B_Y"])
-        else: B_Y = np.array(data["By"])
-
-        try: B_Z = np.array(data["Bz"])
-        except KeyError: B_Z = np.array(data["B_Z"])
-        else: B_Z = np.array(data["Bz"])
-        
-        polflux = np.array(data["pol_flux"])
-
-        return InterpolatedField_3D_Cartesian(
-            X_grid,
-            Y_grid,
-            Z_grid,
-            B_X,
-            B_Y,
-            B_Z,
-            polflux,
-            interp_order)

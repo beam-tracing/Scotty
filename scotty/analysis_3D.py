@@ -39,6 +39,7 @@ def immediate_analysis_3D(
     density_fit: ProfileFitLike,
     temperature_fit: Optional[ProfileFitLike],
     hamiltonian: Hamiltonian_3D,
+    hamiltonian_other: Hamiltonian_3D,
     launch_angular_frequency: float,
     mode_flag: int,
     delta_X: float,
@@ -108,12 +109,6 @@ def immediate_analysis_3D(
     # print("K_Y", K_Y)
     # print("K_Z", K_Z)
     H_Booker = hamiltonian(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
-    hamiltonian_other = Hamiltonian_3D(params,
-                                       field,
-                                       -mode_flag,
-                                       density_fit,
-                                       temperature_fit)
-
     H_Booker_other = hamiltonian_other(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
     
     # Calculating electron density, temperature, and epsilon
@@ -328,7 +323,7 @@ def further_analysis_3D(
     # In my experience, H_eigvals[:,1] corresponds to the O mode, and H_eigvals[:,0] corresponds to the X-mode
     # ALERT: This may not always be the case! Check the output figure to make sure that the appropriate solution is indeed 0 along the ray
     mode_index = params.mode_index
-    if mode_index == "Not calculated": mode_index = 1 if inputs.mode_flag == 1 else 0
+    if mode_index == None: mode_index = 1 if inputs.mode_flag == 1 else 0
 
     # e_hat has components e_1, e_2, e_b
     e_hat = e_eigvecs[:, :, mode_index]

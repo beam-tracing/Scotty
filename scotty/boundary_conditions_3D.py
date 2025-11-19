@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 from scipy.optimize import newton
 from scotty.fun_general import (
@@ -7,15 +8,19 @@ from scotty.fun_general import (
     find_Booker_gamma,
     find_normalised_gyro_freq,
     find_normalised_plasma_freq,
+
+    find_mode_flag_sign,
 )
 from scotty.geometry_3D import MagneticField_3D_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
 from scotty.typing import FloatArray
 
+log = logging.getLogger(__name__)
+
 ##################################################
-#                                                #
-# BOUNDARY CONDITION CODES                       #
-#                                                #
+#
+# BOUNDARY CONDITION CODES
+#
 ##################################################
 
 def check_vector_pointing_into_plasma(q_X: float, q_Y: float, q_Z: float, vector: FloatArray, field: MagneticField_3D_Cartesian):
@@ -32,7 +37,7 @@ def check_vector_pointing_into_plasma(q_X: float, q_Y: float, q_Z: float, vector
 
     if polflux_at_q_minus < polflux_at_q < polflux_at_q_plus: raise ValueError(f"K_plasma is pointing out of the plasma!")
     elif polflux_at_q_plus < polflux_at_q < polflux_at_q_minus: pass
-    else: print(f"Warning: Unable to check if K_plasma is pointing in or out of the plasma!") # TO REMOVE -- need to do proper logging
+    else: log.warning(f"Warning: Unable to check if K_plasma is pointing in or out of the plasma!")
 
 
 
@@ -42,6 +47,8 @@ def apply_continuous_BC_3D(
     Psi_3D_vacuum_labframe_cartesian: FloatArray,
     field: MagneticField_3D_Cartesian,
     hamiltonian: Hamiltonian_3D):
+
+    log.debug(f"Applying continuous boundary conditions")
     
     # For continuous n_e across the plasma-vacuum boundary,
     # but discontinuous grad(n_e).
@@ -57,17 +64,42 @@ def apply_continuous_BC_3D(
         # find_Psi_3D_plasma_discontinuous
     
     # Getting important quantities
+    q = np.array([q_X, q_Y, q_Z])
+    K = np.array([K_X, K_Y, K_Z])
     delta_X, delta_Y, delta_Z = hamiltonian.spacings["X"], hamiltonian.spacings["Y"], hamiltonian.spacings["Z"]
-    dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
-    dH_dX = dH["dH_dX"]
-    dH_dY = dH["dH_dY"]
-    dH_dZ = dH["dH_dZ"]
+    dH = hamiltonian.derivatives(*q, *K)
+    dH["dp_dX"] = field.d_polflux_dX(*q, delta_X)
+    dH["dp_dY"] = field.d_polflux_dY(*q, delta_Y)
+    dH["dp_dZ"] = field.d_polflux_dZ(*q, delta_Z)
+
+    dH_dX  = dH["dH_dX"]
+    dH_dY  = dH["dH_dY"]
+    dH_dZ  = dH["dH_dZ"]
     dH_dKx = dH["dH_dKx"]
     dH_dKy = dH["dH_dKy"]
     dH_dKz = dH["dH_dKz"]
-    dp_dX = field.d_polflux_dX(q_X, q_Y, q_Z, delta_X)
-    dp_dY = field.d_polflux_dY(q_X, q_Y, q_Z, delta_Y)
-    dp_dZ = field.d_polflux_dZ(q_X, q_Y, q_Z, delta_Z)
+
+    dp_dX  = dH["dp_dX"]
+    dp_dY  = dH["dp_dY"]
+    dp_dZ  = dH["dp_dZ"]
+
+    log.debug(f"""
+    Finding Psi at the plasma entry point with continuous boundary conditions
+    ##################################################
+    #
+    # Derivatives at [X,Y,Z] = [{q_X}, {q_Y}, {q_Z}]
+    # with K = [{K_X}, {K_Y}, {K_Z}]:
+    #   - dH/dX = {dH_dX}
+    #   - dH/dY = {dH_dY}
+    #   - dH/dZ = {dH_dZ}
+    #   - dH/dKx = {dH_dKx}
+    #   - dH/dKy = {dH_dKy}
+    #   - dH/dKz = {dH_dKz}
+    #   - d(polflux)/dX = {dp_dX}
+    #   - d(polflux)/dY = {dp_dY}
+    #   - d(polflux)/dZ = {dp_dZ}
+    #
+    """)
 
     # Gradients at the plasma-vacuum boundary can be
     # finnicky, so it's good to check
@@ -89,28 +121,25 @@ def apply_continuous_BC_3D(
     # Now we set up the interface matrix using 6 linearly
     # independent equations to obtain a relation between the
     # entries of "Psi_v" and "Psi_p"
-    interface_matrix = np.zeros([6, 6])
-    interface_matrix[0, 0] = dp_dY**2
-    interface_matrix[0, 1] = -2 * dp_dX * dp_dY
-    interface_matrix[0, 3] = dp_dX**2
-    interface_matrix[1, 0] = dp_dZ**2
-    interface_matrix[1, 2] = -2 * dp_dX * dp_dZ
-    interface_matrix[1, 5] = dp_dX**2
-    interface_matrix[2, 0] = dp_dZ**2
-    interface_matrix[2, 1] = 2*dp_dZ**2
-    interface_matrix[2, 2] = -2*dp_dZ*(dp_dX + dp_dY)
-    interface_matrix[2, 3] = dp_dZ**2
-    interface_matrix[2, 4] = -2*dp_dZ*(dp_dX + dp_dY)
-    interface_matrix[2, 5] = (dp_dX + dp_dY)**2
-    interface_matrix[3, 0] = dH_dKx
-    interface_matrix[3, 1] = dH_dKy
-    interface_matrix[3, 2] = dH_dKz
-    interface_matrix[4, 1] = dH_dKx
-    interface_matrix[4, 3] = dH_dKy
-    interface_matrix[4, 4] = dH_dKz
-    interface_matrix[5, 2] = dH_dKx
-    interface_matrix[5, 4] = dH_dKy
-    interface_matrix[5, 5] = dH_dKz
+    interface_matrix = np.array([
+        [dp_dY**2, -2*dp_dX*dp_dY,  0,                       dp_dX**2,  0,                       0                 ],
+        [dp_dZ**2,  0,             -2*dp_dX*dp_dZ,           0,         0,                       dp_dX**2          ],
+        [dp_dZ**2,  2*dp_dZ**2,    -2*dp_dZ*(dp_dX + dp_dY), dp_dZ**2, -2*dp_dZ*(dp_dX + dp_dY), (dp_dX + dp_dY)**2],
+        [dH_dKx,    dH_dKy,        dH_dKz,                   0,         0,                       0                 ],
+        [0,         dH_dKx,        0,                        dH_dKy,    dH_dKz,                  0                 ],
+        [0,         0,             dH_dKx,                   0,         dH_dKy,                  dH_dKz            ],
+    ], dtype="float64")
+
+    log.debug(f"""
+    #   - interface matrix =
+    #        {interface_matrix[0]}
+    #        {interface_matrix[1]}
+    #        {interface_matrix[2]}
+    #        {interface_matrix[3]}
+    #        {interface_matrix[4]}
+    #        {interface_matrix[5]}
+    #
+    """)
     
     # Comment from the original function code:
         # interface_matrix will be singular if one tries to
@@ -119,12 +148,34 @@ def apply_continuous_BC_3D(
         # my experience
     interface_matrix_inverse = np.linalg.inv(interface_matrix)
 
+    log.debug(f"""
+    #   - interface matrix inverse =
+    #        {interface_matrix_inverse[0]}
+    #        {interface_matrix_inverse[1]}
+    #        {interface_matrix_inverse[2]}
+    #        {interface_matrix_inverse[3]}
+    #        {interface_matrix_inverse[4]}
+    #        {interface_matrix_inverse[5]}
+    #
+    """)
+
     RHS_vector = [(Psi_XX_v * dp_dY**2) + (Psi_YY_v * dp_dX**2) - (2 * Psi_XY_v * dp_dX * dp_dY),
                   (Psi_XX_v * dp_dZ**2) + (Psi_ZZ_v * dp_dX**2) - (2 * Psi_XZ_v * dp_dX * dp_dZ),
     Psi_XX_v*dp_dZ**2 + Psi_YY_v*dp_dZ**2 + Psi_ZZ_v*(dp_dX + dp_dY)**2 + 2*Psi_XY_v*dp_dZ**2 - 2*Psi_XZ_v*dp_dZ*(dp_dX + dp_dY) - 2*Psi_YZ_v*dp_dZ*(dp_dX + dp_dY),
                   -dH_dX,
                   -dH_dY,
                   -dH_dZ]
+    
+    log.debug(f"""
+    #   - RHS vector =
+    #        {RHS_vector[0]}
+    #        {RHS_vector[1]}
+    #        {RHS_vector[2]}
+    #        {RHS_vector[3]}
+    #        {RHS_vector[4]}
+    #        {RHS_vector[5]}
+    #
+    """)
 
     [Psi_XX_p,
      Psi_XY_p,
@@ -132,20 +183,27 @@ def apply_continuous_BC_3D(
      Psi_YY_p,
      Psi_YZ_p,
      Psi_ZZ_p] = np.matmul(interface_matrix_inverse, RHS_vector)
+    
+    log.debug(f"""
+    #   - Psi_3D_plasma_labframe_cartesian
+    #        Psi_XX_p = {Psi_XX_p}
+    #        Psi_XY_p = {Psi_XY_p}
+    #        Psi_XZ_p = {Psi_XZ_p}
+    #        Psi_YY_p = {Psi_YY_p}
+    #        Psi_YZ_p = {Psi_YZ_p}
+    #        Psi_ZZ_p = {Psi_ZZ_p}
+    #
+    ##################################################
+    """)
 
     # Forming back up to get Psi in the plasma
-    Psi_3D_plasma_labframe_cartesian = np.zeros([3, 3], dtype="complex128")
-    Psi_3D_plasma_labframe_cartesian[0, 0] = Psi_XX_p
-    Psi_3D_plasma_labframe_cartesian[1, 1] = Psi_YY_p
-    Psi_3D_plasma_labframe_cartesian[2, 2] = Psi_ZZ_p
-    Psi_3D_plasma_labframe_cartesian[0, 1] = Psi_XY_p
-    Psi_3D_plasma_labframe_cartesian[1, 0] = Psi_3D_plasma_labframe_cartesian[0, 1]
-    Psi_3D_plasma_labframe_cartesian[0, 2] = Psi_XZ_p
-    Psi_3D_plasma_labframe_cartesian[2, 0] = Psi_3D_plasma_labframe_cartesian[0, 2]
-    Psi_3D_plasma_labframe_cartesian[1, 2] = Psi_YZ_p
-    Psi_3D_plasma_labframe_cartesian[2, 1] = Psi_3D_plasma_labframe_cartesian[1, 2]
+    Psi_3D_plasma_labframe_cartesian = np.array([
+        [Psi_XX_p, Psi_XY_p, Psi_XZ_p],
+        [Psi_XY_p, Psi_YY_p, Psi_YZ_p],
+        [Psi_XZ_p, Psi_YZ_p, Psi_ZZ_p],
+    ], dtype="complex128")
 
-    return [K_X, K_Y, K_Z], Psi_3D_plasma_labframe_cartesian
+    return K, Psi_3D_plasma_labframe_cartesian
 
 
 
@@ -191,13 +249,28 @@ def find_K_plasma_with_discontinuous_BC(
         # Seems to work for a mismatch angle up to 50ish deg
     
     # Getting important quantities
+    q = np.array([q_X, q_Y, q_Z])
     delta_X, delta_Y, delta_Z = hamiltonian.spacings["X"], hamiltonian.spacings["Y"], hamiltonian.spacings["Z"]
-    B_X = field.B_X(q_X, q_Y, q_Z)
-    B_Y = field.B_Y(q_X, q_Y, q_Z)
-    B_Z = field.B_Z(q_X, q_Y, q_Z)
-    dp_dX = field.d_polflux_dX(q_X, q_Y, q_Z, delta_X)
-    dp_dY = field.d_polflux_dY(q_X, q_Y, q_Z, delta_Y)
-    dp_dZ = field.d_polflux_dZ(q_X, q_Y, q_Z, delta_Z)
+    B_X = field.B_X(*q)
+    B_Y = field.B_Y(*q)
+    B_Z = field.B_Z(*q)
+    dp_dX = field.d_polflux_dX(*q, delta_X)
+    dp_dY = field.d_polflux_dY(*q, delta_Y)
+    dp_dZ = field.d_polflux_dZ(*q, delta_Z)
+
+    log.debug(f"""
+    Finding K at the plasma entry point with discontinuous boundary conditions
+    ##################################################
+    #
+    # Calculated at [X,Y,Z] = [{q_X}, {q_Y}, {q_Z}]:
+    #   - B_X = {B_X}
+    #   - B_Y = {B_Y}
+    #   - B_Z = {B_Z}
+    #   - d(polflux)/dX = {dp_dX}
+    #   - d(polflux)/dY = {dp_dY}
+    #   - d(polflux)/dZ = {dp_dZ}
+    #
+    """)
     
     # Checks the plasma density
     B_magnitude = np.sqrt(B_X**2 + B_Y**2 + B_Z**2)
@@ -207,19 +280,23 @@ def find_K_plasma_with_discontinuous_BC(
     omega_R = 0.5 * ( gyro_freq + np.sqrt(gyro_freq**2 + 4 * plasma_freq**2))
     omega_UH = np.sqrt(plasma_freq**2 + gyro_freq**2)
 
-    # TO REMOVE -- overriding. need to add back? 8 Oct
+    log.debug(f"""
+    #   - |B| = {B_magnitude}
+    #   - w_pe / w_launch = {plasma_freq}
+    #   - w_ce / w_launch = {gyro_freq}
+    #   - w_L  / w_launch = {omega_L}
+    #   - w_R  / w_launch = {omega_R}
+    #   - w_UH / w_launch = {omega_UH}
+    #
+    """)
+
+    # TO REMOVE -- need to rewrite andf refactor this properly. 12 Nov
     mode_flag_sign = -1 # find_mode_flag_sign(electron_density_p, B_magnitude, launch_angular_frequency, temperature)
 
     if ((mode_flag_sign * mode_flag == 1  and plasma_freq >= 1) or
         (mode_flag_sign * mode_flag == -1 and omega_L >= 1) or
         (mode_flag_sign * mode_flag == -1 and omega_R >= 1 and omega_UH <= 1)):
         raise ValueError("Error: cut-off freq higher than beam freq on plasma side of plasma-vac boundary")
-    
-    # TO REMOVE -- putting here just to see -- 8 Oct
-    print()
-    print("mode_flag", mode_flag)
-    print("mode_flag_sign", mode_flag_sign)
-    print()
     
     # In our derivations, we find three vectors which are parallel to
     # the flux surface by considering three displacements in X, Y, and Z
@@ -325,27 +402,73 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     hamiltonian):
     
     # For discontinuous n_e across the plasma-vacuum boundary
-    
+
     # Getting important quantities
+    q = np.array([q_X, q_Y, q_Z])
+    K_p = np.array([K_X_p, K_Y_p, K_Z_p])
     delta_X, delta_Y, delta_Z = hamiltonian.spacings["X"], hamiltonian.spacings["Y"], hamiltonian.spacings["Z"]
-    dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X_p, K_Y_p, K_Z_p)
-    dH_dX = dH["dH_dX"]
-    dH_dY = dH["dH_dY"]
-    dH_dZ = dH["dH_dZ"]
+    dH = hamiltonian.derivatives(*q, *K_p)
+    dH["dp_dX"] = field.d_polflux_dX(*q, delta_X)
+    dH["dp_dY"] = field.d_polflux_dY(*q, delta_Y)
+    dH["dp_dZ"] = field.d_polflux_dZ(*q, delta_Z)
+    dH["d2p_dX2"]  = field.d2_polflux_dX2(*q, delta_X)
+    dH["d2p_dY2"]  = field.d2_polflux_dY2(*q, delta_Y)
+    dH["d2p_dZ2"]  = field.d2_polflux_dZ2(*q, delta_Z)
+    dH["d2p_dXdY"] = field.d2_polflux_dXdY(*q, delta_X, delta_Y)
+    dH["d2p_dXdZ"] = field.d2_polflux_dXdZ(*q, delta_X, delta_Z)
+    dH["d2p_dYdZ"] = field.d2_polflux_dYdZ(*q, delta_Y, delta_Z)
+
+    dH_dX  = dH["dH_dX"]
+    dH_dY  = dH["dH_dY"]
+    dH_dZ  = dH["dH_dZ"]
     dH_dKx = dH["dH_dKx"]
     dH_dKy = dH["dH_dKy"]
     dH_dKz = dH["dH_dKz"]
-    dp_dX = field.d_polflux_dX(q_X, q_Y, q_Z, delta_X)
-    dp_dY = field.d_polflux_dY(q_X, q_Y, q_Z, delta_Y)
-    dp_dZ = field.d_polflux_dZ(q_X, q_Y, q_Z, delta_Z)
-    d2p_dX2  = field.d2_polflux_dX2(q_X, q_Y, q_Z, delta_X)
-    d2p_dY2  = field.d2_polflux_dY2(q_X, q_Y, q_Z, delta_Y)
-    d2p_dZ2  = field.d2_polflux_dZ2(q_X, q_Y, q_Z, delta_Z)
-    d2p_dXdY = field.d2_polflux_dXdY(q_X, q_Y, q_Z, delta_X, delta_Y)
-    d2p_dXdZ = field.d2_polflux_dXdZ(q_X, q_Y, q_Z, delta_X, delta_Z)
-    d2p_dYdZ = field.d2_polflux_dYdZ(q_X, q_Y, q_Z, delta_Y, delta_Z)
 
+    dp_dX  = dH["dp_dX"]
+    dp_dY  = dH["dp_dY"]
+    dp_dZ  = dH["dp_dZ"]
+    d2p_dX2  = dH["d2p_dX2"]
+    d2p_dY2  = dH["d2p_dY2"]
+    d2p_dZ2  = dH["d2p_dZ2"]
+    d2p_dXdY = dH["d2p_dXdY"]
+    d2p_dXdZ = dH["d2p_dXdZ"]
+    d2p_dYdZ = dH["d2p_dYdZ"]
+
+    log.debug(f"""
+    Finding Psi at the plasma entry point with discontinuous boundary conditions
+    ##################################################
+    #
+    # Derivatives at [X,Y,Z] = [{q_X}, {q_Y}, {q_Z}]
+    # with K_plasma = [{K_X_p}, {K_Y_p}, {K_Z_p}]:
+    #   - dH/dX = {dH_dX}
+    #   - dH/dY = {dH_dY}
+    #   - dH/dZ = {dH_dZ}
+    #   - dH/dKx = {dH_dKx}
+    #   - dH/dKy = {dH_dKy}
+    #   - dH/dKz = {dH_dKz}
+    #   - d(polflux)/dX = {dp_dX}
+    #   - d(polflux)/dY = {dp_dY}
+    #   - d(polflux)/dZ = {dp_dZ}
+    #   - d2(polflux)/dX2 = {d2p_dX2}
+    #   - d2(polflux)/dY2 = {d2p_dY2}
+    #   - d2(polflux)/dZ2 = {d2p_dZ2}
+    #   - d2(polflux)/dXdY = {d2p_dXdY}
+    #   - d2(polflux)/dXdZ = {d2p_dXdZ}
+    #   - d2(polflux)/dYdZ = {d2p_dYdZ}
+    #
+    ##################################################
+    """)
+
+    # Gradients at the plasma-vacuum boundary can be
+    # finnicky, so it's good to check
+    for gradient in dH.keys():
+        if np.isnan(dH[gradient]):
+            raise ValueError(f"Error: {gradient} is NaN when applying continuous boundary conditions in \n `find_Psi_3D_plasma_with_discontinuous_BC`")
+
+    """
     # TO REMOVE -- analytically calculating derivatives -- keeping here cus might be useful in the future? idk
+
     # import scipy.constants as cte
     # e_bb = hamiltonian.dielectrictensor.e_bb
     # e_11 = hamiltonian.dielectrictensor.e_11
@@ -370,6 +493,7 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
 
     # dH_dKx = cte.speed_of_light**2 / omega**2 * (2*K_X_v) + ...
     # INCOMPLETE
+    """
 
     # At the plasma-vacuum boundary, we have two Psi matrices:
     # one corresponding to Psi in the plasma, and the other
@@ -385,28 +509,25 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     # Now we set up the interface matrix using 6 linearly
     # independent equations to obtain a relation between the
     # entries of "Psi_v" and "Psi_p"
-    interface_matrix = np.zeros([6, 6])
-    interface_matrix[0, 0] = dp_dY**2
-    interface_matrix[0, 1] = -2 * dp_dX * dp_dY
-    interface_matrix[0, 3] = dp_dX**2
-    interface_matrix[1, 0] = dp_dZ**2
-    interface_matrix[1, 2] = -2 * dp_dX * dp_dZ
-    interface_matrix[1, 5] = dp_dX**2
-    interface_matrix[2, 0] = dp_dZ**2
-    interface_matrix[2, 1] = 2*dp_dZ**2
-    interface_matrix[2, 2] = -2*dp_dZ*(dp_dX + dp_dY)
-    interface_matrix[2, 3] = dp_dZ**2
-    interface_matrix[2, 4] = -2*dp_dZ*(dp_dX + dp_dY)
-    interface_matrix[2, 5] = (dp_dX + dp_dY)**2
-    interface_matrix[3, 0] = dH_dKx
-    interface_matrix[3, 1] = dH_dKy
-    interface_matrix[3, 2] = dH_dKz
-    interface_matrix[4, 1] = dH_dKx
-    interface_matrix[4, 3] = dH_dKy
-    interface_matrix[4, 4] = dH_dKz
-    interface_matrix[5, 2] = dH_dKx
-    interface_matrix[5, 4] = dH_dKy
-    interface_matrix[5, 5] = dH_dKz
+    interface_matrix = np.array([
+        [dp_dY**2, -2*dp_dX*dp_dY,  0,                       dp_dX**2,  0,                       0                 ],
+        [dp_dZ**2,  0,             -2*dp_dX*dp_dZ,           0,         0,                       dp_dX**2          ],
+        [dp_dZ**2,  2*dp_dZ**2,    -2*dp_dZ*(dp_dX + dp_dY), dp_dZ**2, -2*dp_dZ*(dp_dX + dp_dY), (dp_dX + dp_dY)**2],
+        [dH_dKx,    dH_dKy,        dH_dKz,                   0,         0,                       0                 ],
+        [0,         dH_dKx,        0,                        dH_dKy,    dH_dKz,                  0                 ],
+        [0,         0,             dH_dKx,                   0,         dH_dKy,                  dH_dKz            ],
+    ], dtype="float64")
+
+    log.debug(f"""
+    #   - interface matrix =
+    #        {interface_matrix[0]}
+    #        {interface_matrix[1]}
+    #        {interface_matrix[2]}
+    #        {interface_matrix[3]}
+    #        {interface_matrix[4]}
+    #        {interface_matrix[5]}
+    #
+    """)
 
     # For the discontinuous boundary conditions,
     # K_vacuum =/= K_plasma in general, and this introduces
@@ -417,6 +538,13 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     eta_XY = -0.5 * (d2p_dX2*dp_dY**2 - 2*d2p_dXdY*dp_dX*dp_dY + d2p_dY2*dp_dX**2) / (dp_dX**2 + dp_dY**2)
     eta_XZ = -0.5 * (d2p_dX2*dp_dZ**2 - 2*d2p_dXdZ*dp_dX*dp_dZ + d2p_dZ2*dp_dX**2) / (dp_dX**2 + dp_dZ**2)
     eta_XYZ = -0.5 * (d2p_dX2*dp_dZ**2 + d2p_dY2*dp_dZ**2 + d2p_dZ2*(dp_dX + dp_dY)**2 + 2*d2p_dXdY*dp_dZ**2 - 2*d2p_dXdZ*dp_dZ*(dp_dX + dp_dY) - 2*d2p_dYdZ*dp_dZ*(dp_dX + dp_dY)) / ( dp_dX**2 + dp_dY**2 + dp_dZ**2 )
+
+    log.debug(f"""
+    #   - eta_XY = {eta_XY}
+    #   - eta_XZ = {eta_XZ}
+    #   - eta_XYZ = {eta_XYZ}
+    #
+    """)
     
     # Comment from the original function code:
         # interface_matrix will be singular if one tries to
@@ -425,6 +553,17 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
         # my experience
     interface_matrix_inverse = np.linalg.inv(interface_matrix)
 
+    log.debug(f"""
+    #   - interface matrix inverse =
+    #        {interface_matrix_inverse[0]}
+    #        {interface_matrix_inverse[1]}
+    #        {interface_matrix_inverse[2]}
+    #        {interface_matrix_inverse[3]}
+    #        {interface_matrix_inverse[4]}
+    #        {interface_matrix_inverse[5]}
+    #
+    """)
+
     RHS_vector = [(Psi_XX_v * dp_dY**2) + (Psi_YY_v * dp_dX**2) - (2 * Psi_XY_v * dp_dX * dp_dY) + 2*(K_X_v - K_X_p)*dp_dX*eta_XY + 2*(K_Y_v - K_Y_p)*dp_dY*eta_XY,
                   (Psi_XX_v * dp_dZ**2) + (Psi_ZZ_v * dp_dX**2) - (2 * Psi_XZ_v * dp_dX * dp_dZ) + 2*(K_X_v - K_X_p)*dp_dX*eta_XZ + 2*(K_Z_v - K_Z_p)*dp_dZ*eta_XZ,
     Psi_XX_v*dp_dZ**2 + Psi_YY_v*dp_dZ**2 + Psi_ZZ_v*(dp_dX + dp_dY)**2 + 2*Psi_XY_v*dp_dZ**2 - 2*Psi_XZ_v*dp_dZ*(dp_dX + dp_dY) - 2*Psi_YZ_v*dp_dZ*(dp_dX + dp_dY) + 2*(K_X_v - K_X_p)*dp_dX*eta_XYZ + 2*(K_Y_v - K_Y_p)*dp_dY*eta_XYZ + 2*(K_Z_v - K_Z_p)*dp_dZ*eta_XYZ,
@@ -432,24 +571,42 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
                   -dH_dY,
                   -dH_dZ]
     
+    log.debug(f"""
+    #   - RHS vector =
+    #        {RHS_vector[0]}
+    #        {RHS_vector[1]}
+    #        {RHS_vector[2]}
+    #        {RHS_vector[3]}
+    #        {RHS_vector[4]}
+    #        {RHS_vector[5]}
+    #
+    """)
+    
     [Psi_XX_p,
      Psi_XY_p,
      Psi_XZ_p,
      Psi_YY_p,
      Psi_YZ_p,
      Psi_ZZ_p] = np.matmul(interface_matrix_inverse, RHS_vector)
+    
+    log.debug(f"""
+    #   - Psi_3D_plasma_labframe_cartesian
+    #        Psi_XX_p = {Psi_XX_p}
+    #        Psi_XY_p = {Psi_XY_p}
+    #        Psi_XZ_p = {Psi_XZ_p}
+    #        Psi_YY_p = {Psi_YY_p}
+    #        Psi_YZ_p = {Psi_YZ_p}
+    #        Psi_ZZ_p = {Psi_ZZ_p}
+    #
+    ##################################################
+    """)
 
     # Forming back up to get Psi in the plasma
-    Psi_3D_plasma_labframe_cartesian = np.zeros([3, 3], dtype="complex128")
-    Psi_3D_plasma_labframe_cartesian[0, 0] = Psi_XX_p
-    Psi_3D_plasma_labframe_cartesian[1, 1] = Psi_YY_p
-    Psi_3D_plasma_labframe_cartesian[2, 2] = Psi_ZZ_p
-    Psi_3D_plasma_labframe_cartesian[0, 1] = Psi_XY_p
-    Psi_3D_plasma_labframe_cartesian[1, 0] = Psi_3D_plasma_labframe_cartesian[0, 1]
-    Psi_3D_plasma_labframe_cartesian[0, 2] = Psi_XZ_p
-    Psi_3D_plasma_labframe_cartesian[2, 0] = Psi_3D_plasma_labframe_cartesian[0, 2]
-    Psi_3D_plasma_labframe_cartesian[1, 2] = Psi_YZ_p
-    Psi_3D_plasma_labframe_cartesian[2, 1] = Psi_3D_plasma_labframe_cartesian[1, 2]
+    Psi_3D_plasma_labframe_cartesian = np.array([
+        [Psi_XX_p, Psi_XY_p, Psi_XZ_p],
+        [Psi_XY_p, Psi_YY_p, Psi_YZ_p],
+        [Psi_XZ_p, Psi_YZ_p, Psi_ZZ_p],
+    ], dtype="complex128")
 
     return Psi_3D_plasma_labframe_cartesian
 
@@ -461,28 +618,26 @@ def apply_discontinuous_BC_3D(
     Psi_3D_vacuum_labframe_cartesian: FloatArray,
     field: MagneticField_3D_Cartesian,
     hamiltonian: Hamiltonian_3D):
+
+    log.debug(f"Applying discontinuous boundary conditions")
+
+    q = np.array([q_X, q_Y, q_Z])
+    K_vacuum = np.array([K_X_v, K_Y_v, K_Z_v])
     
-    polflux_at_boundary = field.polflux(q_X, q_Y, q_Z)
+    polflux_at_boundary = field.polflux(*q)
     electron_density_p = hamiltonian.density(polflux_at_boundary)
     launch_angular_frequency = hamiltonian.angular_frequency
     temperature = hamiltonian.temperature
     mode_flag = hamiltonian.mode_flag
 
-    print("TO REMOVE in apply_discontinuous_BC_3D")
-    print("boundary point:", q_X, q_Y, q_Z)
-    print("boundary polflux:", polflux_at_boundary)
     K_plasma = find_K_plasma_with_discontinuous_BC(
-        q_X, q_Y, q_Z,
-        K_X_v, K_Y_v, K_Z_v,
+        *q, *K_vacuum,
         field,
         hamiltonian,
         electron_density_p, launch_angular_frequency, temperature, mode_flag)
     
     Psi_3D_plasma_labframe_cartesian = find_Psi_3D_plasma_with_discontinuous_BC(
-        q_X, q_Y, q_Z,
-        K_X_v, K_Y_v, K_Z_v,
-        K_plasma[0], K_plasma[1], K_plasma[2],
-        Psi_3D_vacuum_labframe_cartesian,
+        *q, *K_vacuum, *K_plasma, Psi_3D_vacuum_labframe_cartesian,
         field,
         hamiltonian)
     
@@ -498,18 +653,17 @@ def apply_BC_3D(
     hamiltonian: Hamiltonian_3D,
     Psi_BC_flag: str):
 
+    q = np.array([q_X, q_Y, q_Z])
+    K = np.array([K_X, K_Y, K_Z])
+
     if Psi_BC_flag == "continuous":
         K_plasma, Psi_3D_plasma_labframe_cartesian = apply_continuous_BC_3D(
-            q_X, q_Y, q_Z,
-            K_X, K_Y, K_Z,
-            Psi_3D_vacuum_labframe_cartesian,
+            *q, *K, Psi_3D_vacuum_labframe_cartesian,
             field,
             hamiltonian)
     elif Psi_BC_flag == "discontinuous":
         K_plasma, Psi_3D_plasma_labframe_cartesian = apply_discontinuous_BC_3D(
-            q_X, q_Y, q_Z,
-            K_X, K_Y, K_Z,
-            Psi_3D_vacuum_labframe_cartesian,
+            *q, *K, Psi_3D_vacuum_labframe_cartesian,
             field,
             hamiltonian)
     else: raise ValueError(f"Psi_BC_flag is invalid! Only 'discontinuous', 'continuous' or None is accepted")

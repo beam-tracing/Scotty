@@ -1,24 +1,17 @@
+import logging
 import numpy as np
 from scotty.fun_general import find_D
 from scotty.geometry_3D import MagneticField_3D_Cartesian
 from scotty.typing import FloatArray
 from typing import Union
-import time
+
+log = logging.getLogger(__name__)
 
 ##################################################
 #                                                #
 # MISCELLANEOUS CODES                            #
 #                                                #
 ##################################################
-
-def timer(func, *args, **kwargs):
-    start_time = time.time()
-    result = func(*args, **kwargs)
-    end_time = time.time()
-    duration = end_time - start_time
-    return result, duration
-
-
 
 def find_H_Cardano_eig(
     K_magnitude,
@@ -74,19 +67,29 @@ def ray_line(X: float, Y: float, Z: float, tau: Union[float, int, FloatArray],
 def poloidal_flux_along_ray_line(X: float, Y: float, Z: float, tau: Union[float, int, FloatArray],
                                  poloidal_launch_angle_deg_Torbeam: float,
                                  toroidal_launch_angle_deg_Torbeam: float,
-                                 field: MagneticField_3D_Cartesian):
+                                 field):
     
-    position = ray_line(X, Y, Z, tau, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam)
+    positions = ray_line(X, Y, Z, tau, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam)
 
     # Get the poloidal flux values at a particular point or point(s).
     # If there are NaNs, then replace those with the first non-NaN instance
     # in the array (i.e. the poloidal flux of the first point in the field)
-    if position.ndim == 1:
-        polflux = field.polflux(*position)
-    if position.ndim == 2:
-        polflux = np.field.polflux(position[:, 0], position[:, 1], position[:, 2])
-        NaN_replacement_value = polflux[~np.isnan(polflux)][0]
-        polflux = np.nan_to_num(polflux, nan=NaN_replacement_value)
+    if positions.ndim == 1:
+        polflux = field.polflux(*positions)
+        if np.isnan(polflux):
+            log.warning(f"Poloidal flux is NaN at [X,Y,Z] = [{X, Y, Z}]. Returning None instead")
+            polflux = None
+    if positions.ndim == 2:
+        polflux = field.polflux(positions[:, 0], positions[:, 1], positions[:, 2])
+        if np.all(np.isnan(polflux)):
+            _printmsg = "\n".join(f"            - [{position}]" for position in positions)
+            log.warning(f"Poloidal fluxes are NaNs at all points queried: [X,Y,Z] =")
+            log.debug(f"\n {_printmsg}")
+            log.warning(f"Returning None instead")
+            polflux = None
+        else:
+            NaN_replacement_value = polflux[~np.isnan(polflux)][0]
+            polflux = np.nan_to_num(polflux, nan=NaN_replacement_value)
     
     return polflux
 
@@ -95,10 +98,12 @@ def poloidal_flux_along_ray_line(X: float, Y: float, Z: float, tau: Union[float,
 def poloidal_flux_difference_along_ray_line(X: float, Y: float, Z: float, tau: Union[float, int, FloatArray],
                                             poloidal_launch_angle_deg_Torbeam: float,
                                             toroidal_launch_angle_deg_Torbeam: float,
-                                            field: MagneticField_3D_Cartesian,
-                                            poloidal_flux_enter):
+                                            field,
+                                            poloidal_flux_enter: float):
     """Signed poloidal flux distance to plasma boundary"""
     
     polflux = poloidal_flux_along_ray_line(X, Y, Z, tau, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam, field)
-    
-    return polflux - poloidal_flux_enter
+
+    # If NaN, then just return NaN (saved as None)
+    if polflux is None: return None
+    else: return polflux - poloidal_flux_enter

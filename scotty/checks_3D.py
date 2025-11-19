@@ -6,15 +6,17 @@
 
 from __future__ import annotations
 
+import logging
+import os
 from pathlib import Path
 from scotty.fun_general import angular_frequency_to_wavenumber, freq_GHz_to_angular_frequency
-from scotty.geometry import MagneticField
+from scotty.geometry_3D import MagneticField_3D_Cartesian
 from scotty.profile_fit import ProfileFitLike
 from scotty.typing import FloatArray
 import numpy as np
 from typing import Literal, Optional, Sequence, Union
 
-
+log = logging.getLogger(__name__)
 
 ##################################################
 #
@@ -75,11 +77,14 @@ class Parameters:
         output_path: Union[str, Path],
         output_filename_suffix: str,
 
-        verbose_run: bool,
+        # verbose_run: bool, # TO REMOVE?
+        # log_level: Union[str, int], # TO REMOVE?
 
         K_plasmaLaunch_cartesian: FloatArray,
         Psi_3D_plasmaLaunch_labframe_cartesian: FloatArray,
         ):
+
+        log.debug(f"Creating `Parameters` class object")
 
         # TORBEAM antenna angles are anti-clockwise from negative X-axis,
         # so we need to rotate the toroidal angle by pi. This will take
@@ -145,13 +150,13 @@ class Parameters:
         self.output_path = output_path
         self.output_filename_suffix = output_filename_suffix
 
-        self.verbose_run = verbose_run
+        # self.verbose_run = verbose_run # TO REMOVE?
 
         self.K_plasmaLaunch_cartesian = K_plasmaLaunch_cartesian
         self.Psi_3D_plasmaLaunch_labframe_cartesian = Psi_3D_plasmaLaunch_labframe_cartesian
     
     def set_experimental_profiles(self):
-        if self.verbose_run: print(f"Setting experimental profiles")
+        log.info(f"Setting experimental profiles")
         if (self.density_fit_parameters is None) and (self.density_fit_method in [None, "smoothing-spline-file"]):
             self.ne_filename = self.ne_data_path / f"ne{self.input_filename_suffix}.dat"
             self.density_fit_parameters = [self.ne_filename, self.interp_order_ne_data, self.interp_smoothing]
@@ -161,8 +166,6 @@ class Parameters:
             # ne_data_density_array = ne_data[2::2]
             # ne_data_radialcoord_array = ne_data[1::2]
         else: self.ne_filename = None
-
-
 
 
 
@@ -191,35 +194,37 @@ def check_user_inputs(params: Parameters):
 
     # launch frequency > 0
     if params.launch_frequency_GHz <= 0:
-        raise ValueError(f"`launch_freq_GHz` must be positive, but got {params.launch_frequency_GHz} GHz!")
+        raise ValueError(f"`launch_freq_GHz` must be positive, but got `{params.launch_frequency_GHz}` GHz")
     
     # launch beam width > 0
     if params.launch_beam_width <= 0:
-        raise ValueError(f"`launch_beam_width` must be positive, but got {params.launch_beam_width} m!")
+        raise ValueError(f"`launch_beam_width` must be positive, but got `{params.launch_beam_width}` m")
     
     # mode flag must be one of {_valid_launch_mode_flags}
     _valid_launch_mode_flags = [1, -1, "O", "X"]
+    log.debug(f"`_valid_launch_mode_flags` set to {_valid_launch_mode_flags}")
     if params.mode_flag_launch not in _valid_launch_mode_flags:
-        raise ValueError(f"`mode_flag` must be one of {_valid_launch_mode_flags}, but got `{params.mode_flag_launch}`!")
+        raise ValueError(f"`mode_flag` must be one of {_valid_launch_mode_flags}, but got `{params.mode_flag_launch}`")
     
     # Psi BC flag must be one of {_valid_Psi_BC_flags}
     _valid_Psi_BC_flags = ["discontinuous", "continuous", None]
+    log.debug(f"`_valid_Psi_BC_flags` set to {_valid_Psi_BC_flags}")
     if params.Psi_BC_flag in [True, False]:
-        raise ValueError(f"`Psi_BC_flag` = True or False is deprecated!")
+        raise ValueError(f"`Psi_BC_flag` = True or False is deprecated")
     elif params.Psi_BC_flag not in _valid_Psi_BC_flags:
-        raise ValueError(f"`Psi_BC_flag` must be one of {_valid_Psi_BC_flags}, but got `{params.Psi_BC_flag}`!")
+        raise ValueError(f"`Psi_BC_flag` must be one of {_valid_Psi_BC_flags}, but got `{params.Psi_BC_flag}`")
     
     # poloidal flux enter must be positive
     if params.poloidal_flux_enter <= 0:
-        raise ValueError(f"`poloidal_flux_enter` must be positive, but got `{params.poloidal_flux_enter}`!")
+        raise ValueError(f"`poloidal_flux_enter` must be positive, but got `{params.poloidal_flux_enter}`")
     
     # poloidal flux zero density must be positive
     if params.poloidal_flux_zero_density <= 0:
-        raise ValueError(f"`poloidal_flux_zero_density` must be positive, but got `{params.poloidal_flux_zero_density}`!")
+        raise ValueError(f"`poloidal_flux_zero_density` must be positive, but got `{params.poloidal_flux_zero_density}`")
 
     # poloidal flux zero density must be positive
     if params.poloidal_flux_zero_temperature <= 0:
-        raise ValueError(f"`poloidal_flux_zero_temperature` must be positive, but got `{params.poloidal_flux_zero_temperature}`!")
+        raise ValueError(f"`poloidal_flux_zero_temperature` must be positive, but got `{params.poloidal_flux_zero_temperature}`")
     
     # Check that the poloidal flux arguments are valid. Specifically:
     # The `poloidal_flux_zero_density` (the poloidal flux value beyond which
@@ -227,21 +232,22 @@ def check_user_inputs(params: Parameters):
     # `poloidal_flux_enter` (the poloidal flux value where the ray enters the
     # plasma).
     if params.poloidal_flux_zero_density < params.poloidal_flux_enter:
-        raise ValueError(f"`poloidal_flux_zero_density` is less than `poloidal_flux_enter`!")
+        raise ValueError(f"`poloidal_flux_zero_density` is less than `poloidal_flux_enter`")
 
     # interp order for magnetic data must be one of
     # {_valid_interp_orders_int} or one of {_valid_interp_orders_str}
     _valid_interp_orders_int = [1, 3, 5]
     _valid_interp_orders_str = ["linear", "cubic", "quintic"]
     _valid_interp_orders = _valid_interp_orders_int + _valid_interp_orders_str
+    log.debug(f"`_valid_interp_orders` set to {_valid_interp_orders}")
     if params.interp_order_magnetic_data in _valid_interp_orders_int:
         if   params.interp_order_magnetic_data == 1: params.interp_order_magnetic_data = "linear"
         elif params.interp_order_magnetic_data == 3: params.interp_order_magnetic_data = "cubic"
         elif params.interp_order_magnetic_data == 5: params.interp_order_magnetic_data = "quintic"
     elif params.interp_order_magnetic_data in _valid_interp_orders_str: pass
     else:
-        print(f"`interp_order` must be one of {_valid_interp_orders}, but got {params.interp_order_magnetic_data}!")
-        print(f"Setting `interp_order` = `quintic` for interpolation.")
+        log.warning(f"`interp_order` must be one of {_valid_interp_orders}, but got {params.interp_order_magnetic_data}")
+        log.warning(f"Setting `interp_order` = `quintic` for interpolation")
         params.interp_order_magnetic_data = "quintic"
     
     # interp order for ne data must be one of
@@ -252,14 +258,14 @@ def check_user_inputs(params: Parameters):
         elif params.interp_order_ne_data == "cubic":   params.interp_order_ne_data = 3
         elif params.interp_order_ne_data == "quintic": params.interp_order_ne_data = 5
     else:
-        print(f"`interp_order` must be one of {_valid_interp_orders}, but got {params.interp_order_ne_data}!")
-        print(f"Setting `interp_order` = `quintic` for interpolation.")
+        log.warning(f"`interp_order` must be one of {_valid_interp_orders}, but got {params.interp_order_ne_data}")
+        log.warning(f"Setting `interp_order` = `quintic` for interpolation")
         params.interp_order_ne_data = 5
     
     # len tau must be positive
     if params.len_tau <= 0:
-        print(f"`len_tau` must be positive, but got `{params.len_tau}`!")
-        print(f"Setting `len_tau` = 102.")
+        log.warning(f"`len_tau` must be a positive integer, but got `{params.len_tau}`")
+        log.warning(f"Setting `len_tau` = 102")
         params.len_tau = 102
     
     # file paths must be valid and exist
@@ -267,104 +273,57 @@ def check_user_inputs(params: Parameters):
     params.magnetic_data_path = Path(params.magnetic_data_path)
     params.ne_data_path = Path(params.ne_data_path)
     params.Te_data_path = Path(params.Te_data_path)
-    params.input_filename_suffix = str(params.input_filename_suffix)
     params.output_path = Path(params.output_path)
+    if not params.magnetic_data_path.is_dir(): raise ValueError(f"`magnetic_data_path` must be a valid directory")
+    if not params.ne_data_path.is_dir(): raise ValueError(f"`ne_data_path` must be a valid directory")
+    if not params.Te_data_path.is_dir(): raise ValueError(f"`Te_data_path` must be a valid directory")
+    if not params.output_path.is_dir():
+        log.warning(f"File path {params.output_path} does not exist. Creating the folder now")
+        os.makedirs(params.output_path)
+        # raise ValueError(f"`output_path` must be a valid directory")
+
+    # file input and output suffixes must be strings
+    params.input_filename_suffix = str(params.input_filename_suffix)
     params.output_filename_suffix = str(params.output_filename_suffix)
-    if not params.magnetic_data_path.is_dir():
-        raise ValueError(f"`magnetic_data_path` must be a valid directory!")
-    if not params.ne_data_path.is_dir():
-        raise ValueError(f"`ne_data_path` must be a valid directory!")
-    if not params.Te_data_path.is_dir():
-        raise ValueError(f"`Te_data_path` must be a valid directory!")
 
 
 
-def _check_launch_position(
-    poloidal_flux_enter: float, launch_position: FloatArray, field: MagneticField
-) -> None:
-    R, _, Z = launch_position
-    launch_psi = field.poloidal_flux(R, Z)
-
+def _check_launch_position(poloidal_flux_enter: float, launch_position: FloatArray, field: MagneticField_3D_Cartesian) -> None:
+    X, Y, Z = launch_position
+    launch_psi = field.poloidal_flux(X, Y, Z)
     if launch_psi < poloidal_flux_enter:
-        raise ValueError("Launch position (R={R:.4f}, Z={Z:.4f}, psi={launch_psi:.4f}) is inside plasma (psi={poloidal_flux_enter})")
+        raise ValueError("Launch position (X={X:.4f}, Y={Y:.4f}, Z={Z:.4f}, psi={launch_psi:.4f}) is inside plasma (psi={poloidal_flux_enter})")
 
 
 
 def _check_mode_flag_for_Psi_BC_flag(params: Parameters) -> None:
-    f"""If Psi_BC_flag is None, then mode_flag must be only one of [1, -1].
+    """If Psi_BC_flag is None, then mode_flag must be only one of [1, -1].
 
-    TO REMOVE this condition -- in the future, when the code is cleaned up
-
-    This condition is required because we (lazily) avoid calculating
-    all required quantities when we do not apply any BCs, so we
+    This condition is required because we avoid calculating some
+    of the required quantities when we do not apply any BCs, so we
     simply pass the user's mode_flag as the mode_flag_initial (i.e.
     the mode flag to use when starting the Hamiltonian calculations)
     and this requires the mode flag to be explicitly either 1 or -1.
+
+    TODO: User should be able to specify O- or X-mode as the mode_flag
+    directly. Currently not implemented because the way the code is
+    currently implemented does not allow one to directly check which
+    solution corresponds to which mode.
     """
+    log.debug(f"Checking mode_flag for Psi_BC_flag")
+
     _valid_initial_mode_flags = [1, -1]
+    log.debug(f"`_valid_initial_mode_flags` set to {_valid_initial_mode_flags}")
     if params.mode_flag_initial not in _valid_initial_mode_flags and params.Psi_BC_flag is None:
-        raise ValueError(f"`mode_flag` must be one of {_valid_initial_mode_flags} if `vacuumLaunch_flag` is False, but got `{params.mode_flag_initial}`!")
+        raise ValueError(f"`mode_flag` must be one of {_valid_initial_mode_flags} if `vacuumLaunch_flag` is False, but got `{params.mode_flag_initial}`")
 
 
 
 def check_input_before_ray_tracing(params: Parameters):
+    log.info(f"Checking the validity of user-specified arguments")
     _check_mode_flag_for_Psi_BC_flag(params)
 
     # Temporarily removing this function as the behaviour it checks for
     # is allowed in the new version which has poloidal_flux_enter and poloidal_zero_density
     # as separate input arguments
     # _check_launch_position(poloidal_flux_enter, launch_position, field)
-
-
-
-##################################################
-#
-# CHECKING INPUTS (for beam_me_up)
-#
-##################################################
-
-def check_mode_flag(mode_flag: int) -> None:
-    """Mode flag should be either -1 (X-mode) or 1 (O-mode)"""
-
-    if mode_flag not in [-1, 1]:
-        raise ValueError(
-            f"Bad value for `mode_flag`! Expected either 1 or -1, got '{mode_flag}'"
-        )
-
-
-def check_launch_position(
-    poloidal_flux_enter: float, launch_position: FloatArray, field: MagneticField
-) -> None:
-    R, _, Z = launch_position
-    launch_psi = field.poloidal_flux(R, Z)
-
-    if launch_psi < poloidal_flux_enter:
-        raise ValueError(
-            f"Launch position (R={R:.4f}, Z={Z:.4f}, psi={launch_psi:.4f}) is inside plasma (psi={poloidal_flux_enter})"
-        )
-
-
-def check_poloidal_flux_arguments(
-    poloidal_flux_enter: float,
-    poloidal_flux_zero_density: float,
-) -> None:
-    if poloidal_flux_zero_density < poloidal_flux_enter:
-        raise ValueError(
-            f"Poloidal_flux_zero_density is less than Poloidal_flux_enter!"
-        )
-
-
-def check_input(
-    mode_flag: int,
-    poloidal_flux_enter: float,
-    launch_position: FloatArray,
-    field: MagneticField,
-    poloidal_flux_zero_density: float,
-) -> None:
-    check_mode_flag(mode_flag)
-    check_poloidal_flux_arguments(poloidal_flux_enter, poloidal_flux_zero_density)
-
-    # Temporarily removing this function as the behaviour it checks for
-    # is allowed in the new version which has poloidal_flux_enter and poloidal_zero_density
-    # as separate input arguments
-    # check_launch_position(poloidal_flux_enter, launch_position, field)
