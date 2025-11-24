@@ -19,7 +19,7 @@ def pack_beam_parameters_3D(
 ) -> FloatArray:
     """Pack coordinates and Psi matrix into single flat array"""
 
-    log.debug(f"Packing ray and beam parameters")
+    log.trace(f"Packing ray and beam parameters")
 
     beam_parameters = np.array(
         (q_X,
@@ -52,7 +52,7 @@ def unpack_beam_parameters_3D(
 ) -> Tuple[ArrayLike, ArrayLike, ArrayLike, ArrayLike, ArrayLike, FloatArray]:
     """Unpack the flat solver state vector into separate coordinate variables and Psi matrix"""
 
-    log.debug(f"Unpacking ray and beam parameters")
+    log.trace(f"Unpacking ray and beam parameters")
 
     q_X = beam_parameters[0, ...]
     q_Y = beam_parameters[1, ...]
@@ -148,11 +148,11 @@ def evolve_beam(q_initial_cartesian: FloatArray,
                                    rtol = rtol,
                                    atol = atol)
     
-    log.info(f"""
-    Beam solver status: {solver_beam_output.status}
-    Beam solver took {duration_beam_solver} s
-    Number of beam evolution evaluations: {solver_beam_output.nfev}
-    Time per beam evolution evaluation: {duration_beam_solver / solver_beam_output.nfev}
+    log.info(f"""\n
+        Beam solver status: {solver_beam_output.status}
+        Beam solver took {duration_beam_solver} s
+        Number of beam evolution evaluations: {solver_beam_output.nfev}
+        Time per beam evolution evaluation: {duration_beam_solver / solver_beam_output.nfev}
     """)
 
     beam_solver_status = solver_beam_output.status

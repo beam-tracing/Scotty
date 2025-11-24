@@ -182,49 +182,55 @@ def handle_leaving_plasma_events(tau_events: Dict[str, FloatArray],
     # Event names here must match those in the `solver_ray_events`
     # dict defined outside this function
     if detected("leave_plasma") and not detected("leave_LCFS"):
-        log.debug("Ray has left plasma")
+        log.info(f"""\n
+        Ray has left plasma
+        """)
         return tau_events["leave_plasma"][0]
 
     if detected("cross_resonance"):
-        log.debug("Ray has crossed resonance")
+        log.info(f"""\n
+        Ray has crossed resonance
+        """)
         return tau_events["cross_resonance"][0]
 
     if detected("cross_resonance2"):
-        log.debug("Ray has crossed resonance 2")
+        log.info(f"""\n
+        Ray has crossed resonance 2
+        """)
         return tau_events["cross_resonance2"][0]
     
     if not detected("leave_plasma") and detected("leave_LCFS"):
-        log.debug("Ray has left LCFS")
+        log.info(f"""\n
+        Ray has left LCFS
+        """)
         return tau_events["leave_LCFS"][0]
     
     if detected("leave_plasma") and detected("leave_LCFS"):
         K_X_at_LCFS = ray_parameters_3D_events[0][2]
         if K_X_at_LCFS < 0:
-            log.debug(f"""
-            Ray has gone through the plasma and LCFS,
-            and exited from the outboard side.
-            Terminating at LCFS
-            """)
+            log.info(f"""\n
+        Ray has gone through the plasma and LCFS, and exited from the outboard side
+        
+        Terminating the propagation at the LCFS
+        """)
             return tau_events["leave_LCFS"][0]
         
-        log.debug(f"""
-        Beam deflection is sufficiently large, so
-        the ray has gone through the plasma and LCFS,
-        but did not exit from the outboard side.
+        log.info(f"""\n
+        Ray deflection is sufficiently large, so the ray has gone through the plasma
+        and LCFS, but did not exit from the outboard side
+        
         Terminating at entry poloidal flux
         """)
-        log.debug(f"")
         return tau_events["leave_plasma"][0]
 
-    log.warning(f"""
-    Ray has left the simulation region without leaving the LCFS.
+    log.warning(f"""\n
+        Ray has left the simulation region without leaving the LCFS
 
-    If one ends up here, things aren't going well. I can think of
-    two possible reasons:
-       1) The launch conditions are really weird (hasn't happened yet, in my experience)
-       2) The max_step setting of the solver is too large, such that the ray leaves the
-          LCFS and enters a region where `poloidal_flux < 1` in a single step. The solver
-          thus doesn't log the event when it really should
+        If one ends up here, things aren't going well. I can think of two possible reasons:
+        1) The launch conditions are really weird (hasn't happened yet, in my experience)
+        2) The max_step setting of the solver is too large, such that the ray leaves the
+            LCFS and enters a region where `poloidal_flux < 1` in a single step. The solver
+            thus doesn't log the event when it really should
     """)
     return tau_events["leave_simulation"][0]
 
@@ -278,11 +284,11 @@ def handle_no_resonance(solver_ray_output,
                                         vectorized=False,
                                         args=solver_arguments)
 
-    log.info(f"""
-    Ray solver cut-off finder status: {solver_ray_output_fine.status}
-    Ray solver took {duration_ray_tracing_fine} s
-    Number of ray evolution evaluations: {solver_ray_output_fine.nfev}
-    Time per ray evolution evaluation: {duration_ray_tracing_fine / solver_ray_output_fine.nfev}
+    log.info(f"""\n
+        Ray solver cut-off finder status: {solver_ray_output_fine.status}
+        Ray solver took {duration_ray_tracing_fine} s
+        Number of ray evolution evaluations: {solver_ray_output_fine.nfev}
+        Time per ray evolution evaluation: {duration_ray_tracing_fine / solver_ray_output_fine.nfev}
     """)
 
     ray_K_magnitude_fine = np.sqrt(K_X**2 + K_Y**2 + K_Z**2)
@@ -378,7 +384,7 @@ def propagate_ray(poloidal_flux_enter: float,
                                  K_initial[0],
                                  K_initial[1],
                                  K_initial[2]]
-    log.debug(f"Packing ray parameters: {ray_parameters_3D_initial}")
+    log.trace(f"Packing ray parameters, [*q, *K] = {ray_parameters_3D_initial}")
 
     # Additional arguments for solver
     solver_ray_events = make_solver_events(poloidal_flux_enter, launch_angular_frequency, field)
@@ -403,11 +409,11 @@ def propagate_ray(poloidal_flux_enter: float,
                                    atol=atol,
                                    max_step=500)
 
-    log.info(f"""
-    Ray solver status: {solver_ray_output.status}
-    Ray solver took {duration_ray_tracing} s
-    Number of ray evolution evaluations: {solver_ray_output.nfev}
-    Time per ray evolution evaluation: {duration_ray_tracing / solver_ray_output.nfev}
+    log.info(f"""\n
+        Ray solver status: {solver_ray_output.status}
+        Ray solver took {duration_ray_tracing} s
+        Number of ray evolution evaluations: {solver_ray_output.nfev}
+        Time per ray evolution evaluation: {duration_ray_tracing / solver_ray_output.nfev}
     """)
 
     if solver_ray_output.status ==  0: raise RuntimeError("Ray has not left plasma/simulation region. Increase tau_max or choose different initial conditions.")

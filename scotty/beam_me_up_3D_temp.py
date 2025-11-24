@@ -10,7 +10,7 @@ from scotty.fun_evolution_3D import evolve_beam
 from scotty.geometry_3D import MagneticField_3D_Cartesian, create_magnetic_geometry_3D
 from scotty.hamiltonian_3D import initialise_hamiltonians, assign_hamiltonians
 from scotty.launch_3D import find_plasma_entry_position, find_auto_delta_signs, find_plasma_entry_parameters
-from scotty.logger_3D import config_logger, timer
+from scotty.logger_3D import config_logger, arr2str
 from scotty.plotting_3D import (
     plot_delta_theta_m,
     plot_dispersion_relation,
@@ -182,13 +182,13 @@ def beam_me_up_3D(
     ##################################################
     #
     # Starting run for:
-    #   - pol. launch angle = {params.poloidal_launch_angle_deg_Torbeam} deg
-    #   - tor. launch angle = {params.toroidal_launch_angle_deg_Torbeam} deg
-    #   - launch frequency = {params.launch_frequency_GHz} GHz
-    #   - mode flag = {params.mode_flag_launch}
-    #   - launch beam width = {params.launch_beam_width} m
-    #   - launch beam curvature = {params.launch_beam_curvature} m^-1
-    #   - launch position [X, Y, Z] = {params.q_launch_cartesian}
+    #   - Pol. launch angle = {params.poloidal_launch_angle_deg_Torbeam} deg
+    #   - Tor. launch angle = {params.toroidal_launch_angle_deg_Torbeam} deg
+    #   - Launch frequency = {params.launch_frequency_GHz} GHz
+    #   - Mode flag = {params.mode_flag_launch}
+    #   - Launch beam width = {params.launch_beam_width} m
+    #   - Launch beam curvature = {params.launch_beam_curvature} m^-1
+    #   - Launch position [X,Y,Z] = {arr2str(params.q_launch_cartesian)}
     #
     ##################################################
     """)
@@ -260,9 +260,6 @@ def beam_me_up_3D(
                                                  density_fit,
                                                  temperature_fit)
     
-    # TO REMOVE
-    tol_H = 1e-5
-    
     # Calculating the plasma entry parameters
     (params.K_launch_cartesian,
      params.K_initial_cartesian,
@@ -288,8 +285,8 @@ def beam_me_up_3D(
                                                        params.Psi_3D_plasmaLaunch_labframe_cartesian,
                                                        hamiltonian_pos1,
                                                        hamiltonian_neg1,
-                                                       tol_H = tol_H, #1e-5,
-                                                       tol_O_mode_polarisation = 0.25)
+                                                       tol_H = 1e-5,
+                                                       tol_O_mode_polarisation = 0.5)
     
     # Assigning the correct Hamiltonian
     (hamiltonian,
@@ -300,7 +297,7 @@ def beam_me_up_3D(
                                                      hamiltonian_neg1,
                                                      params.q_initial_cartesian,
                                                      params.K_initial_cartesian,
-                                                     tol_H = tol_H) #1e-5)
+                                                     tol_H = 1e-5)
 
     # Checking validity of user-specified arguments
     # one last time before ray tracing

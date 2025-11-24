@@ -13,6 +13,7 @@ from scotty.fun_general import (
 )
 from scotty.geometry_3D import MagneticField_3D_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
+from scotty.logger_3D import arr2str
 from scotty.typing import FloatArray
 
 log = logging.getLogger(__name__)
@@ -84,28 +85,27 @@ def apply_continuous_BC_3D(
     dp_dZ  = dH["dp_dZ"]
 
     log.debug(f"""
-    Finding Psi at the plasma entry point with continuous boundary conditions
-    ##################################################
-    #
-    # Derivatives at [X,Y,Z] = [{q_X}, {q_Y}, {q_Z}]
-    # with K = [{K_X}, {K_Y}, {K_Z}]:
-    #   - dH/dX = {dH_dX}
-    #   - dH/dY = {dH_dY}
-    #   - dH/dZ = {dH_dZ}
-    #   - dH/dKx = {dH_dKx}
-    #   - dH/dKy = {dH_dKy}
-    #   - dH/dKz = {dH_dKz}
-    #   - d(polflux)/dX = {dp_dX}
-    #   - d(polflux)/dY = {dp_dY}
-    #   - d(polflux)/dZ = {dp_dZ}
-    #
-    """)
+        Finding Psi at the plasma entry point with continuous boundary conditions
+        ##################################################
+        #
+        # Derivatives at [X,Y,Z] = {arr2str(q)} with K = {arr2str(K)}:
+        #   - dH/dX = {dH_dX}
+        #   - dH/dY = {dH_dY}
+        #   - dH/dZ = {dH_dZ}
+        #   - dH/dKx = {dH_dKx}
+        #   - dH/dKy = {dH_dKy}
+        #   - dH/dKz = {dH_dKz}
+        #
+        #   - d(polflux)/dX = {dp_dX}
+        #   - d(polflux)/dY = {dp_dY}
+        #   - d(polflux)/dZ = {dp_dZ}
+        #""")
 
     # Gradients at the plasma-vacuum boundary can be
     # finnicky, so it's good to check
     for gradient in dH.keys():
         if np.isnan(dH[gradient]):
-            raise ValueError(f"Error: {gradient} is NaN when applying continuous boundary conditions in \n `apply_continuous_BC_3D`")
+            raise ValueError(f"Error: {gradient} is NaN when applying continuous boundary conditions in `apply_continuous_BC_3D`")
     
     # At the plasma-vacuum boundary, we have two Psi matrices:
     # one corresponding to Psi in the plasma, and the other
@@ -131,15 +131,15 @@ def apply_continuous_BC_3D(
     ], dtype="float64")
 
     log.debug(f"""
-    #   - interface matrix =
-    #        {interface_matrix[0]}
-    #        {interface_matrix[1]}
-    #        {interface_matrix[2]}
-    #        {interface_matrix[3]}
-    #        {interface_matrix[4]}
-    #        {interface_matrix[5]}
-    #
-    """)
+        #
+        #   - interface matrix =
+        #        {arr2str(interface_matrix[0])}
+        #        {arr2str(interface_matrix[1])}
+        #        {arr2str(interface_matrix[2])}
+        #        {arr2str(interface_matrix[3])}
+        #        {arr2str(interface_matrix[4])}
+        #        {arr2str(interface_matrix[5])}
+        #""")
     
     # Comment from the original function code:
         # interface_matrix will be singular if one tries to
@@ -149,15 +149,24 @@ def apply_continuous_BC_3D(
     interface_matrix_inverse = np.linalg.inv(interface_matrix)
 
     log.debug(f"""
-    #   - interface matrix inverse =
-    #        {interface_matrix_inverse[0]}
-    #        {interface_matrix_inverse[1]}
-    #        {interface_matrix_inverse[2]}
-    #        {interface_matrix_inverse[3]}
-    #        {interface_matrix_inverse[4]}
-    #        {interface_matrix_inverse[5]}
-    #
-    """)
+        #
+        #   - interface matrix inverse =
+        #        {arr2str(interface_matrix_inverse[0])}
+        #        {arr2str(interface_matrix_inverse[1])}
+        #        {arr2str(interface_matrix_inverse[2])}
+        #        {arr2str(interface_matrix_inverse[3])}
+        #        {arr2str(interface_matrix_inverse[4])}
+        #        {arr2str(interface_matrix_inverse[5])}
+        #""")
+
+    # For continuous boundary conditions, we do not
+    # calculate the `eta`s
+    log.debug(f"""
+        #
+        #   - eta_XY  = None
+        #   - eta_XZ  = None
+        #   - eta_XYZ = None
+        #""")
 
     RHS_vector = [(Psi_XX_v * dp_dY**2) + (Psi_YY_v * dp_dX**2) - (2 * Psi_XY_v * dp_dX * dp_dY),
                   (Psi_XX_v * dp_dZ**2) + (Psi_ZZ_v * dp_dX**2) - (2 * Psi_XZ_v * dp_dX * dp_dZ),
@@ -166,16 +175,17 @@ def apply_continuous_BC_3D(
                   -dH_dY,
                   -dH_dZ]
     
+    # We access the first 3 items twice because they are tuples
     log.debug(f"""
-    #   - RHS vector =
-    #        {RHS_vector[0]}
-    #        {RHS_vector[1]}
-    #        {RHS_vector[2]}
-    #        {RHS_vector[3]}
-    #        {RHS_vector[4]}
-    #        {RHS_vector[5]}
-    #
-    """)
+        #
+        #   - RHS vector =
+        #        {np.real(RHS_vector[0])} + {np.imag(RHS_vector[0])}j
+        #        {np.real(RHS_vector[1])} + {np.imag(RHS_vector[1])}j
+        #        {np.real(RHS_vector[2])} + {np.imag(RHS_vector[2])}j
+        #        {RHS_vector[3]}
+        #        {RHS_vector[4]}
+        #        {RHS_vector[5]}
+        #""")
 
     [Psi_XX_p,
      Psi_XY_p,
@@ -185,16 +195,17 @@ def apply_continuous_BC_3D(
      Psi_ZZ_p] = np.matmul(interface_matrix_inverse, RHS_vector)
     
     log.debug(f"""
-    #   - Psi_3D_plasma_labframe_cartesian
-    #        Psi_XX_p = {Psi_XX_p}
-    #        Psi_XY_p = {Psi_XY_p}
-    #        Psi_XZ_p = {Psi_XZ_p}
-    #        Psi_YY_p = {Psi_YY_p}
-    #        Psi_YZ_p = {Psi_YZ_p}
-    #        Psi_ZZ_p = {Psi_ZZ_p}
-    #
-    ##################################################
-    """)
+        #
+        #   - Psi_3D_plasma_labframe_cartesian
+        #        Psi_XX_p = {np.real(Psi_XX_p)} + {np.imag(Psi_XX_p)}j
+        #        Psi_XY_p = {np.real(Psi_XY_p)} + {np.imag(Psi_XY_p)}j
+        #        Psi_XZ_p = {np.real(Psi_XZ_p)} + {np.imag(Psi_XZ_p)}j
+        #        Psi_YY_p = {np.real(Psi_YY_p)} + {np.imag(Psi_YY_p)}j
+        #        Psi_YZ_p = {np.real(Psi_YZ_p)} + {np.imag(Psi_YZ_p)}j
+        #        Psi_ZZ_p = {np.real(Psi_ZZ_p)} + {np.imag(Psi_ZZ_p)}j
+        #
+        ##################################################
+        """)
 
     # Forming back up to get Psi in the plasma
     Psi_3D_plasma_labframe_cartesian = np.array([
@@ -226,7 +237,7 @@ def find_H_bar_3D(
     Booker_gamma = find_Booker_gamma(electron_density, B_magnitude, launch_angular_frequency, temperature)
 
     H_bar = K_magnitude**2 + K_0**2 * (
-        (Booker_beta + mode_flag*mode_flag_sign*np.sqrt(max(0, Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
+        (Booker_beta - mode_flag*np.sqrt(max(0, Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
         / (2*Booker_alpha)
     )
 
@@ -257,20 +268,6 @@ def find_K_plasma_with_discontinuous_BC(
     dp_dX = field.d_polflux_dX(*q, delta_X)
     dp_dY = field.d_polflux_dY(*q, delta_Y)
     dp_dZ = field.d_polflux_dZ(*q, delta_Z)
-
-    log.debug(f"""
-    Finding K at the plasma entry point with discontinuous boundary conditions
-    ##################################################
-    #
-    # Calculated at [X,Y,Z] = [{q_X}, {q_Y}, {q_Z}]:
-    #   - B_X = {B_X}
-    #   - B_Y = {B_Y}
-    #   - B_Z = {B_Z}
-    #   - d(polflux)/dX = {dp_dX}
-    #   - d(polflux)/dY = {dp_dY}
-    #   - d(polflux)/dZ = {dp_dZ}
-    #
-    """)
     
     # Checks the plasma density
     B_magnitude = np.sqrt(B_X**2 + B_Y**2 + B_Z**2)
@@ -281,22 +278,41 @@ def find_K_plasma_with_discontinuous_BC(
     omega_UH = np.sqrt(plasma_freq**2 + gyro_freq**2)
 
     log.debug(f"""
-    #   - |B| = {B_magnitude}
-    #   - w_pe / w_launch = {plasma_freq}
-    #   - w_ce / w_launch = {gyro_freq}
-    #   - w_L  / w_launch = {omega_L}
-    #   - w_R  / w_launch = {omega_R}
-    #   - w_UH / w_launch = {omega_UH}
-    #
-    """)
+        Finding K at the plasma entry point with discontinuous boundary conditions
+        ##################################################
+        #
+        # Calculated at [X,Y,Z] = {arr2str(q)}:
+        #   - B_X = {B_X}
+        #   - B_Y = {B_Y}
+        #   - B_Z = {B_Z}
+        #   - |B| = {B_magnitude}
+        #
+        #   - w_pe / w_launch = {plasma_freq}
+        #   - w_ce / w_launch = {gyro_freq}
+        #   - w_L  / w_launch = {omega_L}
+        #   - w_R  / w_launch = {omega_R}
+        #   - w_UH / w_launch = {omega_UH}
+        #
+        #   - d(polflux)/dX = {dp_dX}
+        #   - d(polflux)/dY = {dp_dY}
+        #   - d(polflux)/dZ = {dp_dZ}
+        #
+        ##################################################
+        """)
 
     # TO REMOVE -- need to rewrite andf refactor this properly. 12 Nov
-    mode_flag_sign = -1 # find_mode_flag_sign(electron_density_p, B_magnitude, launch_angular_frequency, temperature)
-
+    mode_flag_sign = 1 # find_mode_flag_sign(electron_density_p, B_magnitude, launch_angular_frequency, temperature)
     if ((mode_flag_sign * mode_flag == 1  and plasma_freq >= 1) or
         (mode_flag_sign * mode_flag == -1 and omega_L >= 1) or
         (mode_flag_sign * mode_flag == -1 and omega_R >= 1 and omega_UH <= 1)):
         raise ValueError("Error: cut-off freq higher than beam freq on plasma side of plasma-vac boundary")
+    
+    if mode_flag_sign * mode_flag == 1  and plasma_freq >= 1:
+        raise ValueError(f"Cut-off freq higher than beam freq on plasma side of plasma-vacuum boundary: w_plasma / w_launch = {plasma_freq} >= 1")
+    elif mode_flag_sign * mode_flag == -1 and omega_L >= 1:
+        raise ValueError(f"Cut-off freq higher than beam freq on plasma side of plasma-vacuum boundary: w_L / w_launch = {omega_L} >= 1")
+    elif mode_flag_sign * mode_flag == -1 and omega_R >= 1 and omega_UH <= 1:
+        raise ValueError(f"Cut-off freq higher than beam freq on plasma side of plasma-vacuum boundary: w_R / w_launch = {omega_R} >= 1 and w_UH / w_launch = {omega_UH} <= 1")
     
     # In our derivations, we find three vectors which are parallel to
     # the flux surface by considering three displacements in X, Y, and Z
@@ -354,7 +370,7 @@ def find_K_plasma_with_discontinuous_BC(
     Booker_gamma = find_Booker_gamma(electron_density_p, B_magnitude, launch_angular_frequency, temperature)
     K_normal_plasma_initial_guess = np.sqrt(
         abs(K_parallel**2 + K_binormal**2 + K_0**2 * (
-                (Booker_beta + mode_flag*mode_flag_sign*np.sqrt(max(0, Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
+                (Booker_beta - mode_flag*np.sqrt(max(0, Booker_beta**2 - 4*Booker_alpha*Booker_gamma)))
                 / (2*Booker_alpha)
                 )
             )
@@ -436,29 +452,28 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     d2p_dYdZ = dH["d2p_dYdZ"]
 
     log.debug(f"""
-    Finding Psi at the plasma entry point with discontinuous boundary conditions
-    ##################################################
-    #
-    # Derivatives at [X,Y,Z] = [{q_X}, {q_Y}, {q_Z}]
-    # with K_plasma = [{K_X_p}, {K_Y_p}, {K_Z_p}]:
-    #   - dH/dX = {dH_dX}
-    #   - dH/dY = {dH_dY}
-    #   - dH/dZ = {dH_dZ}
-    #   - dH/dKx = {dH_dKx}
-    #   - dH/dKy = {dH_dKy}
-    #   - dH/dKz = {dH_dKz}
-    #   - d(polflux)/dX = {dp_dX}
-    #   - d(polflux)/dY = {dp_dY}
-    #   - d(polflux)/dZ = {dp_dZ}
-    #   - d2(polflux)/dX2 = {d2p_dX2}
-    #   - d2(polflux)/dY2 = {d2p_dY2}
-    #   - d2(polflux)/dZ2 = {d2p_dZ2}
-    #   - d2(polflux)/dXdY = {d2p_dXdY}
-    #   - d2(polflux)/dXdZ = {d2p_dXdZ}
-    #   - d2(polflux)/dYdZ = {d2p_dYdZ}
-    #
-    ##################################################
-    """)
+        Finding Psi at the plasma entry point with discontinuous boundary conditions
+        ##################################################
+        #
+        # Derivatives at [X,Y,Z] = {arr2str(q)} with K_plasma = {arr2str(K_p)}:
+        #   - dH/dX = {dH_dX}
+        #   - dH/dY = {dH_dY}
+        #   - dH/dZ = {dH_dZ}
+        #   - dH/dKx = {dH_dKx}
+        #   - dH/dKy = {dH_dKy}
+        #   - dH/dKz = {dH_dKz}
+        #
+        #   - d(polflux)/dX = {dp_dX}
+        #   - d(polflux)/dY = {dp_dY}
+        #   - d(polflux)/dZ = {dp_dZ}
+        #
+        #   - d2(polflux)/dX2 = {d2p_dX2}
+        #   - d2(polflux)/dY2 = {d2p_dY2}
+        #   - d2(polflux)/dZ2 = {d2p_dZ2}
+        #   - d2(polflux)/dXdY = {d2p_dXdY}
+        #   - d2(polflux)/dXdZ = {d2p_dXdZ}
+        #   - d2(polflux)/dYdZ = {d2p_dYdZ}
+        #""")
 
     # Gradients at the plasma-vacuum boundary can be
     # finnicky, so it's good to check
@@ -519,15 +534,33 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     ], dtype="float64")
 
     log.debug(f"""
-    #   - interface matrix =
-    #        {interface_matrix[0]}
-    #        {interface_matrix[1]}
-    #        {interface_matrix[2]}
-    #        {interface_matrix[3]}
-    #        {interface_matrix[4]}
-    #        {interface_matrix[5]}
-    #
-    """)
+        #
+        #   - interface matrix =
+        #        {arr2str(interface_matrix[0])}
+        #        {arr2str(interface_matrix[1])}
+        #        {arr2str(interface_matrix[2])}
+        #        {arr2str(interface_matrix[3])}
+        #        {arr2str(interface_matrix[4])}
+        #        {arr2str(interface_matrix[5])}
+        #""")
+    
+    # Comment from the original function code:
+        # interface_matrix will be singular if one tries to
+        # transition while still in vacuum (and there's no
+        # plasma at all); at least that's what happens in
+        # my experience
+    interface_matrix_inverse = np.linalg.inv(interface_matrix)
+
+    log.debug(f"""
+        #
+        #   - interface matrix inverse =
+        #        {arr2str(interface_matrix_inverse[0])}
+        #        {arr2str(interface_matrix_inverse[1])}
+        #        {arr2str(interface_matrix_inverse[2])}
+        #        {arr2str(interface_matrix_inverse[3])}
+        #        {arr2str(interface_matrix_inverse[4])}
+        #        {arr2str(interface_matrix_inverse[5])}
+        #""")
 
     # For the discontinuous boundary conditions,
     # K_vacuum =/= K_plasma in general, and this introduces
@@ -540,29 +573,11 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
     eta_XYZ = -0.5 * (d2p_dX2*dp_dZ**2 + d2p_dY2*dp_dZ**2 + d2p_dZ2*(dp_dX + dp_dY)**2 + 2*d2p_dXdY*dp_dZ**2 - 2*d2p_dXdZ*dp_dZ*(dp_dX + dp_dY) - 2*d2p_dYdZ*dp_dZ*(dp_dX + dp_dY)) / ( dp_dX**2 + dp_dY**2 + dp_dZ**2 )
 
     log.debug(f"""
-    #   - eta_XY = {eta_XY}
-    #   - eta_XZ = {eta_XZ}
-    #   - eta_XYZ = {eta_XYZ}
-    #
-    """)
-    
-    # Comment from the original function code:
-        # interface_matrix will be singular if one tries to
-        # transition while still in vacuum (and there's no
-        # plasma at all); at least that's what happens in
-        # my experience
-    interface_matrix_inverse = np.linalg.inv(interface_matrix)
-
-    log.debug(f"""
-    #   - interface matrix inverse =
-    #        {interface_matrix_inverse[0]}
-    #        {interface_matrix_inverse[1]}
-    #        {interface_matrix_inverse[2]}
-    #        {interface_matrix_inverse[3]}
-    #        {interface_matrix_inverse[4]}
-    #        {interface_matrix_inverse[5]}
-    #
-    """)
+        #
+        #   - eta_XY  = {eta_XY}
+        #   - eta_XZ  = {eta_XZ}
+        #   - eta_XYZ = {eta_XYZ}
+        #""")
 
     RHS_vector = [(Psi_XX_v * dp_dY**2) + (Psi_YY_v * dp_dX**2) - (2 * Psi_XY_v * dp_dX * dp_dY) + 2*(K_X_v - K_X_p)*dp_dX*eta_XY + 2*(K_Y_v - K_Y_p)*dp_dY*eta_XY,
                   (Psi_XX_v * dp_dZ**2) + (Psi_ZZ_v * dp_dX**2) - (2 * Psi_XZ_v * dp_dX * dp_dZ) + 2*(K_X_v - K_X_p)*dp_dX*eta_XZ + 2*(K_Z_v - K_Z_p)*dp_dZ*eta_XZ,
@@ -571,16 +586,17 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
                   -dH_dY,
                   -dH_dZ]
     
+    # We access the first 3 items twice because they are tuples
     log.debug(f"""
-    #   - RHS vector =
-    #        {RHS_vector[0]}
-    #        {RHS_vector[1]}
-    #        {RHS_vector[2]}
-    #        {RHS_vector[3]}
-    #        {RHS_vector[4]}
-    #        {RHS_vector[5]}
-    #
-    """)
+        #
+        #   - RHS vector =
+        #        {np.real(RHS_vector[0])} + {np.imag(RHS_vector[0])}j
+        #        {np.real(RHS_vector[1])} + {np.imag(RHS_vector[1])}j
+        #        {np.real(RHS_vector[2])} + {np.imag(RHS_vector[2])}j
+        #        {RHS_vector[3]}
+        #        {RHS_vector[4]}
+        #        {RHS_vector[5]}
+        #""")
     
     [Psi_XX_p,
      Psi_XY_p,
@@ -590,16 +606,17 @@ def find_Psi_3D_plasma_with_discontinuous_BC(
      Psi_ZZ_p] = np.matmul(interface_matrix_inverse, RHS_vector)
     
     log.debug(f"""
-    #   - Psi_3D_plasma_labframe_cartesian
-    #        Psi_XX_p = {Psi_XX_p}
-    #        Psi_XY_p = {Psi_XY_p}
-    #        Psi_XZ_p = {Psi_XZ_p}
-    #        Psi_YY_p = {Psi_YY_p}
-    #        Psi_YZ_p = {Psi_YZ_p}
-    #        Psi_ZZ_p = {Psi_ZZ_p}
-    #
-    ##################################################
-    """)
+        #
+        #   - Psi_3D_plasma_labframe_cartesian
+        #        Psi_XX_p = {np.real(Psi_XX_p)} + {np.imag(Psi_XX_p)}j
+        #        Psi_XY_p = {np.real(Psi_XY_p)} + {np.imag(Psi_XY_p)}j
+        #        Psi_XZ_p = {np.real(Psi_XZ_p)} + {np.imag(Psi_XZ_p)}j
+        #        Psi_YY_p = {np.real(Psi_YY_p)} + {np.imag(Psi_YY_p)}j
+        #        Psi_YZ_p = {np.real(Psi_YZ_p)} + {np.imag(Psi_YZ_p)}j
+        #        Psi_ZZ_p = {np.real(Psi_ZZ_p)} + {np.imag(Psi_ZZ_p)}j
+        #
+        ##################################################
+        """)
 
     # Forming back up to get Psi in the plasma
     Psi_3D_plasma_labframe_cartesian = np.array([

@@ -6,6 +6,7 @@ from scotty.fun_general import (angular_frequency_to_wavenumber,
                                 find_normalised_gyro_freq,
                                 find_normalised_plasma_freq)
 from scotty.geometry_3D import MagneticField_3D_Cartesian
+from scotty.logger_3D import arr2str
 from scotty.profile_fit import ProfileFitLike
 from scotty.typing import ArrayLike, FloatArray
 from typing import Dict, Literal, Optional, Tuple
@@ -162,11 +163,11 @@ class Hamiltonian_3D:
         log.debug(f"""
         ##################################################
         #
-        # Creating Hamiltonian class with:
+        # Creating Hamiltonian with:
         #   - mode_flag = {self.mode_flag}
         #   - w_launch = {self.angular_frequency}
         #   - K_launch = {self.wavenumber_K0}
-        #   - spacings = {self.spacings}
+        #   - (finite difference) spacings = {self.spacings}
         #   - field type = {type(field)}
         #   - density fit type = {type(density_fit)}
         #   - temperature fit type = {type(temperature_fit)}
@@ -371,11 +372,16 @@ def assign_hamiltonians(mode_flag_launch: Literal["O", "X", 1, -1],
     H_pos1 = hamiltonian_pos1(*q_initial_cartesian, *K_initial_cartesian)
     H_neg1 = hamiltonian_neg1(*q_initial_cartesian, *K_initial_cartesian)
 
-    log.debug(f"""For [X,Y,Z] = [{q_initial_cartesian}] and K = [{K_initial_cartesian}]:
-               - H (mode_flag +1) = {H_pos1}
-               - H (mode_flag -1) = {H_neg1}
-               - H tolerance = {tol_H}
-              """)
+    log.debug(f"""
+        ##################################################
+        #
+        # For [X,Y,Z] = {arr2str(q_initial_cartesian)} and K = {arr2str(K_initial_cartesian)}:
+        #   - H (mode_flag +1) = {H_pos1}
+        #   - H (mode_flag -1) = {H_neg1}
+        #   - H tolerance      = {tol_H}
+        #
+        ##################################################
+        """)
 
     # Some second checks make sure everything is in order
     if abs(H_pos1) < tol_H and abs(H_neg1) > tol_H:
@@ -383,10 +389,10 @@ def assign_hamiltonians(mode_flag_launch: Literal["O", "X", 1, -1],
     elif abs(H_pos1) > tol_H and abs(H_neg1) < tol_H:
         H, H_other, new_mode_flag_initial = hamiltonian_neg1, hamiltonian_pos1, -1
     elif abs(H_pos1) > tol_H and abs(H_neg1) > tol_H:
-        log.warning(f"Both `mode_flag` = +1 or -1 are not solutions! (|H| > {tol_H})")
+        log.warning(f"Neither `mode_flag` = +1 nor -1 are solutions! (|H| > {tol_H} for both)")
         new_mode_flag_initial = None
     else:
-        log.warning(f"Both `mode_flag` = +1 or -1 are solutions! (|H| > {tol_H})")
+        log.warning(f"Both `mode_flag` = +1 or -1 are solutions! (|H| < {tol_H} for both)")
         new_mode_flag_initial = None
     
     # If `new_mode_flag_initial` is not False-y (i.e. no solution assigned)
@@ -400,7 +406,7 @@ def assign_hamiltonians(mode_flag_launch: Literal["O", "X", 1, -1],
         log.warning(f"`mode_flag` was not selected correctly in `find_plasma_entry_parameters` and has been changed from {mode_flag_initial} to {new_mode_flag_initial}. This may or may not be a significant problem.")
         mode_flag_initial = new_mode_flag_initial
     
-    log.debug(f"Hamiltonian with computed `mode_flag` {mode_flag_initial} selected for user-passed `mode_flag` {mode_flag_launch}")
+    log.debug(f"Hamiltonian with computed `mode_flag` = {mode_flag_initial} selected for user-passed `mode_flag` = {mode_flag_launch}")
     
     return H, H_other, mode_flag_initial
 

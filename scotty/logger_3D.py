@@ -1,5 +1,6 @@
 import logging
 import matplotlib
+import numpy as np
 import pathlib
 import time
 from typing import Literal, Optional, Union
@@ -101,7 +102,7 @@ def config_logger(console_log_level: Union[str, int],
 
 
 
-# RALT short for _return_and_log_trace
+# RALT short for return_and_log_trace
 def ralt(log: logging.Logger, msg: str, f: callable, *args, **kwargs):
     result = f(*args, **kwargs)
     if msg: log.trace(msg, result)
@@ -115,3 +116,21 @@ def timer(func, *args, **kwargs):
     end_time = time.time()
     duration = end_time - start_time
     return result, duration
+
+
+
+# MLN short for multi-line numbers
+def mln(arr: Union[list, np.ndarray], prefix: str) -> str:
+    if isinstance(arr, list): arr = np.array(arr)
+    if arr.ndim != 1: raise ValueError(f"The array passed must be one-dimensional!")
+    split_arr = np.array_split(arr, len(arr)//6 + 1)
+    msg = f"\n{prefix}".join(f"{sub_arr}" for sub_arr in split_arr)
+    return msg
+
+
+
+# To make arrays have commas in them (for debug messages)
+def arr2str(arr: Union[list, np.ndarray], precision: int = 7, separator: str = ", ") -> str:
+    if isinstance(arr, list): arr = np.array(arr)
+    msg = np.array2string(arr, precision=precision, separator=separator)
+    return msg
