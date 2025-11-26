@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import pathlib
 from scipy.constants import constants
@@ -27,8 +28,136 @@ from scotty.typing import ArrayLike, FloatArray
 from typing import Dict, Optional
 import xarray as xr
 
+log = logging.getLogger(__name__)
+
 CYLINDRICAL_VECTOR_COMPONENTS = ["R", "zeta", "Z"]
 CARTESIAN_VECTOR_COMPONENTS = ["X", "Y", "Z"]
+
+def main_analysis_3D(
+    solver_output: xr.Dataset,
+    hamiltonian: Hamiltonian_3D,
+    hamiltonian_other: Hamiltonian_3D,
+    field: MagneticField_3D_Cartesian,
+    density_fit: ProfileFitLike,
+    temperature_fit: Optional[ProfileFitLike],
+):
+    tau_array = np.array(solver_output.tau)
+    
+    # Position, wavevector, and derivatives
+    q_X, q_Y, q_Z = np.array(solver_output.q_X), np.array(solver_output.q_Y), np.array(solver_output.q_Z)
+    K_X, K_Y, K_Z = np.array(solver_output.K_X), np.array(solver_output.K_Y), np.array(solver_output.K_Z)
+
+    dH = hamiltonian.derivatives(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
+    dH_dX,  dH_dY,  dH_dZ  = dH["dH_dX"],  dH["dH_dY"],  dH["dH_dZ"]
+    dH_dKx, dH_dKy, dH_dKz = dH["dH_dKx"], dH["dH_dKy"], dH["dH_dKz"]
+    
+    # Finite difference spacings
+    delta_X, delta_Y, delta_Z = hamiltonian.spacings["X"], hamiltonian.spacings["Y"], hamiltonian.spacings["Z"]
+
+    # Poloidal flux and derivatives
+    polflux = field.polflux(q_X, q_Y, q_Z)
+    dp_dX = field.d_polflux_dX(q_X, q_Y, q_Z, delta_X)
+    dp_dY = field.d_polflux_dY(q_X, q_Y, q_Z, delta_Y)
+    dp_dZ = field.d_polflux_dZ(q_X, q_Y, q_Z, delta_Z)
+
+    # Magnetic field and derivatives
+    B_X = field.B_X(q_X, q_Y, q_Z)
+    B_Y = field.B_Y(q_X, q_Y, q_Z)
+    B_Z = field.B_Z(q_X, q_Y, q_Z)
+    B_magnitude = field.magnitude(q_X, q_Y, q_Z)
+    b_hat = field.unitvector(q_X, q_Y, q_Z)
+    dbhat_dX = derivative(field.unitvector, dims="X", args={"X": q_X, "Y": q_Y, "Z": q_Z}, spacings=delta_X)
+    dbhat_dY = derivative(field.unitvector, dims="Y", args={"X": q_X, "Y": q_Y, "Z": q_Z}, spacings=delta_Y)
+    dbhat_dZ = derivative(field.unitvector, dims="Z", args={"X": q_X, "Y": q_Y, "Z": q_Z}, spacings=delta_Z)
+    grad_bhat = np.stack([dbhat_dX, dbhat_dY, dbhat_dZ], axis=1)
+
+    # Constructing {y, g, x} basis
+    g_vec = np.array( [dH_dKx, dH_dKy, dH_dKz] ).T
+    g_magnitude = np.linalg.norm(g_vec, axis=1)
+    g_hat = g_vec / g_magnitude[:, np.newaxis]
+    y_hat = make_unit_vector_from_cross_product(b_hat, g_hat)
+    x_hat = make_unit_vector_from_cross_product(y_hat, g_hat)
+
+    # Calculating (Booker) dispersion relation
+    H_Booker = hamiltonian(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
+    H_Booker_other = hamiltonian_other(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
+
+    # Calculating plasma properties along ray path
+    n_e = density_fit(polflux)
+    T_e = temperature_fit(polflux) if temperature_fit else None
+    epsilon = DielectricTensor_3D(n_e, hamiltonian.angular_frequency, B_magnitude, T_e)
+    normalised_gyro_freqs = find_normalised_gyro_freq(n_e, hamiltonian.angular_frequency, T_e)
+    normalised_plasma_freqs = find_normalised_plasma_freq(B_magnitude, hamiltonian.angular_frequency, T_e)
+
+    # Saving the data and updating the original dict
+    df = xr.Dataset(
+        {
+            # Position derivatives
+            "dH_dX":  (["tau"], dH_dX),
+            "dH_dY":  (["tau"], dH_dY),
+            "dH_dZ":  (["tau"], dH_dZ),
+
+            # Wavevector derivatives
+            "dH_dKx": (["tau"], dH_dKx),
+            "dH_dKy": (["tau"], dH_dKy),
+            "dH_dKz": (["tau"], dH_dKz),
+
+            # Poloidal flux and derivatives
+            "polflux":     (["tau"], polflux),
+            "dpolflux_dX": (["tau"], dp_dX),
+            "dpolflux_dY": (["tau"], dp_dY),
+            "dpolflux_dZ": (["tau"], dp_dZ),
+
+            # Magnetic field data and derivatives
+            "B_X": (["tau"], B_X),
+            "B_Y": (["tau"], B_Y),
+            "B_Z": (["tau"], B_Z),
+            "B_magnitude": (["tau"], B_magnitude),
+            "b_hat":     (["tau","col"], b_hat),
+            "dbhat_dX":  (["tau","col"], dbhat_dX),
+            "dbhat_dY":  (["tau","col"], dbhat_dY),
+            "dbhat_dZ":  (["tau","col"], dbhat_dZ),
+            "grad_bhat": (["tau","row","col"], grad_bhat),
+
+            # Basis vectors
+            "g_magnitude": (["tau"], g_magnitude),
+            "g_hat": (["tau","col"], g_hat),
+            "x_hat": (["tau","col"], x_hat),
+            "y_hat": (["tau","col"], y_hat),
+
+            # H booker stuff
+            "H_Booker": (["tau"], H_Booker),
+            "H_Booker_other": (["tau"], H_Booker_other),
+
+            # Electron density and epsilon (e_bb/e_para, e_11/e_perp, e_12/e_g)
+            "electron_density": (["tau"], n_e),
+            "epsilon_para": (["tau"], epsilon.e_bb),
+            "epsilon_bb":   (["tau"], epsilon.e_bb),
+            "epsilon_perp": (["tau"], epsilon.e_11),
+            "epsilon_11":   (["tau"], epsilon.e_11),
+            "epsilon_g":    (["tau"], epsilon.e_12),
+            "epsilon_12":   (["tau"], epsilon.e_12),
+            "normalised_gyro_freqs": (["tau"], normalised_gyro_freqs),
+            "normalised_plasma_freqs": (["tau"], normalised_plasma_freqs),
+        },
+        coords = {
+            "tau": (["tau"], tau_array, {"long_name": "Parametrised distance along ray"}),
+            "row": CARTESIAN_VECTOR_COMPONENTS,
+            "col": CARTESIAN_VECTOR_COMPONENTS,
+            "q_X": q_X,
+            "q_Y": q_Y,
+            "q_Z": q_Z,
+        },
+    )
+
+    set_vector_components_long_name(df)
+
+    if T_e: df.update({"temperature": (["tau"], T_e)})
+
+    return df
+
+
+
 
 
 
@@ -56,47 +185,47 @@ def immediate_analysis_3D(
     output_filename_suffix: str,
     dH: Dict[str, ArrayLike]):
 
-    q_X = np.array(solver_output.q_X)
-    q_Y = np.array(solver_output.q_Y)
-    q_Z = np.array(solver_output.q_Z)
-    dH_dX = dH["dH_dX"]
-    dH_dY = dH["dH_dY"]
-    dH_dZ = dH["dH_dZ"]
-    K_X = np.array(solver_output.K_X)
-    K_Y = np.array(solver_output.K_Y)
-    K_Z = np.array(solver_output.K_Z)
-    dH_dKx = dH["dH_dKx"]
-    dH_dKy = dH["dH_dKy"]
-    dH_dKz = dH["dH_dKz"]
+    # q_X = np.array(solver_output.q_X)
+    # q_Y = np.array(solver_output.q_Y)
+    # q_Z = np.array(solver_output.q_Z)
+    # dH_dX = dH["dH_dX"]
+    # dH_dY = dH["dH_dY"]
+    # dH_dZ = dH["dH_dZ"]
+    # K_X = np.array(solver_output.K_X)
+    # K_Y = np.array(solver_output.K_Y)
+    # K_Z = np.array(solver_output.K_Z)
+    # dH_dKx = dH["dH_dKx"]
+    # dH_dKy = dH["dH_dKy"]
+    # dH_dKz = dH["dH_dKz"]
     Psi_3D_labframe_cartesian = np.array(solver_output.Psi_3D_labframe_cartesian)
-    polflux = field.polflux(q_X, q_Y, q_Z)
-    dpolflux_dX = field.d_polflux_dX(q_X, q_Y, q_Z, delta_X)
-    dpolflux_dY = field.d_polflux_dY(q_X, q_Y, q_Z, delta_Y)
-    dpolflux_dZ = field.d_polflux_dZ(q_X, q_Y, q_Z, delta_Z)
-    tau_array = solver_output.tau
-    numberOfDataPoints = len(tau_array)
+    # polflux = field.polflux(q_X, q_Y, q_Z)
+    # dpolflux_dX = field.d_polflux_dX(q_X, q_Y, q_Z, delta_X)
+    # dpolflux_dY = field.d_polflux_dY(q_X, q_Y, q_Z, delta_Y)
+    # dpolflux_dZ = field.d_polflux_dZ(q_X, q_Y, q_Z, delta_Z)
+    # tau_array = solver_output.tau
+    # numberOfDataPoints = len(tau_array)
 
     # Finding B field
-    B_X = field.B_X(q_X, q_Y, q_Z)
-    B_Y = field.B_X(q_X, q_Y, q_Z)
-    B_Z = field.B_X(q_X, q_Y, q_Z)
-    B_magnitude = field.magnitude(q_X, q_Y, q_Z)
-    b_hat = field.unitvector(q_X, q_Y, q_Z)
+    # B_X = field.B_X(q_X, q_Y, q_Z)
+    # B_Y = field.B_Y(q_X, q_Y, q_Z)
+    # B_Z = field.B_Z(q_X, q_Y, q_Z)
+    # B_magnitude = field.magnitude(q_X, q_Y, q_Z)
+    # b_hat = field.unitvector(q_X, q_Y, q_Z)
 
     # Finding grad_bhat (dbhat/dX, dbhat/dY, dbhat/dZ)
-    dbhat_dX = derivative(field.unitvector, dims="X", args={"X": q_X, "Y": q_Y, "Z": q_Z}, spacings=delta_X)
-    dbhat_dY = derivative(field.unitvector, dims="Y", args={"X": q_X, "Y": q_Y, "Z": q_Z}, spacings=delta_Y)
-    dbhat_dZ = derivative(field.unitvector, dims="Z", args={"X": q_X, "Y": q_Y, "Z": q_Z}, spacings=delta_Z)
-    grad_bhat = np.zeros([numberOfDataPoints, 3, 3])
-    grad_bhat[:, 0, :] = dbhat_dX
-    grad_bhat[:, 1, :] = dbhat_dY
-    grad_bhat[:, 2, :] = dbhat_dZ
+    # dbhat_dX = derivative(field.unitvector, dims="X", args={"X": q_X, "Y": q_Y, "Z": q_Z}, spacings=delta_X)
+    # dbhat_dY = derivative(field.unitvector, dims="Y", args={"X": q_X, "Y": q_Y, "Z": q_Z}, spacings=delta_Y)
+    # dbhat_dZ = derivative(field.unitvector, dims="Z", args={"X": q_X, "Y": q_Y, "Z": q_Z}, spacings=delta_Z)
+    # grad_bhat = np.zeros([numberOfDataPoints, 3, 3])
+    # grad_bhat[:, 0, :] = dbhat_dX
+    # grad_bhat[:, 1, :] = dbhat_dY
+    # grad_bhat[:, 2, :] = dbhat_dZ
 
     # Finding g = gradK_H and making x_hat, y_hat
-    g_magnitude = np.sqrt(dH_dKx**2 + dH_dKy**2 + dH_dKz**2)
-    g_hat = (np.block([[dH_dKx], [dH_dKy], [dH_dKz]]) / g_magnitude.data).T
-    y_hat = make_unit_vector_from_cross_product(b_hat, g_hat)
-    x_hat = make_unit_vector_from_cross_product(y_hat, g_hat)
+    # g_magnitude = np.sqrt(dH_dKx**2 + dH_dKy**2 + dH_dKz**2)
+    # g_hat = (np.block([[dH_dKx], [dH_dKy], [dH_dKz]]) / g_magnitude.data).T
+    # y_hat = make_unit_vector_from_cross_product(b_hat, g_hat)
+    # x_hat = make_unit_vector_from_cross_product(y_hat, g_hat)
 
     # There are two definitions of H used in Scotty:
     # H_Booker:  H is the determinant of the dispersion tensor D. Calculated using the Booker quartic
@@ -108,17 +237,17 @@ def immediate_analysis_3D(
     # print("K_X", K_X)
     # print("K_Y", K_Y)
     # print("K_Z", K_Z)
-    H_Booker = hamiltonian(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
-    H_Booker_other = hamiltonian_other(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
+    # H_Booker = hamiltonian(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
+    # H_Booker_other = hamiltonian_other(q_X, q_Y, q_Z, K_X, K_Y, K_Z)
     
     # Calculating electron density, temperature, and epsilon
-    electron_density = np.asfarray(density_fit(polflux))
-    temperature = np.asfarray(temperature_fit(polflux)) if temperature_fit else None
-    epsilon = DielectricTensor_3D(electron_density, launch_angular_frequency, B_magnitude, temperature)
+    # electron_density = np.asfarray(density_fit(polflux))
+    # temperature = np.asfarray(temperature_fit(polflux)) if temperature_fit else None
+    # epsilon = DielectricTensor_3D(electron_density, launch_angular_frequency, B_magnitude, temperature)
 
     # Calculating (normalised) gyro freqs and (normalised) plasma freqs
-    normalised_gyro_freqs = find_normalised_gyro_freq(electron_density, launch_angular_frequency, temperature)
-    normalised_plasma_freqs = find_normalised_plasma_freq(B_magnitude, launch_angular_frequency, temperature)
+    # normalised_gyro_freqs = find_normalised_gyro_freq(electron_density, launch_angular_frequency, temperature)
+    # normalised_plasma_freqs = find_normalised_plasma_freq(B_magnitude, launch_angular_frequency, temperature)
 
     # Sanity check -- make sure the calculated quantities are reasonable
     check_output(H_Booker)
@@ -213,9 +342,24 @@ def immediate_analysis_3D(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def further_analysis_3D(
     params: Parameters,
     inputs: xr.Dataset,
+    solver_output: xr.Dataset,
     df: xr.Dataset,
     Psi_3D_entry_labframe_cartesian: FloatArray,
     output_path: pathlib.Path,
@@ -229,8 +373,8 @@ def further_analysis_3D(
     """
 
     # Getting the important data
-    q_X, q_Y, q_Z = np.array(df.q_X), np.array(df.q_Y), np.array(df.q_Z)
-    K_X, K_Y, K_Z = np.array(df.K_X), np.array(df.K_Y), np.array(df.K_Z)
+    q_X, q_Y, q_Z = np.array(solver_output.q_X), np.array(solver_output.q_Y), np.array(solver_output.q_Z)
+    K_X, K_Y, K_Z = np.array(solver_output.K_X), np.array(solver_output.K_Y), np.array(solver_output.K_Z)
     K = np.stack((K_X, K_Y, K_Z), axis=1)
     K_magnitude = np.sqrt(K_X**2 + K_Y**2 + K_Z**2)
     numberOfDataPoints = len(df.tau)
@@ -273,7 +417,7 @@ def further_analysis_3D(
     Psi_yy_entry_beamframe_cartesian = dot([y_hat[0,:]], dot([Psi_3D_entry_labframe_cartesian], [y_hat[0,:]]))
 
     # Find the entries of Psi_3D_labframe_cartesian in the beam frame
-    Psi_3D_labframe_cartesian = np.array(df.Psi_3D_labframe_cartesian)
+    Psi_3D_labframe_cartesian = np.array(solver_output.Psi_3D_labframe_cartesian)
     Psi_xx_beamframe_cartesian = dot(x_hat, dot(Psi_3D_labframe_cartesian, x_hat))
     Psi_xy_beamframe_cartesian = dot(x_hat, dot(Psi_3D_labframe_cartesian, y_hat))
     Psi_xg_beamframe_cartesian = dot(x_hat, dot(Psi_3D_labframe_cartesian, g_hat))
@@ -321,7 +465,8 @@ def further_analysis_3D(
     # e_1_eigvec, e_2_eigvec, e_3_eigvec = e_eigvecs
 
     # In my experience, H_eigvals[:,1] corresponds to the O mode, and H_eigvals[:,0] corresponds to the X-mode
-    # ALERT: This may not always be the case! Check the output figure to make sure that the appropriate solution is indeed 0 along the ray
+    # NOTE: This may not always be the case! Check the output figure to make sure that
+    # the appropriate solution is indeed 0 along the ray
     mode_index = params.mode_index
     if mode_index == None: mode_index = 1 if inputs.mode_flag == 1 else 0
 
@@ -338,7 +483,8 @@ def further_analysis_3D(
         ]
     ).T - np.eye(3)
 
-    # Avoids dividing a small number by another small number, leading to a big number because of numerical errors or something
+    # Avoids dividing a small number by another small number,
+    # leading to a big number because of numerical errors or something
     loc_p_unnormalised = np.divide(
         np.abs(dot(np.conjugate(e_hat), dot(epsilon_minus_identity, e_hat)))**2,
         (df.electron_density * 1e19) ** 2,

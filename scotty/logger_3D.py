@@ -57,6 +57,9 @@ def config_logger(console_log_level: Union[str, int],
     
     log = logging.getLogger()
 
+    # If there are any existing handles (from previous runs), clear them
+    if log.hasHandlers(): log.handlers.clear()
+
     log_message_format = logging.Formatter(
         "%(levelname)8s  >  %(funcName)s()  >  %(filename)s:%(lineno)-4s  >  %(message)s"
     )
@@ -68,33 +71,25 @@ def config_logger(console_log_level: Union[str, int],
     # too lengthy and laggy to display in the main terminal)
     _add_log_level("trace", 5)
 
-    # If the logger already contains handlers (from previous
-    # runs), then just use those
-    if not log.handlers:
+    # Create console handler (print logs to console)
+    console_log_level = _validate_log_level(console_log_level, "console")
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(console_log_level)
+    console_handler.setFormatter(log_message_format)
+    log.addHandler(console_handler)
 
-        # Create console handler to print logs to console
-        console_log_level = _validate_log_level(console_log_level, "console")
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(console_log_level)
-        console_handler.setFormatter(log_message_format)
-        log.addHandler(console_handler)
-
-        # Create file handler to print logs to a separate log file
-        if file_log_level:
-            file_log_level = _validate_log_level(file_log_level, "file")
-            log_filename = output_path / f"scotty_log{output_filename_suffix}.log"
-            file_handler = logging.FileHandler(log_filename, mode = "a", encoding = "utf-8")
-            file_handler.setLevel(file_log_level)
-            file_handler.setFormatter(log_message_format)
-            log.addHandler(file_handler)
-        
-        # Setting the log level
-        if isinstance(console_log_level, str): console_log_level = _valid_log_level_dict[console_log_level]
-        if isinstance(file_log_level, str): file_log_level = _valid_log_level_dict[file_log_level]
-        elif file_log_level is None: file_log_level = console_log_level
-        
-        try: log.setLevel(min(console_log_level, file_log_level))
-        except NameError: log.setLevel(console_log_level)
+    # Create file handler (print logs to file)
+    if file_log_level:
+        file_log_level = _validate_log_level(file_log_level, "file")
+        log_filename = output_path / f"scotty_log{output_filename_suffix}.log"
+        file_handler = logging.FileHandler(log_filename, mode = "a", encoding = "utf-8")
+        file_handler.setLevel(file_log_level)
+        file_handler.setFormatter(log_message_format)
+        log.addHandler(file_handler)
+    
+    # Setting the log level
+    if file_log_level is None: log.setLevel(console_log_level)
+    else: log.setLevel(min(console_log_level, file_log_level))
     
     # Suppress all matplotlib log messages (except those
     # which are important)

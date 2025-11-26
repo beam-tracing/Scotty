@@ -83,9 +83,11 @@ def poloidal_flux_along_ray_line(X: float, Y: float, Z: float, tau: Union[float,
         polflux = field.polflux(positions[:, 0], positions[:, 1], positions[:, 2])
         if np.all(np.isnan(polflux)):
             _printmsg = "\n".join(f"            - [{position}]" for position in positions)
-            log.warning(f"Poloidal fluxes are NaNs at all points queried: [X,Y,Z] =")
-            log.debug(f"\n {_printmsg}")
-            log.warning(f"Returning None instead")
+            log.warning(f"""
+        Poloidal fluxes are NaNs at all points queried: [X,Y,Z] = \n{_printmsg}
+
+        Returning None instead. This may or may not cause issues
+        """)
             polflux = None
         else:
             NaN_replacement_value = polflux[~np.isnan(polflux)][0]

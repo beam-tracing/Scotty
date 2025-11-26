@@ -339,17 +339,16 @@ def ray_evolution_3D_fun(tau, ray_parameters_3D, hamiltonian: Hamiltonian_3D):
     if log.isEnabledFor(5):
         _printmsg = "\n".join(f"        #   - {key} = {dH[key]}" for key in dH)
         log.trace(f"""
-        ##################################################
-        #
-        # Calling Hamiltonian.derivatives with:
-        #   - [X, Y, Z] = [{q_X, q_Y, q_Z}]
-        #   - [K_X, K_Y, K_Z] = [{K_X, K_Y, K_Z}]
-        #
-        # Calculated values:
-        {_printmsg}
-        #
-        ##################################################
-        """)
+            ##################################################
+            #
+            # Calling Hamiltonian.derivatives with:
+            #   - [X, Y, Z] = [{q_X, q_Y, q_Z}]
+            #   - [K_X, K_Y, K_Z] = [{K_X, K_Y, K_Z}]
+            #
+            # Calculated values: \n{_printmsg}
+            #
+            ##################################################
+            """)
 
     # d(parameter) / d(tau)
     # indexes 0, 1, 2 correspond to d(q_X)/d(tau), d(q_Y)/d(tau), d(q_Z)/d(tau)

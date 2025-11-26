@@ -628,7 +628,7 @@ def plot_trajectories_poloidal(
     axs[0].plot(np.array(solver_output.q_X), np.array(solver_output.q_Z), color="black", linestyle="-", linewidth=2)
 
     launch_position_cartesian  = np.array(inputs.launch_position_cartesian)
-    initial_position_cartesian = np.array(inputs.initial_position_cartesian)
+    initial_position_cartesian = np.array(solver_output.initial_position_cartesian)
     X_coords = [launch_position_cartesian[0], initial_position_cartesian[0]]
     Z_coords = [launch_position_cartesian[2], initial_position_cartesian[2]]
     axs[0].plot(X_coords, Z_coords, color="black", linestyle="--", linewidth=2)

@@ -212,34 +212,34 @@ class Hamiltonian_3D:
         H_Booker = (K_magnitude / self.wavenumber_K0)**2 + (Booker_beta - self.mode_flag * np.sqrt(H_discriminant)) / (2 * Booker_alpha)
 
         log.trace(f"""
-        ##################################################
-        #
-        # Calling Hamiltonian with:
-        #   - [X, Y, Z] = [{X, Y, Z}]
-        #   - [K_X, K_Y, K_Z] = [{K_X, K_Y, K_Z}]
-        #
-        # Calculated values:
-        #   - pol. flux = {polflux}
-        #   - n_e = {electron_density}
-        #   - T_e = {temperature}
-        #   - [B_X, B_Y, B_Z] = [{B_X, B_Y, B_Z}]
-        #
-        #   - sin(theta_m)^2 = {sin_theta_m_sq}
-        #   - abs(theta_m) (in rad) = {np.arcsin(np.sqrt(sin_theta_m_sq))}
-        #   - abs(theta_m) (in deg) = {np.rad2deg(np.arcsin(np.sqrt(sin_theta_m_sq)))}
-        #
-        #   - e_11 = {epsilon.e_11}
-        #   - e_12 = {epsilon.e_12}
-        #   - e_bb = {epsilon.e_bb}
-        #
-        #   - Booker_a (a) = {Booker_alpha}
-        #   - Booker_b (b) = {Booker_beta}
-        #   - Booker_g (g) = {Booker_gamma}
-        #   - b^2 - 4ag = {H_discriminant}
-        #   - H_Booker = {H_Booker}
-        #
-        ##################################################
-        """)
+            ##################################################
+            #
+            # Calling Hamiltonian with:
+            #   - [X, Y, Z] = [{X, Y, Z}]
+            #   - [K_X, K_Y, K_Z] = [{K_X, K_Y, K_Z}]
+            #
+            # Calculated values:
+            #   - pol. flux = {polflux}
+            #   - n_e = {electron_density}
+            #   - T_e = {temperature}
+            #   - [B_X, B_Y, B_Z] = [{B_X, B_Y, B_Z}]
+            #
+            #   - sin(theta_m)^2 = {sin_theta_m_sq}
+            #   - abs(theta_m) (in rad) = {np.arcsin(np.sqrt(sin_theta_m_sq))}
+            #   - abs(theta_m) (in deg) = {np.rad2deg(np.arcsin(np.sqrt(sin_theta_m_sq)))}
+            #
+            #   - e_11 = {epsilon.e_11}
+            #   - e_12 = {epsilon.e_12}
+            #   - e_bb = {epsilon.e_bb}
+            #
+            #   - Booker_a (a) = {Booker_alpha}
+            #   - Booker_b (b) = {Booker_beta}
+            #   - Booker_g (g) = {Booker_gamma}
+            #   - b^2 - 4ag = {H_discriminant}
+            #   - H_Booker = {H_Booker}
+            #
+            ##################################################
+            """)
         
         return H_Booker
     
@@ -308,8 +308,7 @@ class Hamiltonian_3D:
             #   - [X, Y, Z] = [{X, Y, Z}]
             #   - [K_X, K_Y, K_Z] = [{K_X, K_Y, K_Z}]
             #
-            # Calculated values:
-            {_printmsg}
+            # Calculated values: \n{_printmsg}
             #
             ##################################################
             """)
@@ -403,7 +402,7 @@ def assign_hamiltonians(mode_flag_launch: Literal["O", "X", 1, -1],
     if not new_mode_flag_initial and mode_flag_launch in ["O", "X"]:
         raise ValueError(f"Unable to determine which `mode_flag` (+1 or -1) to use for {mode_flag_launch}-mode")
     elif mode_flag_initial != new_mode_flag_initial:
-        log.warning(f"`mode_flag` was not selected correctly in `find_plasma_entry_parameters` and has been changed from {mode_flag_initial} to {new_mode_flag_initial}. This may or may not be a significant problem.")
+        log.warning(f"`mode_flag` was not selected correctly in `find_plasma_entry_parameters` and has been changed from {mode_flag_initial} to {new_mode_flag_initial}. This may or may not cause issues")
         mode_flag_initial = new_mode_flag_initial
     
     log.debug(f"Hamiltonian with computed `mode_flag` = {mode_flag_initial} selected for user-passed `mode_flag` = {mode_flag_launch}")
