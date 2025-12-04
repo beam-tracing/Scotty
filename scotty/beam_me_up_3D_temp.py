@@ -3,8 +3,8 @@ import datatree
 import logging
 import numpy as np
 import pathlib
-from scipy.integrate import solve_ivp
-from scotty.analysis_3D import immediate_analysis_3D, further_analysis_3D, main_analysis_3D
+from scotty.analysis_3D import beam_tracing_analysis_3D
+from scotty.analysis_dbs_3D import analysis_dbs
 from scotty.checks_3D import Parameters, check_input_before_ray_tracing, VALID_LAUNCH_MODE_FLAGS, VALID_PSI_BC_FLAGS
 from scotty.fun_evolution_3D import evolve_beam
 from scotty.geometry_3D import MagneticField_3D_Cartesian, create_magnetic_geometry_3D
@@ -95,7 +95,7 @@ def beam_me_up_3D(
     return_dt_field: bool = False, # For returning the datatree, field class, and Hamiltonians
 
     # Keeping the extra kwargs for parsing later
-    **extras,
+    **kwargs,
 
     # These are/have been put in checks_3D
 
@@ -117,59 +117,60 @@ def beam_me_up_3D(
     #
     ##################################################
     q_launch_cartesian = launch_position_cartesian # This is left here for backward compatibility
-    params = Parameters(poloidal_launch_angle_Torbeam = poloidal_launch_angle_Torbeam,
-                        toroidal_launch_angle_Torbeam = toroidal_launch_angle_Torbeam,
-                        launch_freq_GHz = launch_freq_GHz,
-                        launch_beam_width = launch_beam_width,
-                        launch_beam_curvature = launch_beam_curvature,
-                        q_launch_cartesian = q_launch_cartesian,
-                        mode_flag_launch = mode_flag,
-                        vacuumLaunch_flag = vacuumLaunch_flag,
-                        vacuum_propagation_flag = vacuum_propagation_flag,
-                        Psi_BC_flag = Psi_BC_flag,
-                        relativistic_flag = relativistic_flag,
+    params = Parameters(
+        poloidal_launch_angle_Torbeam = poloidal_launch_angle_Torbeam,
+        toroidal_launch_angle_Torbeam = toroidal_launch_angle_Torbeam,
+        launch_freq_GHz = launch_freq_GHz,
+        launch_beam_width = launch_beam_width,
+        launch_beam_curvature = launch_beam_curvature,
+        q_launch_cartesian = q_launch_cartesian,
+        mode_flag_launch = mode_flag,
+        vacuumLaunch_flag = vacuumLaunch_flag,
+        vacuum_propagation_flag = vacuum_propagation_flag,
+        Psi_BC_flag = Psi_BC_flag,
+        relativistic_flag = relativistic_flag,
 
-                        magnetic_data_path = magnetic_data_path,
-                        ne_data_path = ne_data_path,
-                        Te_data_path = Te_data_path,
-                        input_filename_suffix = input_filename_suffix,
-                        output_path = output_path,
-                        output_filename_suffix = output_filename_suffix,
-                        shot = shot,
-                        equil_time = equil_time,
+        magnetic_data_path = magnetic_data_path,
+        ne_data_path = ne_data_path,
+        Te_data_path = Te_data_path,
+        input_filename_suffix = input_filename_suffix,
+        output_path = output_path,
+        output_filename_suffix = output_filename_suffix,
+        shot = shot,
+        equil_time = equil_time,
 
-                        auto_delta_sign = auto_delta_sign,
-                        delta_X = delta_X,
-                        delta_Y = delta_Y,
-                        delta_Z = delta_Z,
-                        delta_K_X = delta_K_X,
-                        delta_K_Y = delta_K_Y,
-                        delta_K_Z = delta_K_Z,
-                        len_tau = len_tau,
-                        rtol = rtol,
-                        atol = atol,
-                        poloidal_flux_enter = poloidal_flux_enter,
-                        poloidal_flux_zero_density = poloidal_flux_zero_density,
-                        poloidal_flux_zero_temperature = poloidal_flux_zero_temperature,
+        auto_delta_sign = auto_delta_sign,
+        delta_X = delta_X,
+        delta_Y = delta_Y,
+        delta_Z = delta_Z,
+        delta_K_X = delta_K_X,
+        delta_K_Y = delta_K_Y,
+        delta_K_Z = delta_K_Z,
+        len_tau = len_tau,
+        rtol = rtol,
+        atol = atol,
+        poloidal_flux_enter = poloidal_flux_enter,
+        poloidal_flux_zero_density = poloidal_flux_zero_density,
+        poloidal_flux_zero_temperature = poloidal_flux_zero_temperature,
 
-                        density_fit_parameters = density_fit_parameters,
-                        density_fit_method = density_fit_method,
-                        temperature_fit_parameters = temperature_fit_parameters,
-                        temperature_fit_method = temperature_fit_method,
-                        interp_order = interp_order,
-                        interp_smoothing = interp_smoothing,
+        density_fit_parameters = density_fit_parameters,
+        density_fit_method = density_fit_method,
+        temperature_fit_parameters = temperature_fit_parameters,
+        temperature_fit_method = temperature_fit_method,
+        interp_order = interp_order,
+        interp_smoothing = interp_smoothing,
 
-                        # TO REMOVE? still unused
-                        figure_flag = figure_flag,
-                        further_analysis_flag = further_analysis_flag,
-                        detailed_analysis_flag = detailed_analysis_flag,
+        # TO REMOVE? still unused
+        figure_flag = figure_flag,
+        further_analysis_flag = further_analysis_flag,
+        detailed_analysis_flag = detailed_analysis_flag,
 
-                        # TO REMOVE? still unused
-                        quick_run = quick_run,
-                        return_dt_field = return_dt_field,
+        # TO REMOVE? still unused
+        quick_run = quick_run,
+        return_dt_field = return_dt_field,
 
-                        **extras
-                        )
+        **kwargs
+        )
 
     # Setting up the logger
     config_logger(console_log_level, file_log_level, params.output_path, output_filename_suffix)
@@ -208,10 +209,11 @@ def beam_me_up_3D(
     # Using the electron density data, create a spline fit as a
     # function of poloidal flux, i.e.:
     # density_fit(poloidal_flux) = electron_density
-    density_fit = make_fit(params.density_fit_method,
-                           params.poloidal_flux_zero_density,
-                           params.density_fit_parameters,
-                           params.ne_filename)
+    density_fit = make_fit(
+        params.density_fit_method,
+        params.poloidal_flux_zero_density,
+        params.density_fit_parameters,
+        params.ne_filename)
 
     # TODO THIS SOON
     # Using the temperature data, create a spline fit as a
@@ -223,12 +225,14 @@ def beam_me_up_3D(
 
     # If the user has already pre-loaded a field, use it
     # Otherwise, create a new one from the specified data pathway
-    field = create_magnetic_geometry_3D(find_B_method,
-                                        params.magnetic_data_path,
-                                        params.input_filename_suffix,
-                                        params.interp_order_magnetic_data,
-                                        shot,
-                                        equil_time)
+    field = create_magnetic_geometry_3D(
+        find_B_method,
+        params.magnetic_data_path,
+        params.input_filename_suffix,
+        params.interp_order_magnetic_data,
+        shot,
+        equil_time,
+        **kwargs.get("create_magnetic_geometry_3D", {}))
     
     log.info(f"""\n
     ##################################################
@@ -239,74 +243,83 @@ def beam_me_up_3D(
     """)
 
     # Calculating the plasma entry position and auto_delta_sign
-    params.q_initial_cartesian = find_plasma_entry_position(params.poloidal_launch_angle_deg_Torbeam,
-                                                            params.toroidal_launch_angle_deg_Torbeam,
-                                                            params.q_launch_cartesian,
-                                                            field,
-                                                            params.poloidal_flux_enter,
-                                                            boundary_adjust = 1e-6)
+    params.q_initial_cartesian = find_plasma_entry_position(
+        params.poloidal_launch_angle_deg_Torbeam,
+        params.toroidal_launch_angle_deg_Torbeam,
+        params.q_launch_cartesian,
+        field,
+        params.poloidal_flux_enter,
+        boundary_adjust = 1e-6)
 
     # Setting the delta_signs
-    (params.delta_X,
-     params.delta_Y,
-     params.delta_Z) = find_auto_delta_signs(params.auto_delta_sign,
-                                             params.q_initial_cartesian,
-                                             params.delta_X,
-                                             params.delta_Y,
-                                             params.delta_Z,
-                                             field)
+    (   params.delta_X,
+        params.delta_Y,
+        params.delta_Z
+    ) = find_auto_delta_signs(
+        params.auto_delta_sign,
+        params.q_initial_cartesian,
+        params.delta_X,
+        params.delta_Y,
+        params.delta_Z,
+        field)
 
     # Initialises the Hamiltonian H for mode_flags +1 and -1
-    (hamiltonian_pos1,
-     hamiltonian_neg1) = initialise_hamiltonians(params.launch_angular_frequency,
-                                                 params.delta_X,
-                                                 params.delta_Y,
-                                                 params.delta_Z,
-                                                 params.delta_K_X,
-                                                 params.delta_K_Y,
-                                                 params.delta_K_Z,
-                                                 field,
-                                                 density_fit,
-                                                 temperature_fit)
+    (   hamiltonian_pos1,
+        hamiltonian_neg1
+    ) = initialise_hamiltonians(
+        params.launch_angular_frequency,
+        params.delta_X,
+        params.delta_Y,
+        params.delta_Z,
+        params.delta_K_X,
+        params.delta_K_Y,
+        params.delta_K_Z,
+        field,
+        density_fit,
+        temperature_fit)
     
     # Calculating the plasma entry parameters
-    (params.K_launch_cartesian,
-     params.K_initial_cartesian,
-     params.Psi_3D_launch_labframe_cartesian,
-     params.Psi_3D_entry_labframe_cartesian,
-     params.Psi_3D_initial_labframe_cartesian,
-     params.distance_from_launch_to_entry,
-     params.e_hat_initial,
-     params.mode_flag_initial,
-     params.mode_index) = find_plasma_entry_parameters(params.vacuumLaunch_flag,
-                                                       params.vacuum_propagation_flag,
-                                                       params.Psi_BC_flag,
-                                                       params.mode_flag_launch,
-                                                       params.poloidal_launch_angle_deg_Torbeam,
-                                                       params.toroidal_launch_angle_deg_Torbeam,
-                                                       params.q_launch_cartesian,
-                                                       params.q_initial_cartesian,
-                                                       params.launch_wavenumber,
-                                                       params.launch_beam_width,
-                                                       params.launch_beam_curvature,
-                                                       field,
-                                                       params.K_plasmaLaunch_cartesian,
-                                                       params.Psi_3D_plasmaLaunch_labframe_cartesian,
-                                                       hamiltonian_pos1,
-                                                       hamiltonian_neg1,
-                                                       tol_H = 1e-5,
-                                                       tol_O_mode_polarisation = 0.5)
+    (   params.K_launch_cartesian,
+        params.K_initial_cartesian,
+        params.Psi_3D_launch_labframe_cartesian,
+        params.Psi_3D_entry_labframe_cartesian,
+        params.Psi_3D_initial_labframe_cartesian,
+        params.distance_from_launch_to_entry,
+        params.e_hat_initial,
+        params.mode_flag_initial,
+        params.mode_index
+    ) = find_plasma_entry_parameters(
+        params.vacuumLaunch_flag,
+        params.vacuum_propagation_flag,
+        params.Psi_BC_flag,
+        params.mode_flag_launch,
+        params.poloidal_launch_angle_deg_Torbeam,
+        params.toroidal_launch_angle_deg_Torbeam,
+        params.q_launch_cartesian,
+        params.q_initial_cartesian,
+        params.launch_wavenumber,
+        params.launch_beam_width,
+        params.launch_beam_curvature,
+        field,
+        params.K_plasmaLaunch_cartesian,
+        params.Psi_3D_plasmaLaunch_labframe_cartesian,
+        hamiltonian_pos1,
+        hamiltonian_neg1,
+        tol_H = 1e-5,
+        tol_O_mode_polarisation = 0.5)
     
     # Assigning the correct Hamiltonian
-    (hamiltonian,
-     hamiltonian_other,
-     params.mode_flag_initial) = assign_hamiltonians(params.mode_flag_launch,
-                                                     params.mode_flag_initial,
-                                                     hamiltonian_pos1,
-                                                     hamiltonian_neg1,
-                                                     params.q_initial_cartesian,
-                                                     params.K_initial_cartesian,
-                                                     tol_H = 1e-5)
+    (   hamiltonian,
+        hamiltonian_other,
+        params.mode_flag_initial
+    ) = assign_hamiltonians(
+        params.mode_flag_launch,
+        params.mode_flag_initial,
+        hamiltonian_pos1,
+        hamiltonian_neg1,
+        params.q_initial_cartesian,
+        params.K_initial_cartesian,
+        tol_H = 1e-5)
 
     # Checking validity of user-specified arguments
     # one last time before ray tracing
@@ -320,16 +333,17 @@ def beam_me_up_3D(
     ##################################################
     """)
 
-    ray_solver_output = propagate_ray(params.poloidal_flux_enter,
-                                      params.launch_angular_frequency,
-                                      field,
-                                      params.q_initial_cartesian,
-                                      params.K_initial_cartesian,
-                                      hamiltonian,
-                                      params.rtol,
-                                      params.atol,
-                                      quick_run,
-                                      params.len_tau)
+    ray_solver_output = propagate_ray(
+        params.poloidal_flux_enter,
+        params.launch_angular_frequency,
+        field,
+        params.q_initial_cartesian,
+        params.K_initial_cartesian,
+        hamiltonian,
+        params.rtol,
+        params.atol,
+        quick_run,
+        params.len_tau)
     
     # TO REMOVE -- need to put one line here to check final value of H_Booker and log it
 
@@ -346,17 +360,32 @@ def beam_me_up_3D(
     ##################################################
     """)
 
-    (solver_status, tau_array,
-     (q_X_array, q_Y_array, q_Z_array,
-      K_X_array, K_Y_array, K_Z_array,
-      Psi_3D_output_labframe_cartesian)) = evolve_beam(params.q_initial_cartesian,
-                                                       params.K_initial_cartesian,
-                                                       params.Psi_3D_initial_labframe_cartesian,
-                                                       tau_leave,
-                                                       tau_points,
-                                                       hamiltonian,
-                                                       params.rtol,
-                                                       params.atol)
+    (   solver_status, tau_array,
+        q_X_array, q_Y_array, q_Z_array,
+        K_X_array, K_Y_array, K_Z_array,
+        Psi_3D_output_labframe_cartesian
+    ) = evolve_beam(
+        params.q_initial_cartesian,
+        params.K_initial_cartesian,
+        params.Psi_3D_initial_labframe_cartesian,
+        tau_leave,
+        tau_points,
+        hamiltonian,
+        params.rtol,
+        params.atol)
+    
+    # For np.stack(..., axis=1), accessing the array once gives
+    # the point-wise coordinates, i.e. (X,Y,Z) for each point.
+    # Transposing it yields coordinate-wise coordinates, i.e. three
+    # arrays of the same length corresponding to all X, all Y, and
+    # all Z coordinates
+
+    q_vec = np.stack((q_X_array, q_Y_array, q_Z_array), axis=1)
+    q_mag = np.linalg.norm(q_vec, axis=1)
+
+    K_vec = np.stack((K_X_array, K_Y_array, K_Z_array), axis=1)
+    K_mag = np.linalg.norm(K_vec, axis=1)
+    K_hat = K_vec / K_mag[:, np.newaxis]
 
     log.info(f"""\n
     ##################################################
@@ -365,107 +394,6 @@ def beam_me_up_3D(
     #
     ##################################################
     """)
-
-    # inputs = xr.Dataset(
-    #     {
-    #         # Data pathways
-    #         "ne_data_path": str(params.ne_data_path),
-    #         "magnetic_data_path": str(params.magnetic_data_path),
-    #         "Te_data_path": str(params.Te_data_path),
-    #         "output_path": str(params.output_path),
-    #         "input_filename_suffix": str(params.input_filename_suffix),
-    #         "output_filename_suffix": str(params.output_filename_suffix),
-            
-    #         # Important ray/beam stuff
-    #         "poloidal_launch_angle_Torbeam": params.poloidal_launch_angle_deg_Torbeam,
-    #         "toroidal_launch_angle_Torbeam": params.toroidal_launch_angle_deg_Torbeam,
-    #         "launch_position_cartesian": (["col"], params.q_launch_cartesian),
-    #         "launch_freq_GHz": params.launch_frequency_GHz,
-    #         "launch_angular_frequency": params.launch_angular_frequency,
-    #         "launch_beam_width": params.launch_beam_width,
-    #         "launch_beam_curvature": params.launch_beam_curvature,
-    #         "K_launch_cartesian": params.K_launch_cartesian,
-    #         "mode_flag": mode_flag, # TO REMOVE?
-    #         "mode_flag_launch": params.mode_flag_launch, # This must be the same as "mode_flag"
-    #         "mode_flag_initial": params.mode_flag_initial,
-    #         "mode_index": params.mode_index,
-    #         "initial_position_cartesian": (["col"], params.q_initial_cartesian),
-    #         "initial_K_cartesian": (["col"], params.K_initial_cartesian),
-    #         "initial_Psi_3D_lab_cartesian": (["row","col"], params.Psi_3D_initial_labframe_cartesian),
-    #         "delta_X": params.delta_X,
-    #         "delta_Y": params.delta_Y,
-    #         "delta_Z": params.delta_Z,
-    #         "delta_K_X": params.delta_K_X,
-    #         "delta_K_Y": params.delta_K_Y,
-    #         "delta_K_Z": params.delta_K_Z,
-    #         "interp_order": interp_order,
-    #         "interp_order_magnetic_data": params.interp_order_magnetic_data,
-    #         "interp_order_ne_data": params.interp_order_ne_data,
-    #         "interp_smoothing": params.interp_smoothing,
-    #         "len_tau": params.len_tau,
-    #         "rtol": params.rtol,
-    #         "atol": params.atol,
-
-    #         # Poloidal flux parameters
-    #         "poloidal_flux_enter": poloidal_flux_enter,
-    #         "poloidal_flux_zero_density": poloidal_flux_zero_density,
-    #         "poloidal_flux_zero_temperature": poloidal_flux_zero_temperature,
-
-    #         # Flags
-    #         "vacuumLaunch_flag": vacuumLaunch_flag,
-    #         "vacuum_propagation_flag": vacuum_propagation_flag,
-    #         "relativistic_flag": relativistic_flag,
-    #         "Psi_BC_flag": Psi_BC_flag,
-    #         "quick_run": quick_run,
-    #         "figure_flag": figure_flag,
-    #         "detailed_analysis_flag": detailed_analysis_flag,
-
-    #         # Miscellaneous
-    #         "find_B_method": str(find_B_method),
-    #         "density_fit_parameters": str(density_fit_parameters),
-    #         "temperature_fit_parameters": str(temperature_fit_parameters),
-    #         "shot": shot,
-    #         "equil_time": equil_time,
-    #     },
-    #     coords = {
-    #         "X": field.X_coord,
-    #         "Y": field.Y_coord,
-    #         "Z": field.Z_coord,
-    #         "row": ["X","Y","Z"],
-    #         "col": ["X","Y","Z"],
-    #     },
-    # )
-
-    # solver_output = xr.Dataset(
-    #     {
-    #         # Solver output
-    #         "solver_status": solver_status,
-    #         "q_X": (["tau"], q_X_array, {"long_name": "X", "units": "m"}),
-    #         "q_Y": (["tau"], q_Y_array, {"long_name": "Y", "units": "m"}),
-    #         "q_Z": (["tau"], q_Z_array, {"long_name": "Z", "units": "m"}),
-    #         "K_X": (["tau"], K_X_array),
-    #         "K_Y": (["tau"], K_Y_array),
-    #         "K_Z": (["tau"], K_Z_array),
-    #         "Psi_3D_launch_labframe_cartesian": (["row","col"], params.Psi_3D_launch_labframe_cartesian),
-    #         "Psi_3D_entry_labframe_cartesian": (["row","col"], params.Psi_3D_entry_labframe_cartesian),
-    #         "initial_Psi_3D_lab_cartesian": (["row","col"], params.Psi_3D_initial_labframe_cartesian), # TO REMOVE -- change key name?
-    #         "Psi_3D_labframe_cartesian": (["tau","row","col"], Psi_3D_output_labframe_cartesian), # TO REMOVE -- change key name?
-    #     },
-    #     coords = {
-    #         "tau": tau_array,
-    #         "row": ["X","Y","Z"],
-    #         "col": ["X","Y","Z"],
-    #     },
-    # )
-
-    # dt = datatree.DataTree.from_dict({"inputs": inputs, "solver_output": solver_output})
-    # dt.attrs = {
-    #     "title": output_filename_suffix,
-    #     "software_name": "scotty-beam-tracing",
-    #     "software_version": __version__,
-    #     "date_created": str(datetime.datetime.now()),
-    #     "id": str(uuid.uuid4())
-    # }
 
     inputs = xr.Dataset(
         {
@@ -538,6 +466,8 @@ def beam_me_up_3D(
             "q_X": (["tau"], q_X_array, {"long_name": "X", "units": "m"}),
             "q_Y": (["tau"], q_Y_array, {"long_name": "Y", "units": "m"}),
             "q_Z": (["tau"], q_Z_array, {"long_name": "Z", "units": "m"}),
+            "q_vector": (["tau","col"], q_vec),
+            "q_magnitude": (["tau"], q_mag),
             
             # Wavevector
             "K_launch_cartesian":  (["col"], params.K_launch_cartesian),
@@ -546,6 +476,9 @@ def beam_me_up_3D(
             "K_X": (["tau"], K_X_array),
             "K_Y": (["tau"], K_Y_array),
             "K_Z": (["tau"], K_Z_array),
+            "K_vector": (["tau","col"], K_vec),
+            "K_hat": (["tau","col"], K_hat),
+            "K_magnitude": (["tau"], K_mag),
             
             # Psi
             "Psi_3D_launch_labframe_cartesian":  (["row","col"], params.Psi_3D_launch_labframe_cartesian),
@@ -581,8 +514,7 @@ def beam_me_up_3D(
         log.warning(f"Beam solver did not reach completion")
         if return_dt_field: return dt, field, hamiltonian, hamiltonian_other
     
-
-
+    log.info(f"""\n
     ##################################################
     #
     # DATA ANALYSIS ROUTINE
@@ -591,60 +523,32 @@ def beam_me_up_3D(
     # bunch of useful stuff
     #
     ##################################################
-
-    print(f"Performing data analysis")
-    dH = hamiltonian.derivatives(q_X_array, q_Y_array, q_Z_array,
-                                 K_X_array, K_Y_array, K_Z_array,
-                                 second_order = True)
+    """)
     
-    df = main_analysis_3D(solver_output = solver_output,
-                          hamiltonian = hamiltonian,
-                          hamiltonian_other = hamiltonian_other,
-                          field = field,
-                          density_fit = density_fit,
-                          temperature_fit = temperature_fit)
-
-    # df = immediate_analysis_3D(
-    #     params,
-    #     solver_output,
-    #     field,
-    #     density_fit,
-    #     temperature_fit,
-    #     hamiltonian,
-    #     hamiltonian_other,
-    #     params.launch_angular_frequency,
-    #     params.mode_flag_initial,
-    #     params.delta_X,
-    #     params.delta_Y,
-    #     params.delta_Z,
-    #     params.delta_K_X,
-    #     params.delta_K_Y,
-    #     params.delta_K_Z,
-    #     Psi_3D_lab_launch = None,             # Not used yet, so set vacuumLaunch_flag = False
-    #     Psi_3D_lab_entry  = None,             # Not used yet, so set vacuumLaunch_flag = False
-    #     distance_from_launch_to_entry = None, # Not used yet, so set vacuumLaunch_flag = False
-    #     vacuumLaunch_flag = False,
-    #     output_path = params.output_path,
-    #     output_filename_suffix = params.output_filename_suffix,
-    #     dH = dH,
-    # )
-
+    analysis = beam_tracing_analysis_3D(
+        inputs = inputs,
+        solver_output = solver_output,
+        hamiltonian = hamiltonian,
+        hamiltonian_other = hamiltonian_other,
+        field = field,
+        density_fit = density_fit,
+        temperature_fit = temperature_fit)
+    
+    # TO REMOVE -- change flag name
     if further_analysis_flag:
-        analysis = further_analysis_3D(
-            params,
-            inputs,
-            solver_output,
-            df,
-            Psi_3D_entry_labframe_cartesian = Psi_3D_output_labframe_cartesian[0], # TO DELETE : this is only temporary, because vacuumLaunch_flag = False
-            output_path = params.output_path,
-            output_filename_suffix = params.output_filename_suffix,
+        dbs_analysis = analysis_dbs(
+            inputs = inputs,
+            solver_output = solver_output,
+            analysis = analysis,
+            hamiltonian = hamiltonian,
+            hamiltonian_other = hamiltonian_other,
             field = field,
-            detailed_analysis_flag = False, # Set to False to disable localisation analysis (not implemented with 3D Scotty anyway)
-            dH = dH,
-        )
+            density_fit = density_fit,
+            temperature_fit = temperature_fit)
 
-        df.update(analysis)
-        dt["analysis"] = datatree.DataTree(df)
+        analysis.update(dbs_analysis)
+    
+    dt["analysis"] = datatree.DataTree(analysis)
 
     # We need to use h5netcdf and invalid_netcdf in order to easily
     # write complex numbers
@@ -668,16 +572,18 @@ def beam_me_up_3D(
 
         # TO REMOVE -- experimental, need to clean up
         plot_trajectories_poloidal(field, dt.inputs, dt.solver_output, dt.analysis, filename=(params.output_path / f"poloidal_trajectory{params.output_filename_suffix}.png"))
-        print(f"Figures saved to \n{params.output_path}")
+        log.info(f"Figures saved to \n        {params.output_path}")
     
-    # TO REMOVE ??? idk
-    print(f"##################################################")
-    print(f"#")
-    print(f"# FINISHED RUN !")
-    print(f"#")
-    print(f"##################################################")
+    log.info(f"""\n
+    ##################################################
+    #
+    # FINISHED RUN !
+    #
+    ##################################################
+    """)
 
-    if return_dt_field: return dt, field, hamiltonian, hamiltonian_other
+    if return_dt_field: return dt, field, density_fit, temperature_fit, hamiltonian
+    else: return dt
 
 
 
@@ -694,14 +600,10 @@ def make_fit(
     if callable(method):
         return method
     
-    if not isinstance(method, (str, type(None))):
-        raise TypeError(
-            f"Unexpected method type. Expected callable, str, or None, but got '{type(method)}'"
-        )
+    if not isinstance(method, (str, type(None))): raise TypeError(
+        f"Unexpected method type. Expected callable, str, or None, but got '{type(method)}'")
     
-    if parameters is None:
-        raise ValueError(
-            f"Passing `density_fit_method` ({method}) as string or None requires a list or array of parameters"
-        )
+    if parameters is None: raise ValueError(
+        f"Passing `density_fit_method` ({method}) as string or None requires a list or array of parameters")
     
     return profile_fit(method, poloidal_flux_zero_density, parameters, filename)

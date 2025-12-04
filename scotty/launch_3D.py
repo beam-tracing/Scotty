@@ -90,6 +90,7 @@ def find_plasma_entry_position(poloidal_launch_angle_deg_Torbeam: float,
             root = spline_roots[(np.abs(spline_roots - poloidal_flux_enter)).argmin()]
         except (ValueError, ZeroDivisionError) as e:
             log.debug(f"Unable to find any roots with `tau_max` = {tau_max} with error: {e}")
+            spline_roots = None
             root = None
         else: return root, spline_roots
         finally:

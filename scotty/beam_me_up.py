@@ -743,7 +743,7 @@ def beam_me_up(
         default_plots(dt, field, output_path, output_filename_suffix)
 
     # TO REMOVE everything except dt
-    return dt, field, hamiltonian, initial_position, launch_K, K_initial, Psi_3D_lab_entry_cartersian, Psi_3D_lab_initial
+    return dt, field, find_density_1D, find_temperature_1D, hamiltonian
 
 
 def default_plots(

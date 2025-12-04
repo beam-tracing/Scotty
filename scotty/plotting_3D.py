@@ -17,26 +17,26 @@ def maybe_make_axis(ax: Optional[plt.Axes], *args, **kwargs) -> plt.Axes:
 
 
 
-def get_metadata(inputs: xr.Dataset) -> dict:
+def get_metadata(inputs: xr.Dataset, round: int = 3) -> dict:
     
     # The items are from an xarray
     # So they are either floats/ints or strings
     # Parse them as such
     def format_metadata(item):
-        try: newitem = f"{np.round(np.array(item), 3)}"
+        try:    newitem = f"{np.round(np.array(item), round)}"
         except: newitem = str(item)
-        else: newitem = f"{np.round(np.array(item), 3)}"
-        return newitem
+        else:   newitem = f"{np.round(np.array(item), round)}"
+        return  newitem
     
     # TO REMOVE -- probably can get units directly from dt.attrs or something?
     return {
         "Poloidal Launch Angle": format_metadata(inputs.poloidal_launch_angle_Torbeam.data) + r"$^\circ$",
         "Toroidal Launch Angle": format_metadata(inputs.toroidal_launch_angle_Torbeam.data) + r"$^\circ$",
-        "Launch Position [X, Y, Z]": format_metadata(inputs.launch_position_cartesian.data),
+        "Launch Position [X,Y,Z]": format_metadata(inputs.launch_position_cartesian.data),
         "Launch Frequency": format_metadata(inputs.launch_freq_GHz.data) + " GHz",
         "Launch Beam Width": format_metadata(inputs.launch_beam_width.data) + "m",
         "Launch Beam Curvature": format_metadata(inputs.launch_beam_curvature.data) + r"m$^{-1}$",
-        "Mode Flag": format_metadata(inputs.mode_flag.data),
+        "Mode Flag": format_metadata(inputs.mode_flag_launch.data),
     }
 
 
@@ -317,12 +317,12 @@ def plot_dispersion_relation(
                       "subplot_legend": True,
                       "subplot_grid": True,
                       },
-                        {"H_eigval 1 (X?)":  np.abs(np.array(analysis.H_eigvals.sel(col="X"))), "color": "pink",       "linestyle": "-", "linewidth": 4},
-                        {"H eigval 2 (O?)":  np.abs(np.array(analysis.H_eigvals.sel(col="Y"))), "color": "lightgreen", "linestyle": "-", "linewidth": 4},
-                        {"H eigval 3":       np.abs(np.array(analysis.H_eigvals.sel(col="Z"))), "color": "gray",       "linestyle": "-", "linewidth": 4},
-                        {"H 1 Cardano":      np.abs(np.array(analysis.H_1_Cardano)),            "color": "k",          "linestyle": ":", "linewidth": 4},
-                        {"H 2 Cardano (X?)": np.abs(np.array(analysis.H_2_Cardano)),            "color": "r",          "linestyle": ":", "linewidth": 4},
-                        {"H 3 Cardano (O?)": np.abs(np.array(analysis.H_3_Cardano)),            "color": "g",          "linestyle": ":", "linewidth": 4},
+                        {"H_eigval 1 (X?)":  np.abs(np.array(analysis.H_Cardano_1)),            "color": "pink",       "linestyle": "-", "linewidth": 4},
+                        {"H eigval 2 (O?)":  np.abs(np.array(analysis.H_Cardano_2)),            "color": "lightgreen", "linestyle": "-", "linewidth": 4},
+                        {"H eigval 3":       np.abs(np.array(analysis.H_Cardano_3)),            "color": "gray",       "linestyle": "-", "linewidth": 4},
+                        {"H 1 Cardano":      np.abs(np.array(analysis.H_Cardano_1_analytical)), "color": "k",          "linestyle": ":", "linewidth": 4},
+                        {"H 2 Cardano (X?)": np.abs(np.array(analysis.H_Cardano_2_analytical)), "color": "r",          "linestyle": ":", "linewidth": 4},
+                        {"H 3 Cardano (O?)": np.abs(np.array(analysis.H_Cardano_3_analytical)), "color": "g",          "linestyle": ":", "linewidth": 4},
                    ],
                  ]
     
@@ -382,16 +382,16 @@ def plot_localisations(
                       "subplot_legend": True,
                       "subplot_grid": True,
                       },
-                        {"k^(-10/3)": np.array(analysis.loc_s_10_3), "color": "blue"},
-                        {"k^(-13/3)": np.array(analysis.loc_s_13_3), "color": "red"},
+                        {"k^(-10/3)": np.array(analysis["loc_s_-10_3"]), "color": "blue"},
+                        {"k^(-13/3)": np.array(analysis["loc_s_-13_3"]), "color": "red"},
                    ],
                    [ {"subplot_title": f"All Pieces",
                       "subplot_title_fontsize": 16,
                       "subplot_legend": True,
                       "subplot_grid": True,
                       },
-                        {"k^(-10/3)": np.array(analysis.loc_all_10_3), "color": "blue"},
-                        {"k^(-13/3)": np.array(analysis.loc_all_13_3), "color": "red"},
+                        {"k^(-10/3)": np.array(analysis["loc_all_-10_3"]), "color": "blue"},
+                        {"k^(-13/3)": np.array(analysis["loc_all_-13_3"]), "color": "red"},
                    ], 
                  ]
     

@@ -64,10 +64,10 @@ def unpack_beam_parameters_3D(
     n_points = beam_parameters.shape[1] if beam_parameters.ndim == 2 else 1
 
     Psi = np.zeros([n_points, 3, 3], dtype="complex128")
-    Psi[:,0,0] = beam_parameters[6, ...]  + 1j * beam_parameters[12, ...]  # Psi_xx
-    Psi[:,1,1] = beam_parameters[7, ...]  + 1j * beam_parameters[13, ...]  # Psi_yy
-    Psi[:,2,2] = beam_parameters[8, ...]  + 1j * beam_parameters[14, ...]  # Psi_zz
-    Psi[:,0,1] = beam_parameters[9, ...]  + 1j * beam_parameters[15, ...]  # Psi_xy
+    Psi[:,0,0] = beam_parameters[6,  ...] + 1j * beam_parameters[12, ...] # Psi_xx
+    Psi[:,1,1] = beam_parameters[7,  ...] + 1j * beam_parameters[13, ...] # Psi_yy
+    Psi[:,2,2] = beam_parameters[8,  ...] + 1j * beam_parameters[14, ...] # Psi_zz
+    Psi[:,0,1] = beam_parameters[9,  ...] + 1j * beam_parameters[15, ...] # Psi_xy
     Psi[:,0,2] = beam_parameters[10, ...] + 1j * beam_parameters[16, ...] # Psi_xz
     Psi[:,1,2] = beam_parameters[11, ...] + 1j * beam_parameters[17, ...] # Psi_yz
     Psi[:,1,0] = Psi[:,0,1] # Psi is symmetric
@@ -163,6 +163,7 @@ def evolve_beam(q_initial_cartesian: FloatArray,
      K_X_array, K_Y_array, K_Z_array,
      Psi_3D_output_labframe_cartesian) = unpack_beam_parameters_3D(beam_parameters_final)
     
-    return beam_solver_status, tau_array, (q_X_array, q_Y_array, q_Z_array,
-                                           K_X_array, K_Y_array, K_Z_array,
-                                           Psi_3D_output_labframe_cartesian)
+    return (beam_solver_status, tau_array,
+            q_X_array, q_Y_array, q_Z_array,
+            K_X_array, K_Y_array, K_Z_array,
+            Psi_3D_output_labframe_cartesian)
