@@ -37,8 +37,9 @@ def analysis_dbs(
 
     # Find the distance along the arc
     # For line integral later
-    q_mag = np.array(solver_output.q_magnitude)
-    dl_along_arc = np.diff(q_mag)
+    dl_along_arc = np.sqrt( np.diff(solver_output.q_X)**2 +
+                            np.diff(solver_output.q_Y)**2 +
+                            np.diff(solver_output.q_Z)**2 )
     distance_along_arc = np.append(0, np.cumsum(dl_along_arc))
 
     # Find the index of the propagation corresponding to min(|K|)

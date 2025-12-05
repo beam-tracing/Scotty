@@ -237,11 +237,16 @@ def find_K_lab_Cartesian(K_lab, q_lab):
     q_R = q_lab[0]
     q_zeta = q_lab[1]
 
-    K_lab_Cartesian = np.zeros(3)
+    if isinstance(K_R, float): n = 1
+    else: n = len(K_R)
+
+    K_lab_Cartesian = np.zeros((3, n))
     K_lab_Cartesian[0] = K_R * np.cos(q_zeta) - K_zeta * np.sin(q_zeta) / q_R  # K_X
     K_lab_Cartesian[1] = K_R * np.sin(q_zeta) + K_zeta * np.cos(q_zeta) / q_R  # K_Y
     K_lab_Cartesian[2] = K_Z
-    return K_lab_Cartesian
+
+    # This returns K_X, K_Y, K_Z (either as floats or individual arrays)
+    return np.squeeze(K_lab_Cartesian)
 
 
 def find_K_lab(K_lab_Cartesian, q_lab_Cartesian):

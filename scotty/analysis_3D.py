@@ -202,6 +202,7 @@ def beam_tracing_analysis_3D(
             "H_Cardano_1_analytical": (["tau"], H_Cardano_eigvals_analytical[0]),
             "H_Cardano_2_analytical": (["tau"], H_Cardano_eigvals_analytical[1]),
             "H_Cardano_3_analytical": (["tau"], H_Cardano_eigvals_analytical[2]),
+            "H_Cardano": (["tau"], H_Cardano_eigvals[:, mode_index]),
 
             # Poloidal flux stuff
             "polflux":     (["tau"], polflux),
