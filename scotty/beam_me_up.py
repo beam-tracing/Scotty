@@ -95,6 +95,7 @@ from scotty.check_input import check_input
 from typing import Optional, Union, Sequence, cast
 from scotty.typing import PathLike, FloatArray
 
+
 def beam_me_up(
     poloidal_launch_angle_Torbeam: float,
     toroidal_launch_angle_Torbeam: float,
