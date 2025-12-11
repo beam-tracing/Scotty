@@ -95,7 +95,7 @@ from scotty.check_input import check_input
 from typing import Optional, Union, Sequence, cast
 from scotty.typing import PathLike, FloatArray
 
-
+from datatree import DataTree  
 def beam_me_up(
     poloidal_launch_angle_Torbeam: float,
     toroidal_launch_angle_Torbeam: float,
@@ -391,6 +391,7 @@ def beam_me_up(
         )
     else:
         find_temperature_1D = None
+        
 
     field = create_magnetic_geometry(
         find_B_method,
@@ -520,7 +521,10 @@ def beam_me_up(
         rtol,
         atol,
         quick_run,
+        mode_flag,
         len_tau,
+        find_density_1D,
+        find_temperature_1D
     )
     if quick_run:
         return ray_solver_output
@@ -661,7 +665,7 @@ def beam_me_up(
         },
     )
 
-    dt = xr.DataTree.from_dict({"inputs": inputs, "solver_output": solver_output})
+    dt = DataTree.from_dict({"inputs": inputs, "solver_output": solver_output})
     dt.attrs = {
         "title": output_filename_suffix,
         "software_name": "scotty-beam-tracing",
@@ -716,7 +720,7 @@ def beam_me_up(
         dH,
     )
     df.update(analysis)
-    dt["analysis"] = xr.DataTree(df)
+    dt["analysis"] = DataTree(df)
 
     # We need to use h5netcdf and invalid_netcdf in order to easily
     # write complex numbers

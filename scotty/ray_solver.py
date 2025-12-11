@@ -10,15 +10,16 @@ plasma, which then sets the integration limits for the beam solver.
 
 from dataclasses import dataclass
 from time import time
-from typing import Any, Callable, Dict, Protocol, Tuple, Union, cast
+from typing import Any, Callable, Dict, Protocol, Tuple, Union, cast, Optional
+from scotty.profile_fit import ProfileFitLike
 
 import numpy as np
 from scipy.integrate import solve_ivp
 
-from scotty.fun_general import K_magnitude, find_normalised_gyro_freq
+from scotty.fun_general import K_magnitude, find_normalised_gyro_freq, find_normalised_plasma_freq
 from scotty.geometry import MagneticField
 from scotty.hamiltonian import Hamiltonian
-from scotty.typing import FloatArray
+from scotty.typing import ArrayLike, FloatArray
 
 
 class _Event(Protocol):
@@ -48,7 +49,7 @@ def _event(terminal: bool, direction: float):
 
 
 def make_solver_events(
-    poloidal_flux_enter: float, launch_angular_frequency: float, field: MagneticField
+    poloidal_flux_enter: float, launch_angular_frequency: float, field: MagneticField, mode_flag: int, find_density:ProfileFitLike, find_temperature_1D: Optional[ProfileFitLike] = None
 ) -> Dict[str, Callable]:
     """Define event handlers for the ray solver
 
@@ -127,17 +128,33 @@ def make_solver_events(
         B_R = field.B_R(q_R, q_Z)
         B_T = field.B_T(q_R, q_Z)
         B_Z = field.B_Z(q_R, q_Z)
-
+        poloidal_flux = field.poloidal_flux(q_R, q_Z)
+        if find_temperature_1D:
+            temperature = find_temperature_1D(poloidal_flux)
+        else:
+            temperature = None
+        
         # Magnitude of B field
         B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
 
         # Find the ratio of beam freq to electron cyclotron freq
-        gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
+        gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency,temperature)
 
         # Find the difference. If the sign changes, it means you have crossed the resonance frequency
-        difference = gyro_freq - 1
-        return difference
-
+        difference_fundamental = gyro_freq - 1
+        difference_second_harmonic = gyro_freq - 0.5
+        
+        if mode_flag == -1:
+            electron_density = find_density(poloidal_flux)
+            plasma_freq = find_normalised_plasma_freq(electron_density, launch_angular_frequency, temperature)
+            UHR_normalised = np.sqrt(gyro_freq**2 + plasma_freq**2)
+            difference_UHR = UHR_normalised-1
+            return difference_fundamental*difference_second_harmonic*difference_UHR
+        else:
+            return difference_fundamental*difference_second_harmonic
+            
+    '''
+    # Old function for second harmonic
     @_event(terminal=True, direction=0.0)
     def event_cross_resonance2(
         tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian
@@ -166,7 +183,7 @@ def make_solver_events(
 
         difference = gyro_freq - 0.5
         return difference
-
+    '''
     @_event(terminal=False, direction=1.0)
     def event_reach_K_min(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
         # To find tau of the cut-off, that is the location where the
@@ -204,7 +221,7 @@ def make_solver_events(
         "leave_LCFS": event_leave_LCFS,
         "leave_simulation": event_leave_simulation,
         "cross_resonance": event_cross_resonance,
-        "cross_resonance2": event_cross_resonance2,
+        #"cross_resonance2": event_cross_resonance2,
         "reach_K_min": event_reach_K_min,
     }
 
@@ -250,10 +267,11 @@ def handle_leaving_plasma_events(
 
     if detected("cross_resonance"):
         return tau_events["cross_resonance"][0]
-
+    '''
+    # Old function for second harmonic
     if detected("cross_resonance2"):
         return tau_events["cross_resonance2"][0]
-
+    '''
     if not detected("leave_plasma") and detected("leave_LCFS"):
         return tau_events["leave_LCFS"][0]
 
@@ -461,7 +479,10 @@ def propagate_ray(
     rtol: float,
     atol: float,
     quick_run: bool,
+    mode_flag: int,
     len_tau: int,
+    find_density: ProfileFitLike,
+    find_temperature_1D: Optional[ProfileFitLike] = None,
     tau_max: float = 1e5,
     verbose: bool = True,
 ) -> Union[Tuple[float, FloatArray], K_cutoff_data]:
@@ -512,7 +533,7 @@ def propagate_ray(
     # with the returned events, and use these names instead of list
     # indices
     solver_ray_events = make_solver_events(
-        poloidal_flux_enter, launch_angular_frequency, field
+        poloidal_flux_enter, launch_angular_frequency, field, mode_flag,find_density,find_temperature_1D
     )
 
     K_R_initial, K_zeta_initial, K_Z_initial = K_initial
@@ -580,9 +601,7 @@ def propagate_ray(
 
     # you want no resonance at all, so both must be 0
     if (
-        len(tau_events["cross_resonance"]) == 0
-        and len(tau_events["cross_resonance2"]) == 0
-    ):
+        len(tau_events["cross_resonance"]) == 0):
         tau_points = handle_no_resonance(
             solver_ray_output,
             tau_leave,
