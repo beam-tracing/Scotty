@@ -95,7 +95,9 @@ from scotty.check_input import check_input
 from typing import Optional, Union, Sequence, cast
 from scotty.typing import PathLike, FloatArray
 
-from datatree import DataTree  
+from datatree import DataTree
+
+
 def beam_me_up(
     poloidal_launch_angle_Torbeam: float,
     toroidal_launch_angle_Torbeam: float,
@@ -391,7 +393,6 @@ def beam_me_up(
         )
     else:
         find_temperature_1D = None
-        
 
     field = create_magnetic_geometry(
         find_B_method,
@@ -524,7 +525,7 @@ def beam_me_up(
         mode_flag,
         len_tau,
         find_density_1D,
-        find_temperature_1D
+        find_temperature_1D,
     )
     if quick_run:
         return ray_solver_output
