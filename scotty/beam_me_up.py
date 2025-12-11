@@ -390,7 +390,6 @@ def beam_me_up(
         )
     else:
         find_temperature_1D = None
-        
 
     field = create_magnetic_geometry(
         find_B_method,
@@ -523,7 +522,7 @@ def beam_me_up(
         mode_flag,
         len_tau,
         find_density_1D,
-        find_temperature_1D
+        find_temperature_1D,
     )
     if quick_run:
         return ray_solver_output
