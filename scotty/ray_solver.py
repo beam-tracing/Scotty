@@ -143,7 +143,7 @@ def make_solver_events(
         B_T = field.B_T(q_R, q_Z)
         B_Z = field.B_Z(q_R, q_Z)
         poloidal_flux = field.poloidal_flux(q_R, q_Z)
-        
+
         # find the temperature at a given poloidal flux
         # this temperature will be used to compute relativistic corrections
         if find_temperature_1D:
@@ -157,7 +157,7 @@ def make_solver_events(
         # Find the ratio of beam freq to electron cyclotron freq
         # temperature is passed as an argument
         # if None, no relativistic corrections are applied
-        
+
         gyro_freq = find_normalised_gyro_freq(
             B_Total, launch_angular_frequency, temperature
         )
@@ -165,26 +165,26 @@ def make_solver_events(
         # Find the difference. If the sign changes, it means you have crossed the resonance frequency
         difference_fundamental = gyro_freq - 1
         difference_second_harmonic = gyro_freq - 0.5
-        
-        #UHR only applies for X-mode, so check mode_flag first
-        
+
+        # UHR only applies for X-mode, so check mode_flag first
+
         if mode_flag == -1:
             electron_density = find_density(poloidal_flux)
             plasma_freq = find_normalised_plasma_freq(
                 electron_density, launch_angular_frequency, temperature
             )
-            
+
             # UHR_frequency = sqrt(gyro_freq^2 + plasma_freq^2)
             # gyro_freq and plasma_freq are normalised
-            
+
             UHR_normalised = np.sqrt(gyro_freq**2 + plasma_freq**2)
             difference_UHR = UHR_normalised - 1
-            
-            # if the sign of any one of those products change, 
+
+            # if the sign of any one of those products change,
             # it means you have crossed resonance
             return difference_fundamental * difference_second_harmonic * difference_UHR
         else:
-            # if the sign of any one of those products change, 
+            # if the sign of any one of those products change,
             # it means you have crossed resonance
             return difference_fundamental * difference_second_harmonic
 
@@ -253,9 +253,9 @@ def make_solver_events(
 
         return d_K_d_tau
 
-    #note: event_cross_resonance2 is outdated. It used to
-    #compute the second harmonic, but now all resonances are packaged
-    #under one single event
+    # note: event_cross_resonance2 is outdated. It used to
+    # compute the second harmonic, but now all resonances are packaged
+    # under one single event
     return {
         "leave_plasma": event_leave_plasma,
         "leave_LCFS": event_leave_LCFS,
@@ -572,10 +572,10 @@ def propagate_ray(
     # values. We can then pass the keys to our event handler along
     # with the returned events, and use these names instead of list
     # indices
-    
-    #added arguments (mode_flag, find_density, find_temperature_1D)
-    #to account for relativistic corrections + UHR
-    
+
+    # added arguments (mode_flag, find_density, find_temperature_1D)
+    # to account for relativistic corrections + UHR
+
     solver_ray_events = make_solver_events(
         poloidal_flux_enter,
         launch_angular_frequency,
