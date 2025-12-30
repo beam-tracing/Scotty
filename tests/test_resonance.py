@@ -41,6 +41,7 @@ np.set_printoptions(linewidth=120, threshold=100)
 # Same six test cases from Test_fund were used, but we include the temperature
 # to add relativistic effects
 
+
 def test_fund_1(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 3,
