@@ -508,9 +508,9 @@ def beam_me_up(
 
     # -------------------
     # Propagate the ray
-    
-    #added new arguments (mode_flag, find_density_1D and find_temperature_1D) 
-    #to calculate UHR and relativistic corrections for all resonances
+
+    # added new arguments (mode_flag, find_density_1D and find_temperature_1D)
+    # to calculate UHR and relativistic corrections for all resonances
 
     print("Starting the solvers")
     ray_solver_output = propagate_ray(
