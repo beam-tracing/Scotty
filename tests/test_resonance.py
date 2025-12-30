@@ -36,6 +36,11 @@ np.set_printoptions(linewidth=120, threshold=100)
 # launch positions (including launching from inboard side), polarisations and magnetic field strength.
 
 
+# Test_fund_X_rel: test to see whether the beam will be absorbed when its frequency is equal
+# to the fundamental electron cyclotron frequency, with relativistic corrections
+# Same six test cases from Test_fund were used, but we include the temperature
+# to add relativistic effects
+
 def test_fund_1(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 3,
@@ -529,6 +534,12 @@ def test_fund_6_rel(tmp_path):
 # to the second harmonic electron cyclotron frequency.
 # Six test cases were created to test for this by varying beam frequency, launch angles,
 # launch positions (including launching from inboard side), polarisations and magnetic field strength.
+
+
+# Test_sec_harm_X_rel: test to see whether the beam will be absorbed when its frequency is equal
+# to the second harmonic electron cyclotron frequency, with relativistic corrections
+# Same six test cases from test_sec_harm were used, but we include the temperature
+# to add relativistic effects
 
 
 def test_sec_harm_1(tmp_path):
