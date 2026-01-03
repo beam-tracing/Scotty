@@ -527,7 +527,9 @@ def further_analysis(
     # In my experience, H_eigvals[:,1] corresponds to the O mode, and H_eigvals[:,0] corresponds to the X-mode
     # ALERT: This may not always be the case! Check the output figure to make sure that the appropriate solution is indeed 0 along the ray
     # e_hat has components e_1,e_2,e_b
-    mode_index = 1 if inputs.mode_flag == 1 else 0
+    _check = np.abs(np.array([ H_eigvals[:,0][len(q_X) // 2], H_eigvals[:,1][len(q_X) // 2], H_eigvals[:,2][len(q_X) // 2] ]))
+    mode_index = np.argmin(_check)
+    # mode_index = 1 if inputs.mode_flag == 1 else 0
     e_hat = e_eigvecs[:, :, mode_index]
 
     # equilibrium dielectric tensor - identity matrix. \bm{\epsilon}_{eq} - \bm{1}
@@ -646,6 +648,12 @@ def further_analysis(
         "arc_length": (["tau"], distance_along_line), # TO REMOVE
         "arc_length_relative_to_cutoff": (["tau"], l_lc), # TO REMOVE
         "H_Cardano": _H_Cardano, # TO REMOVE
+        "H_1": (["tau"], H_eigvals[:,0]), # TO REMOVE
+        "H_2": (["tau"], H_eigvals[:,1]), # TO REMOVE
+        "H_3": (["tau"], H_eigvals[:,2]), # TO REMOVE
+        "e_hat_1": (["tau", "col"], e_eigvecs[:,:,0]), # TO REMOVE
+        "e_hat_2": (["tau", "col"], e_eigvecs[:,:,1]), # TO REMOVE
+        "e_hat_3": (["tau", "col"], e_eigvecs[:,:,2]), # TO REMOVE
     }
 
     RZ_point_spacing = np.sqrt((np.diff(df.q_Z)) ** 2 + (np.diff(df.q_R)) ** 2)

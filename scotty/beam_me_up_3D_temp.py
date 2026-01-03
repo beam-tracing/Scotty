@@ -7,7 +7,7 @@ from scotty.analysis_3D import beam_tracing_analysis_3D
 from scotty.analysis_dbs_3D import analysis_dbs
 from scotty.checks_3D import Parameters, check_input_before_ray_tracing, VALID_LAUNCH_MODE_FLAGS, VALID_PSI_BC_FLAGS
 from scotty.fun_evolution_3D import evolve_beam
-from scotty.geometry_3D import MagneticField_3D_Cartesian, create_magnetic_geometry_3D
+from scotty.geometry_3D import MagneticField_Cartesian, create_magnetic_geometry_3D
 from scotty.hamiltonian_3D import initialise_hamiltonians, assign_hamiltonians
 from scotty.launch_3D import find_plasma_entry_position, find_auto_delta_signs, find_plasma_entry_parameters
 from scotty.logger_3D import config_logger, arr2str
@@ -71,7 +71,7 @@ def beam_me_up_3D(
     poloidal_flux_zero_temperature: float = 1.0, # Temperature analogue of poloidal_flux_zero_density
 
     # Interpolation settings
-    find_B_method: Union[str, MagneticField_3D_Cartesian] = "eduard_3D",
+    find_B_method: Union[str, MagneticField_Cartesian] = "eduard_3D",
     density_fit_method: Optional[Union[str, ProfileFitLike]] = None,
     density_fit_parameters: Optional[Sequence] = None,
     temperature_fit_method: Optional[Union[str, ProfileFitLike]] = None,

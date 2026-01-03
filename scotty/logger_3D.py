@@ -11,7 +11,8 @@ _valid_log_level_dict = {"debug": 10, "info": 20, "warning": 30, "error": 40, "c
 def _add_log_level(levelname, levelvalue):
     levelname = levelname.lower()
     if hasattr(logging, levelname) or hasattr(logging.getLoggerClass(), levelname):
-        print(f"{levelname} is already an existing log level. Skipping this step")
+        log = logging.getLogger()
+        log.debug(f"{levelname} is already an existing log level. Skipping this step")
     else:
         def _log_for_level(self, msg, *args, **kwargs):
             if self.isEnabledFor(levelvalue):

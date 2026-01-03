@@ -5,7 +5,7 @@ from scotty.fun_general import (angular_frequency_to_wavenumber,
                                 dot,
                                 find_normalised_gyro_freq,
                                 find_normalised_plasma_freq)
-from scotty.geometry_3D import MagneticField_3D_Cartesian
+from scotty.geometry_3D import MagneticField_Cartesian
 from scotty.logger_3D import arr2str
 from scotty.profile_fit import ProfileFitLike
 from scotty.typing import ArrayLike, FloatArray
@@ -19,10 +19,9 @@ log = logging.getLogger(__name__)
 #
 ##################################################
 
-class DielectricTensor_3D:
-    r"""
-    Calculates the components of the cold plasma dielectric tensor for a wave with
-    angular frequency \Omega:
+class DielectricTensor_Cartesian:
+    r"""Calculates the components of the cold plasma dielectric tensor for a
+    wave with angular frequency \Omega:
 
     \epsilon =
         [ \epilson_{11}   &   -i\epsilon_{12}   &   0            ]
@@ -36,8 +35,7 @@ class DielectricTensor_3D:
     
     The components of the dielectric tensor are calculated in the
     :math:`(\hat{\mathbf{u}}_1, \hat{\mathbf{u}}_2, \hat{\mathbf{b}})` basis.
-    
-    Hence, :math:`\epsilon_{11}`, :math:`\epsilon_{12}`, and :math:`\epsilon_{bb}`
+    Here, :math:`\epsilon_{11}`, :math:`\epsilon_{12}`, and :math:`\epsilon_{bb}`
     correspond to the ``S``, ``D``, and ``P`` variables in Stix, respectively.
     
     The notation used in this code is chosen to be consistent with Hall-Chen, Parra,
@@ -45,15 +43,30 @@ class DielectricTensor_3D:
 
     Parameters
     ----------
-    electron_density:
-        Electron number density
-    angular_frequency:
-        Angular frequency of the beam
-    B_total:
-        Magnitude of the magnetic field
-    temperature:
-        Temperature profile [optional]. Used to calculate relativistic corrections 
-        to electron mass, which affects :math:`\Omega_{pe}` and :math: `\Omega_{ce}`.
+    electron_density : ArrayLike
+        Electron number density in units of ``1e19``
+    
+    angular_frequency : float
+        Launch angular frequency of the beam
+    
+    B_total : ArrayLike
+        Magnitude of the magnetic field in units of Tesla
+    
+    temperature : ArrayLike, optional
+        Temperature profile. Used to calculate relativistic corrections 
+        to electron mass, which affects :math:`\Omega_{pe}` and :math:`\Omega_{ce}`.
+    
+    Attributes
+    ----------
+    e_bb : ArrayLike
+        The :math:`\epsilon_{bb}` component; also called epsilon_para
+
+    e_11 : ArrayLike
+        The :math:`\epsilon_{11}` component; also called epsilon_perp
+
+    e_12 : ArrayLike
+        The :math:`\epsilon_{12}` component; also called epsilon_g
+    
     """
 
     def __init__(
@@ -72,33 +85,27 @@ class DielectricTensor_3D:
         self._epsilon_12 = _plasma_freq_2 * _gyro_freq / (1 - _gyro_freq_2)
 
     @property
-    def e_bb(self):
-        r"""The :math:`\epsilon_{bb}` component; also called epsilon_para"""
-        return self._epsilon_bb
+    def e_bb(self): return self._epsilon_bb
 
     @property
-    def e_11(self):
-        r"""The :math:`\epsilon_{11}` component; also called epsilon_perp"""
-        return self._epsilon_11
+    def e_11(self): return self._epsilon_11
 
     @property
-    def e_12(self):
-        r"""The :math:`\epsilon_{12}` component; also called epsilon_g"""
-        return self._epsilon_12
+    def e_12(self): return self._epsilon_12
 
 
 
 class Hamiltonian_3D:
-    r"""
-    Functor to evaluate derivatives of the Hamiltonian, H, at a given set of points.
+    r"""Functor to evaluate derivatives of the Hamiltonian, H, at a given set
+    of points.
 
     Scotty calculates derivatives using a grid-free finite difference approach. The
-    Hamiltonian is evaluated at, essentially, an arbitrary set of points around the location
-    we wish to get the derivatives at. In practice we define stencils as relative offsets
-    from a central point, and the evaluation points are the product of the spacing in a
-    given direction with the stencil offsets. By carefully choosing our stencils and
-    evaluating all of the derivatives at once, we can reuse evaluations of :math:`H` between
-    derivatives, saving a lot of computation.
+    Hamiltonian is evaluated at, essentially, an arbitrary set of points around the
+    location we wish to get the derivatives at. In practice we define stencils as
+    relative offsets from a central point, and the evaluation points are the product
+    of the spacing in a given direction with the stencil offsets. By carefully
+    choosing our stencils and evaluating all of the derivatives at once, we can
+    reuse evaluations of :math:`H` between derivatives, saving a lot of computation.
 
     The stencils are defined as a `dict` with a `tuple` of offsets as keys and `float`
     weights as values. For example, the `CFD1_stencil`::
@@ -148,7 +155,7 @@ class Hamiltonian_3D:
                  delta_K_X: float,
                  delta_K_Y: float,
                  delta_K_Z: float,
-                 field: MagneticField_3D_Cartesian,
+                 field: MagneticField_Cartesian,
                  density_fit: ProfileFitLike,
                  temperature_fit: Optional[ProfileFitLike] = None):
         
@@ -201,7 +208,7 @@ class Hamiltonian_3D:
         if np.size(X) == 1: sin_theta_m_sq = np.dot(b_hat, K_hat)**2
         else:               sin_theta_m_sq = dot(b_hat.T, K_hat.T)**2
         
-        epsilon = DielectricTensor_3D(electron_density, self.angular_frequency, B_magnitude, temperature)
+        epsilon = DielectricTensor_Cartesian(electron_density, self.angular_frequency, B_magnitude, temperature)
 
         Booker_alpha = (epsilon.e_bb * sin_theta_m_sq) + epsilon.e_11 * (1 - sin_theta_m_sq)
         Booker_beta  = (-epsilon.e_11 * epsilon.e_bb * (1 + sin_theta_m_sq)) - (epsilon.e_11**2 - epsilon.e_12**2) * (1 - sin_theta_m_sq)
@@ -324,7 +331,7 @@ def initialise_hamiltonians(launch_angular_frequency: float,
                             delta_K_X: float,
                             delta_K_Y: float,
                             delta_K_Z: float,
-                            field: MagneticField_3D_Cartesian,
+                            field: MagneticField_Cartesian,
                             density_fit: ProfileFitLike,
                             temperature_fit: Optional[ProfileFitLike] = None):
     

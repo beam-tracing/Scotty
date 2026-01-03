@@ -10,7 +10,7 @@ import logging
 import os
 from pathlib import Path
 from scotty.fun_general import angular_frequency_to_wavenumber, freq_GHz_to_angular_frequency
-from scotty.geometry_3D import MagneticField_3D_Cartesian
+from scotty.geometry_3D import MagneticField_Cartesian
 from scotty.profile_fit import ProfileFitLike
 from scotty.typing import FloatArray
 import numpy as np
@@ -316,7 +316,7 @@ class Parameters:
 #
 ##################################################
 
-def _check_launch_position(poloidal_flux_enter: float, launch_position: FloatArray, field: MagneticField_3D_Cartesian) -> None:
+def _check_launch_position(poloidal_flux_enter: float, launch_position: FloatArray, field: MagneticField_Cartesian) -> None:
     X, Y, Z = launch_position
     launch_psi = field.poloidal_flux(X, Y, Z)
     if launch_psi < poloidal_flux_enter:

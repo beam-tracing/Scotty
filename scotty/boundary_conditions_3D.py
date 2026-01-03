@@ -11,7 +11,7 @@ from scotty.fun_general import (
 
     find_mode_flag_sign,
 )
-from scotty.geometry_3D import MagneticField_3D_Cartesian
+from scotty.geometry_3D import MagneticField_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
 from scotty.logger_3D import arr2str
 from scotty.typing import FloatArray
@@ -24,7 +24,7 @@ log = logging.getLogger(__name__)
 #
 ##################################################
 
-def check_vector_pointing_into_plasma(q_X: float, q_Y: float, q_Z: float, vector: FloatArray, field: MagneticField_3D_Cartesian):
+def check_vector_pointing_into_plasma(q_X: float, q_Y: float, q_Z: float, vector: FloatArray, field: MagneticField_Cartesian):
     if np.size(vector) != 3: raise ValueError(f"The vector provided must only be 3-D!")
     else: unitvector = vector / np.linalg.norm(vector)
 
@@ -46,7 +46,7 @@ def apply_continuous_BC_3D(
     q_X: float, q_Y: float, q_Z: float,
     K_X: float, K_Y: float, K_Z: float,
     Psi_3D_vacuum_labframe_cartesian: FloatArray,
-    field: MagneticField_3D_Cartesian,
+    field: MagneticField_Cartesian,
     hamiltonian: Hamiltonian_3D):
 
     log.debug(f"Applying continuous boundary conditions")
@@ -633,7 +633,7 @@ def apply_discontinuous_BC_3D(
     q_X: float,   q_Y: float,   q_Z: float,
     K_X_v: float, K_Y_v: float, K_Z_v: float,
     Psi_3D_vacuum_labframe_cartesian: FloatArray,
-    field: MagneticField_3D_Cartesian,
+    field: MagneticField_Cartesian,
     hamiltonian: Hamiltonian_3D):
 
     log.debug(f"Applying discontinuous boundary conditions")
@@ -666,7 +666,7 @@ def apply_BC_3D(
     q_X: float, q_Y: float, q_Z: float,
     K_X: float, K_Y: float, K_Z: float,
     Psi_3D_vacuum_labframe_cartesian: FloatArray,
-    field: MagneticField_3D_Cartesian,
+    field: MagneticField_Cartesian,
     hamiltonian: Hamiltonian_3D,
     Psi_BC_flag: str):
 

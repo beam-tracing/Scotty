@@ -4,8 +4,8 @@ from scipy.optimize import minimize_scalar, root_scalar
 from scotty.boundary_conditions_3D import apply_BC_3D
 from scotty.fun_general import find_inverse_2D, make_array_3x3
 from scotty.fun_general_3D import find_H_Cardano_eig, ray_line, poloidal_flux_difference_along_ray_line
-from scotty.geometry_3D import MagneticField_3D_Cartesian
-from scotty.hamiltonian_3D import DielectricTensor_3D, Hamiltonian_3D
+from scotty.geometry_3D import MagneticField_Cartesian
+from scotty.hamiltonian_3D import DielectricTensor_Cartesian, Hamiltonian_3D
 from scotty.logger_3D import mln, arr2str
 from scotty.typing import FloatArray
 from typing import Literal, Optional
@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 def find_plasma_entry_position(poloidal_launch_angle_deg_Torbeam: float,
                                toroidal_launch_angle_deg_Torbeam: float,
                                q_launch_cartesian: FloatArray,
-                               field: MagneticField_3D_Cartesian,
+                               field: MagneticField_Cartesian,
                                poloidal_flux_enter: float,
                                boundary_adjust: float = 1e-6):
     
@@ -158,7 +158,7 @@ def find_plasma_entry_position(poloidal_launch_angle_deg_Torbeam: float,
 def find_auto_delta_signs(auto_delta_sign: bool,
                           q_initial_cartesian: FloatArray,
                           delta_X: float, delta_Y: float, delta_Z: float,
-                          field: MagneticField_3D_Cartesian):
+                          field: MagneticField_Cartesian):
     
     # Now, we also perform auto_delta_sign checks (if the user specifies)
     if auto_delta_sign:
@@ -191,7 +191,7 @@ def find_plasma_entry_parameters(vacuumLaunch_flag: bool,
                                  launch_wavenumber: float,
                                  launch_beam_width: float,
                                  launch_beam_curvature: float,
-                                 field: MagneticField_3D_Cartesian,
+                                 field: MagneticField_Cartesian,
                                  K_plasmaLaunch_cartesian: Optional[FloatArray] = np.zeros(3),
                                  Psi_3D_plasmaLaunch_labframe_cartesian: Optional[FloatArray] = np.zeros((3,3)),
                                  hamiltonian_pos1: Optional[Hamiltonian_3D] = None,
@@ -394,7 +394,7 @@ def find_plasma_entry_parameters(vacuumLaunch_flag: bool,
 
         B_magnitude = field.magnitude(*q_initial_cartesian)
         b_hat = field.unitvector(*q_initial_cartesian)
-        epsilon = DielectricTensor_3D(electron_density, launch_angular_frequency, B_magnitude, electron_temperature)
+        epsilon = DielectricTensor_Cartesian(electron_density, launch_angular_frequency, B_magnitude, electron_temperature)
 
         log.debug(f"""
         ##################################################

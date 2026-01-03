@@ -117,6 +117,7 @@ def derivative(
     stencil: Optional[str] = None,
     use_cache: bool = True,
 ) -> FloatArray:
+    
     """Partial derivative of a function along one or more of its arguments.
 
     Currently this can take partial derivatives in one or two arguments, given
@@ -136,28 +137,28 @@ def derivative(
 
     Parameters
     ----------
-    func:
+    func :
         Function to take the derivative of
-    dims:
+    dims :
         The name(s) of the dimension(s) to take the derivative along. ``dims``
         must appear in the keys of ``args``. For second derivatives in one
         dimension, pass a tuple with the argument name repeated, for example
         ``("x", "x")`` for the second derivative in ``x``
-    args:
+    args :
         Arguments to ``func`` at the point to evaluate the derivative
-    spacings:
+    spacings :
         Step size for derivative. If a single float, used for all dimensions,
         otherwise if a mapping of dimension names to step size then the keys
         must be identical to those of ``dims``
-    stencil:
+    stencil :
         Stencil name (see `STENCILS` for supported stencils). Defaults to
         central differences
-    use_cache:
+    use_cache :
         If true, then wraps ``func`` with the decorator `cache`
 
     Returns
     -------
-    ArrayLike
+    ArrayLike :
         Derivative of ``func`` evaluated at ``location``
 
     Examples

@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from scipy.integrate import solve_ivp
 from scotty.fun_general import find_normalised_gyro_freq
-from scotty.geometry_3D import MagneticField_3D_Cartesian
+from scotty.geometry_3D import MagneticField_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D
 from scotty.logger_3D import timer
 from scotty.typing import FloatArray
@@ -40,7 +40,7 @@ def _event(terminal: bool, direction: float):
 
 def make_solver_events(poloidal_flux_enter: float,
                        launch_angular_frequency: float,
-                       field: MagneticField_3D_Cartesian) -> Dict[str, Callable]:
+                       field: MagneticField_Cartesian) -> Dict[str, Callable]:
     
     # This event triggers when the beam leaves the same poloidal flux value it entered at
     # Goes from negative to positive when leaving the plasma
@@ -366,7 +366,7 @@ def ray_evolution_3D_fun(tau, ray_parameters_3D, hamiltonian: Hamiltonian_3D):
 
 def propagate_ray(poloidal_flux_enter: float,
                   launch_angular_frequency: float,
-                  field: MagneticField_3D_Cartesian,
+                  field: MagneticField_Cartesian,
                   initial_position: FloatArray,
                   K_initial: FloatArray,
                   hamiltonian: Hamiltonian_3D,

@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pathlib
-from scotty.geometry_3D import InterpolatedField_3D_Cartesian
+from scotty.geometry_3D import InterpolatedField_Cartesian
 from scotty.typing import PathLike, FloatArray
 from typing import Optional, Union
 import xarray as xr
@@ -178,7 +178,7 @@ def plotter(all_X_data: Union[dict, list[dict]],
 
 
 def plot_2d_cross_section(
-    field: InterpolatedField_3D_Cartesian,
+    field: InterpolatedField_Cartesian,
     inputs: xr.Dataset,
     solver_output: xr.Dataset,
     analysis: xr.Dataset,
@@ -527,7 +527,7 @@ def plot_trajectories_individual(
 
 
 def plot_trajectories_poloidal(
-    field: InterpolatedField_3D_Cartesian,
+    field: InterpolatedField_Cartesian,
     inputs: xr.Dataset,
     solver_output: xr.Dataset,
     analysis: xr.Dataset,
@@ -600,7 +600,7 @@ def plot_trajectories_poloidal(
         axs[-1].axis("off")
 
     # TO REMOVE -- old code, doesn't work
-    # field: InterpolatedField_3D_Cartesian,
+    # field: InterpolatedField_Cartesian,
     # inputs: xr.Dataset,
     # solver_output: xr.Dataset,
     # analysis: xr.Dataset,

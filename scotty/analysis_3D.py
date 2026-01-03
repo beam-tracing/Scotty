@@ -21,8 +21,8 @@ from scotty.fun_general import (
     make_unit_vector_from_cross_product,
 )
 from scotty.fun_general_3D import find_H_Cardano_eig, find_beam_widths_curvs
-from scotty.geometry_3D import MagneticField_3D_Cartesian
-from scotty.hamiltonian_3D import DielectricTensor_3D, Hamiltonian_3D, hessians_3D
+from scotty.geometry_3D import MagneticField_Cartesian
+from scotty.hamiltonian_3D import DielectricTensor_Cartesian, Hamiltonian_3D, hessians_3D
 from scotty.profile_fit import ProfileFitLike
 from scotty.typing import ArrayLike, FloatArray
 from typing import Dict, Optional
@@ -38,7 +38,7 @@ def beam_tracing_analysis_3D(
     solver_output: xr.Dataset,
     hamiltonian: Hamiltonian_3D,
     hamiltonian_other: Hamiltonian_3D,
-    field: MagneticField_3D_Cartesian,
+    field: MagneticField_Cartesian,
     density_fit: ProfileFitLike,
     temperature_fit: Optional[ProfileFitLike]):
 
@@ -90,7 +90,7 @@ def beam_tracing_analysis_3D(
     # Calculating plasma properties along ray path
     n_e = density_fit(polflux)
     T_e = temperature_fit(polflux) if temperature_fit else None
-    epsilon = DielectricTensor_3D(n_e, hamiltonian.angular_frequency, B_mag, T_e)
+    epsilon = DielectricTensor_Cartesian(n_e, hamiltonian.angular_frequency, B_mag, T_e)
     normalised_gyro_freqs = find_normalised_gyro_freq(n_e, hamiltonian.angular_frequency, T_e)
     normalised_plasma_freqs = find_normalised_plasma_freq(B_mag, hamiltonian.angular_frequency, T_e)
 
@@ -306,7 +306,7 @@ def beam_tracing_analysis_3D(
 #     Psi_3D_entry_labframe_cartesian: FloatArray,
 #     output_path: pathlib.Path,
 #     output_filename_suffix: str,
-#     field: MagneticField_3D_Cartesian,
+#     field: MagneticField_Cartesian,
 #     detailed_analysis_flag: bool,
 #     dH: Dict[str, ArrayLike]):
 

@@ -4,7 +4,7 @@ import scipy.constants as const
 from scotty.analysis import set_vector_components_long_name
 from scotty.derivatives import derivative
 from scotty.fun_general import dot, make_unit_vector_from_cross_product, find_electron_mass, find_H_Cardano, find_waist
-from scotty.geometry_3D import MagneticField_3D_Cartesian
+from scotty.geometry_3D import MagneticField_Cartesian
 from scotty.hamiltonian_3D import Hamiltonian_3D, hessians_3D
 from scotty.profile_fit import ProfileFitLike
 from typing import Optional
@@ -21,7 +21,7 @@ def analysis_dbs(
     analysis: xr.Dataset,
     hamiltonian: Hamiltonian_3D,
     hamiltonian_other: Hamiltonian_3D,
-    field: MagneticField_3D_Cartesian,
+    field: MagneticField_Cartesian,
     density_fit: ProfileFitLike,
     temperature_fit: Optional[ProfileFitLike]):
 

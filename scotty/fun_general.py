@@ -401,9 +401,7 @@ def find_electron_mass(
         return electron_mass
 
 
-def find_normalised_plasma_freq(
-    electron_density, launch_angular_frequency, temperature=None
-):
+def find_normalised_plasma_freq(electron_density, launch_angular_frequency, temperature=None):
     # if electron_density < 0:
     #     print(electron_density)
     #     electron_density=0
@@ -427,6 +425,15 @@ def find_normalised_gyro_freq(B_Total, launch_angular_frequency, temperature=Non
     )
 
     return normalised_gyro_freq
+
+def find_normalised_cutoff_and_hybrid_freqs(B_Total, electron_density, launch_angular_frequency, temperature=None):
+    normalised_plasma_freq = find_normalised_plasma_freq(electron_density, launch_angular_frequency, temperature)
+    normalised_gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency, temperature=None)
+    normalised_lefthand_cutoff  = 0.5 * (-normalised_gyro_freq + np.sqrt(normalised_gyro_freq**2 + 4 * normalised_plasma_freq**2))
+    normalised_righthand_cutoff = 0.5 * ( normalised_gyro_freq + np.sqrt(normalised_gyro_freq**2 + 4 * normalised_plasma_freq**2))
+    normalised_upper_hybrid = np.sqrt(normalised_plasma_freq**2 + normalised_gyro_freq**2)
+    
+    return normalised_lefthand_cutoff, normalised_righthand_cutoff, normalised_upper_hybrid
 
 
 def find_epsilon_para(electron_density, launch_angular_frequency, temperature=None):

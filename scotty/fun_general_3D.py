@@ -2,7 +2,7 @@ import logging
 from math import floor, log10
 import numpy as np
 from scotty.fun_general import find_D
-from scotty.geometry_3D import MagneticField_3D_Cartesian
+from scotty.geometry_3D import MagneticField_Cartesian
 from scotty.typing import FloatArray
 from typing import Union
 
@@ -21,13 +21,14 @@ def find_beam_widths_curvs(
     Re_Psi_w_eigvals = np.linalg.eigvalsh(Re_Psi_w)
     K_mag = np.linalg.norm(K_vec, axis=1)
     K_g_mag = np.sum(K_vec * g_hat, axis=1)
-    curvs = (K_g_mag**2 / K_mag**3)[:, np.newaxis] * Re_Psi_w_eigvals
+    curvs = np.squeeze((K_g_mag**2 / K_mag**3)[:, np.newaxis] * Re_Psi_w_eigvals)
 
     Im_Psi_w = np.imag(Psi_w)
     Im_Psi_w_eigvals = np.linalg.eigvalsh(Im_Psi_w)
-    widths = np.sqrt( np.full(Im_Psi_w_eigvals.shape, 2) / Im_Psi_w_eigvals )
+    widths = np.squeeze(np.sqrt( np.full(Im_Psi_w_eigvals.shape, 2) / Im_Psi_w_eigvals ))
 
-    return curvs[:, 0], curvs[:, 1], widths[:, 0], widths[:, 1]
+    if curvs.ndim == 1: return curvs[0], curvs[1], widths[0], widths[1]
+    else:               return curvs[:, 0], curvs[:, 1], widths[:, 0], widths[:, 1]
 
 
 
