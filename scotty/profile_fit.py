@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 from __future__ import annotations
+import logging
 from typing import Callable, Optional, List, Dict, Union, Sequence
 from warnings import warn
 
@@ -10,6 +11,7 @@ from scotty.typing import PathLike, ArrayLike
 import numpy as np
 from scipy.interpolate import UnivariateSpline
 
+log = logging.getLogger(__name__)
 
 ProfileFitLike = Callable[[ArrayLike], ArrayLike]
 """A callable that can parameterise density/temperature in 1D"""
@@ -358,6 +360,7 @@ class SmoothingSplineFit(ProfileFit):
         fitting_data = np.fromfile(filename, dtype=float, sep="   ")
         radialcoord_array = fitting_data[1::2]
         fitting_array = fitting_data[2::2]
+        
         # Loading radial coord for now, makes it easier to benchmark
         # with Torbeam. Hence, have to convert to poloidal flux
         poloidal_flux_array = radialcoord_array**2
@@ -393,7 +396,7 @@ def _guess_profile_fit_method(
     parameters: Sequence, filename: Optional[PathLike]
 ) -> str:
     if filename is not None:
-        print("ne(psi): loading from input file")
+        log.info("Loading `ne(psi)` from input file")
         return "smoothing-spline-file"
 
     FIT_LENGTH_MAPPINGS = {
@@ -405,7 +408,7 @@ def _guess_profile_fit_method(
 
     try:
         name, fit_method = FIT_LENGTH_MAPPINGS[len(parameters)]
-        print(f"ne(psi): Using {name}")
+        log.info("Loading `ne(psi)` from input file")
         return fit_method
     except KeyError:
         raise ValueError(

@@ -34,30 +34,47 @@ class DielectricTensor:
     .. math::
 
         \begin{align}
-          \epsilon_{11} &= 1 - \frac{\Omega_{pe}^2}{\Omega^2 - \Omega_{ce}^2} \\
+          \epsilon_{11} &=
+            1 - \frac{\Omega_{pe}^2}{\Omega^2 - \Omega_{ce}^2} \\
           \epsilon_{12} &=
             1 - \frac{\Omega_{pe}^2\Omega_{ce}}{\Omega(\Omega^2 - \Omega_{ce}^2)} \\
-          \epsilon_{bb} &= 1 - \frac{\Omega_{pe}^2}{\Omega^2} \\
+          \epsilon_{bb} &=
+            1 - \frac{\Omega_{pe}^2}{\Omega^2} \\
         \end{align}
 
     The components of the dielectric tensor are calculated in the
     :math:`(\hat{\mathbf{u}}_1, \hat{\mathbf{u}}_2, \hat{\mathbf{b}})` basis.
-    Hence, :math:`\epsilon_{11}`, :math:`\epsilon_{12}`, and
-    :math:`\epsilon_{bb}` correspond to the ``S``, ``D``, and ``P`` variables in
-    Stix, respectively. The notation used in this code is chosen to be
-    consistent with Hall-Chen, Parra, Hillesheim, PPCF 2022.
+    Here, :math:`\epsilon_{11}`, :math:`\epsilon_{12}`, and :math:`\epsilon_{bb}`
+    correspond to the ``S``, ``D``, and ``P`` variables in Stix, respectively.
+    The notation used in this code is chosen to be consistent with Hall-Chen,
+    Parra, Hillesheim, PPCF 2022.
 
     Parameters
     ----------
-    electron_density:
-        Electron number density
-    angular_frequency:
-        Angular frequency of the beam
-    B_total:
-        Magnitude of the magnetic field
-    temperature:
-        Temperature profile [optional]. Used to calculate relativistic corrections 
-        to electron mass, which affects :math:`\Omega_{pe}` and :math: `\Omega_{ce}`.
+    electron_density : ArrayLike
+        Electron number density, scaled by a factor of 1e19
+    
+    angular_frequency : float
+        Angular frequency of the beam, in units of 
+    
+    B_total : ArrayLike
+        Magnitude of the magnetic field, in units of Tesla
+    
+    temperature : ArrayLike, optional
+        Temperature profile used to calculate relativistic corrections to electron
+        mass, which affects :math:`\Omega_{pe}` and :math: `\Omega_{ce}`.
+    
+    Attributes
+    ----------
+    e_bb : ArrayLike
+        The :math:`\epsilon_{bb}` component; also called :math:`\epsilon_{\para}`
+
+    e_11 : ArrayLike
+        The :math:`\epsilon_{11}` component; also called :math:`\epsilon_{\perp}`
+
+    e_12 : ArrayLike
+        The :math:`\epsilon_{12}` component; also called :math:`\epsilon_{g}`
+    
     """
 
     def __init__(
@@ -65,14 +82,9 @@ class DielectricTensor:
         electron_density: ArrayLike,
         angular_frequency: float,
         B_total: ArrayLike,
-        temperature: Optional[ArrayLike] = None,
-    ):
-        _plasma_freq_2 = (
-            find_normalised_plasma_freq(
-                electron_density, angular_frequency, temperature
-            )
-            ** 2
-        )
+        temperature: Optional[ArrayLike] = None):
+
+        _plasma_freq_2 = find_normalised_plasma_freq(electron_density, angular_frequency, temperature)**2
         _gyro_freq = find_normalised_gyro_freq(B_total, angular_frequency, temperature)
         _gyro_freq_2 = _gyro_freq**2
 
@@ -81,19 +93,13 @@ class DielectricTensor:
         self._epsilon_12 = _plasma_freq_2 * _gyro_freq / (1 - _gyro_freq_2)
 
     @property
-    def e_bb(self):
-        r"""The :math:`\epsilon_{bb}` component"""
-        return self._epsilon_bb
+    def e_bb(self): return self._epsilon_bb
 
     @property
-    def e_11(self):
-        r"""The :math:`\epsilon_{11}` component"""
-        return self._epsilon_11
+    def e_11(self): return self._epsilon_11
 
     @property
-    def e_12(self):
-        r"""The :math:`\epsilon_{12}` component"""
-        return self._epsilon_12
+    def e_12(self): return self._epsilon_12
 
 
 class Hamiltonian:

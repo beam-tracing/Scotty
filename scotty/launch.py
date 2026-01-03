@@ -121,8 +121,10 @@ def launch_beam(
         raise ValueError(
             f"Unexpected value for `Psi_BC_flag` ({Psi_BC_flag}), expected one of None, 'continuous, or 'discontinuous'"
         )
-
-    toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam)
+    
+    # TO REMOVE - launch_position[1] -- this was introduced to account for q_zeta =/= 0
+    # If q_zeta = 0, then this has no effect anyway
+    toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam) - launch_position[1]
     poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_Torbeam)
 
     wavenumber_K0 = angular_frequency_to_wavenumber(launch_angular_frequency)
@@ -145,6 +147,9 @@ def launch_beam(
         wavenumber_K0 * launch_beam_curvature + 2j * launch_beam_width ** (-2)
     )
     Psi_w_beam_launch_cartersian = np.eye(2) * Psi_w_beam_diagonal
+
+    # TO REMOVE -- only after the # TO REMOVE comment for toroidal_launch_angle above has been solved
+    toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_Torbeam)
 
     rotation_matrix_pol = np.array(
         [
@@ -353,7 +358,7 @@ def find_entry_point(
 
     def beam_line(tau):
         """Parameterised line in beam direction"""
-        return launch_position + tau * step_array
+        return cylindrical_to_cartesian(*launch_position) + tau * step_array
 
     def poloidal_flux_boundary_along_line(tau):
         """Signed poloidal flux distance to plasma boundary"""
@@ -396,7 +401,7 @@ def find_entry_point(
     # The root might be just outside the plasma due to floating point
     # errors, if so, take small steps until we're definitely inside
     boundary_tau = boundary.root
-    R_boundary, _, Z_boundary = cartesian_to_cylindrical(*beam_line(boundary_tau))
+    R_boundary, zeta_boundary, Z_boundary = cartesian_to_cylindrical(*beam_line(boundary_tau))
     if field.poloidal_flux(R_boundary, Z_boundary) > poloidal_flux_enter:
         boundary_tau += boundary_adjust
 

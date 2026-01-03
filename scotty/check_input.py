@@ -6,9 +6,19 @@
 
 from __future__ import annotations
 
-from .typing import FloatArray
-from .geometry import MagneticField
+from pathlib import Path
+from scotty.fun_general import angular_frequency_to_wavenumber, freq_GHz_to_angular_frequency
+from scotty.geometry import MagneticField
+from scotty.profile_fit import ProfileFitLike
+from scotty.typing import FloatArray
+import numpy as np
+from typing import Literal, Optional, Sequence, Union
 
+##################################################
+#
+# CHECKING INPUTS (for beam_me_up)
+#
+##################################################
 
 def check_mode_flag(mode_flag: int) -> None:
     """Mode flag should be either -1 (X-mode) or 1 (O-mode)"""

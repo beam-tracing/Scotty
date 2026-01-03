@@ -4,28 +4,31 @@
 from __future__ import annotations
 
 from abc import ABC
-import pathlib
-from typing import Callable, Optional, Tuple
-
 from h5netcdf.legacyapi import Dataset
+import logging
 import numpy as np
+import pathlib
 from scipy.interpolate import RectBivariateSpline, UnivariateSpline
-
 from scotty.derivatives import derivative
 from scotty.fun_general import find_nearest
+from scotty.logger_3D import timer
 from scotty.typing import ArrayLike, FloatArray
+from typing import Callable, Optional, Tuple
 
+log = logging.getLogger()
+
+##################################################
+#
+# FIELD CLASSES
+#
+##################################################
 
 class MagneticField(ABC):
     """Abstract base class for magnetic field geometries"""
-
-    #: Sample locations for the major radius coordinate
-    R_coord: FloatArray
-    #: Sample locations for the vertical coordinate
-    Z_coord: FloatArray
-    #: Value of the poloidal magnetic flux, :math:`\psi`, on ``(R_coord, Z_coord)``
-    poloidalFlux_grid: FloatArray
-    ## TODO: Include B_R_grid, B_T_grid, and B_Z_grid
+    R_coord: FloatArray #: Sample locations for the major radius coordinate
+    Z_coord: FloatArray #: Sample locations for the vertical coordinate
+    poloidalFlux_grid: FloatArray #: Value of the poloidal magnetic flux, :math:`\psi`, on ``(R_coord, Z_coord)``
+    ## TODO: Include B_R grid, B_T grid, and B_Z grid
 
     def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         raise NotImplementedError
@@ -39,62 +42,34 @@ class MagneticField(ABC):
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         raise NotImplementedError
 
-    def d_poloidal_flux_dR(
-        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
-    ) -> FloatArray:
-        return derivative(
-            self.poloidal_flux, "q_R", {"q_R": q_R, "q_Z": q_Z}, {"q_R": delta_R}
-        )
+    def d_poloidal_flux_dR(self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float) -> FloatArray:
+        r"""Returns the first derivative in R of the poloidal flux"""
+        return derivative(self.poloidal_flux, "q_R", {"q_R": q_R, "q_Z": q_Z}, {"q_R": delta_R})
 
-    def d_poloidal_flux_dZ(
-        self, q_R: ArrayLike, q_Z: ArrayLike, delta_Z: float
-    ) -> FloatArray:
-        return derivative(
-            self.poloidal_flux, "q_Z", {"q_R": q_R, "q_Z": q_Z}, {"q_Z": delta_Z}
-        )
+    def d_poloidal_flux_dZ(self, q_R: ArrayLike, q_Z: ArrayLike, delta_Z: float) -> FloatArray:
+        r"""Returns the first derivative in Z of the poloidal flux"""
+        return derivative(self.poloidal_flux, "q_Z", {"q_R": q_R, "q_Z": q_Z}, {"q_Z": delta_Z})
 
-    def d2_poloidal_flux_dR2(
-        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
-    ) -> FloatArray:
-        return derivative(
-            self.poloidal_flux,
-            ("q_R", "q_R"),
-            {"q_R": q_R, "q_Z": q_Z},
-            {"q_R": delta_R},
-        )
+    def d2_poloidal_flux_dR2(self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float) -> FloatArray:
+        r"""Returns the second derivative in R of the poloidal flux"""
+        return derivative(self.poloidal_flux, ("q_R", "q_R"), {"q_R": q_R, "q_Z": q_Z}, {"q_R": delta_R})
 
-    def d2_poloidal_flux_dZ2(
-        self, q_R: ArrayLike, q_Z: ArrayLike, delta_Z: float
-    ) -> FloatArray:
-        return derivative(
-            self.poloidal_flux,
-            ("q_Z", "q_Z"),
-            {"q_R": q_R, "q_Z": q_Z},
-            {"q_Z": delta_Z},
-        )
+    def d2_poloidal_flux_dZ2(self, q_R: ArrayLike, q_Z: ArrayLike, delta_Z: float) -> FloatArray:
+        r"""Returns the second derivative in Z of the poloidal flux"""
+        return derivative(self.poloidal_flux, ("q_Z", "q_Z"), {"q_R": q_R, "q_Z": q_Z}, {"q_Z": delta_Z})
 
-    def d2_poloidal_flux_dRdZ(
-        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float, delta_Z: float
-    ) -> FloatArray:
-        return derivative(
-            self.poloidal_flux,
-            ("q_R", "q_Z"),
-            {"q_R": q_R, "q_Z": q_Z},
-            {"q_R": delta_R, "q_Z": delta_Z},
-        )
+    def d2_poloidal_flux_dRdZ(self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float, delta_Z: float) -> FloatArray:
+        r"""Returns the (mixed) second derivative in R and Z of the poloidal flux"""
+        return derivative(self.poloidal_flux, ("q_R", "q_Z"), {"q_R": q_R, "q_Z": q_Z}, {"q_R": delta_R, "q_Z": delta_Z})
 
     def magnitude(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        """Returns :math:`|B|`, the magnitude of the magnetic field"""
-        return np.sqrt(
-            self.B_R(q_R, q_Z) ** 2 + self.B_T(q_R, q_Z) ** 2 + self.B_Z(q_R, q_Z) ** 2
-        )
+        r"""Returns :math:`|B|`, the magnitude of the magnetic field"""
+        return np.sqrt(self.B_R(q_R, q_Z) ** 2 + self.B_T(q_R, q_Z) ** 2 + self.B_Z(q_R, q_Z) ** 2)
 
     def unit(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         r"""Returns :math:`\mathbf{B}/|B|`, the unit vector of the magnetic field"""
         magnitude = self.magnitude(q_R, q_Z)
-        unit_vector = np.array(
-            [self.B_R(q_R, q_Z), self.B_T(q_R, q_Z), self.B_Z(q_R, q_Z)]
-        )
+        unit_vector = np.array( [self.B_R(q_R, q_Z), self.B_T(q_R, q_Z), self.B_Z(q_R, q_Z)] )
         return (unit_vector / magnitude).T
 
 
@@ -259,11 +234,11 @@ class CurvySlabField(MagneticField):
 
 
 def _make_rect_spline(
-    R_grid, Z_grid, array, interp_order: int, interp_smoothing: int
+    R_coord, Z_coord, array, interp_order: int, interp_smoothing: int
 ) -> Tuple[Callable[[ArrayLike, ArrayLike], FloatArray], RectBivariateSpline]:
     spline = RectBivariateSpline(
-        R_grid,
-        Z_grid,
+        R_coord,
+        Z_coord,
         array,
         bbox=[None, None, None, None],
         kx=interp_order,
@@ -298,66 +273,123 @@ def _make_spline_derivatives(
 
 
 class InterpolatedField(MagneticField):
-    """Interpolated numerical equilibrium using bivariate splines
+    r"""Interpolated numerical equilibrium using SciPy bivariate splines
 
     Parameters
     ----------
-    R_grid:
+    R_coord : ArrayLike, shape (n1,)
         1D array of points in ``R`` (metres)
-    Z_grid:
+    
+    Z_coord : ArrayLike, shape (n2,)
         1D array of points in ``Z`` (metres)
-    B_R:
-        2D ``(R, Z)`` grid of radial magnetic field values (Tesla)
-    B_T:
-        2D ``(R, Z)`` grid of toroidal magnetic field values (Tesla)
-    B_Z:
-        2D ``(R, Z)`` grid of vertical magnetic field values (Tesla)
-    psi:
-        2D ``(R, Z)`` grid of poloidal flux values (Weber/radian)
-    interp_order:
-        Order of interpolating splines
-    interp_smoothing:
-        Smoothing factor for interpolating splines
+    
+    B_R : ArrayLike, shape (n1, n2)
+        2D ``(R, Z)`` grid of the radial magnetic field values, in units of Tesla
+    
+    B_T : ArrayLike, shape (n1, n2)
+        2D ``(R, Z)`` grid of the toroidal magnetic field values, in units of Tesla
+    
+    B_Z : ArrayLike, shape (n1, n2)
+        2D ``(R, Z)`` grid of the vertical magnetic field values, in units of Tesla
+    
+    psi : ArrayLike, shape (n1, n2)
+        2D ``(R, Z)`` grid of the normalised poloidal flux values
+    
+    interp_order : int, optional
+        Order of interpolating splines. Default is ``5`` (quintic)
+    
+    interp_smoothing : int, optional
+        Smoothing factor for interpolating splines. Default is ``0`` (no smoothing)
+    
+    Attributes
+    ----------
+    R_coord : ArrayLike, shape (n1,)
+        1D array of points in ``R`` (metres)
+
+    Z_coord : ArrayLike, shape (n2,)
+        1D array of points in ``Z`` (metres)
+
+    B_R : ArrayLike, shape (n1, n2)
+        2D ``(R, Z)`` grid of the radial magnetic field values, in units of Tesla
+
+    B_T :ArrayLike, shape (n1, n2)
+        2D ``(R, Z)`` grid of the toroidal magnetic field values, in units of Tesla
+
+    B_Z :ArrayLike, shape (n1, n2)
+        2D ``(R, Z)`` grid of the vertical magnetic field values, in units of Tesla
+
+    poloidalFlux_grid : ArrayLike, shape (n1, n2)
+        2D ``(R, Z)`` grid of the normalised poloidal flux values
+    
+    Methods
+    ----------
+    B_R : Interpolated spline of the radial magnetic field values at coordinates
+
+    B_T : Interpolated spline of the toroidal magnetic field values at coordinates
+
+    B_Z : Interpolated spline of the vertical magnetic field values at coordinates
+
+    poloidal_flux : Interpolated spline of the normalised poloidal flux values at coordinates
+
+    d_poloidal_flux_dR : Numerically-calculated derivative at coordinates, first-order in R
+
+    d_poloidal_flux_dZ : Numerically-calculated derivative at coordinates, first-order in Z
+
+    d2_poloidal_flux_dR2 : Numerically-calculated derivative at coordinates, second-order in R
+
+    d2_poloidal_flux_dRdZ : Numerically-calculated derivative at coordinates, second-order in R and Z
+
+    d2_poloidal_flux_dZ2 : Numerically-calculated derivative at coordinates, second-order in Z
+
     """
 
     def __init__(
         self,
-        R_grid: FloatArray,
-        Z_grid: FloatArray,
+        R_coord: FloatArray,
+        Z_coord: FloatArray,
         B_R: FloatArray,
         B_T: FloatArray,
         B_Z: FloatArray,
         psi: FloatArray,
         interp_order: int = 5,
-        interp_smoothing: int = 0,
-    ):
-        self._interp_B_R, _ = _make_rect_spline(
-            R_grid, Z_grid, B_R, interp_order, interp_smoothing
-        )
-        self._interp_B_T, _ = _make_rect_spline(
-            R_grid, Z_grid, B_T, interp_order, interp_smoothing
-        )
-        self._interp_B_Z, _ = _make_rect_spline(
-            R_grid, Z_grid, B_Z, interp_order, interp_smoothing
-        )
-        self._interp_poloidal_flux, psi_spline = _make_rect_spline(
-            R_grid, Z_grid, psi, interp_order, interp_smoothing
-        )
-        self._set_poloidal_flux_derivatives(psi_spline)
+        interp_smoothing: int = 0):
 
-        self.R_coord = R_grid
-        self.Z_coord = Z_grid
+        ((self._interp_B_R,
+          self._spline_B_R),
+          duration_B_R_interpolation) = timer(_make_rect_spline, R_coord, Z_coord, B_R, interp_order, interp_smoothing)
+        log.debug(f"Interpolating 2D B_R profile took {duration_B_R_interpolation} s")
+        
+        ((self._interp_B_T,
+          self._spline_B_T),
+          duration_B_T_interpolation) = timer(_make_rect_spline, R_coord, Z_coord, B_T, interp_order, interp_smoothing)
+        log.debug(f"Interpolating 2D B_T profile took {duration_B_T_interpolation} s")
+
+        ((self._interp_B_Z,
+          self._spline_B_Z),
+          duration_B_Z_interpolation) = timer(_make_rect_spline, R_coord, Z_coord, B_Z, interp_order, interp_smoothing)
+        log.debug(f"Interpolating 2D B_Z profile took {duration_B_Z_interpolation} s")
+
+        ((self._interp_poloidal_flux,
+          self._spline_psi),
+          duration_psi_interpolation) = timer(_make_rect_spline, R_coord, Z_coord, psi, interp_order, interp_smoothing)
+        log.debug(f"Interpolating 2D psi profile took {duration_psi_interpolation} s")
+
+        self._set_poloidal_flux_derivatives(self._spline_psi)
+
+        self.R_coord = R_coord
+        self.Z_coord = Z_coord
+        self.B_R = B_R
+        self.B_T = B_T
+        self.B_Z = B_Z
         self.poloidalFlux_grid = psi
 
     def _set_poloidal_flux_derivatives(self, psi_spline):
-        try:
-            (
-                self._dpsi_dR,
-                self._dpsi_dZ,
-                self._d2psi_dR2,
-                self._d2psi_dZ2,
-                self._d2psi_dRdZ,
-            ) = _make_spline_derivatives(psi_spline)
+        try: (self._dpsi_dR,
+              self._dpsi_dZ,
+              self._d2psi_dR2,
+              self._d2psi_dZ2,
+              self._d2psi_dRdZ) = _make_spline_derivatives(psi_spline)
+        
         except AttributeError:
             # Older versions of SciPy don't have
             # `RectBivariateSpline.partial_derivative`, so fall back
@@ -368,49 +400,34 @@ class InterpolatedField(MagneticField):
             self._d2psi_dZ2 = super().d2_poloidal_flux_dZ2
             self._d2psi_dRdZ = super().d2_poloidal_flux_dRdZ
 
-    def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        return self._interp_B_R(q_R, q_Z)
+    # Defining class attributes for B_R, B_T, B_Z, and polflux
+    def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray: return self._interp_B_R(q_R, q_Z)
+    def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray: return self._interp_B_T(q_R, q_Z)
+    def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray: return self._interp_B_Z(q_R, q_Z)
+    def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray: return self._interp_poloidal_flux(q_R, q_Z)
 
-    def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        return self._interp_B_T(q_R, q_Z)
-
-    def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        return self._interp_B_Z(q_R, q_Z)
-
-    def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        return self._interp_poloidal_flux(q_R, q_Z)
-
-    def d_poloidal_flux_dR(
-        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
-    ) -> FloatArray:
+    # Defining the class attributes for the first- and second-order derivatives of polflux
+    def d_poloidal_flux_dR(self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float) -> FloatArray:
         return self._dpsi_dR(q_R, q_Z, delta_R)
 
-    def d_poloidal_flux_dZ(
-        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
-    ) -> FloatArray:
+    def d_poloidal_flux_dZ(self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float) -> FloatArray:
         return self._dpsi_dZ(q_R, q_Z, delta_R)
 
-    def d2_poloidal_flux_dR2(
-        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
-    ) -> FloatArray:
+    def d2_poloidal_flux_dR2(self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float) -> FloatArray:
         return self._d2psi_dR2(q_R, q_Z, delta_R)
 
-    def d2_poloidal_flux_dZ2(
-        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float
-    ) -> FloatArray:
+    def d2_poloidal_flux_dZ2(self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float) -> FloatArray:
         return self._d2psi_dZ2(q_R, q_Z, delta_R)
 
-    def d2_poloidal_flux_dRdZ(
-        self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float, delta_Z: float
-    ) -> FloatArray:
+    def d2_poloidal_flux_dRdZ(self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float, delta_Z: float) -> FloatArray:
         return self._d2psi_dRdZ(q_R, q_Z, delta_R, delta_Z)
 
 
 class EFITField(InterpolatedField):
     def __init__(
         self,
-        R_grid: FloatArray,
-        Z_grid: FloatArray,
+        R_coord: FloatArray,
+        Z_coord: FloatArray,
         rBphi: FloatArray,
         psi_norm_2D: FloatArray,
         psi_unnorm_axis: float,
@@ -421,15 +438,15 @@ class EFITField(InterpolatedField):
         interp_order: int = 5,
         interp_smoothing: int = 0,
     ):
-        self.R_coord = R_grid
-        self.Z_coord = Z_grid
+        self.R_coord = R_coord
+        self.Z_coord = Z_coord
         self.poloidalFlux_grid = psi_norm_2D
 
         self.delta_R = delta_R or 1e-8
         self.delta_Z = delta_Z or 1e-8
 
         self._interp_poloidal_flux, psi_spline = _make_rect_spline(
-            R_grid, Z_grid, psi_norm_2D, interp_order, interp_smoothing
+            R_coord, Z_coord, psi_norm_2D, interp_order, interp_smoothing
         )
         self._set_poloidal_flux_derivatives(psi_spline)
 
@@ -493,8 +510,8 @@ class EFITField(InterpolatedField):
         norm_psi_2D = unnorm_psi_2D * polflux_const_m + polflux_const_c
 
         return EFITField(
-            R_grid=data_R_coord,
-            Z_grid=data_Z_coord,
+            R_coord=data_R_coord,
+            Z_coord=data_Z_coord,
             rBphi=rBphi,
             psi_norm_2D=norm_psi_2D,
             psi_norm_1D=norm_psi_1D,
@@ -545,8 +562,8 @@ class EFITField(InterpolatedField):
         poloidalFlux_grid = (unnorm_psi_2D - psi_axis) / (psi_boundary - psi_axis)
 
         return cls(
-            R_grid=data_R_coord,
-            Z_grid=data_Z_coord,
+            R_coord=data_R_coord,
+            Z_coord=data_Z_coord,
             rBphi=rBphi,
             psi_norm_2D=poloidalFlux_grid,
             psi_norm_1D=poloidalFlux,
@@ -574,8 +591,8 @@ class EFITField(InterpolatedField):
             print("EFIT time", time_EFIT[t_idx])
 
             return EFITField(
-                R_grid=loadfile["R_EFIT"],
-                Z_grid=loadfile["Z_EFIT"],
+                R_coord=loadfile["R_EFIT"],
+                Z_coord=loadfile["Z_EFIT"],
                 rBphi=loadfile["rBphi"][t_idx, :],
                 psi_norm_2D=loadfile["poloidalFlux_grid"][t_idx, :, :],
                 psi_norm_1D=loadfile["poloidalFlux"][t_idx, :],

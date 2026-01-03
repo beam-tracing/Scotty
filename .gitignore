@@ -232,3 +232,8 @@ cython_debug/
 # Generated version file
 scotty/_version.py
 *.json
+scotty/DO NOT USE - JUST BACKING UP HERE/fun_general_stellarator.py
+scotty/DO NOT USE - JUST BACKING UP HERE/beam_me_up_stellarator.py
+scotty/DO NOT USE - JUST BACKING UP HERE/hamiltonian_stellarator.py
+scotty/DO NOT USE - JUST BACKING UP HERE/ray_solver_stellarator.py
+scotty/interpolated_data.pkl

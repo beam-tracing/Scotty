@@ -314,7 +314,7 @@ def plot_poloidal_beam_path(
     dt: DataTree,
     filename: Optional[PathLike] = None,
     ax: Optional[plt.Axes] = None,
-    zoom=False,
+    zoom=True,
 ) -> plt.Axes:
     """
     Plots the beam path on the R Z plane (poloidal cross section)

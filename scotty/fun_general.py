@@ -204,6 +204,7 @@ def find_vec_lab_Cartesian(vec_lab, q_zeta):
 
 
 def find_q_lab(q_lab_Cartesian):
+    """ Cartesian to Cylindrical """
     q_X = q_lab_Cartesian[0]
     q_Y = q_lab_Cartesian[1]
     q_Z = q_lab_Cartesian[2]
@@ -216,31 +217,40 @@ def find_q_lab(q_lab_Cartesian):
 
 
 def find_q_lab_Cartesian(q_lab):
+    """ Cylindrical to Cartesian """
     q_R = q_lab[0]
     q_zeta = q_lab[1]
     q_Z = q_lab[2]
-    q_lab_Cartesian = np.zeros((3, len(q_lab[0])))
-    q_lab_Cartesian[0] = np.array(q_R * np.cos(q_zeta) - q_zeta * np.sin(q_zeta))
-    q_lab_Cartesian[1] = q_R * np.sin(q_zeta) + q_zeta * np.cos(q_zeta)
+
+    q_lab_Cartesian = np.zeros_like(q_lab)
+    q_lab_Cartesian[0] = q_R * np.cos(q_zeta)
+    q_lab_Cartesian[1] = q_R * np.sin(q_zeta)
     q_lab_Cartesian[2] = q_Z
     return q_lab_Cartesian
 
 
 def find_K_lab_Cartesian(K_lab, q_lab):
+    """ Cylindrical to Cartesian """
     K_R = K_lab[0]
     K_zeta = K_lab[1]
     K_Z = K_lab[2]
     q_R = q_lab[0]
     q_zeta = q_lab[1]
 
-    K_lab_Cartesian = np.zeros(3)
+    if isinstance(K_R, float): n = 1
+    else: n = len(K_R)
+
+    K_lab_Cartesian = np.zeros((3, n))
     K_lab_Cartesian[0] = K_R * np.cos(q_zeta) - K_zeta * np.sin(q_zeta) / q_R  # K_X
     K_lab_Cartesian[1] = K_R * np.sin(q_zeta) + K_zeta * np.cos(q_zeta) / q_R  # K_Y
     K_lab_Cartesian[2] = K_Z
-    return K_lab_Cartesian
+
+    # This returns K_X, K_Y, K_Z (either as floats or individual arrays)
+    return np.squeeze(K_lab_Cartesian)
 
 
 def find_K_lab(K_lab_Cartesian, q_lab_Cartesian):
+    """ Cartesian to Cylindrical """
     K_X = K_lab_Cartesian[0]
     K_Y = K_lab_Cartesian[1]
     K_Z = K_lab_Cartesian[2]
@@ -391,9 +401,7 @@ def find_electron_mass(
         return electron_mass
 
 
-def find_normalised_plasma_freq(
-    electron_density, launch_angular_frequency, temperature=None
-):
+def find_normalised_plasma_freq(electron_density, launch_angular_frequency, temperature=None):
     # if electron_density < 0:
     #     print(electron_density)
     #     electron_density=0
@@ -417,6 +425,15 @@ def find_normalised_gyro_freq(B_Total, launch_angular_frequency, temperature=Non
     )
 
     return normalised_gyro_freq
+
+def find_normalised_cutoff_and_hybrid_freqs(B_Total, electron_density, launch_angular_frequency, temperature=None):
+    normalised_plasma_freq = find_normalised_plasma_freq(electron_density, launch_angular_frequency, temperature)
+    normalised_gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency, temperature=None)
+    normalised_lefthand_cutoff  = 0.5 * (-normalised_gyro_freq + np.sqrt(normalised_gyro_freq**2 + 4 * normalised_plasma_freq**2))
+    normalised_righthand_cutoff = 0.5 * ( normalised_gyro_freq + np.sqrt(normalised_gyro_freq**2 + 4 * normalised_plasma_freq**2))
+    normalised_upper_hybrid = np.sqrt(normalised_plasma_freq**2 + normalised_gyro_freq**2)
+    
+    return normalised_lefthand_cutoff, normalised_righthand_cutoff, normalised_upper_hybrid
 
 
 def find_epsilon_para(electron_density, launch_angular_frequency, temperature=None):
@@ -976,7 +993,7 @@ def find_Psi_3D_plasma_discontinuous(
         -0.5
         * (
             d2polflux_dR2 * dpolflux_dZ**2
-            + 2 * d2polflux_dRdZ * dpolflux_dR * dpolflux_dZ
+            - 2 * d2polflux_dRdZ * dpolflux_dR * dpolflux_dZ
             + d2polflux_dZ2 * dpolflux_dR**2
         )
         / (dpolflux_dR**2 + dpolflux_dZ**2)
@@ -1022,15 +1039,20 @@ def find_Psi_3D_plasma_discontinuous(
         interface_matrix_inverse,
         [
             Psi_v_zeta_zeta,
+
             Psi_v_R_R * dpolflux_dZ**2
             - 2 * Psi_v_R_Z * dpolflux_dR * dpolflux_dZ
-            + Psi_v_Z_Z * dpolflux_dR**2,
-            -Psi_v_R_zeta * dpolflux_dZ
-            + Psi_v_zeta_Z * dpolflux_dR
+            + Psi_v_Z_Z * dpolflux_dR**2
             + 2 * (K_v_R - K_p_R) * dpolflux_dR * eta
             + 2 * (K_v_Z - K_p_Z) * dpolflux_dZ * eta,
+
+            -Psi_v_R_zeta * dpolflux_dZ
+            + Psi_v_zeta_Z * dpolflux_dR,
+
             -dH_dR,
+
             -dH_dZ,
+            
             0,
         ],
     )

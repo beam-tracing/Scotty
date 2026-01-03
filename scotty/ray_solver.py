@@ -591,5 +591,22 @@ def propagate_ray(
             solver_arguments,
             solver_ray_events["leave_plasma"],
         )
-
+    
+    # TO REMOVE
+    solver_ray_output = solve_ivp(
+        ray_evolution_2D_fun,
+        [0, tau_max],
+        ray_parameters_2D_initial,
+        method="RK45",
+        t_eval=tau_points,
+        dense_output=False,
+        events=solver_ray_events.values(),
+        vectorized=False,
+        args=solver_arguments,
+        rtol=rtol,
+        atol=atol,
+        max_step=50,
+    )
+    # TO REMOVE -- to put this for ray_tracing_flag
+    # return solver_ray_output.t, solver_ray_output.y, solver_ray_output.status
     return tau_leave, tau_points
