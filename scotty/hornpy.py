@@ -8,6 +8,7 @@ note that what he calls 'flare angle', I call 'semiflare angle'.
 
 - Table 7.1 for ratios of beam widths to aperture radii
 """
+
 from typing import Dict
 
 import numpy as np

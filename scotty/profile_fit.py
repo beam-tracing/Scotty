@@ -10,7 +10,6 @@ from scotty.typing import PathLike, ArrayLike
 import numpy as np
 from scipy.interpolate import UnivariateSpline
 
-
 ProfileFitLike = Callable[[ArrayLike], ArrayLike]
 """A callable that can parameterise density/temperature in 1D"""
 
