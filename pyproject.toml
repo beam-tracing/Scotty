@@ -21,6 +21,7 @@ dependencies = [
     "xarray>=2024.10.0",
 	"typing-extensions>=4.0.0",
     "h5netcdf",
+    "h5py",
 ]
 dynamic = ["version"]
 

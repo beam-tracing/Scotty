@@ -11,6 +11,7 @@ split into a set of dictionaries (`DEFAULT_DIAGNOSTIC_PARAMETERS`,
 `user_settings`) that look up and parse the requested case.
 
 """
+
 from __future__ import annotations
 import math
 import numpy as np

@@ -34,9 +34,7 @@ def test_find_nearest():
 
 
 def test_read_floats_into_list():
-    data = io.StringIO(
-        dedent(
-            """
+    data = io.StringIO(dedent("""
             5.00000000e-01
             1.00000000e+00
             1.50000000e+00
@@ -45,9 +43,7 @@ def test_read_floats_into_list():
             0.061111111   0.18333333   0.30555556   0.42777778   0.55
             Magnetic field: B_R
             1 2 3 4
-            """
-        )
-    )
+            """))
     x_coords = read_floats_into_list_until("Z-coordinates", data)
     z_coords = read_floats_into_list_until("B_R", data)
     B_r = read_floats_into_list_until("not in file", data)

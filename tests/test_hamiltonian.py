@@ -8,7 +8,6 @@ from numpy.testing import assert_allclose
 
 import pytest
 
-
 # Wavenumbers used in the tests
 k_q_R = 2.1
 k_q_Z = 3.2
