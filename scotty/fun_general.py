@@ -1110,7 +1110,8 @@ def apply_discontinuous_BC(
         field.B_R(q_R, q_Z),
         field.B_T(q_R, q_Z),
         field.B_Z(q_R, q_Z),
-        hamiltonian.density(poloidal_flux_boundary),  # in the plasma
+        # hamiltonian.density(poloidal_flux_boundary),  # in the plasma
+        field.electron_density(q_R, q_Z),
         d_poloidal_flux_dR_boundary,
         d_poloidal_flux_dZ_boundary,
         temperature,

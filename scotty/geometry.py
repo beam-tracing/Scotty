@@ -351,9 +351,17 @@ class InterpolatedField(MagneticField):
         B_T: FloatArray,
         B_Z: FloatArray,
         psi: FloatArray,
+        n_e: FloatArray = None,
         interp_order: int = 5,
         interp_smoothing: int = 0):
 
+        self.R_coord = R_coord
+        self.Z_coord = Z_coord
+        self.B_R_grid = B_R
+        self.B_T_grid = B_T
+        self.B_Z_grid = B_Z
+        self.poloidalFlux_grid = psi
+        
         ((self._interp_B_R,
           self._spline_B_R),
           duration_B_R_interpolation) = timer(_make_rect_spline, R_coord, Z_coord, B_R, interp_order, interp_smoothing)
@@ -374,14 +382,15 @@ class InterpolatedField(MagneticField):
           duration_psi_interpolation) = timer(_make_rect_spline, R_coord, Z_coord, psi, interp_order, interp_smoothing)
         log.debug(f"Interpolating 2D psi profile took {duration_psi_interpolation} s")
 
-        self._set_poloidal_flux_derivatives(self._spline_psi)
+        if n_e is not None:
+            self.n_e_grid = n_e
+            ((self._interp_electron_density,
+             self._spline_n_e),
+             duration_n_e_interpolation) = timer(_make_rect_spline, R_coord, Z_coord, n_e, interp_order, interp_smoothing)
+            log.debug(f"Interpolating 2D n_e profile took {duration_n_e_interpolation} s")
 
-        self.R_coord = R_coord
-        self.Z_coord = Z_coord
-        self.B_R = B_R
-        self.B_T = B_T
-        self.B_Z = B_Z
-        self.poloidalFlux_grid = psi
+
+        self._set_poloidal_flux_derivatives(self._spline_psi)
 
     def _set_poloidal_flux_derivatives(self, psi_spline):
         try: (self._dpsi_dR,
@@ -405,6 +414,7 @@ class InterpolatedField(MagneticField):
     def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray: return self._interp_B_T(q_R, q_Z)
     def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray: return self._interp_B_Z(q_R, q_Z)
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray: return self._interp_poloidal_flux(q_R, q_Z)
+    def electron_density(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray: return self._interp_electron_density(q_R, q_Z)
 
     # Defining the class attributes for the first- and second-order derivatives of polflux
     def d_poloidal_flux_dR(self, q_R: ArrayLike, q_Z: ArrayLike, delta_R: float) -> FloatArray:

@@ -207,8 +207,12 @@ class Hamiltonian:
         """
 
         K_magnitude = np.sqrt(K_R**2 + (K_zeta / q_R) ** 2 + K_Z**2)
-        poloidal_flux = self.field.poloidal_flux(q_R, q_Z)
-        electron_density = self.density(poloidal_flux)
+
+        if hasattr(self.field, "n_e_grid"):
+            electron_density = self.field.electron_density(q_R, q_Z)
+        else:
+            poloidal_flux = self.field.poloidal_flux(q_R, q_Z)
+            electron_density = self.density(poloidal_flux)
 
         if self.temperature:
             temperature = self.temperature(poloidal_flux)

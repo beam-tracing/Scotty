@@ -151,7 +151,13 @@ def beam_me_up(
     B_p_a=None,
     R_axis=None,
     minor_radius_a=None,
+
+    # TO REMOVE
+    eduard_temporary_ray_tracing_flag = False,
+    eduard_2d_ne_flag = False,
+
 ) -> datatree.DataTree:
+    
     r"""Run the beam tracer
 
     Overview
@@ -316,6 +322,22 @@ def beam_me_up(
         direction (into the plasma).
     """
 
+    ##################################################
+    #
+    # INITIALISATION ROUTINE
+    #
+    ##################################################
+    # q_launch_cylindrical = launch_position # This is left here for backward compatibility
+    # params = Par
+
+
+
+
+
+
+
+
+
     print("Beam trace me up, Scotty!")
     print(f"scotty version {__version__}")
     run_id = uuid.uuid4()
@@ -340,25 +362,27 @@ def beam_me_up(
     ne_data_density_array = None
     ne_data_radialcoord_array = None
 
-    if density_fit_parameters is None and (
-        density_fit_method in [None, "smoothing-spline-file"]
-    ):
-        ne_filename = ne_data_path / f"ne{input_filename_suffix}.dat"
-        density_fit_parameters = [ne_filename, interp_order, interp_smoothing]
-
-        # FIXME: Read data so it can be saved later
-        ne_data = np.fromfile(ne_filename, dtype=float, sep="   ")
-        ne_data_density_array = ne_data[2::2]
-        ne_data_radialcoord_array = ne_data[1::2]
+    # if ne_data_path == pathlib.Path("."): pass
+    if eduard_2d_ne_flag:
+        find_density_1D = None
     else:
-        ne_filename = None
+        if density_fit_parameters is None and (density_fit_method in [None, "smoothing-spline-file"]):
+            ne_filename = ne_data_path / f"ne{input_filename_suffix}.dat"
+            density_fit_parameters = [ne_filename, interp_order, interp_smoothing]
 
-    find_density_1D = make_density_fit(
-        density_fit_method,
-        poloidal_flux_zero_density,
-        density_fit_parameters,
-        ne_filename,
-    )
+            # FIXME: Read data so it can be saved later
+            ne_data = np.fromfile(ne_filename, dtype=float, sep="   ")
+            ne_data_density_array = ne_data[2::2]
+            ne_data_radialcoord_array = ne_data[1::2]
+        else:
+            ne_filename = None
+
+        find_density_1D = make_density_fit(
+            density_fit_method,
+            poloidal_flux_zero_density,
+            density_fit_parameters,
+            ne_filename,
+        )
 
     # Run section if relativistic flag is set to True, and checks for whether the required temperature
     # data files are stored in path. If it does not exist, set relativistic flag to false and print
@@ -407,6 +431,7 @@ def beam_me_up(
         equil_time,
         abs(delta_R),
         abs(delta_Z),
+        eduard_2d_ne_flag, # TO REMOVE
     )
 
     if auto_delta_sign:
@@ -525,272 +550,328 @@ def beam_me_up(
 
 
 
-
-    # # TO REMOVE remember to change back the return of prop_ray
-    # print("Starting the solvers")
-    # tau_array, output_arrays, solver_status = propagate_ray(
-    #     poloidal_flux_enter,
-    #     launch_angular_frequency,
-    #     field,
-    #     initial_position,
-    #     K_initial,
-    #     hamiltonian,
-    #     rtol,
-    #     atol,
-    #     False, # quick_run
-    #     len_tau,
-    # )
-    
-    # q_R_array, q_Z_array, K_R_array, K_Z_array = output_arrays
-    # dH = hamiltonian.derivatives(q_R_array, q_Z_array, K_R_array, np.full_like(K_R_array, K_zeta_initial), K_Z_array)
-    # dH_dKR = dH["dH_dKR"]
-    # dH_dKzeta = dH["dH_dKzeta"]
-    # dH_dKZ = dH["dH_dKZ"]
-    # g_magnitude = np.sqrt(q_R_array**2 * dH_dKzeta**2 + dH_dKR**2 + dH_dKZ**2)
-    # g_hat = (np.block([[dH_dKR], [q_R_array * dH_dKzeta], [dH_dKZ]]) / g_magnitude).T
-
-    # B_magnitude = field.magnitude(q_R_array, q_Z_array)
-    # b_hat = field.unit(q_R_array, q_Z_array)
-    # b_hat_R, b_hat_zeta, b_hat_Z = b_hat[:, 0], b_hat[:, 1], b_hat[:, 2]
-
-    # from scotty.fun_general import make_unit_vector_from_cross_product
-    # y_hat = make_unit_vector_from_cross_product(b_hat, g_hat)
-    # x_hat = make_unit_vector_from_cross_product(y_hat, g_hat)
-
-    # from scotty.fun_general import find_nearest, K_magnitude, dot
-    # K_magnitude_array = K_magnitude(K_R_array, K_zeta_initial, K_Z_array, q_R_array)
-    # cutoff_index = find_nearest(np.abs(K_magnitude_array), 0)
-
-    # sin_theta_m = (b_hat_R*K_R_array + b_hat_zeta*K_zeta_initial + b_hat_Z*K_Z_array) / K_magnitude_array
-    # theta_m = np.sign(sin_theta_m) * np.arcsin(abs(sin_theta_m))
-    # kperp1_hat = make_unit_vector_from_cross_product(y_hat, b_hat)
-    # sin_theta = -dot(x_hat, kperp1_hat)
-    # theta = np.sign(sin_theta) * np.arcsin(abs(sin_theta))
-    # cos_theta = np.cos(theta)
-    # k_perp_1_bs = -2 * K_magnitude_array * np.cos(theta_m + theta) / cos_theta
-    # k_perp_1_bs_at_cutoff = k_perp_1_bs[cutoff_index]
-
-    # from scotty.hamiltonian import DielectricTensor
-    # epsilon = DielectricTensor(
-    #     hamiltonian.density(field.poloidal_flux(q_R_array, q_Z_array)),
-    #     launch_angular_frequency,
-    #     B_magnitude,
-    # )
-
-    # from scotty.analysis_3D import find_H_Cardano_eig
-    # H_eigvals, e_eigvecs = find_H_Cardano_eig(
-    #     K_magnitude_array,
-    #     launch_angular_frequency,
-    #     epsilon.e_bb,
-    #     epsilon.e_11,
-    #     epsilon.e_12,
-    #     theta_m,
-    # )
-
-    # # print(H_eigvals)
-    # # print()
-    # # print(e_eigvecs[:, 0])
-    # # print(e_eigvecs[:, 1])
-    # # print(e_eigvecs[:, 2])
-
-    # inputs = xr.Dataset(
-    #     {
-    #         "B_T_axis": B_T_axis,
-    #         "B_p_a": B_p_a,
-    #         "K_initial": (["col"], K_initial),
-    #         "Psi_BC_flag": Psi_BC_flag,
-    #         "R_axis": R_axis,
-    #         "atol": atol,
-    #         "delta_K_R": delta_K_R,
-    #         "delta_K_Z": delta_K_Z,
-    #         "delta_K_zeta": delta_K_zeta,
-    #         "delta_R": delta_R,
-    #         "delta_Z": delta_Z,
-    #         "density_fit_method": str(density_fit_method),
-    #         "density_fit_parameters": str(density_fit_parameters),
-    #         "detailed_analysis_flag": detailed_analysis_flag,
-    #         "equil_time": (equil_time),
-    #         "figure_flag": figure_flag,
-    #         "find_B_method": str(find_B_method),
-    #         "initial_position": (["col"], initial_position),
-    #         "input_filename_suffix": input_filename_suffix,
-    #         "interp_order": interp_order,
-    #         "interp_smoothing": interp_smoothing,
-    #         "launch_K": (launch_K),
-    #         "launch_angular_frequency": launch_angular_frequency,
-    #         "launch_beam_curvature": launch_beam_curvature,
-    #         "launch_beam_width": launch_beam_width,
-    #         "launch_freq_GHz": launch_freq_GHz,
-    #         "launch_position": (["col"], launch_position),
-    #         "len_tau": len_tau,
-    #         "magnetic_data_path": str(magnetic_data_path),
-    #         "minor_radius_a": minor_radius_a,
-    #         "mode_flag": mode_flag,
-    #         "ne_data_density_array": (ne_data_density_array),
-    #         "ne_data_path": str(ne_data_path),
-    #         "ne_data_radialcoord_array": (ne_data_radialcoord_array),
-    #         "output_filename_suffix": output_filename_suffix,
-    #         "output_path": str(output_path),
-    #         "plasmaLaunch_K": plasmaLaunch_K,
-    #         "plasmaLaunch_Psi_3D_lab_Cartesian": (
-    #             ["row", "col"],
-    #             plasmaLaunch_Psi_3D_lab_Cartesian,
-    #         ),
-    #         "poloidalFlux_grid": (["R", "Z"], field.poloidalFlux_grid),
-    #         "poloidal_flux_enter": poloidal_flux_enter,
-    #         "poloidal_launch_angle_Torbeam": poloidal_launch_angle_Torbeam,
-    #         "quick_run": quick_run,
-    #         "rtol": rtol,
-    #         "shot": shot,
-    #         "toroidal_launch_angle_Torbeam": toroidal_launch_angle_Torbeam,
-    #         "vacuumLaunch_flag": vacuumLaunch_flag,
-    #         "vacuum_propagation_flag": vacuum_propagation_flag,
-    #     },
-    #     coords={
-    #         "R": field.R_coord,
-    #         "Z": field.Z_coord,
-    #         "row": ["R", "zeta", "Z"],
-    #         "col": ["R", "zeta", "Z"],
-    #     },
-    # )
-    # solver_output = xr.Dataset(
-    #     {
-    #         "q_R": (["tau"], q_R_array, {"long_name": "R", "units": "m"}),
-    #         "q_Z": (["tau"], q_Z_array, {"long_name": "Z", "units": "m"}),
-    #         "K_R": (["tau"], K_R_array),
-    #         "K_zeta": K_zeta_initial,
-    #         "K_Z": (["tau"], K_Z_array),
-
-    #         "K_magnitude": K_magnitude_array,
-    #         "g_hat": (["tau", "col"], g_hat),
-    #         "g_magnitude": g_magnitude,
-    #         "x_hat": (["tau", "col"], x_hat),
-    #         "y_hat": (["tau", "col"], y_hat),
-    #         "b_hat": (["tau", "col"], b_hat),
-    #         "B_magnitude": B_magnitude,
-    #         "cutoff_index": cutoff_index,
-
-    #         "theta_m": theta_m,
-    #         "theta": theta,
-    #         "theta_m_at_cutoff": theta_m[cutoff_index],
-    #         "theta_at_cutoff": theta[cutoff_index],
-
-    #         "kperp1_hat": (["tau", "col"], kperp1_hat),
-    #         "k_perp_1_bs": k_perp_1_bs,
-    #         "k_perp_1_bs_at_cutoff": k_perp_1_bs_at_cutoff,
-
-    #         "q_R_at_cutoff": q_R_array[cutoff_index],
-    #         "q_Z_at_cutoff": q_Z_array[cutoff_index],
-    #         "K_R_at_cutoff": K_R_array[cutoff_index],
-    #         "K_Z_at_cutoff": K_Z_array[cutoff_index],
-    #         "polflux_at_cutoff": field.poloidal_flux(q_R_array[cutoff_index], q_Z_array[cutoff_index]),
-
-    #         "H_1": (["tau"], H_eigvals[:,0]),
-    #         "H_2": (["tau"], H_eigvals[:,1]),
-    #         "H_3": (["tau"], H_eigvals[:,2]),
-
-    #         "e_hat_1": (["tau", "col"], e_eigvecs[:,:,0]),
-    #         "e_hat_2": (["tau", "col"], e_eigvecs[:,:,1]),
-    #         "e_hat_3": (["tau", "col"], e_eigvecs[:,:,2]),
-
-    #     },
-    #     coords={
-    #         "tau": tau_array,
-    #         "row": ["R", "zeta", "Z"],
-    #         "col": ["R", "zeta", "Z"],
-    #     },
-    # )
-
-    # _TEMP_DT = datatree.DataTree.from_dict({"inputs": inputs, "solver_output": solver_output})
-    # _TEMP_DT.attrs = {
-    #     "title": output_filename_suffix,
-    #     "software_name": "scotty-beam-tracing",
-    #     "software_version": __version__,
-    #     "date_created": str(datetime.datetime.now()),
-    #     "id": str(run_id),
-    # }
-
-    # import os
-    # from scotty.plotting import maybe_make_axis
-    # import matplotlib.pyplot as plt
-    # # ax = maybe_make_axis(None)
-    # # cax = ax.contour(
-    # #     field.R_coord,
-    # #     field.Z_coord,
-    # #     field.poloidalFlux_grid.T,
-    # #     levels=np.linspace(0, 1, 11, endpoint=True),
-    # #     cmap="plasma_r",
-    # # )
-    # # ax.clabel(cax, inline=True)
-    # # ax.plot(1, 0, label="Launch Position", color="red", marker=">")
-    # # ax.plot([1, q_R_array[0]], [0, q_Z_array[0]], color="black", linestyle=":")
-    # # ax.plot(q_R_array, q_Z_array, label="Central Ray", color="black", linestyle="-")
-    # # ax.axis(
-    # #     xmin = -0.05,
-    # #     xmax = 1.05,
-    # #     ymin = -0.75,
-    # #     ymax = 0.5,
-    # # )
-    # # plt.legend()
-    # # plt.gca().set_aspect('equal')
-    # # plt.draw()
-    # # plt.savefig(output_path / f"ray_path.png")
-
-    # padding = 0.2  # fraction to pad around the data
-    # q_R_min, q_R_max = np.min(q_R_array), np.max(q_R_array)
-    # q_Z_min, q_Z_max = np.min(q_Z_array), np.max(q_Z_array)
-    # R_range = q_R_max - q_R_min
-    # Z_range = q_Z_max - q_Z_min
-
-    # # Make figure with two subplots
-    # fig, axes = plt.subplots(1, 2, figsize=(12, 6))  # 1 row, 2 columns
-
-    # for i, ax in enumerate(axes):
-    #     # Contour plot
-    #     cax = ax.contour(
-    #         field.R_coord,
-    #         field.Z_coord,
-    #         field.poloidalFlux_grid.T,
-    #         levels=np.linspace(0, 1, 11, endpoint=True),
-    #         cmap="plasma_r",
-    #     )
-    #     ax.clabel(cax, inline=True)
+    if eduard_temporary_ray_tracing_flag:
+        # TO REMOVE remember to change back the return of prop_ray
+        print("Starting the solvers")
+        tau_array, output_arrays, solver_status = propagate_ray(
+            poloidal_flux_enter,
+            launch_angular_frequency,
+            field,
+            initial_position,
+            K_initial,
+            hamiltonian,
+            rtol,
+            atol,
+            False, # quick_run
+            len_tau,
+            eduard_temporary_ray_tracing_flag = eduard_temporary_ray_tracing_flag # TO REMOVE
+        )
         
-    #     # Launch position and ray
-    #     ax.scatter(1, 0, label="Launch Position", color="red", marker=">")
-    #     ax.plot([1, q_R_array[0]], [0, q_Z_array[0]], color="black", linestyle=":")
-    #     ax.plot(q_R_array, q_Z_array, label="Central Ray", color="black", linestyle="-")
+        q_R_array, q_Z_array, K_R_array, K_Z_array = output_arrays
+        dH = hamiltonian.derivatives(q_R_array, q_Z_array, K_R_array, np.full_like(K_R_array, K_zeta_initial), K_Z_array)
+        dH_dKR = dH["dH_dKR"]
+        dH_dKzeta = dH["dH_dKzeta"]
+        dH_dKZ = dH["dH_dKZ"]
+        g_magnitude = np.sqrt(q_R_array**2 * dH_dKzeta**2 + dH_dKR**2 + dH_dKZ**2)
+        g_hat = (np.block([[dH_dKR], [q_R_array * dH_dKzeta], [dH_dKZ]]) / g_magnitude).T
+
+        B_magnitude = field.magnitude(q_R_array, q_Z_array)
+        b_hat = field.unit(q_R_array, q_Z_array)
+        b_hat_R, b_hat_zeta, b_hat_Z = b_hat[:, 0], b_hat[:, 1], b_hat[:, 2]
+
+        from scotty.fun_general import make_unit_vector_from_cross_product
+        y_hat = make_unit_vector_from_cross_product(b_hat, g_hat)
+        x_hat = make_unit_vector_from_cross_product(y_hat, g_hat)
+
+        from scotty.fun_general import find_nearest, K_magnitude, dot
+        K_magnitude_array = K_magnitude(K_R_array, K_zeta_initial, K_Z_array, q_R_array)
+        cutoff_index = find_nearest(np.abs(K_magnitude_array), 0)
+        K_cutoff = K_magnitude_array[cutoff_index]
+        Kc_K0 = np.abs(K_cutoff / hamiltonian.wavenumber_K0)
+
+        sin_theta_m = (b_hat_R*K_R_array + b_hat_zeta*K_zeta_initial/q_R_array + b_hat_Z*K_Z_array) / K_magnitude_array
+        theta_m = np.sign(sin_theta_m) * np.arcsin(abs(sin_theta_m))
+        kperp1_hat = make_unit_vector_from_cross_product(y_hat, b_hat)
+        sin_theta = -dot(x_hat, kperp1_hat)
+        theta = np.sign(sin_theta) * np.arcsin(abs(sin_theta))
+        cos_theta = np.cos(theta)
+        k_perp_1_bs = -2 * K_magnitude_array * np.cos(theta_m + theta) / cos_theta
+        k_perp_1_bs_at_cutoff = k_perp_1_bs[cutoff_index]
+
+        from scotty.hamiltonian import DielectricTensor
+        if hasattr(field, "n_e_grid"):
+            epsilon = DielectricTensor(
+                field.electron_density(q_R_array, q_Z_array),
+                launch_angular_frequency,
+                B_magnitude,
+            )
+        else:
+            epsilon = DielectricTensor(
+                hamiltonian.density(field.poloidal_flux(q_R_array, q_Z_array)),
+                launch_angular_frequency,
+                B_magnitude,
+            )
+
+        from scotty.analysis_3D import find_H_Cardano_eig
+        H_eigvals, e_eigvecs = find_H_Cardano_eig(
+            K_magnitude_array,
+            launch_angular_frequency,
+            epsilon.e_bb,
+            epsilon.e_11,
+            epsilon.e_12,
+            theta_m,
+        )
+
+        # print(H_eigvals)
+        # print()
+        # print(e_eigvecs[:, 0])
+        # print(e_eigvecs[:, 1])
+        # print(e_eigvecs[:, 2])
+
+        inputs = xr.Dataset(
+            {
+                "B_T_axis": B_T_axis,
+                "B_p_a": B_p_a,
+                "K_initial": (["col"], K_initial),
+                "Psi_BC_flag": Psi_BC_flag,
+                "R_axis": R_axis,
+                "atol": atol,
+                "delta_K_R": delta_K_R,
+                "delta_K_Z": delta_K_Z,
+                "delta_K_zeta": delta_K_zeta,
+                "delta_R": delta_R,
+                "delta_Z": delta_Z,
+                "density_fit_method": str(density_fit_method),
+                "density_fit_parameters": str(density_fit_parameters),
+                "detailed_analysis_flag": detailed_analysis_flag,
+                "equil_time": (equil_time),
+                "figure_flag": figure_flag,
+                "find_B_method": str(find_B_method),
+                "initial_position": (["col"], initial_position),
+                "input_filename_suffix": input_filename_suffix,
+                "interp_order": interp_order,
+                "interp_smoothing": interp_smoothing,
+                "launch_K": (launch_K),
+                "launch_angular_frequency": launch_angular_frequency,
+                "launch_beam_curvature": launch_beam_curvature,
+                "launch_beam_width": launch_beam_width,
+                "launch_freq_GHz": launch_freq_GHz,
+                "launch_position": (["col"], launch_position),
+                "len_tau": len_tau,
+                "magnetic_data_path": str(magnetic_data_path),
+                "minor_radius_a": minor_radius_a,
+                "mode_flag": mode_flag,
+                "ne_data_density_array": (ne_data_density_array),
+                "ne_data_path": str(ne_data_path),
+                "ne_data_radialcoord_array": (ne_data_radialcoord_array),
+                "output_filename_suffix": output_filename_suffix,
+                "output_path": str(output_path),
+                "plasmaLaunch_K": plasmaLaunch_K,
+                "plasmaLaunch_Psi_3D_lab_Cartesian": (
+                    ["row", "col"],
+                    plasmaLaunch_Psi_3D_lab_Cartesian,
+                ),
+                "poloidalFlux_grid": (["R", "Z"], field.poloidalFlux_grid),
+                "poloidal_flux_enter": poloidal_flux_enter,
+                "poloidal_launch_angle_Torbeam": poloidal_launch_angle_Torbeam,
+                "quick_run": quick_run,
+                "rtol": rtol,
+                "shot": shot,
+                "toroidal_launch_angle_Torbeam": toroidal_launch_angle_Torbeam,
+                "vacuumLaunch_flag": vacuumLaunch_flag,
+                "vacuum_propagation_flag": vacuum_propagation_flag,
+            },
+            coords={
+                "R": field.R_coord,
+                "Z": field.Z_coord,
+                "row": ["R", "zeta", "Z"],
+                "col": ["R", "zeta", "Z"],
+            },
+        )
+        solver_output = xr.Dataset(
+            {
+                "q_R": (["tau"], q_R_array, {"long_name": "R", "units": "m"}),
+                "q_Z": (["tau"], q_Z_array, {"long_name": "Z", "units": "m"}),
+                "K_R": (["tau"], K_R_array),
+                "K_zeta": K_zeta_initial,
+                "K_Z": (["tau"], K_Z_array),
+
+                "K_magnitude": K_magnitude_array,
+                "g_hat": (["tau", "col"], g_hat),
+                "g_magnitude": g_magnitude,
+                "x_hat": (["tau", "col"], x_hat),
+                "y_hat": (["tau", "col"], y_hat),
+                "b_hat": (["tau", "col"], b_hat),
+                "B_magnitude": B_magnitude,
+                "cutoff_index": cutoff_index,
+                "Kc_K0": Kc_K0,
+
+                "theta_m": theta_m,
+                "theta": theta,
+                "theta_m_at_cutoff": theta_m[cutoff_index],
+                "theta_at_cutoff": theta[cutoff_index],
+
+                "kperp1_hat": (["tau", "col"], kperp1_hat),
+                "k_perp_1_bs": k_perp_1_bs,
+                "k_perp_1_bs_at_cutoff": k_perp_1_bs_at_cutoff,
+
+                "q_R_at_cutoff": q_R_array[cutoff_index],
+                "q_Z_at_cutoff": q_Z_array[cutoff_index],
+                "K_R_at_cutoff": K_R_array[cutoff_index],
+                "K_Z_at_cutoff": K_Z_array[cutoff_index],
+                "polflux_at_cutoff": field.poloidal_flux(q_R_array[cutoff_index], q_Z_array[cutoff_index]),
+
+                "H_1": (["tau"], H_eigvals[:,0]),
+                "H_2": (["tau"], H_eigvals[:,1]),
+                "H_3": (["tau"], H_eigvals[:,2]),
+
+                "e_hat_1": (["tau", "col"], e_eigvecs[:,:,0]),
+                "e_hat_2": (["tau", "col"], e_eigvecs[:,:,1]),
+                "e_hat_3": (["tau", "col"], e_eigvecs[:,:,2]),
+
+            },
+            coords={
+                "tau": tau_array,
+                "row": ["R", "zeta", "Z"],
+                "col": ["R", "zeta", "Z"],
+            },
+        )
+
+        _TEMP_DT = datatree.DataTree.from_dict({"inputs": inputs, "solver_output": solver_output})
+        _TEMP_DT.attrs = {
+            "title": output_filename_suffix,
+            "software_name": "scotty-beam-tracing",
+            "software_version": __version__,
+            "date_created": str(datetime.datetime.now()),
+            "id": str(run_id),
+        }
+
+        import os
+        from scotty.plotting import maybe_make_axis
+        import matplotlib.pyplot as plt
+        # ax = maybe_make_axis(None)
+        # cax = ax.contour(
+        #     field.R_coord,
+        #     field.Z_coord,
+        #     field.poloidalFlux_grid.T,
+        #     levels=np.linspace(0, 1, 11, endpoint=True),
+        #     cmap="plasma_r",
+        # )
+        # ax.clabel(cax, inline=True)
+        # ax.plot(1, 0, label="Launch Position", color="red", marker=">")
+        # ax.plot([1, q_R_array[0]], [0, q_Z_array[0]], color="black", linestyle=":")
+        # ax.plot(q_R_array, q_Z_array, label="Central Ray", color="black", linestyle="-")
+        # ax.axis(
+        #     xmin = -0.05,
+        #     xmax = 1.05,
+        #     ymin = -0.75,
+        #     ymax = 0.5,
+        # )
+        # plt.legend()
+        # plt.gca().set_aspect('equal')
+        # plt.draw()
+        # plt.savefig(output_path / f"ray_path.png")
+
+        padding = 0.2  # fraction to pad around the data
+        q_R_min, q_R_max = np.min(q_R_array), np.max(q_R_array)
+        q_Z_min, q_Z_max = np.min(q_Z_array), np.max(q_Z_array)
+        R_range = q_R_max - q_R_min
+        Z_range = q_Z_max - q_Z_min
+
+        # Make figure with two subplots
+        fig, axes = plt.subplots(1, 3, figsize=(12, 6))  # 1 row, 3 columns
+
+        for i, ax in enumerate(axes):
+            # Contour plot
+            cax = ax.contour(
+                field.R_coord,
+                field.Z_coord,
+                field.poloidalFlux_grid.T,
+                levels=np.linspace(0, 1, 11, endpoint=True),
+                cmap="plasma_r",
+            )
+            ax.clabel(cax, inline=True)
+            
+            # Launch position and ray
+            start_R, _, start_Z = launch_position
+            ax.scatter(start_R, start_Z, label="Launch Position", color="red", marker=">")
+            ax.plot([start_R, q_R_array[0]], [start_Z, q_Z_array[0]], color="black", linestyle=":")
+            ax.plot(q_R_array, q_Z_array, label="Central Ray", color="black", linestyle="-")
+            
+            # Aspect ratio
+            ax.set_aspect('equal')
+
+            """ THIS IS FOR REALTA """
+            """if i == 0:
+                # Full view
+                ax.set_xlim(-0.05, 0.55)
+                ax.set_ylim(-1, 1)
+                ax.set_title("Full View")
+                ax.legend()
+            elif i == 1:
+                # Top half view
+                ax.scatter(q_R_array[cutoff_index], q_Z_array[cutoff_index], label="Cutoff", color="red", marker="x")
+                ax.legend()
+                ax.set_xlim(0, 0.15)
+                ax.set_ylim(0, 0.5)
+                ax.set_title("Top-Half View")
+            else:
+                # Zoomed-in view
+                ax.scatter(q_R_array[cutoff_index], q_Z_array[cutoff_index], label="Cutoff", color="red", marker="x")
+                # ax.legend()
+                ax.set_xlim(q_R_min - padding*R_range, q_R_max + padding*R_range)
+                ax.set_ylim(q_Z_min - padding*Z_range, q_Z_max + padding*Z_range)
+                ax.set_title("Zoomed View")"""
+            
+
+            
+            """ THIS IS FOR NORMAL SCOTTY"""
+            if i == 0:
+                # Full view
+                ax.set_xlim(0.0, 2.0)
+                ax.set_ylim(-2.2, 2.2)
+                ax.set_title("Full View")
+                ax.legend()
+            elif i == 1:
+                # Top half view
+                ax.scatter(q_R_array[cutoff_index], q_Z_array[cutoff_index], label="Cutoff", color="red", marker="x")
+                ax.legend()
+                ax.set_xlim(q_R_min - padding*R_range - 0.1, q_R_max + padding*R_range + 0.1)
+                ax.set_ylim(q_Z_min - padding*Z_range - 0.1, q_Z_max + padding*Z_range + 0.1)
+                ax.set_title("Closer View")
+            else:
+                # Zoomed-in view
+                ax.scatter(q_R_array[cutoff_index], q_Z_array[cutoff_index], label="Cutoff", color="red", marker="x")
+                # ax.legend()
+                ax.set_xlim(q_R_min - padding*R_range - 0.01, q_R_max + padding*R_range + 0.01)
+                ax.set_ylim(q_Z_min - padding*Z_range - 0.01, q_Z_max + padding*Z_range + 0.01)
+                ax.set_title("Zoomed View")
+            
+
+
+
         
-    #     # Aspect ratio
-    #     ax.set_aspect('equal')
+        plt.suptitle(f"Ray Path Plots for \n{launch_freq_GHz} GHz, pol {poloidal_launch_angle_Torbeam} deg, tor {toroidal_launch_angle_Torbeam} deg")
+        plt.tight_layout()
+        plt.savefig(output_path / f"ray_path{output_filename_suffix}.png", bbox_inches="tight", dpi=600)
+        plt.draw()
+        plt.close()
 
-    #     if i == 0:
-    #         # Full view
-    #         ax.set_xlim(-0.05, 1.05)
-    #         ax.set_ylim(-0.9, 0.6)
-    #         ax.set_title("Full View")
-    #         ax.legend()
-    #     else:
-    #         # Zoomed-in view
-    #         ax.scatter(q_R_array[cutoff_index], q_Z_array[cutoff_index], label="Cutoff", color="red", marker="x")
-    #         ax.legend()
-    #         ax.set_xlim(q_R_min - padding*R_range, q_R_max + padding*R_range)
-    #         ax.set_ylim(q_Z_min - padding*Z_range, q_Z_max + padding*Z_range)
-    #         ax.set_title("Zoomed View")
+        _TEMP_DT.to_netcdf(
+            output_path / f"scotty_output{output_filename_suffix}.h5",
+            engine="h5netcdf",
+            invalid_netcdf=True,
+        )
 
-    # plt.tight_layout()
-    # plt.savefig(output_path / "ray_path_comparison.png")
-    # plt.draw()
-    # plt.close()
+        print()
+        print()
+        print()
+        print(f"RUN DONE for frequency {launch_freq_GHz}, pol = {poloidal_launch_angle_Torbeam}, tor = {toroidal_launch_angle_Torbeam}")
+        print()
+        print()
+        print()
 
-    # _TEMP_DT.to_netcdf(
-    #     output_path / f"scotty_output{output_filename_suffix}.h5",
-    #     engine="h5netcdf",
-    #     invalid_netcdf=True,
-    # )
-
-    # if quick_run:
-    #     return field, _TEMP_DT
+        return field, _TEMP_DT
     
 
 
@@ -1049,9 +1130,14 @@ def default_plots(
     Allows one to quickly gain an insight into what transpired in the simulation
     """
 
+    from scotty.plotting import plot_toroidal_beam_path, plot_widths
+
     print("Making figures")
-    plot_poloidal_beam_path(dt, filename=(output_path / f"Ray1_{suffix}.png"))
+    plot_poloidal_beam_path(dt, filename=(output_path / f"beam_path{suffix}_zoomed.png"), zoom=True)
+    plot_poloidal_beam_path(dt, filename=(output_path / f"beam_path{suffix}.png"), zoom=False)
+    plot_toroidal_beam_path(dt, filename=(output_path / f"beam_path_toroidal.png"))
     plot_dispersion_relation(dt.analysis, filename=(output_path / f"H_{suffix}.png"))
+    plot_widths(dt, filename=(output_path / f"beam_widths.png"))
     print("Figures have been saved")
 
 
@@ -1125,6 +1211,9 @@ def create_magnetic_geometry(
     equil_time: Optional[float] = None,
     delta_R: Optional[float] = None,
     delta_Z: Optional[float] = None,
+
+    # TO REMOVE
+    eduard_2d_ne_flag = False,
     **kwargs,
 ) -> MagneticField:
     """Create an object representing the magnetic field geometry"""
@@ -1185,16 +1274,19 @@ def create_magnetic_geometry(
         topfile_filename = magnetic_data_path / f"topfile{input_filename_suffix}"
         torbeam = Torbeam.from_file(topfile_filename)
 
-        return InterpolatedField(
-            torbeam.R_grid,
-            torbeam.Z_grid,
-            torbeam.B_R,
-            torbeam.B_T,
-            torbeam.B_Z,
-            torbeam.psi,
-            interp_order,
-            interp_smoothing,
-        )
+        args = {
+            "R_coord": torbeam.R_grid,
+            "Z_coord": torbeam.Z_grid,
+            "B_R": torbeam.B_R,
+            "B_T": torbeam.B_T,
+            "B_Z": torbeam.B_Z,
+            "psi": torbeam.psi,
+            "interp_order": interp_order,
+            "interp_smoothing": interp_smoothing,
+        }
+        # if "n_e" in data.keys(): args["n_e"] = torbeam.n_e
+        if eduard_2d_ne_flag: args["n_e"] = torbeam.n_e
+        return InterpolatedField(**args)
 
     elif find_B_method == "omfit":
         print("Using OMFIT JSON Torbeam file for B and poloidal flux")
@@ -1209,17 +1301,20 @@ def create_magnetic_geometry(
         def unflatten(array):
             """Convert from column-major (TORBEAM, Fortran) to row-major order (Scotty, Python)"""
             return np.asarray(array).reshape(len(data_Z_coord), len(data_R_coord)).T
-
-        return InterpolatedField(
-            data_R_coord,
-            data_Z_coord,
-            unflatten(data["Br"]),
-            unflatten(data["Bt"]),
-            unflatten(data["Bz"]),
-            unflatten(data["pol_flux"]),
-            interp_order,
-            interp_smoothing,
-        )
+        
+        args = {
+            "R_coord": data_R_coord,
+            "Z_coord": data_Z_coord,
+            "B_R": unflatten(data["Br"]),
+            "B_T": unflatten(data["Bt"]),
+            "B_Z": unflatten(data["Bz"]),
+            "psi": unflatten(data["pol_flux"]),
+            "interp_order": interp_order,
+            "interp_smoothing": interp_smoothing,
+        }
+        # if "n_e" in data.keys(): args["n_e"] = unflatten(data["n_e"])
+        if eduard_2d_ne_flag: args["n_e"] = unflatten(data["n_e"])
+        return InterpolatedField(**args)
     
     # TO REMOVE
     elif find_B_method == "omfit_rowmajor":
@@ -1228,17 +1323,20 @@ def create_magnetic_geometry(
 
         with open(topfile_filename) as f:
             data = json.load(f)
-
-        return InterpolatedField(
-            np.array(data["R"]),
-            np.array(data["Z"]),
-            np.array(data["Br"]),
-            np.array(data["Bt"]),
-            np.array(data["Bz"]),
-            np.array(data["pol_flux"]),
-            interp_order,
-            interp_smoothing,
-        )
+        
+        args = {
+            "R_coord": np.array(data["R"]),
+            "Z_coord": np.array(data["Z"]),
+            "B_R": np.array(data["Br"]),
+            "B_T": np.array(data["Bt"]),
+            "B_Z": np.array(data["Bz"]),
+            "psi": np.array(data["pol_flux"]),
+            "interp_order": interp_order,
+            "interp_smoothing": interp_smoothing,
+        }
+        if "n_e" in data.keys(): args["n_e"] = np.array(data["n_e"])
+        if eduard_2d_ne_flag: args["n_e"] = np.array(data["n_e"])
+        return InterpolatedField(**args)
 
     if find_B_method == "test":
         # Works nicely with the new MAST-U UDA output
@@ -1248,28 +1346,31 @@ def create_magnetic_geometry(
             t_idx = find_nearest(time_EFIT, equil_time)
             print("EFIT time", time_EFIT[t_idx])
 
-            return InterpolatedField(
-                R_grid=loadfile["R_EFIT"],
-                Z_grid=loadfile["Z_EFIT"],
-                psi=loadfile["poloidalFlux_grid"][t_idx, :, :],
-                B_T=loadfile["Bphi_grid"][t_idx, :, :],
-                B_R=loadfile["Br_grid"][t_idx, :, :],
-                B_Z=loadfile["Bz_grid"][t_idx, :, :],
-                interp_order=interp_order,
-                interp_smoothing=interp_smoothing,
-            )
+            args = {
+                "R_coord": loadfile["R_EFIT"],
+                "Z_coord": loadfile["Z_EFIT"],
+                "B_R": loadfile["Br_grid"][t_idx, :, :],
+                "B_T": loadfile["Bphi_grid"][t_idx, :, :],
+                "B_Z": loadfile["Bz_grid"][t_idx, :, :],
+                "psi": loadfile["poloidalFlux_grid"][t_idx, :, :],
+                "interp_order": interp_order,
+                "interp_smoothing": interp_smoothing,
+            }
+            return InterpolatedField(**args)
+    
     if find_B_method == "test_notime":
         with np.load(magnetic_data_path) as loadfile:
-            return InterpolatedField(
-                R_grid=loadfile["R_EFIT"],
-                Z_grid=loadfile["Z_EFIT"],
-                psi=loadfile["poloidalFlux_grid"],
-                B_T=loadfile["Bphi_grid"],
-                B_R=loadfile["Br_grid"],
-                B_Z=loadfile["Bz_grid"],
-                interp_order=interp_order,
-                interp_smoothing=interp_smoothing,
-            )
+            args = {
+                "R_coord": loadfile["R_EFIT"],
+                "Z_coord": loadfile["Z_EFIT"],
+                "B_R": loadfile["Br_grid"],
+                "B_T": loadfile["Bphi_grid"],
+                "B_Z": loadfile["Bz_grid"],
+                "psi": loadfile["poloidalFlux_grid"],
+                "interp_order": interp_order,
+                "interp_smoothing": interp_smoothing,
+            }
+            return InterpolatedField(**args)
 
     ########################################
     # Interpolated numerical geometries from EFIT data

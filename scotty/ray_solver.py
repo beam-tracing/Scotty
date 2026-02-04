@@ -462,8 +462,11 @@ def propagate_ray(
     atol: float,
     quick_run: bool,
     len_tau: int,
-    tau_max: float = 1e5,
+    tau_max: float = 1e7,
     verbose: bool = True,
+
+    # TO REMOVE
+    eduard_temporary_ray_tracing_flag = False,
 ) -> Union[Tuple[float, FloatArray], K_cutoff_data]:
     """Propagate a ray. Quickly finds tau at which the ray leaves the
     plasma, as well as estimates location of cut-off.
@@ -608,5 +611,7 @@ def propagate_ray(
         max_step=50,
     )
     # TO REMOVE -- to put this for ray_tracing_flag
-    # return solver_ray_output.t, solver_ray_output.y, solver_ray_output.status
-    return tau_leave, tau_points
+    if eduard_temporary_ray_tracing_flag:
+        return solver_ray_output.t, solver_ray_output.y, solver_ray_output.status
+    else:
+        return tau_leave, tau_points
