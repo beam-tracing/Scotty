@@ -1,19 +1,43 @@
+"""
+GUI for Scotty
+
+Uses the Tkinter module to create an interface to run Scotty and utilise its functions, allowing more fluid user interaction
+
+How to run: Install all required packages (tkinter, scotty, numpy, scipy, matplotlib, h5py), run the python file 
+
+Structure
+- Initialization + General functions (validation, running beam_me_up())
+- Parameter page creation 
+    - Page behaviours (for subpages)
+    - Widget creation (buttons, labels, info labels)
+- Misc page creation (plotting, diagnostic presets)
+    - Related functions
+    - Page behaviours
+    - Widget creation
+
+"""
+
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.plotting import *
+from scotty.torbeam import Torbeam
+from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.geometry import find_nearest, InterpolatedField
 from scotty.beam_me_up import make_density_fit, create_magnetic_geometry, beam_me_up
 
 import numpy as np
 import pathlib
-import os
+# import os
+import re
 import copy
 import itertools
 import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
+
+from pathlib import Path
+from scipy import interpolate
 
 #---------------------------------#
 # Main page creation
@@ -25,43 +49,20 @@ AVAILABLEPLOTS = []
 #---------------------------------#
 # Functions
 def submit(): # Main beam_me_up() running function
-
-    # File name/path compilation
-    mag_path, mag_filename = os.path.split(magnetic_data_path.get())
-    spl_mag = mag_filename.split('_')
-    if len(spl_mag) != 3 or not spl_mag[0].isdigit() or spl_mag[1:3] != ["equilibrium","data.npz"]:
-        # input(f'renaming {mag_filename}') # <- For testing, can be uncommented if needed
-        mag_filename = f"{shot.get()}_equilibrium_data.npz"
-        os.rename(magnetic_data_path.get(),mag_path+mag_filename)
-        magnetic_data_path.set(mag_path+mag_filename)
-        B_file_update()
-
-    ne_path, ne_filename = os.path.split(ne_data_path.get())
-    if ne_filename[:2] != 'ne':
-        # input(f'renaming {ne_filename}') 
-        ne_filename = f"ne{ne_filename}"
-        os.rename(ne_data_path.get(),ne_filename)
-        ne_data_path.set(ne_path+ne_filename)
-        ne_file_update()
-
     # Gather (most) parameters for beam_me_up()
     base_dict = {
         'mode_flag': int(mode_flag.get()),
         'launch_beam_width': float(launch_beam_width.get()),
         'launch_beam_curvature': float(launch_beam_curvature.get()),
         'launch_position': np.array([float(x.strip()) for x in launch_position.get().split(',')]),
-        'find_B_method': 'test',
-        'shot': int(shot.get()) if shot.get() != "0" else int(mag_filename.split("_")[0]) if mag_filename.split("_")[0].isdigit() else 0,
+        'find_B_method': load_magnetic_field(),
         'Psi_BC_flag': Psi_BC_flag.get() if Psi_BC_flag.get() != "None" else None,
         'figure_flag': figure_flag.get() == "True",
         'vacuum_propagation_flag': bool(vacuum_propagation_flag.get()),
-        'ne_data_path': pathlib.Path(ne_path),
-        'magnetic_data_path': pathlib.Path(mag_path),
         'equil_time': float(equil_time.get()),
         'output_filename_suffix': output_file_suffix.get(),
         'quick_run': quick_run.get() == 'True',
         'output_path': pathlib.Path(output_path.get()),
-        'input_filename_suffix': ne_filename[2:-4],
         'poloidal_flux_enter': float(poloidal_flux_enter.get()),
         'poloidal_flux_zero_density': float(poloidal_flux_zero_density.get()),
         'delta_R': float(delta_R.get()),
@@ -73,7 +74,8 @@ def submit(): # Main beam_me_up() running function
         'interp_smoothing': float(interp_smoothing.get()),
         'len_tau': int(len_tau.get()),
         'rtol': float(rtol.get()),
-        'atol': float(atol.get())
+        'atol': float(atol.get()),
+        'density_fit_method' : load_density_fit(),
     }
 
     # Batch range handling
@@ -82,28 +84,28 @@ def submit(): # Main beam_me_up() running function
         'toroidal_launch_angle_Torbeam': toroidal_launch_angle_Torbeam.get(),
         'launch_freq_GHz': launch_freq_GHz.get(),
     }
-    varlbl_lists = []
-    rng_lists = []
-    for var in batched_vars:
-        if '[' in batched_vars[var]: 
+    varlbl_lists = [] # Stores names of parameter to be varied
+    rng_lists = [] # Stores values in correspondence to "varlbl_lists"
+    for var in batched_vars: 
+        if '[' in batched_vars[var]: # Parameter has multiple values, update both lists 
             varlbl_lists.append(var)
             rng_lists.append(rmv_dupes(list(map(float,batched_vars[var][1:-1].split(',')))))
-        else: 
+        else: # Parameter has a single value, update base dictionary of parameters
             base_dict[var] = float(batched_vars[var])
 
     # Multiple runs
+    # - .h5 files are not updated in plotting page when multiple runs are done
     if varlbl_lists:
-        failed_ind = []
-        for runind,run in enumerate(itertools.product(*rng_lists)):
-            # print(run)
+        failed_ind = [] # Stores indexes (1-indexed) of failed runs
+        for runind,run in enumerate(itertools.product(*rng_lists)): # Creates a product of all varied parameters, and runs through all combinations
             kwargs_dict = copy.deepcopy(base_dict)
-            for ind,lbl in enumerate(varlbl_lists):
-                kwargs_dict[lbl] = run[ind]
+            for ind,lbl in enumerate(varlbl_lists): # Update parametrs based on current combination
+                kwargs_dict[lbl] = run[ind] 
             try:
                 kwargs_dict['output_filename_suffix'] += str(runind +1)
                 dt = beam_me_up(**kwargs_dict)
                 print(dt)
-            except Exception as err:
+            except Exception as err: # If error, update failed runs
                 failed_ind.append(str(runind+1))
                 print(f"Run {runind+1} failed with error - {str(err)}")
         if failed_ind:
@@ -116,8 +118,8 @@ def submit(): # Main beam_me_up() running function
     else:
         try:
             dt = beam_me_up(**base_dict)
-            xarray_path.set(f"{base_dict['output_path']}/scotty_output{base_dict['output_filename_suffix']}.h5")
-            print(dt)
+            xarray_path.set(f"{base_dict['output_path']}/scotty_output{base_dict['output_filename_suffix']}.h5") # Updates plotting page
+            # print(dt)
             messagebox.showinfo("Info",'Simulation Completed')
         except Exception as err:
             messagebox.showinfo("Info",f"Simulation Failed - {err}")
@@ -125,18 +127,21 @@ def submit(): # Main beam_me_up() running function
         xr_updatefunc()
 
 #------------------------------------------------------------------#
-# Validation functions for main 'Run' button
-def isbatchval(varstr):
-    if not varstr.strip(): return False
-    if (varstr[0] == '[') != (varstr[-1] == ']'): return False
-    if (varstr[0] != '['): return isfloat(varstr)
+# Validation functions for main 'Run' button, ensuring all variables are in the correct format
+
+# Used for paremeters that can have multiple values (launch angles, frequency)
+def isbatchval(varstr): 
+    if not varstr.strip(): return False # Checks if empty
+    if (varstr[0] == '[') != (varstr[-1] == ']'): return False # Checks if ']' is present when multiple values are used
+    if (varstr[0] != '['): return isfloat(varstr) # Checks for float instead when single value is used
     else:
         try:
-            _ = [float(x.strip()) for x in varstr[1:-1].split(',')]
+            _ = [float(x.strip()) for x in varstr[1:-1].split(',')] # to check if variable raises errors
             return True
         except ValueError:
             return False 
 
+# Returns True if float, False if not
 def isfloat(x):
     try:
         float(x)
@@ -151,7 +156,7 @@ launch_freq_GHz = tk.StringVar()
 val_torangle = lambda:isbatchval(toroidal_launch_angle_Torbeam.get())
 val_polangle = lambda:isbatchval(poloidal_launch_angle_Torbeam.get())
 
-def val_launchpos():
+def val_launchpos(): # Validates if launch position is in format R,ζ,Z
     try:
         pos = [float(x.strip()) for x in launch_position.get().split(',')] 
         return len(pos) == 3
@@ -166,40 +171,46 @@ val_files = lambda:magnetic_data_path.get() and ne_data_path.get()
 
 validators = [val_torangle,val_polangle,val_launchpos,val_launchfreq,val_launchbwidth,val_launchbcurv,val_files]
 
+# Trace function for all launch parameters, running every validation for all parameters whenever any launch parameter is updated
 def validate_launch_all(*args):
     all_valid = all(validator() for validator in validators)
-    if all_valid:
+    if all_valid: # If validation passes, beam_me_up() can be run
         submitbutton.config(state="normal")
         guidance_label.config(text="Ready to run")
-    else:
+    else: # disable the run button 
         submitbutton.config(state="disabled")
         guidance_label.config(text="Enter input files and launch parameters in the correct format to enable 'Run' button")
 
 #------------------------------------------------------------------#
 # Entered validation functions (used inside the tk.Entry widgets)
+# - Entry validation reverts user input if they type in invalid characters
+
+# Validation for float variables
 def entrfloat(x):
-    if x in ['','-']: return True
+    if x in ['','-']: return True # Must be kept so user can delete/type within the input fields properly
     try:
         float(x)
         return True
     except Exception:
         return False
 
+# Validation for launch position
 def entrpos(x):
-    if x.count(',') > 2: 
+    if x.count(',') > 2: # Check if more than 3 values are input
         return False
     for y in x:
-        if (not y.isdigit() and y not in ['','.','-',',']): 
+        if (not y.isdigit() and y not in ['','.','-',',']): # Every character must be a number or valid symbol
             return False
     return True
 
+# Validation for parameters that allow multiple values
 def entrbatch(x):
     isv = True
-    if any(x.count(char) > 1 for char in "[]"):
+    if any(x.count(char) > 1 for char in "[]"): # If more than one of each square bracket exist, invalid
         return False
     for y in x:
         try:
-            if y not in ['','.','-',',','[',']']:
+            if y not in ['','.','-',',','[',']']: # Every character must be a number or valid symbol
                 int(y)
         except Exception:
             isv = False
@@ -228,9 +239,346 @@ def auto_updatefunc(plotname,criteria,cargsfuncsl):
     return update_availplots
 
 #---------------------------------#
+# Magnetic Field object loading
+def load_magnetic_field():
+    magnetic_path = magnetic_data_path.get()
+    inp_suffix = Path(magnetic_path).suffix
+
+    if inp_suffix == '.npz': # Using Numpy files
+        with np.load(magnetic_path) as loadfile:
+            time_EFIT = loadfile["time_EFIT"]
+            t_idx = find_nearest(time_EFIT, float(equil_time.get()))
+            return InterpolatedField(
+                R_grid=loadfile["R_EFIT"],
+                Z_grid=loadfile["Z_EFIT"],
+                psi=loadfile["poloidalFlux_grid"][t_idx, :, :],
+                B_T=loadfile["Bphi_grid"][t_idx, :, :],
+                B_R=loadfile["Br_grid"][t_idx, :, :],
+                B_Z=loadfile["Bz_grid"][t_idx, :, :],
+                interp_order=5,
+                interp_smoothing=float(interp_smoothing.get()),
+            )
+    elif inp_suffix == '.eqdsk': # Using G-EQDSK files
+        topfile_path = topfile_extraction(magnetic_path)
+        torbeam_obj = Torbeam.from_file(topfile_path)
+        return InterpolatedField(
+            torbeam_obj.R_grid,
+            torbeam_obj.Z_grid,
+            torbeam_obj.B_R,
+            torbeam_obj.B_T,
+            torbeam_obj.B_Z,
+            torbeam_obj.psi,
+            interp_order=5,
+            interp_smoothing=float(interp_smoothing.get()),
+        )
+    else:
+        raise ValueError("File format not accepted")
+
+# Density fit object loading
+def load_density_fit():
+    return make_density_fit("smoothing-spline-file",1.0,[ne_data_path.get()],filename=ne_data_path.get())
+
+#---------------------------------#
+# G-EQDSK -> topfile
+def topfile_extraction(eqdskfilepath,inputfilesuffix = "_mastU"): 
+    # inputfilesuffix only used when creating new topfile
+    # will overwrite topfile if 2 of the same filename exist at once
+    if eqdskfilepath in EQDSKFILE_CACHE: return EQDSKFILE_CACHE[eqdskfilepath] #returns respective topfile
+    def preprocess_line(line): # Add spaces before the negative sign if not preceded by 'e' or whitespace
+        return re.sub(r'(?<!\s)(?<!e)(?<!E)-', r' -', line)
+
+    with open(eqdskfilepath) as fid:
+        # Read the file header (first 51 characters) and discard it
+        fid.read(51)
+        
+        # Read the simulation grid info (3 float numbers)
+        temp = [float(val) for val in fid.readline().split()]
+        nw, nh = temp[1], temp[2]
+
+        # Read 0D parameters (20 float numbers)
+        temp = fid.readline()
+        temp = [float(val) for val in preprocess_line(temp).split()]
+        temp1 = fid.readline()
+        temp1 = [float(val) for val in preprocess_line(temp1).split()]
+        temp2 = fid.readline()
+        temp2 = [float(val) for val in preprocess_line(temp2).split()]
+        temp3 = fid.readline()
+        temp3 = [float(val) for val in preprocess_line(temp3).split()]
+        parameters_0D = {
+            'rdim': temp[0],
+            'zdim': temp[1],
+            'rcentr': temp[2],
+            'rleft': temp[3],
+            'zmid': temp[4],
+            'rmaxis': temp1[0],
+            'zmaxis': temp1[1],
+            'simag': temp1[2],
+            'sibry': temp1[3],
+            'bcentr': temp1[4],
+            'current': temp2[0],
+            'simag2': temp2[1],
+            'xdum1':temp2[2],
+            'rmagaxis2':temp2[3],
+            'xdum2':temp2[4],
+            'zmaxis2':temp3[0],
+            'xdum3':temp3[1],
+            'sibry2':temp3[2],
+            'xdum4':temp3[3],
+            'xdum5':temp3[4],
+            
+        }
+        templine = fid.readline()
+        templine = [float(val) for val in preprocess_line(templine).split()]
+
+        # Read 1D profile (nw float numbers)
+        fpol = []
+        indextrack = 0
+        while len(fpol) < nw:
+            fpol.append(templine[indextrack])
+            indextrack += 1
+            if indextrack == len(templine):
+                templine = fid.readline()
+                templine = [float(val) for val in preprocess_line(templine).split()]
+                indextrack = 0
+
+        pres = []
+        while len(pres) < nw:
+            pres.append(templine[indextrack])
+            indextrack += 1
+            if indextrack == len(templine):
+                templine = fid.readline()
+                templine = [float(val) for val in preprocess_line(templine).split()]
+                indextrack = 0
+        ffprim = []
+        while len(ffprim) < nw:
+            ffprim.append(templine[indextrack])
+            indextrack += 1
+            if indextrack == len(templine):
+                templine = fid.readline()
+                templine = [float(val) for val in preprocess_line(templine).split()]
+                indextrack = 0
+        pprime = []
+        while len(pprime) < nw:
+            pprime.append(templine[indextrack])
+            indextrack += 1
+            if indextrack == len(templine):
+                templine = fid.readline()
+                templine = [float(val) for val in preprocess_line(templine).split()]
+                indextrack = 0
+        
+        psirz = []
+        while len(psirz) < nh:
+            sub = []
+            while len(sub)< nw:
+                sub.append(templine[indextrack])
+                indextrack += 1
+                if indextrack == len(templine):
+                    templine = fid.readline()
+                    templine = [float(val) for val in preprocess_line(templine).split()]
+                    indextrack = 0
+                if len(sub) == nw:
+                    psirz.append(sub)
+        qpsi = []
+        while len(qpsi) < nw:
+            qpsi.append(templine[indextrack])
+            indextrack += 1
+            if indextrack == len(templine):
+                templine = fid.readline()
+                templine = [float(val) for val in preprocess_line(templine).split()]
+                indextrack = 0
+        nbbs, limitr = int(templine[0]),int(templine[1])
+        oddevenline = 1 
+        rbbs = []
+        zbbs = []
+        templine = fid.readline()
+        templine = [float(val) for val in preprocess_line(templine).split()]
+        while len(rbbs)< nbbs or len(zbbs) < nbbs:
+            if oddevenline%2 == 1 and len(templine) == 5:
+                rbbs.append(templine[0])
+                zbbs.append(templine[1])
+                rbbs.append(templine[2])
+                zbbs.append(templine[3])
+                rbbs.append(templine[4])
+                templine = fid.readline()
+                templine = [float(val) for val in preprocess_line(templine).split()]
+                oddevenline += 1
+            elif oddevenline%2 == 0 and len(templine) == 5:
+                zbbs.append(templine[0])
+                rbbs.append(templine[1])
+                zbbs.append(templine[2])
+                rbbs.append(templine[3])
+                zbbs.append(templine[4])
+                templine = fid.readline()
+                templine = [float(val) for val in preprocess_line(templine).split()]
+                oddevenline += 1
+            elif oddevenline%2 == 1: #odd number, clear up the lines
+                for i in range(0,len(templine)):
+                    if i%2 == 0:
+                        rbbs.append(templine[i])
+                    else:
+                        zbbs.append(templine[i])
+            elif oddevenline%2 == 0: #odd number, clear up the lines
+                for i in range(0,len(templine)):
+                    if i%2 == 0:
+                        zbbs.append(templine[i])
+                    else:
+                        rbbs.append(templine[i])
+                
+        rlim = []
+        zlim = []
+        
+        while len(rlim)< limitr or len(zlim) < limitr:
+            templine = fid.readline()
+            templine = [float(val) for val in preprocess_line(templine).split()]
+            if oddevenline%2 == 1:
+                for i in range(0,len(templine)):
+                    if i%2 == 0:
+                        if len(rlim) != limitr:
+                            rlim.append(templine[i])
+                    else:
+                        if len(zlim) != limitr:
+                            zlim.append(templine[i])
+                oddevenline += 1
+            else:
+                for i in range(0,len(templine)):
+                    if i%2 == 0:
+                        if len(zlim) != limitr:
+                            zlim.append(templine[i])
+                    else:
+                        if len(rlim) != limitr:
+                            rlim.append(templine[i])
+                oddevenline += 1
+            
+        Rgrid = np.linspace(parameters_0D['rleft'],parameters_0D['rleft'] + parameters_0D['rdim'], int(nw))
+        Zgrid = np.linspace(parameters_0D['zmid'] - parameters_0D['zdim'] / 2,
+                            parameters_0D['zmid'] + parameters_0D['zdim'] / 2, int(nh))
+        
+        psirz2d = np.transpose(np.array(psirz))
+        # plt.figure()
+        # plt.contourf(Rgrid,Zgrid,np.transpose(psirz2d)) #plotting, may renable for debugging purposes
+
+        #### normalize such that 0 at magnetic axis, 1 at LCFS.
+        psirz2dnorm = np.divide(psirz2d-parameters_0D['sibry'],parameters_0D['simag'])
+        #### Normalize such that minimum is 0. Divide by abs of min value
+        min_psi_abs = np.abs(np.min(psirz2dnorm)) ### rescaling.
+        min_psi = (np.min(psirz2dnorm)) ### rescaling.
+        max_psi = (np.max(psirz2dnorm)) ### rescaling.
+        psirz2dnorm = psirz2dnorm -max_psi ### shifting..
+        psirz2dnorm = - psirz2dnorm/max_psi
+
+        ########## Getting B_R, B_T, and B_Z
+
+        B_R_grid = np.zeros_like(psirz2dnorm)
+        B_T_grid = np.zeros_like(psirz2dnorm)
+        B_Z_grid = np.zeros_like(psirz2dnorm)
+
+
+        interp_order=3
+        interp_smoothing=0
+
+
+        #flatten psi2d
+        psi2d_flatten = psirz2d.flatten()
+        #print(psirz2d)
+        #print(psi2d_flatten) # joins up the rows tgt into one array
+
+        Zin_new = np.array(list(Zgrid)*len(Zgrid))
+        #print(len(Zin))
+        #print(len(Zin_new)) #should get a 129*129 size
+        Rin_new = []
+        for i in range(len(Rgrid)):
+            Rin_join = [Rgrid[i]]*len(Rgrid)
+            Rin_new = Rin_new + Rin_join
+
+        #print(len(Rin_new))
+
+        interp_psirz2d = interpolate.RectBivariateSpline(
+            Rgrid,
+            Zgrid,
+            psirz2d,
+            kx=interp_order,
+            ky=interp_order,
+            s=0
+            ) 
+
+
+        # plt.figure()
+        # plt.plot(Rgrid,psirz2d[:,len(Zgrid)//2],'o',label="Original")
+        # plt.plot(Rgrid,interp_psirz2d(Rgrid[:],Zgrid[len(Zgrid)//2]),label="interpolation")
+
+        npsi = len(fpol)
+        pol_flux_array_EQDSK_norm = np.linspace(0,1,npsi) #### From 0 to 1(LCFS) to max.
+
+        interp_rBphi = interpolate.UnivariateSpline(
+            pol_flux_array_EQDSK_norm, ## What I call psi_norm_1D
+            fpol, ## What I call rBphi
+            w=None,
+            bbox=[None, None],
+            k=interp_order,
+            s=interp_smoothing,
+            ext=0,
+            check_finite=False,
+        )
+        # plt.figure()
+        # plt.plot(np.sqrt(pol_flux_array_EQDSK_norm),interp_rBphi(pol_flux_array_EQDSK_norm))
+
+        dpolflux_dR = interp_psirz2d(Rgrid, Zgrid, dx=1, dy=0) # First derivative
+        dpolflux_dZ = interp_psirz2d(Rgrid, Zgrid, dx=0, dy=1)
+
+
+        for i in range(int(nw)):
+            B_R_grid[i,:] = -1*dpolflux_dZ[i,:] / Rgrid[i]
+            B_Z_grid[i,:] = dpolflux_dR[i,:] / Rgrid[i]
+            #B_R_grid_new[i,:] = -1*dpol_dz(Rin[i],Zin)/Rin[i]
+            #B_Z_grid_new[i,:] = dpol_dr(Rin[i],Zin)/Rin[i]
+
+
+
+        for i in range(int(nw)): #R
+            for j in range(int(nh)): #z
+                B_T_grid[i,j] = interp_rBphi(psirz2dnorm[i,j])/Rgrid[i]
+
+        eqdskfilepath_ = Path(eqdskfilepath)
+        topfile_name = f'topfile{inputfilesuffix}'
+        topfile_path = eqdskfilepath_.parent / topfile_name
+        with open(topfile_path, 'w') as f:
+            f.write("X-coordinates\n")
+            for line in Rgrid.tolist():
+                f.writelines(str(line)+"\n")
+            f.write("Z-coordinates\n")
+            for line in Zgrid.tolist():
+                f.writelines(str(line)+"\n")
+            f.write("B_R\n")
+            for line in np.transpose(B_R_grid).tolist():
+                for linee in line:
+                    f.writelines(str(linee)+"\n")
+            f.write("B_t\n")
+            for line in (np.transpose(B_T_grid)).tolist():
+                for linee in line:
+                    f.writelines(str(linee)+"\n")
+            f.write("B_Z\n")
+            for line in np.transpose(B_Z_grid).tolist():
+                for linee in line:
+                    f.writelines(str(linee)+"\n")
+            f.write("psi\n")
+            for line in np.transpose(psirz2dnorm).tolist():
+                for linee in line:
+                    f.writelines(str(linee)+"\n")
+        f.close()    
+        EQDSKFILE_CACHE[eqdskfilepath] = topfile_path
+        if topfile_path in EQDSKFILE_CACHE.values():
+            for eqdskf in EQDSKFILE_CACHE:
+                if EQDSKFILE_CACHE[eqdskf] == topfile_path:
+                    del EQDSKFILE_CACHE[eqdskf]
+
+        return topfile_path
+
+EQDSKFILE_CACHE = {} # For storage of topfile so function does not have to run again for the same file
+
+#---------------------------------#
 # Miscellaneous functions 
-# Dropdown function
-def autodropdown(pg,options,tvar,row,def_ind): # Uses default col and other params
+# Creates a dropdown object with certain set variables (column, state, etc)
+def autodropdown(pg,options,tvar,row,def_ind):
     ent = ttk.Combobox(pg, textvariable=tvar)
     ent.grid(row=row,column=1,padx=5,pady=5)
     ent['values'] = options  
@@ -239,32 +587,33 @@ def autodropdown(pg,options,tvar,row,def_ind): # Uses default col and other para
     ent.state(["readonly"])  
     return ent
 
-rmv_dupes = lambda x: [y for ind,y in enumerate(x) if (y not in x[:ind])]
-ispresent_func = lambda y: all(x != '' for x in y) 
+rmv_dupes = lambda x: [y for ind,y in enumerate(x) if (y not in x[:ind])] # Removes duplicates from a list
+ispresent_func = lambda y: all(x != '' for x in y) # Function for checking if all varaibles in a list are valid (for trace functions)
 
 #---------------------------------#
 # File inputs
 
 tk.Label(root, text="Input Files",font=("Arial", 20)).grid(row=0,column=0,columnspan=2, sticky = "n", padx=5, pady=10)
 
-def choose_B_file():
+def choose_B_file(): # Function for button to choose magnetic field file
     global magnetic_data_path
-    path = filedialog.askopenfilename(
-        title="Select a NumPy (.npz) input file",
-        filetypes=(("NumPy files", "*.npz"),))
-    if path: 
+    path = filedialog.askopenfilename( # Requests file from user
+        title="Select an input file",
+        filetypes=(("NumPy files", "*.npz"),("G-EQDSK files","*.eqdsk"),))
+    if path: # Only updates if a file is chosen / path isnt None
         magnetic_data_path.set(path)
         B_file_update()
 
-B_file_update = lambda:mag_data_l.config(text = f"Magnetic Field File: {magnetic_data_path.get()}")
+B_file_update = lambda:mag_data_l.config(text = f"Magnetic Field File: {magnetic_data_path.get()}") # Updates label for magnetic field file
 
+# Widget creation - magnetic field file input
 magnetic_data_path = tk.StringVar()
 mag_data_l = tk.Label(root, text=f"Magnetic Field File: {magnetic_data_path.get()}",wraplength=200)
 mag_data_l.grid(row=1, column=0, padx=5, pady=5)
 B_file_button = tk.Button(root, text="Choose File", command=choose_B_file)
 B_file_button.grid(row=2,column=0,pady = 5)
 
-def choose_ne_file():
+def choose_ne_file(): # Function for button to choose electron density file
     global ne_data_path
     path = filedialog.askopenfilename(
     title="Select a .dat input file",
@@ -272,20 +621,24 @@ def choose_ne_file():
     if path: 
         ne_data_path.set(path)
         ne_file_update()
-ne_file_update = lambda:ne_data_l.config(text = f"ne Data File: {ne_data_path.get()}")
 
+ne_file_update = lambda:ne_data_l.config(text = f"ne Data File: {ne_data_path.get()}") # Updates label for elecron density file
+
+# Widget creation - electron density file input
 ne_data_path = tk.StringVar()
 ne_data_l = tk.Label(root, text=f"ne Data File: {ne_data_path.get()}",wraplength=300)
 ne_data_l.grid(row=1, column=1, padx=5, pady=5)
 ne_file_button = tk.Button(root, text="Choose File", command=choose_ne_file)
 ne_file_button.grid(row=2,column=1,pady = 10)
 
+# Seperator
 file_launch_separator = ttk.Separator(root, orient="horizontal")
 file_launch_separator.grid(row=3, column=0,columnspan=3, sticky="ew", padx=10, pady=5)
 
 #---------------------------------#
 # Launch Params 
 
+# Widget creation
 tk.Label(root, text="Launch Parameters",font=("Arial", 16)).grid(row=4,column=0,columnspan=2, sticky = "n", padx=5, pady=15)
 
 tk.Label(root, text="Toroidal Launch Angle / ˚:").grid(row=5, column=0, sticky="e", padx=5, pady=5)
@@ -326,16 +679,18 @@ for var in [poloidal_launch_angle_Torbeam, toroidal_launch_angle_Torbeam,
 
 #---------------------------------#
 # Info Labels
-def show_info(text):
+def show_info(text): # Function to display text
     messagebox.showinfo("Info",text)
 
-def create_infolabel(pg,text,r,c,padx = 10,pady = 5): # Creates info label widget
-    btn_frame = tk.Frame(pg, bg="white")
-    info_btn = tk.Label(
+# Function to create info label widget
+def create_infolabel(pg,text,r,c,padx = 10,pady = 5): 
+    btn_frame = tk.Frame(pg, bg="white") # Frame for button
+    info_btn = tk.Label( 
         btn_frame,
         text="i",fg="black",bg="#E6E6E6",font=("Roboto", 9, "bold"),
         width=2,height=1,relief="flat",cursor="hand2",bd=0
-        )
+        ) # Button
+    # Button functionalities
     info_btn.bind("<Button-1>", lambda e: show_info(text))
     info_btn.bind("<Enter>", lambda e: info_btn.config(bg="#C2C2C2"))
     info_btn.bind("<Leave>", lambda e: info_btn.config(bg="#E6E6E6"))
@@ -343,12 +698,11 @@ def create_infolabel(pg,text,r,c,padx = 10,pady = 5): # Creates info label widge
     btn_frame.grid(row = r, column= c,padx=padx, pady=pady)
     return btn_frame
 
+# Info label widget creation for all launch parameters
 file_input_info = create_infolabel(
     root,
-    "Files to be used in beam_me_up(), magnetic field Numpy file (.npz) "\
-    "and equilibrium electron density data file (.dat) respectively\n\n" \
-    "Files will be renamed in the case that they are not in the correct naming convention "
-    "([shot]_equilibrium_data.npz / ne[suffix].dat)",
+    "Files to be used in beam_me_up(), valid magnetic field files (Numpy .npz / G-EQDSK .eqdsk) "\
+    "and equilibrium electron density data file (.dat) respectively\n\n",
     0,2
 )
 launch_param_info = create_infolabel(
@@ -406,7 +760,7 @@ mode_flag_info = create_infolabel(
 # Advanced parameters
 advanced_window = None
 
-# Advanced parameters variable init
+# Advanced parameters variable initialization
 shot = tk.StringVar()
 shot.set('0')
 equil_time = tk.StringVar()
@@ -425,7 +779,7 @@ output_file_suffix = tk.StringVar()
 output_path = tk.StringVar() 
 
 # Functions
-def advancedwindow_close():
+def advancedwindow_close(): # To reset variable when closed
     global advanced_window
     advanced_window.destroy()
     advanced_window = None
@@ -433,6 +787,7 @@ def advancedwindow_close():
 def open_advanced():
     global advanced_window
     
+    # Focus window if window is open / duplicate preventor
     if advanced_window is not None and advanced_window.winfo_exists():
         advanced_window.lift()
         advanced_window.focus_force()
@@ -515,6 +870,7 @@ def open_advanced():
     quickrun_ent = autodropdown(adv_bottomframe,['True','False'],quick_run,4,1)
     tk.Entry(adv_bottomframe, textvariable=output_file_suffix).grid(row=5, column=1, padx=5, pady=5)
 
+    # Output folder function
     def choose_outputfolder():
         global output_path
         path = filedialog.askdirectory(title="Select a folder")
@@ -571,6 +927,7 @@ advpg_button.grid(row=27, column=0,columnspan=1, pady=10)
 # Solver parameters
 solverwindow = None
 
+# Variables
 auto_delta_sign = tk.StringVar()
 delta_R = tk.StringVar()
 delta_R.set('-0.0001')
@@ -589,6 +946,7 @@ atol.set('0.000001')
 rtol = tk.StringVar()
 rtol.set('0.001')
 
+# Functions
 def solverwindow_close():
     global solverwindow
     solverwindow.destroy()
@@ -597,6 +955,7 @@ def solverwindow_close():
 def open_solver_params():
     global solverwindow
 
+    # Focus window if window is open / duplicate preventor
     if solverwindow is not None and solverwindow.winfo_exists():
         solverwindow.lift()
         solverwindow.focus_force()
@@ -605,6 +964,7 @@ def open_solver_params():
     solverwindow = tk.Toplevel(root)
     solverwindow.protocol("WM_DELETE_WINDOW", solverwindow_close)
 
+    # Widget creation
     tk.Label(solverwindow, text="Solver Parameters",font=("Arial", 15)).grid(row=1,column=0,columnspan=2, sticky = "n", padx=5, pady=10)
 
     tk.Label(solverwindow, text="Auto Delta Sign:").grid(row=2, column=0, sticky="e", padx=5, pady=5)
@@ -627,6 +987,7 @@ def open_solver_params():
     tk.Entry(solverwindow, textvariable=atol,validate='all',validatecommand=(vadvfloat,'%P')).grid(row=9, column=1, padx=5, pady=5)
     tk.Entry(solverwindow, textvariable=rtol,validate='all',validatecommand=(vadvfloat,'%P')).grid(row=10, column=1, padx=5, pady=5)
 
+    # Solver parameter info labels
     auto_delta_sign_info = create_infolabel(
         solverwindow,
         "Ensures that forward difference is always in negative poloidal" \
@@ -674,12 +1035,11 @@ def open_solver_params():
         10,2
     )
 
-
 solverpg_button = tk.Button(root, text="Solver Parameters", command=open_solver_params)
 solverpg_button.grid(row=28, column=0, pady=10)
 
 #---------------------------------#
-# Diagnostic implementation
+# Diagnostic presets
 diagnosticwindow = None
 
 # Variables
@@ -702,6 +1062,8 @@ def validate_diagnostic(*args):
         diagnostic_set_button.config(state = "disabled")
 
 # Function to set diagsnotics
+# - replaces values of all parameters with ones taken from get_parameters_for_Scotty
+# - .set() automatically updates values in input fields
 def set_diagnostic():
     if diagnostic.get() not in DIAGNOSTICS: return
     n_params = get_parameters_for_Scotty(diagnostic=diagnostic.get(),launch_freq_GHz=float(d_launch_freq.get() if d_launch_freq.get() else 0 ))
@@ -722,6 +1084,7 @@ def set_diagnostic():
 def open_diagnostics():
     global diagnosticwindow,diagnostic_set_button
     
+    # Focus window if window is open / duplicate preventor
     if diagnosticwindow is not None and diagnosticwindow.winfo_exists():
         diagnosticwindow.lift()
         diagnosticwindow.focus_force()
@@ -730,6 +1093,7 @@ def open_diagnostics():
     diagnosticwindow = tk.Toplevel(root)
     diagnosticwindow.protocol("WM_DELETE_WINDOW",diagnostic_close)
 
+    # Widget creation
     tk.Label(diagnosticwindow, text="Diagnostic Presets",font=("Arial", 16)).grid(row=0,column=0,columnspan=2, sticky = "n", padx=5, pady=15)
 
     ent = ttk.Combobox(diagnosticwindow, textvariable=diagnostic,height=20,font=("Arial",14))
@@ -743,6 +1107,7 @@ def open_diagnostics():
     diagnostic_set_button = tk.Button(diagnosticwindow, text="Set Diagnostic", command=set_diagnostic,state ="disabled")
     diagnostic_set_button.grid(row=4,column=0,columnspan=2,pady=10)
 
+    # Diagnostic presets info labels
     diagnostic_info = create_infolabel(
         diagnosticwindow,
         "Set diagnostic presets from Scotty.\n\n" \
@@ -759,6 +1124,7 @@ def open_diagnostics():
         3,2
     )
 
+# Validation for enabling diagnostic preset button
 for var in [diagnostic,d_launch_freq]:
     var.trace_add("write",validate_diagnostic)
 
@@ -787,12 +1153,9 @@ def open_notes():
     notes.title("Notes")
     notes.protocol("WM_DELETE_WINDOW",notes_close)
 
-    tk.Label(notes, 
-             text="In the case that magnetic data/ne data files are not in naming conventions suitable for Scotty to use, files will be automatically renamed",
-             wraplength=500).grid(row=0,column=0,columnspan=2, padx=5, pady=5)
-    tk.Label(notes, 
-             text="Only .npz files are able to be used as input files currently",
-             wraplength=500).grid(row=1,column=0,columnspan=2, padx=5, pady=5)
+    # tk.Label(notes, 
+    #          text="In the case that ne data files are not in naming conventions suitable for Scotty to use, files will be automatically renamed",
+    #          wraplength=500).grid(row=0,column=0,columnspan=2, padx=5, pady=5)
     tk.Label(notes, 
              text="For 'Enter' button to function, all launch Parameters must be filled with a valid format, especially Launch Position which must be in a 'x,y,z' format where x,y and z are all floats",
              wraplength=500).grid(row=2,column=0,columnspan=2, padx=5, pady=5)
@@ -819,7 +1182,7 @@ for var in mfile_vars:
     var.trace_add('write',auto_updatefunc(
         "Poloidal Cross-section",ispresent_func,[v.get for v in mfile_vars]
     ))
-# Density Fit Heatmap hidden    
+# Density Fit Heatmap [hidden]
 #     var.trace_add('write',auto_updatefunc(
 #         "Density Fit Heatmap", ispresent_func,[v.get for v in mfile_vars + [ne_data_path]]
 #     ))
@@ -831,31 +1194,16 @@ fullinp_vars = [poloidal_launch_angle_Torbeam,toroidal_launch_angle_Torbeam,
 for var in fullinp_vars:
     var.trace_add('write',auto_updatefunc("Full Input Graph",ispresent_func,[v.get for v in fullinp_vars]))
 
-# Function that loads magnetic field object
-# - can modify to use create_magnetic_geometry()
-def load_magnetic_field():
-    with np.load(magnetic_data_path.get()) as loadfile:
-        time_EFIT = loadfile["time_EFIT"]
-        t_idx = find_nearest(time_EFIT, float(equil_time.get()))
-        return InterpolatedField(
-            R_grid=loadfile["R_EFIT"],
-            Z_grid=loadfile["Z_EFIT"],
-            psi=loadfile["poloidalFlux_grid"][t_idx, :, :],
-            B_T=loadfile["Bphi_grid"][t_idx, :, :],
-            B_R=loadfile["Br_grid"][t_idx, :, :],
-            B_Z=loadfile["Bz_grid"][t_idx, :, :],
-            interp_order=5,
-            interp_smoothing=float(interp_smoothing.get()),
-        )
-
 #---------------------------------#
 # Plots
+
+# Input Plots
 def magnetic_flux_surface_3D(fig):
     ax = fig.add_subplot(111, projection="3d")  
     field = load_magnetic_field()
     return plot_flux_surface_3D(field,1.0,ax)
-
-def density_fit_launch(fig):
+ 
+def density_fit_launch(fig): # Plots radial coordinates against density
     ax = fig.add_subplot(111) 
     ne_data = np.fromfile(ne_data_path.get(), dtype=float, sep="   ")
     ne_data_density_array = ne_data[2::2]
@@ -867,14 +1215,13 @@ def density_fit_launch(fig):
     ax.grid(True)
     return ax
 
-def density_fit_heatmap(fig):
+def density_fit_heatmap(fig): # Unused
     ax = fig.add_subplot(111) 
     field = load_magnetic_field()
-    densfit = make_density_fit("smoothing-spline-file",1.0,[ne_data_path.get()],filename=ne_data_path.get())
+    densfit = load_density_fit()
     rho = np.sqrt(field.poloidalFlux_grid.T)
     density_grid = densfit(rho)
     density_grid[density_grid <= 0] = np.nan
-    # print(density_grid)
     m = ax.pcolormesh(field.R_coord, field.Z_coord, density_grid, shading='auto', cmap='plasma')
     cbar = fig.colorbar(m, ax=ax)
     cbar.set_label("Density (10^19 m^-3)")
@@ -902,7 +1249,7 @@ def plot_all_inp(fig):
         poloidal_flux_enter=float(poloidal_flux_enter.get()),
         ax = ax)
 
-def poloidal_crosssection(fig):
+def poloidal_crosssection(fig): # Adapted from Scotty's 'plot_poloidal_crosssection'
     ax = fig.add_subplot(111) 
     field = load_magnetic_field()
     R_min = np.min(field.R_coord)
@@ -935,6 +1282,9 @@ def poloidal_crosssection(fig):
         [], [], color="black", linestyle="dashed", label=r"$\psi = 1$"
     )
     ax.legend(handles=[dashed_line])
+    ax.set_title("Poloidal Crosssection")
+    ax.set_xlabel("R [m]")
+    ax.set_ylabel("Z [m]")
     return ax
 
 # Factory function for ALL plotting functions that take in datatree as input
@@ -1009,21 +1359,25 @@ def plot_selector_update():
         if plot_selector and plot_selector.winfo_exists():
             currplots = [plot for plot in AVAILABLEPLOTS if plot in CATEGORIES[selcat.get()]]
             plot_selector['values'] = currplots
+            print(currplots, bool(currplots))
             if currplots:
                 plot_selector.current(0)
-                plot_selector.config(state="readonly")  
+                plot_selector.config(state="readonly")
+                if toplot_button and toplot_button.winfo_exists():
+                    toplot_button.config(state="normal")  
             else:
                 plot_selector.set('')
                 plot_selector.config(state="disabled")
-        if toplot_button and toplot_button.winfo_exists():
-            toplot_button.config(state="normal" if AVAILABLEPLOTS else "disabled")
+                if toplot_button and toplot_button.winfo_exists():
+                    toplot_button.config(state="disabled")
     except NameError:
         pass
 
 def update_plot(): 
     chosenplot = plot_selector.get()
-    plt.clf()
+    plt.clf() # clears current figure
     fig = plt.gcf()  # get current figure
+    # Updates current figure with selected graph
     if chosenplot in INPUT_PLOT_FUNCTIONS: 
         INPUT_PLOT_FUNCTIONS[chosenplot](fig)
     elif chosenplot in DT_PLOT_FUNCTIONS:
@@ -1032,6 +1386,7 @@ def update_plot():
         print("Error - Plot not found")
     plt.show(block=False)
 
+# Function for selecting xarray file
 def choose_h5_file():
     global xr_label
     path = filedialog.askopenfilename(
@@ -1043,13 +1398,14 @@ def choose_h5_file():
         print(xarray_path.get())
         xr_label.config(text = f"Selected .h5 file: {xarray_path.get()}")
 
+# Updates output plots based on if a .h5 file selected
 def xr_updatefunc(*args):
     global toplot_button
-    mode = xarray_path.get() != ''
+    mode = xarray_path.get() != '' # Checks if there is currently a .h5 file
     for plotname in DT_PLOT_FUNCTIONS:
-        if mode and plotname not in AVAILABLEPLOTS:
+        if mode and plotname not in AVAILABLEPLOTS: # If output file present but plots not in global array
             AVAILABLEPLOTS.append(plotname)
-        elif not mode and plotname in AVAILABLEPLOTS:
+        elif not mode and plotname in AVAILABLEPLOTS: # If output file not present but plots are still in global array
             AVAILABLEPLOTS.remove(plotname)
     AVAILABLEPLOTS.sort()
     plot_selector_update()
@@ -1057,6 +1413,7 @@ def xr_updatefunc(*args):
 def open_plot_window():
     global plot_window, plot_selector,xr_label, toplot_button
     
+    # Focus window if window is open / duplicate preventor
     if plot_window is not None and plot_window.winfo_exists():
         plot_window.lift()
         plot_window.focus_force()
@@ -1066,6 +1423,7 @@ def open_plot_window():
     plot_window.title("Plotting")
     plot_window.protocol("WM_DELETE_WINDOW",plots_close)
 
+    # Widget creation
     tk.Label(plot_window, text="Select Plots",font=("Arial", 16)).grid(row=0,column=0,columnspan=2, sticky = "nsew", padx=5, pady=15)
 
     tk.Label(plot_window, text="Category: ").grid(row=1,column=0, sticky = "e", padx=5, pady=5)
@@ -1073,7 +1431,7 @@ def open_plot_window():
 
     plot_selector = autodropdown(plot_window,AVAILABLEPLOTS,selplot,2,0)
     plot_selector.grid(row = 2, column = 0, sticky= "nsew", columnspan= 2, pady= 10)  
-    plot_selector_update()
+    plot_selector_update() 
     xr_label = tk.Label(plot_window, text=f"Selected .h5 file: {xarray_path.get()}", wraplength=200)
     xr_label.grid(row=3,column=0, sticky = "nsew", padx=5, pady=10)
 
@@ -1082,6 +1440,7 @@ def open_plot_window():
     toplot_button = tk.Button(plot_window, text="Plot Selected Graph", command=update_plot,width=15,font=("Arial",14),state='disabled')
     toplot_button.grid(row=4, column=0,columnspan=2, pady=10)
 
+    # Plotting info labels
     plot_info = create_infolabel(
         plot_window,
         "Plots graphs based on inputs and outputs given.\n\n" \
