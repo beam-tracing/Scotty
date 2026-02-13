@@ -509,6 +509,9 @@ def beam_me_up(
     # -------------------
     # Propagate the ray
 
+    # added new arguments (mode_flag, find_density_1D and find_temperature_1D)
+    # to calculate UHR and relativistic corrections for all resonances
+
     print("Starting the solvers")
     ray_solver_output = propagate_ray(
         poloidal_flux_enter,
@@ -520,7 +523,10 @@ def beam_me_up(
         rtol,
         atol,
         quick_run,
+        mode_flag,
         len_tau,
+        find_density_1D,
+        find_temperature_1D,
     )
     if quick_run:
         return ray_solver_output
