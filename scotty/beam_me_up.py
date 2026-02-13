@@ -874,8 +874,7 @@ def create_magnetic_geometry(
         # topfile
         # Others: inbeam.dat, Te.dat (not currently used in this code)
         topfile_filename = magnetic_data_path / f"topfile{input_filename_suffix}"
-        torbeam = Torbeam.from_file(topfile_filename)
-
+        torbeam = Torbeam.from_file_scaled_psi(Torbeam, topfile_filename)
         return InterpolatedField(
             torbeam.R_grid,
             torbeam.Z_grid,
