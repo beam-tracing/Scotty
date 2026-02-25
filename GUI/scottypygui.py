@@ -2,29 +2,69 @@
 GUI for Scotty
 
 Uses the Tkinter module to create an interface to run Scotty and utilise its functions, allowing more fluid user interaction
+Takes in user input in the form of parameters and files, runs Scotty's beam_me_up() and returns output files
 
-How to run: Install all required packages (tkinter, scotty, numpy, scipy, matplotlib, h5py), run the python file 
+Input files:
+Magentic field 
+- .npz (Numpy file)
+- topfile (TORBEAM input file)
+- .eqdsk (EQDSK file - use preprocessing page to extract topfile)
+Electron density 
+- ne.dat 
+
+Output file: .h5 (HDF5 file)
+- Contains an xarray datatree object with values of the results from beam_me_up()
+
+How to run: Install all required packages (tkinter, scotty, numpy, scipy, matplotlib), run the python file 
 
 Structure
 - Initialization + General functions (validation, running beam_me_up())
-- Parameter page creation 
-    - Page behaviours (for subpages)
-    - Widget creation (buttons, labels, info labels)
-- Misc page creation (plotting, diagnostic presets)
-    - Related functions
-    - Page behaviours
-    - Widget creation
 
+- Main Page 
+Serves as the 'central' page of the GUI
+For input of launch parameters, input files, and the main button to run beam_me_up() with selected paraemters
+    - Widget creation (buttons, input fields, dropdowns)
+    Creates the user interface to interact with
+    - Info labels
+    Creates info labels the user can trigger to see further details
+
+Advanced parameters / Solver parameters page
+Additional pages that contain more specific inputs that are optional to run beam_me_up()
+    - Page behaviour
+    This includes the function to open the page, close and ensure that the page does not have duplicates
+    - Widget creation
+    - Info labels
+
+Other pages
+Preprocessing page - Has the function to convert EQDSK files to topfiles
+Diagnostic page - Uses Scotty's get_parameters_for_Scotty() function to get default paraemters of different diagnostics
+Plotting page - Plots both input and output values onto graphs so the data can be visualised
+
+Code structure 
+    - Related functions (Eg: setting diagnostic values for diagnostic page, graph plotting for plotting page)
+    - Page behaviour
+    - Widget creation
+    - Info labels
 """
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from scotty.plotting import *
 from scotty.torbeam import Torbeam
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.geometry import find_nearest, InterpolatedField
 from scotty.beam_me_up import make_density_fit, create_magnetic_geometry, beam_me_up
+from scotty.plotting import (
+    plot_flux_surface_3D, 
+    cylindrical_to_cartesian, 
+    plot_all_the_things, 
+    plot_poloidal_beam_path, 
+    plot_toroidal_beam_path, 
+    plot_3D_beam_profile_3D_plotting, 
+    plot_psi, plot_dispersion_relation, 
+    plot_instrumentation_functions, 
+    plot_widths
+    )
 
 import numpy as np
 import pathlib
@@ -93,8 +133,15 @@ def submit(): # Main beam_me_up() running function
         else: # Parameter has a single value, update base dictionary of parameters
             base_dict[var] = float(batched_vars[var])
 
-    # Multiple runs
-    # - .h5 files are not updated in plotting page when multiple runs are done
+    # There are 2 different modes: Single runs and Sweeps
+    # Single runs are the 'default', done when all only singular parameters are provided 
+    # Sweeps are done when any (valid) parameter has mutliple values (eg varying launch angles)
+
+    # Single runs will update the .h5 input parameter in the plotting page with the one returned from running beam_me_up()
+    
+    # Sweeps will continue through every iteration even if any are invalid, but will only return the file (to the user's directory) if completed
+
+    # Sweeps
     if varlbl_lists:
         failed_ind = [] # Stores indexes (1-indexed) of failed runs
         for runind,run in enumerate(itertools.product(*rng_lists)): # Creates a product of all varied parameters, and runs through all combinations
@@ -177,7 +224,7 @@ def validate_launch_all(*args):
     if all_valid: # If validation passes, beam_me_up() can be run
         submitbutton.config(state="normal")
         guidance_label.config(text="Ready to run")
-    else: # disable the run button 
+    else: # Else disable the run button 
         submitbutton.config(state="disabled")
         guidance_label.config(text="Enter input files and launch parameters in the correct format to enable 'Run' button")
 
@@ -196,7 +243,7 @@ def entrfloat(x):
 
 # Validation for launch position
 def entrpos(x):
-    if x.count(',') > 2: # Check if more than 3 values are input
+    if len(x.split(',')) > 3: # Check if more than 3 values are input
         return False
     for y in x:
         if (not y.isdigit() and y not in ['','.','-',',']): # Every character must be a number or valid symbol
@@ -240,9 +287,11 @@ def auto_updatefunc(plotname,criteria,cargsfuncsl):
 
 #---------------------------------#
 # Magnetic Field object loading
+# Uses different methods based on file types
 def load_magnetic_field():
     magnetic_path = magnetic_data_path.get()
-    inp_suffix = Path(magnetic_path).suffix
+    inp_path = Path(magnetic_path)
+    inp_suffix = inp_path.suffix
 
     if inp_suffix == '.npz': # Using Numpy files
         with np.load(magnetic_path) as loadfile:
@@ -258,8 +307,11 @@ def load_magnetic_field():
                 interp_order=5,
                 interp_smoothing=float(interp_smoothing.get()),
             )
-    elif inp_suffix == '.eqdsk': # Using G-EQDSK files
-        topfile_path = topfile_extraction(magnetic_path)
+    elif inp_suffix == '.eqdsk' or 'topfile' in inp_path.stem: #topfile + .eqdsk
+        if inp_suffix == '.eqdsk': # Using G-EQDSK files
+            topfile_path = topfile_extraction(magnetic_path)
+        else:
+            topfile_path = magnetic_path 
         torbeam_obj = Torbeam.from_file(topfile_path)
         return InterpolatedField(
             torbeam_obj.R_grid,
@@ -331,6 +383,8 @@ def topfile_extraction(eqdskfilepath,inputfilesuffix = "_mastU"):
         templine = [float(val) for val in preprocess_line(templine).split()]
 
         # Read 1D profile (nw float numbers)
+        # Reads values from the current line one by one 
+        
         fpol = []
         indextrack = 0
         while len(fpol) < nw:
@@ -340,7 +394,7 @@ def topfile_extraction(eqdskfilepath,inputfilesuffix = "_mastU"):
                 templine = fid.readline()
                 templine = [float(val) for val in preprocess_line(templine).split()]
                 indextrack = 0
-
+        
         pres = []
         while len(pres) < nw:
             pres.append(templine[indextrack])
@@ -349,6 +403,8 @@ def topfile_extraction(eqdskfilepath,inputfilesuffix = "_mastU"):
                 templine = fid.readline()
                 templine = [float(val) for val in preprocess_line(templine).split()]
                 indextrack = 0
+        
+        
         ffprim = []
         while len(ffprim) < nw:
             ffprim.append(templine[indextrack])
@@ -367,7 +423,7 @@ def topfile_extraction(eqdskfilepath,inputfilesuffix = "_mastU"):
                 indextrack = 0
         
         psirz = []
-        while len(psirz) < nh:
+        while len(psirz) < nh: # 2D grid 
             sub = []
             while len(sub)< nw:
                 sub.append(templine[indextrack])
@@ -386,6 +442,8 @@ def topfile_extraction(eqdskfilepath,inputfilesuffix = "_mastU"):
                 templine = fid.readline()
                 templine = [float(val) for val in preprocess_line(templine).split()]
                 indextrack = 0
+                
+        # Seperates the alternating values from the EQDSK file to R and Z
         nbbs, limitr = int(templine[0]),int(templine[1])
         oddevenline = 1 
         rbbs = []
@@ -567,9 +625,12 @@ def topfile_extraction(eqdskfilepath,inputfilesuffix = "_mastU"):
         f.close()    
         EQDSKFILE_CACHE[eqdskfilepath] = topfile_path
         if topfile_path in EQDSKFILE_CACHE.values():
+            delkeys = []
             for eqdskf in EQDSKFILE_CACHE:
                 if EQDSKFILE_CACHE[eqdskf] == topfile_path:
-                    del EQDSKFILE_CACHE[eqdskf]
+                    delkeys.append(eqdskf)
+            for k in delkeys:
+                del EQDSKFILE_CACHE[k]
 
         return topfile_path
 
@@ -577,15 +638,15 @@ EQDSKFILE_CACHE = {} # For storage of topfile so function does not have to run a
 
 #---------------------------------#
 # Miscellaneous functions 
-# Creates a dropdown object with certain set variables (column, state, etc)
-def autodropdown(pg,options,tvar,row,def_ind):
-    ent = ttk.Combobox(pg, textvariable=tvar)
-    ent.grid(row=row,column=1,padx=5,pady=5)
-    ent['values'] = options  
+# Default template for multiselect dropdowns, with certain set variables (column, state, etc)
+def dropdown(pg,options,tvar,row,def_ind):
+    obj = ttk.Combobox(pg, textvariable=tvar)
+    obj.grid(row=row,column=1,padx=5,pady=5)
+    obj['values'] = options  
     if options:
-        ent.current(def_ind)
-    ent.state(["readonly"])  
-    return ent
+        obj.current(def_ind)
+    obj.state(["readonly"])  
+    return obj
 
 rmv_dupes = lambda x: [y for ind,y in enumerate(x) if (y not in x[:ind])] # Removes duplicates from a list
 ispresent_func = lambda y: all(x != '' for x in y) # Function for checking if all varaibles in a list are valid (for trace functions)
@@ -595,14 +656,25 @@ ispresent_func = lambda y: all(x != '' for x in y) # Function for checking if al
 
 tk.Label(root, text="Input Files",font=("Arial", 20)).grid(row=0,column=0,columnspan=2, sticky = "n", padx=5, pady=10)
 
+VALID_PREFIX = ['topfile']
+VALID_SUFFIX = ['.npz','.eqdsk']
 def choose_B_file(): # Function for button to choose magnetic field file
     global magnetic_data_path
     path = filedialog.askopenfilename( # Requests file from user
         title="Select an input file",
-        filetypes=(("NumPy files", "*.npz"),("G-EQDSK files","*.eqdsk"),))
+        # filetypes=(("NumPy files", "*.npz"),
+        #            ("G-EQDSK files","*.eqdsk"),
+        #            ("All files", "*"),)
+                   )
     if path: # Only updates if a file is chosen / path isnt None
-        magnetic_data_path.set(path)
-        B_file_update()
+        path = Path(path)
+        if path.suffix in VALID_SUFFIX or any(pref in path.stem for pref in VALID_PREFIX):
+            magnetic_data_path.set(path)
+            B_file_update()
+        elif not path.is_file():
+            messagebox.showinfo("Info",f"Selected path is not a file")
+        else:
+            messagebox.showinfo("Info","Selected file is not valid")
 
 B_file_update = lambda:mag_data_l.config(text = f"Magnetic Field File: {magnetic_data_path.get()}") # Updates label for magnetic field file
 
@@ -660,15 +732,15 @@ tk.Entry(root, textvariable=launch_position,validate='all',validatecommand=(vadv
 tk.Entry(root, textvariable=launch_freq_GHz,validate='all',validatecommand=(vadvbatch,'%P')).grid(row=8, column=1, padx=5, pady=5)
 tk.Entry(root, textvariable=launch_beam_width,validate='all',validatecommand=(vadvfloat,'%P')).grid(row=9, column=1, padx=5, pady=5)
 tk.Entry(root, textvariable=launch_beam_curvature,validate='all',validatecommand=(vadvfloat,'%P')).grid(row=10, column=1, padx=5, pady=5)
-mflag_ent = autodropdown(root,['1','-1'],mode_flag,11,0)    
+mflag_ent = dropdown(root,['1','-1'],mode_flag,11,0)    
 
 launch_pages_separator = ttk.Separator(root, orient="horizontal")
 launch_pages_separator.grid(row=12, column=0,columnspan=3, sticky="ew", padx=10, pady=10)
 
 submitbutton = tk.Button(root, text="Run", command=submit, state="disabled", font=("Arial",20))
-submitbutton.grid(row=29, column=0, columnspan=2, pady=10)
+submitbutton.grid(row=30, column=0, columnspan=2, pady=10)
 guidance_label = tk.Label(root, text="Enter input files and launch parameters in the correct format to enable 'Run' button",font=("Arial", 10),fg='grey')
-guidance_label.grid(row=30,column=0,columnspan=2, sticky = "n", padx=5, pady=5)
+guidance_label.grid(row=31,column=0,columnspan=2, sticky = "n", padx=5, pady=5)
 
 # Trace all - for enabling/disabling 'Run' button
 for var in [poloidal_launch_angle_Torbeam, toroidal_launch_angle_Torbeam, 
@@ -676,7 +748,6 @@ for var in [poloidal_launch_angle_Torbeam, toroidal_launch_angle_Torbeam,
             launch_beam_curvature,mode_flag,ne_data_path,
             magnetic_data_path]:
     var.trace_add("write", validate_launch_all)
-
 #---------------------------------#
 # Info Labels
 def show_info(text): # Function to display text
@@ -701,8 +772,8 @@ def create_infolabel(pg,text,r,c,padx = 10,pady = 5):
 # Info label widget creation for all launch parameters
 file_input_info = create_infolabel(
     root,
-    "Files to be used in beam_me_up(), valid magnetic field files (Numpy .npz / G-EQDSK .eqdsk) "\
-    "and equilibrium electron density data file (.dat) respectively\n\n",
+    "Files to be used in beam_me_up(), valid magnetic field files (Numpy .npz / G-EQDSK .eqdsk / topfile) "\
+    "and equilibrium electron density data file (.dat) respectively",
     0,2
 )
 launch_param_info = create_infolabel(
@@ -820,8 +891,8 @@ def open_advanced():
     tk.Entry(adv_topframe, textvariable=equil_time,validate='all',validatecommand=(vadvfloat,'%P')).grid(row=1, column=1, padx=5, pady=5)
     tk.Entry(adv_topframe, textvariable=poloidal_flux_enter,validate='all',validatecommand=(vadvfloat,'%P')).grid(row=2, column=1, padx=5, pady=5)
     tk.Entry(adv_topframe, textvariable=poloidal_flux_zero_density,validate='all',validatecommand=(vadvfloat,'%P')).grid(row=3, column=1, padx=5, pady=5)
-    psiflag_ent = autodropdown(adv_topframe,['None','discontinuous','continuous'],Psi_BC_flag,4,0) 
-    vacpropflag_ent = autodropdown(adv_topframe,['True','False'],vacuum_propagation_flag,5,0)
+    psiflag_ent = dropdown(adv_topframe,['None','discontinuous','continuous'],Psi_BC_flag,4,0) 
+    vacpropflag_ent = dropdown(adv_topframe,['True','False'],vacuum_propagation_flag,5,0)
 
     equil_time_info = create_infolabel(
         adv_topframe,
@@ -866,8 +937,8 @@ def open_advanced():
 
     tk.Entry(adv_bottomframe, textvariable=shot,validate='all',validatecommand=(vadvint,'%P')).grid(row=1, column=1, padx=5, pady=5)
     tk.Entry(adv_bottomframe, textvariable=len_tau,validate='all',validatecommand=(vadvint,'%P')).grid(row=2, column=1, padx=5, pady=5)
-    figflag_ent = autodropdown(adv_bottomframe,['True','False'],figure_flag,3,0)
-    quickrun_ent = autodropdown(adv_bottomframe,['True','False'],quick_run,4,1)
+    figflag_ent = dropdown(adv_bottomframe,['True','False'],figure_flag,3,0)
+    quickrun_ent = dropdown(adv_bottomframe,['True','False'],quick_run,4,1)
     tk.Entry(adv_bottomframe, textvariable=output_file_suffix).grid(row=5, column=1, padx=5, pady=5)
 
     # Output folder function
@@ -977,7 +1048,7 @@ def open_solver_params():
     tk.Label(solverwindow, text="atol:").grid(row=9, column=0, sticky="e", padx=5, pady=5)
     tk.Label(solverwindow, text="rtol:").grid(row=10, column=0, sticky="e", padx=5, pady=5)
 
-    delta_sign_dropdown = autodropdown(solverwindow,['True','False'],auto_delta_sign,2,0)
+    delta_sign_dropdown = dropdown(solverwindow,['True','False'],auto_delta_sign,2,0)
     tk.Entry(solverwindow, textvariable=delta_R,validate='all',validatecommand=(vadvfloat,'%P')).grid(row=3, column=1, padx=5, pady=5)
     tk.Entry(solverwindow, textvariable=delta_Z,validate='all',validatecommand=(vadvfloat,'%P')).grid(row=4, column=1, padx=5, pady=5)
     tk.Entry(solverwindow, textvariable=delta_K_R,validate='all',validatecommand=(vadvfloat,'%P')).grid(row=5, column=1, padx=5, pady=5)
@@ -1037,7 +1108,49 @@ def open_solver_params():
 
 solverpg_button = tk.Button(root, text="Solver Parameters", command=open_solver_params)
 solverpg_button.grid(row=28, column=0, pady=10)
+#---------------------------------#
+# Preprocessing page - for the preprocessing functions eg converting eqdsk files to npz 
 
+preprocess = None
+
+def preprocessing_close(): 
+    global preprocess
+    preprocess.destroy()
+    preprocess = None
+    
+def open_preprocess(): 
+    global preprocess
+    
+    if preprocess is not None and preprocess.winfo_exists():
+        preprocess.lift()
+        preprocess.focus_force()
+        return
+    
+    preprocess = tk.Toplevel(root)
+    preprocess.protocol("WM_DELETE_WINDOW",preprocessing_close)
+    
+    def convert_eqdsk_to_topfile():
+        path = filedialog.askopenfilename( # User picks the eqdsk file to convert
+            title="Choose EQDSK FIle to convert",
+            filetypes=(("G-EQDSK files","*.eqdsk"),)) 
+        if path:
+            topfile_extraction(path) 
+
+    # Widget creation
+    tk.Label(preprocess, text="Preprocessing",font=("Arial", 15)).grid(row=1,column=0,columnspan=3, sticky = "n", padx=5, pady=10)
+
+    conversion_button = tk.Button(preprocess, text="Convert EQDSK to topfile", command=convert_eqdsk_to_topfile)
+    conversion_button.grid(row=2, column=0, pady=10)
+
+    # Info label
+    conversion_button_info = create_infolabel(
+        preprocess,
+        "Processes the selected EQDSK file to create a TORBEAM topfile in the same directiry, which can be used as an input file.", 
+        2,2
+    )
+
+preprocess_button = tk.Button(root, text="Preprocessing", command=open_preprocess)
+preprocess_button.grid(row=29, column=0,columnspan=2, pady=5)
 #---------------------------------#
 # Diagnostic presets
 diagnosticwindow = None
@@ -1167,7 +1280,7 @@ def open_notes():
              wraplength=500).grid(row=4,column=0,columnspan=2, padx=5, pady=5)
 
 notes_button = tk.Button(root, text="Notes", command=open_notes)
-notes_button.grid(row=31, column=0,columnspan=2, pady=5)
+notes_button.grid(row=32, column=0,columnspan=2, pady=5)
 
 #---------------------------------#
 # Plot Functions unrelated to GUI
@@ -1182,7 +1295,7 @@ for var in mfile_vars:
     var.trace_add('write',auto_updatefunc(
         "Poloidal Cross-section",ispresent_func,[v.get for v in mfile_vars]
     ))
-# Density Fit Heatmap [hidden]
+# Density Fit Heatmap [currently unused]
 #     var.trace_add('write',auto_updatefunc(
 #         "Density Fit Heatmap", ispresent_func,[v.get for v in mfile_vars + [ne_data_path]]
 #     ))
@@ -1209,7 +1322,7 @@ def density_fit_launch(fig): # Plots radial coordinates against density
     ne_data_density_array = ne_data[2::2]
     ne_data_radialcoord_array = ne_data[1::2]
     ax.scatter(ne_data_radialcoord_array, ne_data_density_array,color='blue', s=20)
-    ax.set_xlabel("Rho")
+    ax.set_xlabel("R (m)") # Label might not be accurate (?)
     ax.set_ylabel("Density (10^19 m^-3)")
     ax.set_title(f"Density Profile")
     ax.grid(True)
@@ -1359,7 +1472,7 @@ def plot_selector_update():
         if plot_selector and plot_selector.winfo_exists():
             currplots = [plot for plot in AVAILABLEPLOTS if plot in CATEGORIES[selcat.get()]]
             plot_selector['values'] = currplots
-            print(currplots, bool(currplots))
+            # print(currplots, bool(currplots))
             if currplots:
                 plot_selector.current(0)
                 plot_selector.config(state="readonly")
@@ -1395,7 +1508,7 @@ def choose_h5_file():
     )
     if path:
         xarray_path.set(path)
-        print(xarray_path.get())
+        # print(xarray_path.get())
         xr_label.config(text = f"Selected .h5 file: {xarray_path.get()}")
 
 # Updates output plots based on if a .h5 file selected
@@ -1427,9 +1540,9 @@ def open_plot_window():
     tk.Label(plot_window, text="Select Plots",font=("Arial", 16)).grid(row=0,column=0,columnspan=2, sticky = "nsew", padx=5, pady=15)
 
     tk.Label(plot_window, text="Category: ").grid(row=1,column=0, sticky = "e", padx=5, pady=5)
-    cat_selector = autodropdown(plot_window,["Basic Plots","Input Plots","Output Plots","Debugging Plots"],selcat,1,0) 
+    cat_selector = dropdown(plot_window,["Basic Plots","Input Plots","Output Plots","Debugging Plots"],selcat,1,0) 
 
-    plot_selector = autodropdown(plot_window,AVAILABLEPLOTS,selplot,2,0)
+    plot_selector = dropdown(plot_window,AVAILABLEPLOTS,selplot,2,0)
     plot_selector.grid(row = 2, column = 0, sticky= "nsew", columnspan= 2, pady= 10)  
     plot_selector_update() 
     xr_label = tk.Label(plot_window, text=f"Selected .h5 file: {xarray_path.get()}", wraplength=200)
