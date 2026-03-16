@@ -48,7 +48,10 @@ def _event(terminal: bool, direction: float):
 
 
 def make_solver_events(
-    poloidal_flux_enter: float, launch_angular_frequency: float, field: MagneticField
+    poloidal_flux_enter: float,
+    launch_angular_frequency: float,
+    field: MagneticField,
+    reflectometry_flag: bool,
 ) -> Dict[str, Callable]:
     """Define event handlers for the ray solver
 
@@ -210,7 +213,9 @@ def make_solver_events(
 
 
 def handle_leaving_plasma_events(
-    tau_events: Dict[str, FloatArray], ray_parameters_2D_events: FloatArray
+    tau_events: Dict[str, FloatArray],
+    ray_parameters_2D_events: FloatArray,
+    reflectometry_flag: bool,
 ) -> float:
     """Handle events detected by `scipy.integrate.solve_ivp`. This
     only handles events due to the ray leaving the plasma or
@@ -256,7 +261,6 @@ def handle_leaving_plasma_events(
 
     if not detected("leave_plasma") and detected("leave_LCFS"):
         return tau_events["leave_LCFS"][0]
-
     if detected("leave_plasma") and detected("leave_LCFS"):
         # If both event_leave_plasma and event_leave_LCFS occur
         K_R_LCFS = ray_parameters_2D_events[0][2]
@@ -463,6 +467,7 @@ def propagate_ray(
     quick_run: bool,
     len_tau: int,
     tau_max: float = 1e5,
+    reflectometry_flag: bool = False,
     verbose: bool = True,
 ) -> Union[Tuple[float, FloatArray], K_cutoff_data]:
     """Propagate a ray. Quickly finds tau at which the ray leaves the
@@ -512,7 +517,7 @@ def propagate_ray(
     # with the returned events, and use these names instead of list
     # indices
     solver_ray_events = make_solver_events(
-        poloidal_flux_enter, launch_angular_frequency, field
+        poloidal_flux_enter, launch_angular_frequency, field, reflectometry_flag
     )
 
     K_R_initial, K_zeta_initial, K_Z_initial = K_initial
@@ -565,7 +570,7 @@ def propagate_ray(
         zip(solver_ray_events.keys(), solver_ray_output.y_events)
     )
     tau_leave = handle_leaving_plasma_events(
-        tau_events, ray_parameters_2D_events["leave_LCFS"]
+        tau_events, ray_parameters_2D_events["leave_LCFS"], reflectometry_flag
     )
 
     if quick_run:

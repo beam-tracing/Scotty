@@ -38,6 +38,7 @@ def launch_beam(
     mode_flag: int,
     field: MagneticField,
     hamiltonian: Hamiltonian,
+    reflectometry_flag: bool = False,
     vacuumLaunch_flag: bool = True,
     vacuum_propagation_flag: bool = True,
     Psi_BC_flag: Union[bool, str, None] = True,
@@ -66,6 +67,8 @@ def launch_beam(
         Angular frequency of the beam at launch
     field: MagneticField
         Object describing the magnetic field of the plasma
+    reflectometry_flag: bool
+        If ``True``, run reflectometry, otherwise run DBS
     vacuumLaunch_flag: bool
         If ``True``, launch beam from vacuum, otherwise beam launch
         position is inside the plasma already

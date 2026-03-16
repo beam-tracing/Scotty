@@ -105,6 +105,7 @@ def beam_me_up(
     launch_beam_curvature: float,
     launch_position: FloatArray,
     # keyword arguments begin
+    reflectometry_flag: bool = False,
     vacuumLaunch_flag: bool = True,
     relativistic_flag: bool = False,  # includes relativistic corrections to electron mass when set to True
     find_B_method: Union[str, MagneticField] = "torbeam",
@@ -204,6 +205,8 @@ def beam_me_up(
     vacuumLaunch_flag: bool
         If ``True``, launch beam from vacuum, otherwise beam launch
         position is inside the plasma already
+    reflectometry_flag: bool
+        If ``True``, run reflectometry, otherwise run DBS
     vacuum_propagation_flag: bool
         If ``True``, run solver from the launch position, and don't
         use analytical vacuum propagation
@@ -480,6 +483,7 @@ def beam_me_up(
             launch_angular_frequency=launch_angular_frequency,
             mode_flag=mode_flag,
             field=field,
+            reflectometry_flag=reflectometry_flag,
             hamiltonian=hamiltonian,
             vacuum_propagation_flag=vacuum_propagation_flag,
             Psi_BC_flag=Psi_BC_flag,
@@ -499,9 +503,15 @@ def beam_me_up(
         K_initial = plasmaLaunch_K
         initial_position = launch_position
         launch_K = None
-        Psi_3D_lab_launch = None
-        Psi_3D_lab_entry = None
-        Psi_3D_lab_entry_cartersian = None
+        Psi_3D_lab_launch = find_Psi_3D_lab(
+            plasmaLaunch_Psi_3D_lab_Cartesian,
+            launch_position[0],
+            launch_position[1],
+            plasmaLaunch_K[0],
+            plasmaLaunch_K[1],
+        )
+        Psi_3D_lab_entry = np.zeros([3, 3])
+        Psi_3D_lab_entry_cartersian = np.zeros([3, 3])
         distance_from_launch_to_entry = None
 
     K_R_initial, K_zeta_initial, K_Z_initial = K_initial
@@ -633,6 +643,7 @@ def beam_me_up(
             "quick_run": quick_run,
             "rtol": rtol,
             "shot": shot,
+            "reflectometry_flag": reflectometry_flag,
             "toroidal_launch_angle_Torbeam": toroidal_launch_angle_Torbeam,
             "vacuumLaunch_flag": vacuumLaunch_flag,
             "vacuum_propagation_flag": vacuum_propagation_flag,
@@ -670,10 +681,11 @@ def beam_me_up(
         "id": str(run_id),
     }
 
-    if solver_status == -1:
-        # If the solver doesn't finish, end the function here
-        print("Solver did not reach completion")
-        return
+    if not reflectometry_flag:
+        if solver_status == -1:
+            # If the solver doesn't finish, end the function here
+            print("Solver did not reach completion")
+            return
 
     # -------------------
     # Process the data from the main loop to give a bunch of useful stuff
@@ -701,8 +713,8 @@ def beam_me_up(
         Psi_3D_lab_entry,
         distance_from_launch_to_entry,
         vacuumLaunch_flag,
+        reflectometry_flag,
         output_path,
-        output_filename_suffix,
         dH,
     )
     analysis = further_analysis(
@@ -713,6 +725,7 @@ def beam_me_up(
         output_filename_suffix,
         field,
         detailed_analysis_flag,
+        reflectometry_flag,
         dH,
     )
     df.update(analysis)
