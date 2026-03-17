@@ -73,17 +73,25 @@ import re
 import copy
 import itertools
 import xarray as xr
+
+import matplotlib.pylab as pl
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
+from matplotlib.figure import Figure 
+from matplotlib.backends.backend_tkagg import (
+    FigureCanvasTkAgg,
+    NavigationToolbar2Tk
+)
+
 
 from pathlib import Path
 from scipy import interpolate
+from scipy.optimize import fsolve
 
 #---------------------------------#
 # Main page creation
 root = tk.Tk()
 root.title("Scotty Input")
-print("Disclaimer - Entering files will rename them to fit Scotty package")
 AVAILABLEPLOTS = []
 
 #---------------------------------#
@@ -264,6 +272,15 @@ def entrbatch(x):
             break
     return isv
 
+# Validation for positive float variables
+def entrposfloat(x):
+    if x in ['']: return True # Must be kept so user can delete/type within the input fields properly
+    try:
+        float(x)
+        return float(x) >= 0 # Checks if input is both a valid float and above 0
+    except Exception:
+        return False
+    
 entrint = lambda x:x.isdigit() or x == ''
 
 # Has to be registered to root to use in the input fields
@@ -271,6 +288,7 @@ vadvint = root.register(entrint)
 vadvfloat = root.register(entrfloat)
 vadvlaunchpos = root.register(entrpos)
 vadvbatch = root.register(entrbatch)
+vadvposfloat = root.register(entrposfloat)
 
 #---------------------------------#
 # Update available plots factory function
@@ -443,7 +461,7 @@ def topfile_extraction(eqdskfilepath,inputfilesuffix = "_mastU"):
                 templine = [float(val) for val in preprocess_line(templine).split()]
                 indextrack = 0
                 
-        # Seperates the alternating values from the EQDSK file to R and Z
+        # Separates the alternating values from the EQDSK file to R and Z
         nbbs, limitr = int(templine[0]),int(templine[1])
         oddevenline = 1 
         rbbs = []
@@ -634,6 +652,223 @@ def topfile_extraction(eqdskfilepath,inputfilesuffix = "_mastU"):
 
         return topfile_path
 
+def AnalyseThomson(input_dir,output_dir,time,shots,figure_flag = True):
+    # ---
+    # Essentially will be a ported over version of the Analyse Thomsom file (refinements can be done later idk how to do rn)
+    # ---
+
+    def process_Thomson2(shot, time, eq_file_path):
+
+        # we are assuming eq_file_path will be complete path of the input .npz file
+        filename = eq_file_path
+        if shot > 30471: # MAST-U
+            # filename = eq_file_path + str(shot) + '_equilibrium_data.npz'
+            loadfile = np.load(filename)
+            # Thomson data
+            t_TSC = loadfile['t_TSC']
+            R_TSC = loadfile['R_TSC'] # in meters [numberOfTimePoints,numberOfRPointsPerTimePoint]
+            Z_TSC = 0.015 # From Rory Scannell
+            ne_TSC = loadfile['ne_TSC']
+            ne_err_TSC = loadfile['ne_err_TSC']
+            Te_TSC = loadfile['Te_TSC']
+            data_Z_coord = loadfile['Z_EFIT']
+            data_R_coord = loadfile['R_EFIT']
+            t_EFIT = loadfile['time_EFIT']
+            poloidal_flux = loadfile['poloidalFlux_grid']
+            loadfile.close()
+            
+            print(t_EFIT)
+            t_index_EFIT = find_nearest(t_EFIT,  time)
+            t_nearest_EFIT = t_EFIT[t_index_EFIT]  
+            data_poloidal_flux_grid = poloidal_flux[t_index_EFIT,:,:] 
+            
+            
+        else: # MAST
+            # filename = eq_file_path + str(shot) + '_equilibrium_data.npz'
+            loadfile = np.load(filename)
+            # Thomson data
+            t_TSC = loadfile['t_TSC']
+            R_TSC = loadfile['R_TSC'] # in meters [numberOfTimePoints,numberOfRPointsPerTimePoint]
+            Z_TSC = 0.015 # From Rory Scannell, MAST wiki
+            ne_TSC = loadfile['ne_TSC']
+            ne_err_TSC = loadfile['ne_err_TSC']
+            Te_TSC = loadfile['Te_TSC']
+            data_Z_coord = loadfile['Z_EFIT']
+            data_R_coord = loadfile['R_EFIT']
+            t_base_B = loadfile['t_base_B']
+            t_base_C = loadfile['t_base_C']
+            poloidal_flux_unnormalised = loadfile['poloidal_flux_unnormalised']
+            poloidal_flux_unnormalised_axis = loadfile['poloidal_flux_unnormalised_axis']
+            poloidal_flux_unnormalised_boundary = loadfile['poloidal_flux_unnormalised_boundary']
+            loadfile.close()
+            
+            t_base_B_idx = find_nearest(t_base_B, time)
+            t_base_C_idx = find_nearest(t_base_C, t_base_B[t_base_B_idx]) # Get the same time slice
+            t_nearest_EFIT = t_base_B[t_base_B_idx]
+
+            data_poloidal_flux_grid = np.transpose(poloidal_flux_unnormalised[t_base_B_idx,:,:] - poloidal_flux_unnormalised_axis[t_base_C_idx]) / (poloidal_flux_unnormalised_boundary[t_base_C_idx] - poloidal_flux_unnormalised_axis[t_base_C_idx])
+
+
+
+        t_index_Thomson = find_nearest(t_TSC,  time)
+        t_nearest_Thomson = t_TSC[t_index_Thomson]
+
+
+        ## Figure
+        # plt.figure(figsize=(5,5))
+        # plt.title('Poloidal Plane')
+        # contour_levels = np.linspace(0,1,11)
+        # CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid[:,:]), contour_levels,vmin=0,vmax=1.2,cmap='inferno')
+        # # CS = plt.contour(data_R_coord, data_Z_coord, np.transpose(data_poloidal_flux_grid[t_index_EFIT,:,:]))
+        # plt.clabel(CS, inline=True, fontsize=10,inline_spacing=1,fmt= '%1.1f',use_clabeltext=True) # Labels the flux surfaces
+        # plt.title(str(shot))
+        
+        interp_order = 3 # For the 2D interpolation functions
+        interp_smoothing = 0 # For the 2D interpolation functions. For no smoothing, set to 0    
+        interp_poloidal_flux = interpolate.RectBivariateSpline(data_R_coord,data_Z_coord,data_poloidal_flux_grid, bbox=[None, None, None, None], kx=interp_order, ky=interp_order, s=interp_smoothing)
+            
+        print('Time: requested:', "{:.3g}".format(time),'s' )    
+        print('Time: Thomson data:', "{:.3g}".format(t_nearest_Thomson),'s' )
+        print('Time: EFIT data:', "{:.3g}".format(t_nearest_EFIT),'s' )
+        print(t_index_Thomson)
+        
+        Thomson_R_coord = R_TSC[t_index_Thomson,:]
+        Thomson_Z_coord = Z_TSC * np.ones_like(Thomson_R_coord)
+        
+        Thomson_poloidal_flux = interp_poloidal_flux(Thomson_R_coord,Thomson_Z_coord,grid=False) 
+
+        # return Thomson_poloidal_flux[:], ne_TSC[t_index_Thomson,:], ne_err_TSC[t_index_Thomson,:]
+        
+        ## Get rid of inboard midplane
+        return Thomson_poloidal_flux[len(Thomson_poloidal_flux)//2:], ne_TSC[t_index_Thomson,len(Thomson_poloidal_flux)//2:], ne_err_TSC[t_index_Thomson,len(Thomson_poloidal_flux)//2:]
+
+    def interp_smooth_Thomson(pol_flux_to_use, ne_to_use,ne_err_to_use):
+        # Choosing 's' is important
+        # values of s used previously: 27 (160ms, 190ms), 44 (220ms), 59 (250ms)
+        interp_ne = interpolate.UnivariateSpline(pol_flux_to_use, ne_to_use,
+                                                w=None, bbox=[None, None], 
+                                                k=3, s=1.3, 
+                                                ext=0, check_finite=False)
+        
+        pol_flux_interped = np.linspace(0.0,2.0,501)
+        ne_interped = interp_ne(pol_flux_interped)
+        
+        # plt.figure()
+        # plt.plot(pol_flux_interped,ne_interped)
+        
+        ## Setting small values of ne to zero
+        idx_last = len(ne_interped)
+        for ii, ne in enumerate(ne_interped):
+            if ne > ne_interped[0:10].max()*10**(-3):     
+                continue
+            else: 
+                idx_last = ii
+                break
+        ne_trimmed = ne_interped[0:idx_last]
+        polflux_trimmed = pol_flux_interped[0:idx_last]
+        
+        pol_flux_enter = fsolve(interp_ne, polflux_trimmed[-1])
+        ne_output = np.append(ne_trimmed,0)
+        polflux_output = np.append(polflux_trimmed,pol_flux_enter)    
+        return polflux_output, ne_output
+
+    shots = np.array(shots)
+
+    pol_flux_all = np.array([])
+    ne_all = np.array([])
+    ne_err_all = np.array([])
+
+    colors = pl.cm.jet(np.linspace(0,1,len(shots)))
+    plt.figure()
+    for ii, shot in enumerate(shots):
+        print(type(shot))
+        pol_flux, ne, ne_err = process_Thomson2(shot, time,input_dir)
+
+        ## Remove NaNs
+        pol_flux_noNaN = pol_flux[~np.isnan(ne)]
+        ne_noNaN = ne[~np.isnan(ne)] / 10**19
+        ne_err_noNaN = ne_err[~np.isnan(ne_err)] / 10**19
+        
+        ## Only use the outboard points
+        pol_flux_outboard = pol_flux_noNaN[pol_flux_noNaN.argmin():]
+        ne_outboard = ne_noNaN[pol_flux_noNaN.argmin():]    
+        ne_err_outboard = ne_err_noNaN[pol_flux_noNaN.argmin():]    
+        
+        ## Select which data to save
+        # pol_flux_save = pol_flux_outboard
+        # ne_save = ne_outboard
+        # ne_err_save = ne_err_outboard
+        pol_flux_save = pol_flux_noNaN
+        ne_save = ne_noNaN
+        ne_err_save = ne_err_noNaN
+        
+        pol_flux_all = np.append(pol_flux_all,pol_flux_save)
+        ne_all = np.append(ne_all,ne_save)
+        ne_err_all = np.append(ne_err_all,ne_err_save)
+        
+        ##
+        ne_too_high = 12.0
+        print('ne_too_high = ', ne_too_high)
+        idx_remove = np.argwhere(ne_all>ne_too_high)
+        pol_flux_new = np.delete(pol_flux_all,idx_remove)
+        ne_new = np.delete(ne_all,idx_remove)
+        ne_err_new = np.delete(ne_err_all,idx_remove)
+        pol_flux_all = pol_flux_new
+        ne_all = ne_new
+        ne_err_all = ne_err_new
+
+        plt.plot(pol_flux_save,ne_save,color=colors[ii],linestyle='',marker='o',mfc='none',label=shot)
+        print(len(pol_flux_save),len(ne_save))
+        # plt.plot(pol_flux_save,ne_save,color='r',linestyle='',marker='o',mfc='none',label=shot)
+    ## Sort
+    idx_sort = np.argsort(pol_flux_all)
+    pol_flux_sorted = pol_flux_all[idx_sort]
+    ne_sorted = ne_all[idx_sort]
+    ne_err_sorted = ne_err_all[idx_sort]
+
+    polflux_output, ne_smoothed = interp_smooth_Thomson(pol_flux_sorted, ne_sorted, ne_err_sorted)
+
+    ## Filter function
+    filter_steepness = 20.0
+    filter_centre = 1.1
+    filter_amp = 1.0
+    filter_fun = 0.5*filter_amp*(1-np.tanh(filter_steepness * (polflux_output - filter_centre))) + (1-filter_amp)
+    ne_output = ne_smoothed * filter_fun
+
+    filename = f'{output_dir}' + '/ne_' + f'{shot:.0f}' + '_' + f'{time*1000:.0f}' +'ms'
+
+    if figure_flag:
+        # plt.errorbar(pol_flux_outboard,ne_outboard,ne_err_outboard,linestyle='',marker='.',mfc='none',label='outboard')
+        plt.plot(polflux_output,ne_smoothed,'k',linestyle='-',marker='',mfc='none',label='all')
+        plt.plot(polflux_output,filter_fun,'gray',linestyle='-',marker='',mfc='none',label='all')
+        plt.plot(polflux_output,ne_output,'r',linestyle='-',marker='',mfc='none',label='all')
+
+        # plt.plot(pol_flux_interped,ne_interped,'k',linestyle='-',marker='',mfc='none',label='outboard')
+
+        # plt.plot(pol_flux_plot,F_full(pol_flux_plot,*F_full_guess),'c',label='fit full')
+        # plt.plot(pol_flux_plot,F_ped(pol_flux_plot,*F_ped_guess),'m',label='fit ped')
+        # plt.plot(pol_flux_plot, F_full(pol_flux_plot,*popt))
+        # plt.plot(pol_flux_plot, popt[2] * np.tanh(popt[3] * (pol_flux_plot - popt[4])) )
+        # plt.errorbar(pol_flux_noNaN, ne_noNaN, yerr=ne_err_noNaN, fmt='-')
+        plt.xlim(-0.1,1.6)
+        # plt.ylim(0,1.1*ne_noNaN.max())
+        plt.ylim(-0.1,ne_output.max()+0.5)
+        plt.ylabel(r'$n_e / 10^{19} m^{-3}$') # x-direction
+        plt.xlabel(r'$\psi_p$')
+        plt.title('Density profile')
+        plt.legend(loc='upper right',edgecolor='k',facecolor=None)
+        # plt.savefig('ne.jpg',dpi=300)
+        
+        plt.savefig(f'{filename}' +'.jpg', dpi=300, format='jpg', bbox_inches='tight')
+
+    ne_data_file = open(f'{filename}' +'.dat','w')  
+    ne_data_file.write(str(len(polflux_output)) + '\n') 
+    for ii in range(0, len(polflux_output)):
+        ## Saving radial coordinate rather than poloidal flux
+        ne_data_file.write('{:.8e}   {:.8e} \n'.format(np.sqrt(polflux_output[ii]),ne_output[ii]))        
+    ne_data_file.close() 
+    return f'{filename}' +'.dat' # Returns full filepath
+
 EQDSKFILE_CACHE = {} # For storage of topfile so function does not have to run again for the same file
 
 #---------------------------------#
@@ -650,6 +885,8 @@ def dropdown(pg,options,tvar,row,def_ind):
 
 rmv_dupes = lambda x: [y for ind,y in enumerate(x) if (y not in x[:ind])] # Removes duplicates from a list
 ispresent_func = lambda y: all(x != '' for x in y) # Function for checking if all varaibles in a list are valid (for trace functions)
+
+
 
 #---------------------------------#
 # File inputs
@@ -703,9 +940,10 @@ ne_data_l.grid(row=1, column=1, padx=5, pady=5)
 ne_file_button = tk.Button(root, text="Choose File", command=choose_ne_file)
 ne_file_button.grid(row=2,column=1,pady = 10)
 
-# Seperator
+# Separator
 file_launch_separator = ttk.Separator(root, orient="horizontal")
 file_launch_separator.grid(row=3, column=0,columnspan=3, sticky="ew", padx=10, pady=5)
+
 
 #---------------------------------#
 # Launch Params 
@@ -748,6 +986,8 @@ for var in [poloidal_launch_angle_Torbeam, toroidal_launch_angle_Torbeam,
             launch_beam_curvature,mode_flag,ne_data_path,
             magnetic_data_path]:
     var.trace_add("write", validate_launch_all)
+
+    
 #---------------------------------#
 # Info Labels
 def show_info(text): # Function to display text
@@ -827,13 +1067,15 @@ mode_flag_info = create_infolabel(
     11,2
 )
 
+
+
 #---------------------------------#
 # Advanced parameters
 advanced_window = None
 
 # Advanced parameters variable initialization
-shot = tk.StringVar()
-shot.set('0')
+shot_inpvar = tk.StringVar()
+shot_inpvar.set('0')
 equil_time = tk.StringVar()
 equil_time.set('0.0')
 len_tau = tk.StringVar()
@@ -888,7 +1130,7 @@ def open_advanced():
     tk.Label(adv_topframe, text="Psi-BC Flag:").grid(row=4, column=0, sticky="e", padx=5, pady=5)
     tk.Label(adv_topframe, text="Vacuum Propagation Flag:").grid(row=5, column=0, sticky="e", padx=5, pady=5)
 
-    tk.Entry(adv_topframe, textvariable=equil_time,validate='all',validatecommand=(vadvfloat,'%P')).grid(row=1, column=1, padx=5, pady=5)
+    tk.Entry(adv_topframe, textvariable=equil_time,validate='all',validatecommand=(vadvposfloat,'%P')).grid(row=1, column=1, padx=5, pady=5)
     tk.Entry(adv_topframe, textvariable=poloidal_flux_enter,validate='all',validatecommand=(vadvfloat,'%P')).grid(row=2, column=1, padx=5, pady=5)
     tk.Entry(adv_topframe, textvariable=poloidal_flux_zero_density,validate='all',validatecommand=(vadvfloat,'%P')).grid(row=3, column=1, padx=5, pady=5)
     psiflag_ent = dropdown(adv_topframe,['None','discontinuous','continuous'],Psi_BC_flag,4,0) 
@@ -935,7 +1177,7 @@ def open_advanced():
     tk.Label(adv_bottomframe, text="Quick Run:").grid(row=4, column=0, sticky="e", padx=5, pady=5)
     tk.Label(adv_bottomframe, text="Output Suffix:").grid(row=5, column=0, sticky="e", padx=5, pady=5)
 
-    tk.Entry(adv_bottomframe, textvariable=shot,validate='all',validatecommand=(vadvint,'%P')).grid(row=1, column=1, padx=5, pady=5)
+    tk.Entry(adv_bottomframe, textvariable=shot_inpvar,validate='all',validatecommand=(vadvint,'%P')).grid(row=1, column=1, padx=5, pady=5)
     tk.Entry(adv_bottomframe, textvariable=len_tau,validate='all',validatecommand=(vadvint,'%P')).grid(row=2, column=1, padx=5, pady=5)
     figflag_ent = dropdown(adv_bottomframe,['True','False'],figure_flag,3,0)
     quickrun_ent = dropdown(adv_bottomframe,['True','False'],quick_run,4,1)
@@ -993,6 +1235,8 @@ def open_advanced():
 
 advpg_button = tk.Button(root, text="Advanced Parameters", command=open_advanced,width=20,font=("Arial",14))
 advpg_button.grid(row=27, column=0,columnspan=1, pady=10)
+
+
 
 #---------------------------------#
 # Solver parameters
@@ -1108,18 +1352,200 @@ def open_solver_params():
 
 solverpg_button = tk.Button(root, text="Solver Parameters", command=open_solver_params)
 solverpg_button.grid(row=28, column=0, pady=10)
+
+
+
 #---------------------------------#
 # Preprocessing page - for the preprocessing functions eg converting eqdsk files to npz 
 
+# Variables
 preprocess = None
+ne_mod_window = None
+ne_inp_time = tk.StringVar(value='0.0')
+ne_inp_shots = tk.StringVar()
+ne_gen_input_dir = tk.StringVar()
+ne_gen_output_dir = tk.StringVar()
+ne_inp_figure_flag = tk.BooleanVar(value=True)
+ne_mod_file = tk.StringVar()
 
+#---------------------------------#
+# Ne file creation functions
+def generate_ne_file():
+    global ne_mod_file
+    input_dir = ne_gen_input_dir.get()
+    output_dir = ne_gen_output_dir.get()
+    time = float(ne_inp_time.get())
+    figure_flag = ne_inp_figure_flag.get()
+    try:
+        shot_ = int(Path(input_dir).stem.split("_")[0])
+    except Exception as err:
+        print(f"shot retrieval failed: {err}\ndefaulting to shot = 30472")
+        shot_ = 30472
+    print(type(shot_))
+    try:
+        path = AnalyseThomson(
+            input_dir=input_dir,
+            output_dir=output_dir,
+            time=time,
+            shots=[shot_],
+            figure_flag=figure_flag
+            )
+        ne_mod_file.set(path)
+        ne_mod_dir_update()
+        messagebox.showinfo("Info","File(s) created")
+    except Exception as err:
+        print(err)
+        messagebox.showinfo("Info","File creation failed")
+
+def validate_ne_inputs(*args):
+    global ne_file_generate_button
+    validation_list = [
+        lambda:isfloat(ne_inp_time.get()),
+        lambda:ne_gen_input_dir.get() != "",
+        lambda:ne_gen_output_dir.get() != "",
+        ]
+    isvalid = all(x() for x in validation_list)
+    if isvalid: 
+        ne_file_generate_button.config(state="active")
+    else: 
+        ne_file_generate_button.config(state="disabled")
+#---------------------------------#
+# Ne file modification functions
+
+def load_points(path):
+    if path:
+        data = np.fromfile(path, dtype=float, sep="   ")
+        pts = np.array([[data[x],data[x+1]] for x in range(1,len(data),2)])
+        return pts
+    else:
+        raise ValueError
+    
+def save_points(path,pts):
+    print(path,pts)
+    if path and len(pts) != 0:
+        np.savetxt(path, pts, header=str(len(pts)), comments='')
+    else:
+        raise ValueError("Path/Points do not exist")
+
+def mod_graph_init():
+    path = ne_mod_file.get()
+    try:
+        o_pts = load_points(path=path)
+    except ValueError:
+        messagebox.showinfo("Error", "File selected is not valid")
+        return
+    pts = o_pts.copy()
+    
+    ne_fig = Figure() # Used so it does not interfere with other graphs
+    ne_ax = ne_fig.add_subplot(111)
+    ne_ax.set_xlabel("R (m)")
+    ne_ax.set_ylabel("Density (10^19 m^-3)")
+    ne_ax.set_title(f"{Path(path).name}")
+    ne_ax.grid(True)
+
+    ne_sc, = ne_ax.plot(*pts.T, 'o-',markersize = 5,picker=8,) # Main plot
+    selected_plot, = ne_ax.plot([], [], 'o', color='red', markersize=10, zorder=5) # Showing which point is clicked
+    selected_ind = None # Selected index
+    picked = False # Checking if pick_event is triggered alongside button_press_event
+    
+    ne_fig.text(0.5, 0.01, "Backspace=Delete   S=Save", 
+         ha='center', fontsize=8, color='gray')
+    
+    # Events within the figure
+    def redraw():
+        if len(pts):
+            ne_sc.set_data(*pts.T)
+        else:
+            ne_sc.set_data([], [])
+        ne_fig.canvas.draw_idle()
+
+    # called after seleceted_ind is modified to update seleceted_plot
+    def update_selected():
+        if selected_ind != None:
+            selected_plot.set_data([pts[selected_ind,0]],[pts[selected_ind,1]])
+        else:
+            selected_plot.set_data([],[])
+        ne_fig.canvas.draw_idle()
+
+    def select_pt(e):
+        nonlocal selected_ind, picked
+        picked = True
+        pos = e.mouseevent
+        coords = pts[e.ind]   
+        data = np.hypot(coords[:,0]-pos.xdata,coords[:,1]-pos.ydata)
+        selected_ind = e.ind[data.argmin()]
+        update_selected() # sets select index of closet point to mouse, relative to all points
+
+    def deselect(e):
+        nonlocal selected_ind, picked
+        if picked:
+            picked = False
+        else:
+            selected_ind = None
+            update_selected()
+
+    def key_press_func(e):
+        nonlocal selected_ind, pts
+        # debug
+        # print(e)
+        # print(vars(e))
+        
+        # Deletion of point
+        if e.key == 'backspace':
+            if selected_ind != None:
+                pts = np.delete(pts, selected_ind, axis=0)
+                selected_ind = None
+                update_selected()
+                redraw()
+
+        # Saving figure
+        if e.key == 's':
+            confirmation = messagebox.askyesno("Title", "Save data? This will overwrite the previous data.")
+            if confirmation:
+                save_points(path=path,pts=pts)
+    
+    ne_fig.canvas.mpl_connect('pick_event', select_pt)
+    ne_fig.canvas.mpl_connect('button_press_event', deselect)
+    ne_fig.canvas.mpl_connect('key_press_event', key_press_func)
+    
+    return ne_fig
+
+#---------------------------------#
+# Graph window creation
+# the graph for modifying ne.dat file is treated as if its own page 
+
+def open_ne_mod_graph():
+    global ne_mod_window
+    # Create window for graph, since Figure() object used doesnt have a built in .show function
+    if ne_mod_window and ne_mod_window.winfo_exists():
+        ne_mod_window.lift()
+        ne_mod_window.focus_force()
+        return
+
+    # Retrieve figure
+    try:
+        fig = mod_graph_init()
+        if not fig: return
+    except Exception as err:
+        # print(err) #debug
+        return
+
+    ne_mod_window = tk.Toplevel(root)
+    ne_mod_window.geometry("1200x800")
+    canvas = FigureCanvasTkAgg(fig, master=ne_mod_window) # connect figure to window
+    canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True) 
+    toolbar = NavigationToolbar2Tk(canvas, ne_mod_window) # add toolbar similar to normal matplotlib
+    toolbar.update()
+    canvas.draw() # show toolbar
+    
+#---------------------------------#
 def preprocessing_close(): 
     global preprocess
     preprocess.destroy()
     preprocess = None
     
 def open_preprocess(): 
-    global preprocess
+    global preprocess, ne_file_generate_button, ne_mod_dir_l
     
     if preprocess is not None and preprocess.winfo_exists():
         preprocess.lift()
@@ -1132,15 +1558,21 @@ def open_preprocess():
     def convert_eqdsk_to_topfile():
         path = filedialog.askopenfilename( # User picks the eqdsk file to convert
             title="Choose EQDSK FIle to convert",
-            filetypes=(("G-EQDSK files","*.eqdsk"),)) 
+            # filetypes=(("G-EQDSK files","*.eqdsk"),("All files", "*"),)) 
+        )
         if path:
-            topfile_extraction(path) 
+            try:
+                topfile_extraction(path) 
+            except Exception as err:
+                print(err)
 
     # Widget creation
-    tk.Label(preprocess, text="Preprocessing",font=("Arial", 15)).grid(row=1,column=0,columnspan=3, sticky = "n", padx=5, pady=10)
-
+    tk.Label(preprocess, text="Preprocessing",font=("Arial", 18)).grid(row=1,column=0,columnspan=3, sticky = "n", padx=5, pady=10)
+    
     conversion_button = tk.Button(preprocess, text="Convert EQDSK to topfile", command=convert_eqdsk_to_topfile)
     conversion_button.grid(row=2, column=0, pady=10)
+    conv_separator = ttk.Separator(preprocess,orient="horizontal") 
+    conv_separator.grid(row= 3,column=0,columnspan=3,padx=5, sticky="ew",pady=5)
 
     # Info label
     conversion_button_info = create_infolabel(
@@ -1149,8 +1581,90 @@ def open_preprocess():
         2,2
     )
 
+    # Density data file
+    AnalyseThomson_frame = tk.Frame(preprocess)
+    AnalyseThomson_frame.grid(row=4,column=0,columnspan=3,padx=5,pady=5)
+    tk.Label(AnalyseThomson_frame, text="Electron Density File",font=("Arial", 18)).grid(row=1,column=0,columnspan=3, sticky = "n", padx=5, pady=10)
+    tk.Label(AnalyseThomson_frame, text="Time / s:").grid(row=2, column=0, sticky="e", padx=5, pady=5)
+    # tk.Label(AnalyseThomson_frame, text="Shot(s)*:").grid(row=3, column=0, sticky="e", padx=5, pady=5)
+
+    tk.Entry(AnalyseThomson_frame, textvariable=ne_inp_time,validate='all',validatecommand=(vadvposfloat,'%P')).grid(row=2, column=1, padx=5, pady=5)
+    # tk.Entry(AnalyseThomson_frame, textvariable=ne_inp_shots,validate='all',validatecommand=(vadvbatch,'%P')).grid(row=3, column=1, padx=5, pady=5)
+
+    # Input + Output directory choosing
+    def choose_ne_input_file(): # Function for button to choose input directory file
+        global ne_gen_input_dir
+        path = filedialog.askopenfilename(
+        title="Select a .npz input file",
+        filetypes=(("NumPy files", "*.npz"),))
+        if path: 
+            ne_gen_input_dir.set(path)
+            ne_input_dir_update()
+        
+    ne_input_dir_update = lambda:ne_input_dir_l.config(text = f"Input file: {ne_gen_input_dir.get()}") 
+    ne_input_dir_l = tk.Label(AnalyseThomson_frame, text=f"Input file: {ne_gen_input_dir.get()}",wraplength=150)
+    ne_input_dir_l.grid(row=4, column=0,sticky="e", padx=5, pady=5)
+    ne_input_dir_button = tk.Button(AnalyseThomson_frame, text="Choose File", command=choose_ne_input_file)
+    ne_input_dir_button.grid(row=4,column=1,padx=5, pady=5)
+
+    def choose_ne_output_dir(): # Function for button to choose output directory
+        global ne_gen_output_dir
+        path = filedialog.askdirectory(title="Select a folder")
+        if path: 
+            ne_gen_output_dir.set(path)
+            ne_file_update()
+        
+    ne_file_update = lambda:ne_output_dir_l.config(text = f"Output Directory: {ne_gen_output_dir.get()}") # Updates label for elecron density file
+    ne_output_dir_l = tk.Label(AnalyseThomson_frame, text=f"Output Directory: {ne_gen_output_dir.get()}",wraplength=150)
+    ne_output_dir_l.grid(row=5, column=0,sticky="e", padx=5, pady=5)
+    ne_output_dir_button = tk.Button(AnalyseThomson_frame, text="Choose Directory", command=choose_ne_output_dir)
+    ne_output_dir_button.grid(row=5,column=1,padx=5, pady=5)
+
+    tk.Label(AnalyseThomson_frame, text="Generate Figures:").grid(row=6, column=0, sticky="e", padx=5, pady=5)
+    ne_figure_flag_checkbox = tk.Checkbutton(AnalyseThomson_frame, variable=ne_inp_figure_flag)
+    ne_figure_flag_checkbox.grid(row=6,column=1,padx=5, pady=5)
+
+    ne_file_generate_button = tk.Button(AnalyseThomson_frame,text= "Generate electron density file",command=generate_ne_file)
+    ne_file_generate_button.grid(row=7, column=0,padx=5,pady=10,columnspan=3)
+    validate_ne_inputs() # Run validation function, which should intially disable the button when opened due to empty file paths
+
+    # Trace functions for all required variables in preprocessing page for electron density file 
+    for var in [ne_inp_time,ne_gen_input_dir,ne_gen_output_dir]:
+        var.trace_add("write",validate_ne_inputs)
+        
+    # FILE MODIFICATION
+    ne_filec_separator = ttk.Separator(preprocess,orient="horizontal") 
+    ne_filec_separator.grid(row=5,column=0,columnspan=3,padx=5, sticky="ew",pady=5)
+
+    ne_file_mod_frame = tk.Frame(preprocess)
+    ne_file_mod_frame.grid(row=6,column=0,columnspan=3,padx=5,pady=5)
+    tk.Label(ne_file_mod_frame, text="File Modification",font=("Arial", 15)).grid(row=1,column=0,columnspan=3, sticky = "n", padx=5, pady=10)
+
+    def choose_ne_mod_file(): # Function for button to choose input ne file for modifiation
+        global ne_mod_file
+        path = filedialog.askopenfilename(
+        title="Select a .dat input file",
+        filetypes=(("Data files", "*.dat"),))
+        if path: 
+            ne_mod_file.set(path)
+            ne_mod_dir_update()
+        
+    ne_mod_dir_l = tk.Label(ne_file_mod_frame, text=f"Input ne.dat file: {ne_mod_file.get()}",wraplength=150)
+    ne_mod_dir_l.grid(row=2, column=0,sticky="e", padx=5, pady=5)
+    ne_mod_dir_button = tk.Button(ne_file_mod_frame, text="Choose File", command=choose_ne_mod_file)
+    ne_mod_dir_button.grid(row=2,column=1,padx=5, pady=5)
+
+    ne_mod_button = tk.Button(ne_file_mod_frame,text= "Open File",command=open_ne_mod_graph)
+    ne_mod_button.grid(row=3,column=0,padx=5,pady=5,columnspan=3)
+
+# Function to update label with current variable of the selected ne.dat file
+ne_mod_dir_update = lambda:ne_mod_dir_l.config(text = f"Input ne.dat file: {ne_mod_file.get()}") 
+
 preprocess_button = tk.Button(root, text="Preprocessing", command=open_preprocess)
 preprocess_button.grid(row=29, column=0,columnspan=2, pady=5)
+
+
+
 #---------------------------------#
 # Diagnostic presets
 diagnosticwindow = None
@@ -1244,6 +1758,8 @@ for var in [diagnostic,d_launch_freq]:
 diagnospg_button = tk.Button(root, text="Diagnostic Presets", command=open_diagnostics)
 diagnospg_button.grid(row=28, column=1, pady=10)
 
+
+
 #---------------------------------#
 # Notes page - for additional things the user might want to know
 # - can delete if needed
@@ -1272,15 +1788,17 @@ def open_notes():
     tk.Label(notes, 
              text="For 'Enter' button to function, all launch Parameters must be filled with a valid format, especially Launch Position which must be in a 'x,y,z' format where x,y and z are all floats",
              wraplength=500).grid(row=2,column=0,columnspan=2, padx=5, pady=5)
-    tk.Label(notes, 
-             text="Shot number will be automatically derived from the magnetic data file name if shot is left at 0 and magnetic data file is in correct naming convention for Scotty",
-             wraplength=500).grid(row=3,column=0,columnspan=2, padx=5, pady=5)
+    # tk.Label(notes, 
+    #          text="Shot number will be automatically derived from the magnetic data file name if shot is left at 0 and magnetic data file is in correct naming convention for Scotty",
+    #          wraplength=500).grid(row=3,column=0,columnspan=2, padx=5, pady=5)
     tk.Label(notes, 
              text="Sweep variarbles include the launch angles and launch frequency, formatted in [n,n,n] where n is any float value. Do note that duplicate values are automatically removed",
              wraplength=500).grid(row=4,column=0,columnspan=2, padx=5, pady=5)
 
 notes_button = tk.Button(root, text="Notes", command=open_notes)
 notes_button.grid(row=32, column=0,columnspan=2, pady=5)
+
+
 
 #---------------------------------#
 # Plot Functions unrelated to GUI
@@ -1307,6 +1825,8 @@ fullinp_vars = [poloidal_launch_angle_Torbeam,toroidal_launch_angle_Torbeam,
 for var in fullinp_vars:
     var.trace_add('write',auto_updatefunc("Full Input Graph",ispresent_func,[v.get for v in fullinp_vars]))
 
+
+
 #---------------------------------#
 # Plots
 
@@ -1322,7 +1842,7 @@ def density_fit_launch(fig): # Plots radial coordinates against density
     ne_data_density_array = ne_data[2::2]
     ne_data_radialcoord_array = ne_data[1::2]
     ax.scatter(ne_data_radialcoord_array, ne_data_density_array,color='blue', s=20)
-    ax.set_xlabel("R (m)") # Label might not be accurate (?)
+    ax.set_xlabel("R (m)")
     ax.set_ylabel("Density (10^19 m^-3)")
     ax.set_title(f"Density Profile")
     ax.grid(True)
@@ -1452,6 +1972,7 @@ CATEGORIES = {
     "Debugging Plots": debugging_plots
 }
 
+
 #---------------------------------#
 # Plotting window
 plot_window = None
@@ -1568,19 +2089,7 @@ def open_plot_window():
 plots_button = tk.Button(root, text="Plotting", command=open_plot_window,width=15,font=("Arial",14))
 plots_button.grid(row=27, column=1,columnspan=1, pady=10)
 
-# gui debugging
-# for widget in root.winfo_children():
-#     try:
-#         text = widget.cget("text")
-#     except:
-#         text = None
-#     grid_info = widget.grid_info()
-#     print('-----')
-#     print(widget)
-#     print(widget.winfo_class())
-#     print(text)
-#     print(grid_info["column"],grid_info["row"])
-
 #---------------------------------#
 # Main loop
 root.mainloop()
+
