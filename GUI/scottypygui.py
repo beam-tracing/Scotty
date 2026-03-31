@@ -654,7 +654,7 @@ def topfile_extraction(eqdskfilepath,inputfilesuffix = "_mastU"):
 
 def AnalyseThomson(input_dir,output_dir,time,shots,figure_flag = True):
     # ---
-    # Essentially will be a ported over version of the Analyse Thomsom file (refinements can be done later idk how to do rn)
+    # Essentially will be a ported over version of the Analyse Thomsom file 
     # ---
 
     def process_Thomson2(shot, time, eq_file_path):
@@ -1443,20 +1443,34 @@ def mod_graph_init():
     ne_ax.set_title(f"{Path(path).name}")
     ne_ax.grid(True)
 
-    ne_sc, = ne_ax.plot(*pts.T, 'o-',markersize = 5,picker=8,) # Main plot
+    ne_sc, = ne_ax.plot(*pts.T, 'o',markersize = 5,picker=8,) # Main plot
     selected_plot, = ne_ax.plot([], [], 'o', color='red', markersize=10, zorder=5) # Showing which point is clicked
     selected_ind = None # Selected index
     picked = False # Checking if pick_event is triggered alongside button_press_event
     
-    ne_fig.text(0.5, 0.01, "Backspace=Delete   S=Save", 
-         ha='center', fontsize=8, color='gray')
+    ne_fig.text(0.5, 0.01, "Backspace=Delete   S=Save", ha='center', fontsize=8, color='gray')
+
+    # Gets the values for the smooth spline with output (x_smoothed, y_smoothed)
+    def get_spline():
+        order = np.argsort(pts[:,0])
+        sorted_pts = pts[order]
+        spl = interpolate.UnivariateSpline(sorted_pts[:,0], sorted_pts[:,1], s=0)
+
+        x_sm = np.linspace(sorted_pts[0,0],sorted_pts[-1,0], 1000)
+        y_sm = spl(x_sm)
+
+        return x_sm, y_sm
+    
+    ne_sc_smooth, = ne_ax.plot(*get_spline(),'-', linewidth=1.5, color='steelblue', zorder = 1)
     
     # Events within the figure
     def redraw():
         if len(pts):
             ne_sc.set_data(*pts.T)
+            ne_sc_smooth.set_data(*get_spline())
         else:
             ne_sc.set_data([], [])
+            ne_sc_smooth.set_data([],[])
         ne_fig.canvas.draw_idle()
 
     # called after seleceted_ind is modified to update seleceted_plot
@@ -1516,6 +1530,7 @@ def mod_graph_init():
 
 def open_ne_mod_graph():
     global ne_mod_window
+
     # Create window for graph, since Figure() object used doesnt have a built in .show function
     if ne_mod_window and ne_mod_window.winfo_exists():
         ne_mod_window.lift()
