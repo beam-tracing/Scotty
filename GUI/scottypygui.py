@@ -652,7 +652,7 @@ def topfile_extraction(eqdskfilepath,inputfilesuffix = "_mastU"):
 
         return topfile_path
 
-def AnalyseThomson(input_dir,output_dir,time,shots,figure_flag = True):
+def AnalyseThomson(input_dir,output_dir,time,shots,figure_flag = True, smooth_flag = True,s_value = 1.3):
     # ---
     # Essentially will be a ported over version of the Analyse Thomsom file 
     # ---
@@ -742,12 +742,12 @@ def AnalyseThomson(input_dir,output_dir,time,shots,figure_flag = True):
         ## Get rid of inboard midplane
         return Thomson_poloidal_flux[len(Thomson_poloidal_flux)//2:], ne_TSC[t_index_Thomson,len(Thomson_poloidal_flux)//2:], ne_err_TSC[t_index_Thomson,len(Thomson_poloidal_flux)//2:]
 
-    def interp_smooth_Thomson(pol_flux_to_use, ne_to_use,ne_err_to_use):
+    def interp_smooth_Thomson(pol_flux_to_use, ne_to_use,ne_err_to_use, s_value):
         # Choosing 's' is important
         # values of s used previously: 27 (160ms, 190ms), 44 (220ms), 59 (250ms)
         interp_ne = interpolate.UnivariateSpline(pol_flux_to_use, ne_to_use,
                                                 w=None, bbox=[None, None], 
-                                                k=3, s=1.3, 
+                                                k=3, s=s_value, 
                                                 ext=0, check_finite=False)
         
         pol_flux_interped = np.linspace(0.0,2.0,501)
@@ -825,21 +825,27 @@ def AnalyseThomson(input_dir,output_dir,time,shots,figure_flag = True):
     pol_flux_sorted = pol_flux_all[idx_sort]
     ne_sorted = ne_all[idx_sort]
     ne_err_sorted = ne_err_all[idx_sort]
+    print(ne_sorted)
+    if smooth_flag:
+        polflux_output, ne_smoothed = interp_smooth_Thomson(pol_flux_sorted, ne_sorted, ne_err_sorted,s_value)
+        print(ne_smoothed)
+    else:
+        polflux_output = pol_flux_sorted
+        ne_smoothed = ne_sorted
 
-    polflux_output, ne_smoothed = interp_smooth_Thomson(pol_flux_sorted, ne_sorted, ne_err_sorted)
-
-    ## Filter function
+    # Filter function
     filter_steepness = 20.0
     filter_centre = 1.1
     filter_amp = 1.0
     filter_fun = 0.5*filter_amp*(1-np.tanh(filter_steepness * (polflux_output - filter_centre))) + (1-filter_amp)
     ne_output = ne_smoothed * filter_fun
-
+    print(ne_output)
     filename = f'{output_dir}' + '/ne_' + f'{shot:.0f}' + '_' + f'{time*1000:.0f}' +'ms'
 
-    if figure_flag:
+    if figure_flag: # make into a func / change var
         # plt.errorbar(pol_flux_outboard,ne_outboard,ne_err_outboard,linestyle='',marker='.',mfc='none',label='outboard')
-        plt.plot(polflux_output,ne_smoothed,'k',linestyle='-',marker='',mfc='none',label='all')
+        if smooth_flag:
+            plt.plot(polflux_output,ne_smoothed,'k',linestyle='-',marker='',mfc='none',label='all')
         plt.plot(polflux_output,filter_fun,'gray',linestyle='-',marker='',mfc='none',label='all')
         plt.plot(polflux_output,ne_output,'r',linestyle='-',marker='',mfc='none',label='all')
 
@@ -885,8 +891,6 @@ def dropdown(pg,options,tvar,row,def_ind):
 
 rmv_dupes = lambda x: [y for ind,y in enumerate(x) if (y not in x[:ind])] # Removes duplicates from a list
 ispresent_func = lambda y: all(x != '' for x in y) # Function for checking if all varaibles in a list are valid (for trace functions)
-
-
 
 #---------------------------------#
 # File inputs
@@ -999,7 +1003,7 @@ def create_infolabel(pg,text,r,c,padx = 10,pady = 5):
     info_btn = tk.Label( 
         btn_frame,
         text="i",fg="black",bg="#E6E6E6",font=("Roboto", 9, "bold"),
-        width=2,height=1,relief="flat",cursor="hand2",bd=0
+        width=2,height=1,relief="flat",cursor="hand2",bd=0, anchor='center', justify='center'
         ) # Button
     # Button functionalities
     info_btn.bind("<Button-1>", lambda e: show_info(text))
@@ -1066,7 +1070,6 @@ mode_flag_info = create_infolabel(
     "1 corresponds to O-Mode, -1 corresponds to X-Mode.",
     11,2
 )
-
 
 
 #---------------------------------#
@@ -1361,12 +1364,15 @@ solverpg_button.grid(row=28, column=0, pady=10)
 # Variables
 preprocess = None
 ne_mod_window = None
+smoothing_mod_window = None
 ne_inp_time = tk.StringVar(value='0.0')
 ne_inp_shots = tk.StringVar()
 ne_gen_input_dir = tk.StringVar()
 ne_gen_output_dir = tk.StringVar()
 ne_inp_figure_flag = tk.BooleanVar(value=True)
+ne_inp_smooth_flag = tk.BooleanVar(value=True)
 ne_mod_file = tk.StringVar()
+smoothing_factor = tk.StringVar(value='1.3')
 
 #---------------------------------#
 # Ne file creation functions
@@ -1376,6 +1382,7 @@ def generate_ne_file():
     output_dir = ne_gen_output_dir.get()
     time = float(ne_inp_time.get())
     figure_flag = ne_inp_figure_flag.get()
+    smooth_flag = ne_inp_smooth_flag.get()
     try:
         shot_ = int(Path(input_dir).stem.split("_")[0])
     except Exception as err:
@@ -1388,7 +1395,9 @@ def generate_ne_file():
             output_dir=output_dir,
             time=time,
             shots=[shot_],
-            figure_flag=figure_flag
+            figure_flag=figure_flag,
+            smooth_flag = smooth_flag,
+            s_value= float(smoothing_factor.get())
             )
         ne_mod_file.set(path)
         ne_mod_dir_update()
@@ -1448,21 +1457,20 @@ def mod_graph_init():
     selected_ind = None # Selected index
     picked = False # Checking if pick_event is triggered alongside button_press_event
     
-    ne_fig.text(0.5, 0.01, "Backspace=Delete   S=Save", ha='center', fontsize=8, color='gray')
+    ne_fig.text(0.5, 0.01, "Backspace=Delete   S=Save   Q=Toggle Spline", ha='center', fontsize=8, color='gray')
 
     # Gets the values for the smooth spline with output (x_smoothed, y_smoothed)
     def get_spline():
         order = np.argsort(pts[:,0])
         sorted_pts = pts[order]
-        spl = interpolate.UnivariateSpline(sorted_pts[:,0], sorted_pts[:,1], s=0)
-
-        x_sm = np.linspace(sorted_pts[0,0],sorted_pts[-1,0], 1000)
+        spl = interpolate.UnivariateSpline(sorted_pts[:,0], sorted_pts[:,1], s=float(smoothing_factor.get()),
+                                            w=None, bbox=[None, None], k=3, ext=0, check_finite=False)
+        x_sm = np.linspace(0,sorted_pts[-1,0], 501)
         y_sm = spl(x_sm)
-
         return x_sm, y_sm
     
     ne_sc_smooth, = ne_ax.plot(*get_spline(),'-', linewidth=1.5, color='steelblue', zorder = 1)
-    
+
     # Events within the figure
     def redraw():
         if len(pts):
@@ -1517,7 +1525,15 @@ def mod_graph_init():
             confirmation = messagebox.askyesno("Title", "Save data? This will overwrite the previous data.")
             if confirmation:
                 save_points(path=path,pts=pts)
-    
+
+        # Toggle spline
+        if e.key == 'q':
+            ne_sc_smooth.set_visible(not ne_sc_smooth.get_visible())
+            ne_fig.canvas.draw_idle()
+
+    # Redraws graph if smoothing factor variable is changed
+    smoothing_factor.trace_add("write",lambda *_: redraw() if smoothing_factor.get() != '' else '' )
+
     ne_fig.canvas.mpl_connect('pick_event', select_pt)
     ne_fig.canvas.mpl_connect('button_press_event', deselect)
     ne_fig.canvas.mpl_connect('key_press_event', key_press_func)
@@ -1639,8 +1655,40 @@ def open_preprocess():
     ne_figure_flag_checkbox = tk.Checkbutton(AnalyseThomson_frame, variable=ne_inp_figure_flag)
     ne_figure_flag_checkbox.grid(row=6,column=1,padx=5, pady=5)
 
+    tk.Label(AnalyseThomson_frame, text="Enable Smoothing:").grid(row=7, column=0, sticky="e", padx=5, pady=5)
+    ne_smooth_flag_checkbox = tk.Checkbutton(AnalyseThomson_frame, variable=ne_inp_smooth_flag)
+    ne_smooth_flag_checkbox.grid(row=7,column=1,padx=5, pady=5)
+
+    # Button to modify smoothing factor uses the create_infolabel function as the base button before modfying it
+    ne_smooth_extras_frame = create_infolabel(AnalyseThomson_frame,'',7,2,5,5)
+    ne_smooth_extras_button = ne_smooth_extras_frame.winfo_children()[0]
+    ne_smooth_extras_button.config(text="＋")
+    
+    # Page to modify smoothing factor
+    def open_smoothing_mod(*arg):
+        global smoothing_mod_window
+        if smoothing_mod_window and smoothing_mod_window.winfo_exists():
+            smoothing_mod_window.lift()
+            smoothing_mod_window.focus_force()
+            return
+        
+        smoothing_mod_window = tk.Toplevel(root)
+        tk.Label(smoothing_mod_window, text="Smoothing Factor:").grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        tk.Entry(smoothing_mod_window, textvariable=smoothing_factor,validate='all',validatecommand=(vadvposfloat,'%P')).grid(row=1, column=1, padx=5, pady=5)
+        smoothing_mod_info = create_infolabel(
+            smoothing_mod_window,
+            "Affects the smoothing of the resultant cubic spline in the created electron density file\n\n" \
+            "s = 0 : The spline cuts through all points exactly\n\n" \
+            "s > 0 : The spline loses accuracy, but becomes more smooth as s becomes larger\n\n" \
+            "Also affects the spline shown in the ne modification window", 
+            1,2
+        )
+    
+    # Fix page open function to button
+    ne_smooth_extras_button.bind("<Button-1>", open_smoothing_mod)
+
     ne_file_generate_button = tk.Button(AnalyseThomson_frame,text= "Generate electron density file",command=generate_ne_file)
-    ne_file_generate_button.grid(row=7, column=0,padx=5,pady=10,columnspan=3)
+    ne_file_generate_button.grid(row=8, column=0,padx=5,pady=10,columnspan=3)
     validate_ne_inputs() # Run validation function, which should intially disable the button when opened due to empty file paths
 
     # Trace functions for all required variables in preprocessing page for electron density file 
