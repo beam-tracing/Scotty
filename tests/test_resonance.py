@@ -30,6 +30,11 @@ import xarray as xr
 np.set_printoptions(linewidth=120, threshold=100)
 
 
+# The tests are verified by first plotting the absorption curves in the R-Z plane. Then, 
+# the trajectory is plotted on this same plot. If the trajectory stops at the curve, it means that the function is working
+# These tests are for circular flux surfaces. 
+# cutoff_and_resonance_surfaces_circ_flux.py file can be used to plot surfaces to check whether trajectory stops at the correct position
+
 # Test_fund: test to see whether the beam will be absorbed when its frequency is equal
 # to the fundamental electron cyclotron frequency.
 # Six test cases were created to test for this by varying beam frequency, launch angles,
@@ -40,6 +45,8 @@ np.set_printoptions(linewidth=120, threshold=100)
 # to the fundamental electron cyclotron frequency, with relativistic corrections
 # Same six test cases from Test_fund were used, but we include the temperature
 # to add relativistic effects
+# A combination of high temperatures (> 5keV) and low temperatures (< 5keV) are tested. 
+
 
 def test_fund_1(tmp_path):
     kwargs_dict = {
@@ -80,6 +87,7 @@ def test_fund_1(tmp_path):
     )
 
 
+
 def test_fund_1_rel(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 3,
@@ -95,7 +103,7 @@ def test_fund_1_rel(tmp_path):
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",
         "relativistic_flag": True,
-        "temperature_fit_parameters": np.array([8.0]),
+        "temperature_fit_parameters": np.array([2.0]), # Low temperature <5 keV
         "temperature_fit_method": "quadratic",
         "Psi_BC_flag": "continuous",
         "figure_flag": False,
@@ -117,7 +125,7 @@ def test_fund_1_rel(tmp_path):
             float(output["q_Z"][-1]),
             float(output["q_zeta"][-1]),
         ],
-        [1.8875122401738984, -0.059929951013837655, -0.0001464913323563407],
+        [1.9103564491962086, -0.05809777044206722, -8.882382142451245e-05],
         rtol=1e-2,
         atol=1e-2,
     )
@@ -176,7 +184,7 @@ def test_fund_2_rel(tmp_path):
         "delta_Z": 0.00001,
         "density_fit_method": "quadratic",
         "relativistic_flag": True,
-        "temperature_fit_parameters": np.array([6.0]),
+        "temperature_fit_parameters": np.array([6.0]), #high temperature >5 keV
         "temperature_fit_method": "quadratic",
         "find_B_method": "analytical",
         "Psi_BC_flag": "continuous",
@@ -261,7 +269,7 @@ def test_fund_3_rel(tmp_path):
         "find_B_method": "analytical",
         "Psi_BC_flag": "continuous",
         "relativistic_flag": True,
-        "temperature_fit_parameters": np.array([10.0]),
+        "temperature_fit_parameters": np.array([10.0]), #high temperature >5 keV
         "temperature_fit_method": "quadratic",
         "figure_flag": False,
         "vacuum_propagation_flag": True,
@@ -341,7 +349,7 @@ def test_fund_4_rel(tmp_path):
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",
         "relativistic_flag": True,
-        "temperature_fit_parameters": np.array([20.0]),
+        "temperature_fit_parameters": np.array([20.0]), #high temperature >5 keV
         "temperature_fit_method": "quadratic",
         "Psi_BC_flag": "continuous",
         "figure_flag": False,
@@ -421,8 +429,8 @@ def test_fund_5_rel(tmp_path):
         "delta_Z": 0.00001,
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",
-        "relativistic_flag": True,
-        "temperature_fit_parameters": np.array([3.5]),
+        "relativistic_flag": True, 
+        "temperature_fit_parameters": np.array([3.5]), # Low temperature <5 keV
         "temperature_fit_method": "quadratic",
         "Psi_BC_flag": "continuous",
         "figure_flag": False,
@@ -482,7 +490,7 @@ def test_fund_6(tmp_path):
             float(output["q_Z"][-1]),
             float(output["q_zeta"][-1]),
         ],
-        [1.0983935588516547, 0.26638074344861923, 3.1415778015244564],
+        [1.0984030644872753, 0.2663811511398719, 3.14157778864863],
         rtol=1e-2,
         atol=1e-2,
     )
@@ -504,7 +512,7 @@ def test_fund_6_rel(tmp_path):
         "find_B_method": "analytical",
         "Psi_BC_flag": "continuous",
         "relativistic_flag": True,
-        "temperature_fit_parameters": np.array([6.7]),
+        "temperature_fit_parameters": np.array([6.7]), #high temperature >5 keV
         "temperature_fit_method": "quadratic",
         "figure_flag": False,
         "vacuum_propagation_flag": True,
@@ -597,7 +605,7 @@ def test_sec_harm_1_rel(tmp_path):
         "find_B_method": "analytical",
         "Psi_BC_flag": "continuous",
         "relativistic_flag": True,
-        "temperature_fit_parameters": np.array([7.8]),
+        "temperature_fit_parameters": np.array([7.8]),  #high temperature >5 keV
         "temperature_fit_method": "quadratic",
         "figure_flag": False,
         "vacuum_propagation_flag": True,
@@ -671,14 +679,14 @@ def test_sec_harm_2_rel(tmp_path):
         "launch_beam_width": 0.04,
         "launch_beam_curvature": -0.25,
         "launch_position": np.array([2.587, 0.0, -0.0157]),
-        "density_fit_parameters": np.array([1.0]),
+        "density_fit_parameters": np.array([1]),
         "delta_R": -0.00001,
         "delta_Z": 0.00001,
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",
         "Psi_BC_flag": "continuous",
         "relativistic_flag": True,
-        "temperature_fit_parameters": np.array([8.9]),
+        "temperature_fit_parameters": np.array([0.8]),  # Low temperature <5 keV
         "temperature_fit_method": "quadratic",
         "figure_flag": False,
         "vacuum_propagation_flag": True,
@@ -698,7 +706,7 @@ def test_sec_harm_2_rel(tmp_path):
             float(output["q_Z"][-1]),
             float(output["q_zeta"][-1]),
         ],
-        [1.797367262755111, -0.1612504461292691, -0.0007762208143146181],
+        [1.8373067418891855, -0.15175779104290016, -0.0004711781281609329],
         rtol=1e-2,
         atol=1e-2,
     )
@@ -758,7 +766,7 @@ def test_sec_harm_3_rel(tmp_path):
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",
         "relativistic_flag": True,
-        "temperature_fit_parameters": np.array([10.4]),
+        "temperature_fit_parameters": np.array([10.4]),  #high temperature >5 keV
         "temperature_fit_method": "quadratic",
         "Psi_BC_flag": "continuous",
         "figure_flag": False,
@@ -840,7 +848,7 @@ def test_sec_harm_4_rel(tmp_path):
         "find_B_method": "analytical",
         "Psi_BC_flag": "continuous",
         "relativistic_flag": True,
-        "temperature_fit_parameters": np.array([9.6]),
+        "temperature_fit_parameters": np.array([2.8]), # Low temperature <5 keV
         "temperature_fit_method": "quadratic",
         "figure_flag": False,
         "vacuum_propagation_flag": True,
@@ -860,7 +868,7 @@ def test_sec_harm_4_rel(tmp_path):
             float(output["q_Z"][-1]),
             float(output["q_zeta"][-1]),
         ],
-        [1.3720239258428526, -0.3402604871775677, -2.953364767952308],
+        [1.393558370046402, -0.3443703253176513, -2.9533975261126915],
         rtol=1e-2,
         atol=1e-2,
     )
@@ -921,7 +929,7 @@ def test_sec_harm_5_rel(tmp_path):
         "find_B_method": "analytical",
         "Psi_BC_flag": "continuous",
         "relativistic_flag": True,
-        "temperature_fit_parameters": np.array([12.9]),
+        "temperature_fit_parameters": np.array([12.9]),  #high temperature >5 keV
         "temperature_fit_method": "quadratic",
         "figure_flag": False,
         "vacuum_propagation_flag": True,
@@ -1003,7 +1011,7 @@ def test_sec_harm_6_rel(tmp_path):
         "find_B_method": "analytical",
         "Psi_BC_flag": "continuous",
         "relativistic_flag": True,
-        "temperature_fit_parameters": np.array([15.3]),
+        "temperature_fit_parameters": np.array([15.3]),  #high temperature >5 keV
         "temperature_fit_method": "quadratic",
         "figure_flag": False,
         "vacuum_propagation_flag": True,
