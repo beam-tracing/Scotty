@@ -45,7 +45,7 @@ np.set_printoptions(linewidth=120, threshold=100)
 # to the fundamental electron cyclotron frequency, with relativistic corrections
 # Same six test cases from Test_fund were used, but we include the temperature
 # to add relativistic effects
-# A combination of high temperatures (> 5keV) and low temperatures (< 5keV) are tested.
+# A combination of high (relativistic) temperatures (> 5keV) and low (non-relativistic) temperatures (< 5keV) are tested.
 
 
 def test_fund_1(tmp_path):
