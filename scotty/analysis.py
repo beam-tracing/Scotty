@@ -37,7 +37,6 @@ from scotty.geometry import MagneticField
 from scotty.hamiltonian import DielectricTensor, Hamiltonian, hessians
 from scotty.typing import ArrayLike, FloatArray, PathLike
 
-
 CYLINDRICAL_VECTOR_COMPONENTS = ["R", "zeta", "Z"]
 CARTESIAN_VECTOR_COMPONENTS = ["X", "Y", "Z"]
 SOLUTION_COMPONENTS = ["solution_1", "solution_2", "solution_3"]
