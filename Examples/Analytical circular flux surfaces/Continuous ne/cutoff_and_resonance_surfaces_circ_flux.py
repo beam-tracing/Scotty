@@ -59,7 +59,7 @@ def find_electron_mass(
 
 
 
-path = 'C:/Users/matth/Downloads/Scotty/Examples/Analytical circular flux surfaces/Continuous ne/scotty_output_nonrel.h5'
+path = 'C:/Users/matth/Downloads/Scotty/Examples/Analytical circular flux surfaces/Continuous ne/scotty_output.h5'
 dt = datatree.open_datatree(path, engine="h5netcdf")
 plot_poloidal_beam_path(dt,zoom=1)
 mass = 9.1093837*10**(-31)
