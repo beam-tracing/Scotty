@@ -48,6 +48,7 @@ np.set_printoptions(linewidth=120, threshold=100)
 # A combination of high temperatures (> 5keV) and low temperatures (< 5keV) are tested. 
 
 
+
 def test_fund_1(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 3,
