@@ -107,7 +107,7 @@ def beam_me_up(
     # keyword arguments begin
     vacuumLaunch_flag: bool = True,
     relativistic_flag: bool = False,  # includes relativistic corrections to electron mass when set to True
-    resonance_flag: bool = True, # includes resonances when set to True. Set to False if you do not want beam absorption.
+    resonance_flag: bool = True,  # includes resonances when set to True. Set to False if you do not want beam absorption.
     find_B_method: Union[str, MagneticField] = "torbeam",
     density_fit_parameters: Optional[Sequence] = None,
     temperature_fit_parameters: Optional[Sequence] = None,

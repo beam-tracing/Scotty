@@ -49,6 +49,7 @@ np.set_printoptions(linewidth=120, threshold=100)
 
 # Note that by default, test_resonance is set to True
 
+
 def test_fund_1(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 3,
@@ -1035,9 +1036,9 @@ def test_sec_harm_6_rel(tmp_path):
         rtol=1e-2,
         atol=1e-2,
     )
-    
-    
-# test_flag: tests whether resonance_Flag works  
+
+
+# test_flag: tests whether resonance_Flag works
 def test_flag_true(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 3,
@@ -1076,7 +1077,8 @@ def test_flag_true(tmp_path):
         rtol=1e-2,
         atol=1e-2,
     )
-    
+
+
 def test_flag_false(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 3,
@@ -1111,7 +1113,7 @@ def test_flag_false(tmp_path):
             float(output["q_Z"][-1]),
             float(output["q_zeta"][-1]),
         ],
-        [1.1957606076131668, -0.387656945685278 , -0.02299510661920331],
+        [1.1957606076131668, -0.387656945685278, -0.02299510661920331],
         rtol=1e-2,
         atol=1e-2,
     )

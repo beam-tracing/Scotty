@@ -171,24 +171,30 @@ def make_solver_events(
 
         if mode_flag == -1:
             electron_density = find_density(poloidal_flux)
-            plasma_freq = find_normalised_plasma_freq(electron_density, launch_angular_frequency, temperature)
+            plasma_freq = find_normalised_plasma_freq(
+                electron_density, launch_angular_frequency, temperature
+            )
             UHR_normalised = np.sqrt(gyro_freq**2 + plasma_freq**2)
-            difference_UHR = UHR_normalised-1
+            difference_UHR = UHR_normalised - 1
             if resonance_flag == False:
                 # to prevent event from getting detected, force product to be positive so that there
                 # is no sign change.
-                return np.abs(difference_fundamental*difference_second_harmonic*difference_UHR) 
+                return np.abs(
+                    difference_fundamental * difference_second_harmonic * difference_UHR
+                )
             else:
-                return difference_fundamental*difference_second_harmonic*difference_UHR
+                return (
+                    difference_fundamental * difference_second_harmonic * difference_UHR
+                )
 
         else:
             if resonance_flag == False:
                 # to prevent event from getting detected, force product to be positive so that there
                 # is no sign change.
-                print(difference_fundamental*difference_second_harmonic)
-                return np.abs(difference_fundamental*difference_second_harmonic)
+                print(difference_fundamental * difference_second_harmonic)
+                return np.abs(difference_fundamental * difference_second_harmonic)
             else:
-                return difference_fundamental*difference_second_harmonic
+                return difference_fundamental * difference_second_harmonic
 
     """
     # Old function for second harmonic
