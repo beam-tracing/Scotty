@@ -191,7 +191,6 @@ def make_solver_events(
             if resonance_flag == False:
                 # to prevent event from getting detected, force product to be positive so that there
                 # is no sign change.
-                print(difference_fundamental * difference_second_harmonic)
                 return np.abs(difference_fundamental * difference_second_harmonic)
             else:
                 return difference_fundamental * difference_second_harmonic
