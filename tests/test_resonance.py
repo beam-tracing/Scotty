@@ -35,18 +35,19 @@ np.set_printoptions(linewidth=120, threshold=100)
 # These tests are for circular flux surfaces.
 # cutoff_and_resonance_surfaces_circ_flux.py file can be used to plot surfaces to check whether trajectory stops at the correct position
 
-# Test_fund: test to see whether the beam will be absorbed when its frequency is equal
+# Test_fund: tests whether the beam will be absorbed when its frequency is equal
 # to the fundamental electron cyclotron frequency.
 # Six test cases were created to test for this by varying beam frequency, launch angles,
 # launch positions (including launching from inboard side), polarisations and magnetic field strength.
 
 
-# Test_fund_X_rel: test to see whether the beam will be absorbed when its frequency is equal
+# Test_fund_X_rel: tests whether the beam will be absorbed when its frequency is equal
 # to the fundamental electron cyclotron frequency, with relativistic corrections
 # Same six test cases from Test_fund were used, but we include the temperature
 # to add relativistic effects
 # A combination of high (relativistic) temperatures (> 5keV) and low (non-relativistic) temperatures (< 5keV) are tested.
 
+# Note that by default, test_resonance is set to True
 
 def test_fund_1(tmp_path):
     kwargs_dict = {
@@ -1031,6 +1032,86 @@ def test_sec_harm_6_rel(tmp_path):
             float(output["q_zeta"][-1]),
         ],
         [1.8727077745502694, -0.14516056979886102, 0.00040192846208131653],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+    
+    
+# test_flag: tests whether resonance_Flag works  
+def test_flag_true(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": 3,
+        "toroidal_launch_angle_Torbeam": 0,
+        "launch_freq_GHz": 33,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([3, 0, 0]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "resonance_flag": True,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "Psi_BC_flag": "continuous",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.5,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.9162396978780787, -0.05765344712076549, -7.654831340237264e-05],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+    
+def test_flag_false(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": 3,
+        "toroidal_launch_angle_Torbeam": 0,
+        "launch_freq_GHz": 33,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([3, 0, 0]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "resonance_flag": False,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "Psi_BC_flag": "continuous",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.5,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.1957606076131668, -0.387656945685278 , -0.02299510661920331],
         rtol=1e-2,
         atol=1e-2,
     )

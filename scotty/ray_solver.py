@@ -57,6 +57,7 @@ def make_solver_events(
     launch_angular_frequency: float,
     field: MagneticField,
     mode_flag: int,
+    resonance_flag: bool,
     find_density: ProfileFitLike,
     find_temperature_1D: Optional[ProfileFitLike] = None,
 ) -> Dict[str, Callable]:
@@ -170,23 +171,24 @@ def make_solver_events(
 
         if mode_flag == -1:
             electron_density = find_density(poloidal_flux)
-            plasma_freq = find_normalised_plasma_freq(
-                electron_density, launch_angular_frequency, temperature
-            )
-
-            # UHR_frequency = sqrt(gyro_freq^2 + plasma_freq^2)
-            # gyro_freq and plasma_freq are normalised
-
+            plasma_freq = find_normalised_plasma_freq(electron_density, launch_angular_frequency, temperature)
             UHR_normalised = np.sqrt(gyro_freq**2 + plasma_freq**2)
-            difference_UHR = UHR_normalised - 1
+            difference_UHR = UHR_normalised-1
+            if resonance_flag == False:
+                # to prevent event from getting detected, force product to be positive so that there
+                # is no sign change.
+                return np.abs(difference_fundamental*difference_second_harmonic*difference_UHR) 
+            else:
+                return difference_fundamental*difference_second_harmonic*difference_UHR
 
-            # if the sign of any one of those products change,
-            # it means you have crossed resonance
-            return difference_fundamental * difference_second_harmonic * difference_UHR
         else:
-            # if the sign of any one of those products change,
-            # it means you have crossed resonance
-            return difference_fundamental * difference_second_harmonic
+            if resonance_flag == False:
+                # to prevent event from getting detected, force product to be positive so that there
+                # is no sign change.
+                print(difference_fundamental*difference_second_harmonic)
+                return np.abs(difference_fundamental*difference_second_harmonic)
+            else:
+                return difference_fundamental*difference_second_harmonic
 
     """
     # Old function for second harmonic
@@ -521,6 +523,7 @@ def propagate_ray(
     quick_run: bool,
     mode_flag: int,
     len_tau: int,
+    resonance_flag: bool,
     find_density: ProfileFitLike,
     find_temperature_1D: Optional[ProfileFitLike] = None,
     tau_max: float = 1e5,
@@ -553,6 +556,8 @@ def propagate_ray(
         Number of points for tau
     tau_max : float
         Maximum value of tau before the solver stops
+    resonance_flag: bool
+        If true, terminate beam when it hits resonance
     verbose : bool
         If true, print some timing information
 
@@ -581,6 +586,7 @@ def propagate_ray(
         launch_angular_frequency,
         field,
         mode_flag,
+        resonance_flag,
         find_density,
         find_temperature_1D,
     )
