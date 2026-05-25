@@ -107,6 +107,7 @@ def beam_me_up(
     # keyword arguments begin
     vacuumLaunch_flag: bool = True,
     relativistic_flag: bool = False,  # includes relativistic corrections to electron mass when set to True
+    resonance_flag: bool = True,  # includes resonances when set to True. Set to False if you do not want beam absorption.
     find_B_method: Union[str, MagneticField] = "torbeam",
     density_fit_parameters: Optional[Sequence] = None,
     temperature_fit_parameters: Optional[Sequence] = None,
@@ -211,6 +212,8 @@ def beam_me_up(
         If ``True``, generates a temperature profile from given data
         or parameters and applies relativistic corrections to electron
         mass.
+    resonance_flag: bool
+        If ``True``, terminate beam when it encounters resonance
     Psi_BC_flag: String
         If ``None``, do no special treatment at plasma-vacuum boundary
         If ``continuous``, apply BCs for continuous ne but discontinuous gradient of ne
@@ -509,6 +512,9 @@ def beam_me_up(
     # -------------------
     # Propagate the ray
 
+    # added new arguments (mode_flag, find_density_1D and find_temperature_1D)
+    # to calculate UHR and relativistic corrections for all resonances
+
     print("Starting the solvers")
     ray_solver_output = propagate_ray(
         poloidal_flux_enter,
@@ -520,7 +526,11 @@ def beam_me_up(
         rtol,
         atol,
         quick_run,
+        mode_flag,
         len_tau,
+        resonance_flag,
+        find_density_1D,
+        find_temperature_1D,
     )
     if quick_run:
         return ray_solver_output

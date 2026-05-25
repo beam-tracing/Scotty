@@ -30,10 +30,24 @@ import xarray as xr
 np.set_printoptions(linewidth=120, threshold=100)
 
 
-# Test_fund: test to see whether the beam will be absorbed when its frequency is equal
+# The tests are verified by first plotting the absorption curves in the R-Z plane. Then,
+# the trajectory is plotted on this same plot. If the trajectory stops at the curve, it means that the function is working
+# These tests are for circular flux surfaces.
+# cutoff_and_resonance_surfaces_circ_flux.py file can be used to plot surfaces to check whether trajectory stops at the correct position
+
+# Test_fund: tests whether the beam will be absorbed when its frequency is equal
 # to the fundamental electron cyclotron frequency.
 # Six test cases were created to test for this by varying beam frequency, launch angles,
 # launch positions (including launching from inboard side), polarisations and magnetic field strength.
+
+
+# Test_fund_X_rel: tests whether the beam will be absorbed when its frequency is equal
+# to the fundamental electron cyclotron frequency, with relativistic corrections
+# Same six test cases from Test_fund were used, but we include the temperature
+# to add relativistic effects
+# A combination of high (relativistic) temperatures (> 5keV) and low (non-relativistic) temperatures (< 5keV) are tested.
+
+# Note that by default, test_resonance is set to True
 
 
 def test_fund_1(tmp_path):
@@ -70,6 +84,49 @@ def test_fund_1(tmp_path):
             float(output["q_zeta"][-1]),
         ],
         [1.9162396978780787, -0.05765344712076549, -7.654831340237264e-05],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
+def test_fund_1_rel(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": 3,
+        "toroidal_launch_angle_Torbeam": 0,
+        "launch_freq_GHz": 33,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([3, 0, 0]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "relativistic_flag": True,
+        "temperature_fit_parameters": np.array([2.0]),  # Low temperature <5 keV
+        "temperature_fit_method": "quadratic",
+        "Psi_BC_flag": "continuous",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "poloidal_flux_zero_temperature": 1,
+        "B_T_axis": 1.5,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.9103564491962086, -0.05809777044206722, -8.882382142451245e-05],
         rtol=1e-2,
         atol=1e-2,
     )
@@ -114,6 +171,50 @@ def test_fund_2(tmp_path):
     )
 
 
+def test_fund_2_rel(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": -3,
+        "toroidal_launch_angle_Torbeam": 0,
+        "launch_freq_GHz": 28,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([3, 0, 0.05]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "relativistic_flag": True,
+        "temperature_fit_parameters": np.array([6.0]),  # high temperature >5 keV
+        "temperature_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "Psi_BC_flag": "continuous",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_temperature": 1,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.3,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.9514969586482378, 0.10535069088939782, 3.9809690264897525e-05],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
 def test_fund_3(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": -5,
@@ -148,6 +249,48 @@ def test_fund_3(tmp_path):
             float(output["q_zeta"][-1]),
         ],
         [1.9188624402871175, 0.1459755482521055, 0.0002667820559604742],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
+def test_fund_3_rel(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": -5,
+        "toroidal_launch_angle_Torbeam": 0,
+        "launch_freq_GHz": 29,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([3, 0, 0.05]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "Psi_BC_flag": "continuous",
+        "relativistic_flag": True,
+        "temperature_fit_parameters": np.array([10.0]),  # high temperature >5 keV
+        "temperature_fit_method": "quadratic",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.3,
+        "B_p_a": 0.2,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.889134378242231, 0.1504157503711391, 0.0006146164855220494],
         rtol=1e-2,
         atol=1e-2,
     )
@@ -192,6 +335,48 @@ def test_fund_4(tmp_path):
     )
 
 
+def test_fund_4_rel(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": 3,
+        "toroidal_launch_angle_Torbeam": 0,
+        "launch_freq_GHz": 40,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([2.4, 0, 0.05]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "relativistic_flag": True,
+        "temperature_fit_parameters": np.array([20.0]),  # high temperature >5 keV
+        "temperature_fit_method": "quadratic",
+        "Psi_BC_flag": "continuous",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.8,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.7729485069975504, 0.01730988891262524, 1.4602626722329214e-05],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
 def test_fund_5(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 0,
@@ -231,6 +416,48 @@ def test_fund_5(tmp_path):
     )
 
 
+def test_fund_5_rel(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": 0,
+        "toroidal_launch_angle_Torbeam": 0,
+        "launch_freq_GHz": 40,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([2.2, 0, -0.4]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "relativistic_flag": True,
+        "temperature_fit_parameters": np.array([3.5]),  # Low temperature <5 keV
+        "temperature_fit_method": "quadratic",
+        "Psi_BC_flag": "continuous",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.8,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.7,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.8841856569285043, -0.4082171370330961, -0.000483268825027544],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
 def test_fund_6(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": -2,
@@ -264,7 +491,49 @@ def test_fund_6(tmp_path):
             float(output["q_Z"][-1]),
             float(output["q_zeta"][-1]),
         ],
-        [1.0983935588516547, 0.26638074344861923, 3.1415778015244564],
+        [1.0984030644872753, 0.2663811511398719, 3.14157778864863],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
+def test_fund_6_rel(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": -2,
+        "toroidal_launch_angle_Torbeam": 0,
+        "launch_freq_GHz": 50,
+        "mode_flag": -1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([0.8, 0, 0.2]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "Psi_BC_flag": "continuous",
+        "relativistic_flag": True,
+        "temperature_fit_parameters": np.array([6.7]),  # high temperature >5 keV
+        "temperature_fit_method": "quadratic",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.3,
+        "B_p_a": 0.2,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.0957854232564677, 0.26627001769942255, 3.1415811409120136],
         rtol=1e-2,
         atol=1e-2,
     )
@@ -274,6 +543,12 @@ def test_fund_6(tmp_path):
 # to the second harmonic electron cyclotron frequency.
 # Six test cases were created to test for this by varying beam frequency, launch angles,
 # launch positions (including launching from inboard side), polarisations and magnetic field strength.
+
+
+# Test_sec_harm_X_rel: test to see whether the beam will be absorbed when its frequency is equal
+# to the second harmonic electron cyclotron frequency, with relativistic corrections
+# Same six test cases from test_sec_harm were used, but we include the temperature
+# to add relativistic effects
 
 
 def test_sec_harm_1(tmp_path):
@@ -310,6 +585,48 @@ def test_sec_harm_1(tmp_path):
             float(output["q_zeta"][-1]),
         ],
         [1.9249442300308424, -0.015775382056218094, -1.0554438814446962e-05],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
+def test_sec_harm_1_rel(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": 0,
+        "toroidal_launch_angle_Torbeam": 0.0,
+        "launch_freq_GHz": 44,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([2.587, 0.0, -0.0157]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "Psi_BC_flag": "continuous",
+        "relativistic_flag": True,
+        "temperature_fit_parameters": np.array([7.8]),  # high temperature >5 keV
+        "temperature_fit_method": "quadratic",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.0,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.8975282918693326, -0.015842580414156197, -2.0258121032266632e-05],
         rtol=1e-2,
         atol=1e-2,
     )
@@ -354,6 +671,48 @@ def test_sec_harm_2(tmp_path):
     )
 
 
+def test_sec_harm_2_rel(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": 10,
+        "toroidal_launch_angle_Torbeam": 0.0,
+        "launch_freq_GHz": 46,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([2.587, 0.0, -0.0157]),
+        "density_fit_parameters": np.array([1]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "Psi_BC_flag": "continuous",
+        "relativistic_flag": True,
+        "temperature_fit_parameters": np.array([0.8]),  # Low temperature <5 keV
+        "temperature_fit_method": "quadratic",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.0,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.8373067418891855, -0.15175779104290016, -0.0004711781281609329],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
 def test_sec_harm_3(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 10,
@@ -388,6 +747,48 @@ def test_sec_harm_3(tmp_path):
             float(output["q_zeta"][-1]),
         ],
         [1.8013024517505818, -0.16041011588294915, 0.029613857265963682],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
+def test_sec_harm_3_rel(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": 10,
+        "toroidal_launch_angle_Torbeam": -4,
+        "launch_freq_GHz": 47,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([2.587, 0.0, -0.0157]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "relativistic_flag": True,
+        "temperature_fit_parameters": np.array([10.4]),  # high temperature >5 keV
+        "temperature_fit_method": "quadratic",
+        "Psi_BC_flag": "continuous",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.0,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.743676653710253, -0.17490610912314625, 0.03228998311608891],
         rtol=1e-2,
         atol=1e-2,
     )
@@ -432,6 +833,48 @@ def test_sec_harm_4(tmp_path):
     )
 
 
+def test_sec_harm_4_rel(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": 5,
+        "toroidal_launch_angle_Torbeam": 10,
+        "launch_freq_GHz": 60,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([0.1, 0, -0.2]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "Psi_BC_flag": "continuous",
+        "relativistic_flag": True,
+        "temperature_fit_parameters": np.array([2.8]),  # Low temperature <5 keV
+        "temperature_fit_method": "quadratic",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.0,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.393558370046402, -0.3443703253176513, -2.9533975261126915],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
 def test_sec_harm_5(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 1,
@@ -471,6 +914,49 @@ def test_sec_harm_5(tmp_path):
     )
 
 
+def test_sec_harm_5_rel(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": 1,
+        "toroidal_launch_angle_Torbeam": 0,
+        "launch_freq_GHz": 70,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([0.1, 0, 0]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "Psi_BC_flag": "continuous",
+        "relativistic_flag": True,
+        "temperature_fit_parameters": np.array([12.9]),  # high temperature >5 keV
+        "temperature_fit_method": "quadratic",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.5,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+        "len_tau": 1002,  # needs more points for more accurate determination
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.7165072858256694, -0.03699963289704433, 3.1427380476219575],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
 def test_sec_harm_6(tmp_path):
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 10,
@@ -505,6 +991,129 @@ def test_sec_harm_6(tmp_path):
             float(output["q_zeta"][-1]),
         ],
         [1.9247988276944217, -0.1334200438972866, 0.00010847150538311593],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
+def test_sec_harm_6_rel(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": 10,
+        "toroidal_launch_angle_Torbeam": 0.0,
+        "launch_freq_GHz": 44,
+        "mode_flag": -1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([2.587, 0.0, -0.0157]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "Psi_BC_flag": "continuous",
+        "relativistic_flag": True,
+        "temperature_fit_parameters": np.array([15.3]),  # high temperature >5 keV
+        "temperature_fit_method": "quadratic",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.0,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.8727077745502694, -0.14516056979886102, 0.00040192846208131653],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
+# test_flag: tests whether resonance_Flag works
+def test_flag_true(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": 3,
+        "toroidal_launch_angle_Torbeam": 0,
+        "launch_freq_GHz": 33,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([3, 0, 0]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "resonance_flag": True,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "Psi_BC_flag": "continuous",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.5,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.9162396978780787, -0.05765344712076549, -7.654831340237264e-05],
+        rtol=1e-2,
+        atol=1e-2,
+    )
+
+
+def test_flag_false(tmp_path):
+    kwargs_dict = {
+        "poloidal_launch_angle_Torbeam": 3,
+        "toroidal_launch_angle_Torbeam": 0,
+        "launch_freq_GHz": 33,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([3, 0, 0]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "resonance_flag": False,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "Psi_BC_flag": "continuous",
+        "figure_flag": False,
+        "vacuum_propagation_flag": True,
+        "vacuumLaunch_flag": True,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.5,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+    }
+    kwargs_dict["output_path"] = tmp_path
+    output = beam_me_up(**kwargs_dict)["analysis"]
+    assert_allclose(
+        [
+            float(output["q_R"][-1]),
+            float(output["q_Z"][-1]),
+            float(output["q_zeta"][-1]),
+        ],
+        [1.1957606076131668, -0.387656945685278, -0.02299510661920331],
         rtol=1e-2,
         atol=1e-2,
     )
