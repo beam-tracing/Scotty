@@ -88,17 +88,17 @@ STENCILS: Dict[str, Stencil] = {
         (-1, -1): 0.25,
     },
 }
-"""Finite difference stencils for `derivative`.
+"""Finite difference stencils for :func:`derivative`.
 
 The second-derivative stencils are optimised for minimal function evaluations.
 
-The naming scheme here is ``<order>_<kind><error>`` with:
+The stencil names encode the derivative order, difference kind, and error order:
 
-- ``<order>`` is ``d<n>`` for the ``n``th derivative, and this is repeated for
-  multiple dimensions
-- ``<kind>`` is either ``FFD`` for forward finite difference or ``CFD`` for
-  central finite difference, again repeated for each dimension
-- ``<error>`` is the order of the error scaling
+- The derivative order uses ``dN`` (for example, ``d1`` for a first
+  derivative), repeated for each dimension.
+- The difference kind is ``FFD`` for forward or ``CFD`` for central finite
+  differences, repeated for each dimension.
+- The final number gives the order of the error scaling.
 
 So ``d1d1_FFD_CFD2`` is the first mixed-derivative of two dimensions, using
 forward differences for the first dimension and central for the second, with

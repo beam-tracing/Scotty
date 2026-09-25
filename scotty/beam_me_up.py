@@ -157,34 +157,16 @@ def beam_me_up(
     Overview
     ========
 
-    1. Initialise density fit parameters. One of:
-        - spline with data from file
-        - Stefanikova
-        - O(3) polynomial
-        - tanh
-        - quadratic
-       See `profile_fit` for more details
-    2. If relativistic_flag enabled, initialise temperature
-       fit parameters. Not yet fully implemented. One of:
-        - spline with data from file
-        - linear
-        See 'profile_fit' for more details
-    3. Initialise magnetic field method. One of:
-        - TORBEAM
-        - OMFIT
-        - analytical
-        - EFIT++
-        - UDA
-        - curvy slab
-        - test/test_notime
-       See `geometry` for more details
-    4. Initialise beam launch parameters (vacuum/plasma). See `launch`
-       for more details.
-    5. Propagate single ray with IVP solver to find point where beam
-       leaves plasma. See `ray_solver` for more details
-    6. Propagate beam with IVP solver
-    7. Dump raw output
-    8. Analysis
+    1. Initialise a density profile (spline, Stefanikova, polynomial, tanh, or
+       quadratic). See :mod:`scotty.profile_fit`.
+    2. If relativistic effects are enabled, initialise a temperature profile.
+       This feature is not yet fully implemented.
+    3. Initialise the magnetic field from TORBEAM, OMFIT, analytical, EFIT++,
+       UDA, or curvy-slab data. See :mod:`scotty.geometry`.
+    4. Initialise the beam launch parameters. See :mod:`scotty.launch`.
+    5. Propagate a single ray to locate the plasma exit. See
+       :mod:`scotty.ray_solver`.
+    6. Propagate the beam, save the raw output, and perform the analysis.
 
     Parameters
     ==========
@@ -245,7 +227,7 @@ def beam_me_up(
     delta_K_Z: float
         Finite difference spacing to use for ``K_Z``
     find_B_method:
-        See `create_magnetic_geometry` for more information.
+        See :func:`create_magnetic_geometry` for more information.
 
         Common options:
 
@@ -286,7 +268,7 @@ def beam_me_up(
         - ``"quadratic"``: constrained quadratic (`QuadraticFit`)
 
         If ``density_fit_method`` is a string, then the corresponding
-        `DensityFit` object is constructed using
+        :class:`scotty.profile_fit.ProfileFit` object is constructed using
         ``poloidal_flux_zero_density`` and ``density_fit_parameters``.
 
         ``"smoothing-spline-file"`` looks for a file called
@@ -791,7 +773,8 @@ def make_temperature_fit(
 ) -> (
     ProfileFitLike
 ):  # Temporary measure to check if DensityFit is compatible with temp data
-    """Either construct a `DensityFit` instance, or return ``method``
+    """Either construct a :class:`scotty.profile_fit.ProfileFit` instance, or
+    return ``method``
     if it's already suitable. Suitable methods are callables that take
     an array of poloidal fluxes and return an array of temperatures.
 

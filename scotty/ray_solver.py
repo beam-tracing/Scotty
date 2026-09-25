@@ -195,7 +195,7 @@ def make_solver_events(
             else:
                 return difference_fundamental * difference_second_harmonic
 
-    """
+    r"""
     # Old function for second harmonic
     
     @_event(terminal=True, direction=0.0)

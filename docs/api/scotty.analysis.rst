@@ -1,7 +1,7 @@
-scotty.fun\_CFD module
+scotty.analysis module
 ======================
 
-.. automodule:: scotty.fun_CFD
+.. automodule:: scotty.analysis
    :members:
    :undoc-members:
    :show-inheritance:

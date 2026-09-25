@@ -6,10 +6,9 @@
 Welcome to Scotty's documentation!
 ==================================
 
-The main interface to Scotty is through `beam_me_up()
-<scotty.beam_me_up.beam_me_up>`. Many standard cases are provided
-through `get_parameters_for_Scotty()
-<scotty.get_parameters_for_Scotty>`.
+The main interface to Scotty is :func:`scotty.beam_me_up.beam_me_up`. Many
+standard cases are provided through
+:func:`scotty.init_bruv.get_parameters_for_Scotty`.
 
 
 .. toctree::

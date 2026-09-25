@@ -57,7 +57,7 @@ class DielectricTensor:
         Magnitude of the magnetic field
     temperature:
         Temperature profile [optional]. Used to calculate relativistic corrections 
-        to electron mass, which affects :math:`\Omega_{pe}` and :math: `\Omega_{ce}`.
+        to electron mass, which affects :math:`\Omega_{pe}` and :math:`\Omega_{ce}`.
     """
 
     def __init__(
@@ -109,8 +109,8 @@ class Hamiltonian:
     derivatives at once, we can reuse evaluations of :math:`H` between
     derivatives, saving a lot of computation.
 
-    The stencils are defined as a `dict` with a `tuple` of offsets as keys and
-    `float` weights as values. For example, the `CFD1_stencil`::
+    The stencils are defined as a ``dict`` with a ``tuple`` of offsets as keys and
+    ``float`` weights as values. For example, the ``CFD1_stencil``::
 
         {(1,): 0.5, (-1,): -0.5}
 

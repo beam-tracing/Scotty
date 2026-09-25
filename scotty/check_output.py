@@ -2,7 +2,7 @@
 # Copyright 2022 - 2023, Valerian Hall-Chen and the Scotty contributors
 # SPDX-License-Identifier: GPL-3.0
 
-"""Checks various quantities that `beam_me_up <scotty.beam_me_up.beam_me_up>` calculates"""
+"""Checks quantities calculated by :func:`scotty.beam_me_up.beam_me_up`."""
 
 from __future__ import annotations
 import numpy as np

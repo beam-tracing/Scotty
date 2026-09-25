@@ -222,7 +222,8 @@ class PolynomialFit(ProfileFit):
         return np.polyval(self.coefficients, poloidal_flux)
 
     def __repr__(self):
-        return f"PolynomialFit({self.poloidal_flux_zero_profile}, {', '.join(self.coefficients)})"
+        coefficients = ", ".join(map(str, self.coefficients))
+        return f"PolynomialFit({self.poloidal_flux_zero_profile}, {coefficients})"
 
 
 class StefanikovaFit(ProfileFit):

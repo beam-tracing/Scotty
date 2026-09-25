@@ -64,6 +64,12 @@ def test_spline_fit_from_file(ne_dat):
     assert np.allclose(density, fit(rho**2))
 
 
+def test_polynomial_fit_repr():
+    fit = PolynomialFit(LCFS, 1.0, -0.5, 0.25)
+
+    assert repr(fit) == "PolynomialFit(1.0, 1.0, -0.5, 0.25)"
+
+
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_make_profile_fit(ne_dat):
     fit = profile_fit("quadratic", LCFS, [CENTRAL_DENSITY])

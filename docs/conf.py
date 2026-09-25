@@ -61,7 +61,7 @@ html_theme = "sphinx_book_theme"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
+html_static_path = []
 
 html_context = {
     "github_user": "valerian-chen",
@@ -83,8 +83,6 @@ html_theme_options = dict(
     use_repository_button=True,
     use_issues_button=True,
     home_page_in_toc=False,
-    extra_navbar="",
-    navbar_footer_text="",
 )
 
 # -- Extension configuration -------------------------------------------------
@@ -92,7 +90,7 @@ html_theme_options = dict(
 autodoc_typehints = "description"
 autodoc_type_aliases = {
     "ArrayLike": "numpy.typing.ArrayLike",
-    "DensityFitLike": "scotty.density_fit.DensityFitLike",
+    "ProfileFitLike": "scotty.profile_fit.ProfileFitLike",
 }
 
 # -- Options for intersphinx extension ---------------------------------------

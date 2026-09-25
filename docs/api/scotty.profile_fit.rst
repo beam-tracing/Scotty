@@ -1,7 +1,7 @@
-scotty.postmortem2 module
+scotty.profile_fit module
 =========================
 
-.. automodule:: scotty.postmortem2
+.. automodule:: scotty.profile_fit
    :members:
    :undoc-members:
    :show-inheritance:

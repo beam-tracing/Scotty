@@ -3,16 +3,15 @@
 Output parameters
 =================
 
-:func:`beam_me_up` returns a `datatree`_ instance which contains the
-simulation inputs under ``inputs``, the immediate results under
-``solver_output``, and some further processed results under
-``analysis``.
+:func:`scotty.beam_me_up.beam_me_up` returns an ``xarray.DataTree`` instance,
+which contains the simulation inputs under ``inputs``, the immediate results
+under ``solver_output``, and further processed results under ``analysis``.
 
 Datatrees are collections of `xarray`_ ``Datasets``, which themselves
 are collections of N-dimensional variables with labelled coordinates.
 
-See `beam_me_up() <scotty.beam_me_up.beam_me_up>` for a detailed
-description of input parameters.
+See :func:`scotty.beam_me_up.beam_me_up` for a detailed description of input
+parameters.
 
 All the outputs are in cylindrical coordinates unless otherwise stated
 (``Cartesian`` or with the lower case ``x`` or ``y``).
@@ -46,7 +45,7 @@ netCDF (although this has been fixed and should be available in the
 next netCDF release). For this reason, the default filename is
 ``scotty_output.h5``.
 
-The best way to read these files with `open_datatree`_, specifying the
+The best way to read these files is with `xarray.open_datatree`_, specifying the
 ``h5netcdf`` engine::
 
   import xarray
@@ -56,4 +55,4 @@ The best way to read these files with `open_datatree`_, specifying the
 
 .. _xarray: https://xarray.pydata.org
 .. _h5netcdf: https://h5netcdf.org
-.. _DataTree: https://docs.xarray.dev/en/stable/generated/xarray.open_datatree.html#xarray-open-datatree
+.. _xarray.open_datatree: https://docs.xarray.dev/en/stable/generated/xarray.open_datatree.html
