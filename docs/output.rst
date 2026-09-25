@@ -38,6 +38,14 @@ The result tree has three main groups:
    Derived quantities sampled along the ray, including density, poloidal flux,
    beam geometry, and localization terms.
 
+Recommended inspection order:
+
+1. Check the poloidal ray path against the equilibrium.
+2. Check density and poloidal flux along the physical distance travelled.
+3. Mark and review the estimated cutoff location.
+4. Use the dispersion plot as a numerical consistency check.
+5. After these checks, inspect toroidal, width, or localization plots as needed.
+
 Plot the ray in the poloidal plane
 ----------------------------------
 
@@ -52,12 +60,32 @@ This plot shows poloidal-flux contours from the run's input equilibrium, the
 launch position, the central ray through vacuum and plasma, and dashed lines
 indicating the beam width. ``zoom=True`` frames the view around the beam. The
 function returns a Matplotlib ``Axes``, so you can add annotations or change
-labels. It does not mark the cutoff automatically; to annotate Scotty's cutoff
-estimate, add it to the plot explicitly:
+labels.
+
+Before interpreting the cutoff, inspect the density and flux sampled along the
+ray:
 
 .. code-block:: python
 
    analysis = tree["analysis"]
+   distance = analysis.distance_along_line
+
+   fig, (density_ax, flux_ax) = plt.subplots(2, 1, sharex=True)
+   density_ax.plot(distance, analysis.electron_density)
+   density_ax.set_ylabel("Electron density")
+   flux_ax.plot(distance, analysis.poloidal_flux)
+   flux_ax.set(xlabel="Distance from launch [m]", ylabel="Poloidal flux")
+   fig.tight_layout()
+   plt.show()
+
+Scotty's cutoff estimate is the point where the wavevector magnitude is
+smallest along the computed trajectory. Treat it as an estimate from the run:
+first check that the ray path, density profile, and equilibrium cover the
+region of interest. The poloidal plot does not mark the cutoff automatically;
+add it after reviewing the trajectory and profiles:
+
+.. code-block:: python
+
    cutoff_index = int(analysis.cutoff_index.item())
    cutoff_R = analysis.q_R.isel(tau=cutoff_index).item()
    cutoff_Z = analysis.q_Z.isel(tau=cutoff_index).item()
@@ -67,23 +95,25 @@ estimate, add it to the plot explicitly:
    ax.legend()
    plt.show()
 
-Scotty's cutoff estimate is the point where the wavevector magnitude is
-smallest along the computed trajectory. Treat it as an estimate from the run:
-first check that the ray path and equilibrium cover the region of interest.
-
 Other useful plots
 ------------------
 
 ``plot_toroidal_beam_path(tree)``
    Shows the ray and beam width in the Cartesian X-Y (toroidal) plane, along
-   with the last closed flux surface and magnetic axis.
+   with a flux contour and magnetic-axis estimate. The helper assumes the
+   last-closed-flux-surface contour is at ``poloidal_flux = 1``. Check that
+   this matches the flux normalization in your equilibrium; otherwise, do not
+   interpret that contour as your plasma boundary.
 ``plot_dispersion_relation(tree["analysis"])``
    Compares the absolute dispersion-relation solutions calculated by two
    methods as a function of distance from the cutoff. Use it as a numerical
    check: the physical branch should remain close to zero along the ray. The
    plotted branch labels are not a substitute for checking the selected mode.
 ``plot_widths(tree)``
-   Plots the two principal beam widths against physical distance along the ray.
+   Derives and plots two principal widths from the eigenvalues of the imaginary
+   transverse beam tensor against physical distance along the ray. Treat it as
+   a diagnostic: non-finite or nonphysical widths are a reason to check the
+   simulation and tensor, not values to interpret literally.
 ``plot_instrumentation_functions(tree)``
    Plots the localization factors and their combined response. These are
    model-dependent analysis quantities, not probabilities.
@@ -109,9 +139,10 @@ directory first:
 
 To create the standard quick-look figures during a simulation, leave
 ``figure_flag=True`` (the default). Scotty creates poloidal ray and dispersion
-figures in ``output_path``, using ``output_filename_suffix`` in their names.
-Set ``figure_flag=False`` to skip these figures and make plots later from the
-saved DataTree.
+figures in ``output_path``. For an output suffix ``"_demo"``, their names are
+``Ray1_demo.png`` and ``H_demo.png``; without a suffix, they are ``Ray1.png``
+and ``H.png``. Set ``figure_flag=False`` to skip these figures and make plots
+later from the saved DataTree.
 
 Inspect the underlying data
 ---------------------------

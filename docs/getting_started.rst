@@ -53,20 +53,9 @@ Save the following as ``run_synthetic.py`` and run it with Python:
    results = beam_me_up(**parameters)
    print(results)
 
-The returned object is an ``xarray.DataTree``. It contains the simulation
-inputs, solver results, and derived analysis in separate groups. For example,
-the ray trajectory is stored in ``solver_output``:
-
-.. code-block:: python
-
-   trajectory = results.solver_output
-   print(trajectory.q_R)
-   print(trajectory.q_zeta)
-   print(trajectory.q_Z)
-
-The coordinates ``q_R``, ``q_zeta``, and ``q_Z`` are the radial, toroidal, and
-vertical components of the trajectory. They are sampled along ``tau``, the
-parameter along the beam.
+The returned object is an ``xarray.DataTree`` containing the run inputs,
+solver results, and derived analysis. See :ref:`output` for a plotting example
+and an explanation of how to explore those results.
 
 Read the saved results
 ----------------------
@@ -85,30 +74,9 @@ DataTree, including complex-valued beam quantities:
    )
    print(saved_results)
 
-The main groups are:
-
-``inputs``
-   Parameters and grids used to run the simulation.
-``solver_output``
-   The trajectory, wavevector components, and evolving ``Psi_3D`` beam tensor.
-``analysis``
-   Derived quantities, including beam geometry and localization results.
-
-For a first look, compare the ray coordinates with the density and poloidal
-flux along the same samples:
-
-.. code-block:: python
-
-   print(saved_results.solver_output.q_R)
-   print(saved_results.analysis.electron_density)
-   print(saved_results.analysis.poloidal_flux)
-
-The arrays use labelled coordinates, so you can select by the ``tau``
-coordinate or by index. The ``tau`` coordinate is the solver's integration
-parameter, not physical distance; use ``analysis.distance_along_line`` for
-distance along the ray. See :ref:`output` for how to interpret the main
-quantities and :ref:`input` when replacing the synthetic case with files from
-an experiment.
+To plot the saved ray and understand the result groups and coordinates, follow
+the :ref:`output` guide. See :ref:`input` when replacing the synthetic case
+with equilibrium and profile files from an experiment.
 
 Next steps
 ----------

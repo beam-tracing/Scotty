@@ -18,9 +18,11 @@ It does not retrieve experimental data or infer all shot-specific launch
 settings. For each run, set and verify the launch frequency, poloidal and
 toroidal launch angles, and mode (``+1`` for O-mode, ``-1`` for X-mode).
 
-For example, this starts a DIII-D run using an OMFIT-exported equilibrium and
-a separate density profile. Replace the illustrative launch settings, shot
-suffix, and paths with the values for your case:
+For a single-time equilibrium, an OMFIT JSON export is a convenient option; it
+is readable and can be inspected without a binary reader. If your workflow
+already uses TORBEAM files, continue to use those instead. The following
+illustrates a DIII-D run with a separate density profile. Replace the example
+settings, boundary flux, suffix, and paths with values for your case:
 
 .. code-block:: python
 
@@ -37,6 +39,8 @@ suffix, and paths with the values for your case:
        poloidal_launch_angle_Torbeam=5.0,
        toroidal_launch_angle_Torbeam=-3.0,
        mode_flag=-1,
+       poloidal_flux_enter=1.0,  # illustrative; use this equilibrium's boundary flux
+       poloidal_flux_zero_density=1.01,  # check against the supplied profile
        density_fit_method="smoothing-spline-file",
        magnetic_data_path=Path("inputs/equilibrium"),
        ne_data_path=Path("inputs/profiles"),
@@ -47,10 +51,32 @@ suffix, and paths with the values for your case:
    Path("results").mkdir(parents=True, exist_ok=True)
    results = beam_me_up(**parameters)
 
-In Scotty's TORBEAM angle convention, a positive poloidal launch angle points
-downwards. Check the convention when translating angles from another diagnostic
-or code. The example values above are illustrative, not validated settings for
-a particular shot.
+The example values above are illustrative, not validated settings for a
+particular shot.
+
+.. note:: Coordinate and flux conventions
+
+   * Launch angles use Scotty's TORBEAM convention and are given in degrees; a
+     positive poloidal launch angle points downwards.
+   * Positions use cylindrical coordinates ``(R, zeta, Z)``: ``R`` and ``Z``
+     are in metres and ``zeta`` is the toroidal angle in radians.
+   * The equilibrium and profile must use a consistent poloidal-flux label.
+     Density files store the profile against :math:`\rho = \sqrt{\psi}`;
+     ``poloidal_flux_enter`` and ``poloidal_flux_zero_density`` are flux labels,
+     not :math:`\rho` values.
+
+Pre-run checklist
+-----------------
+
+Before calling ``beam_me_up``, verify that:
+
+* The equilibrium and density profile refer to the same shot and time.
+* The launch frequency, both launch angles, and mode match the case you intend
+  to simulate.
+* ``poloidal_flux_enter`` is the boundary label for this equilibrium, and
+  ``poloidal_flux_zero_density`` is consistent with the profile edge.
+* The equilibrium grid covers the whole expected ray path, not just the launch
+  point.
 
 With ``input_filename_suffix="_shot1"``, the example expects:
 
@@ -67,8 +93,8 @@ names. It does not select the shot or time inside the data. Choose an
 equilibrium snapshot and density profile from the same shot/time, and make
 sure the launch settings and flux-boundary parameters agree with those data.
 
-OMFIT JSON equilibrium
-----------------------
+Single-time OMFIT JSON equilibrium
+----------------------------------
 
 For ``find_B_method="omfit"``, Scotty reads
 ``topfile{input_filename_suffix}.json`` from ``magnetic_data_path``. This is a
@@ -79,11 +105,26 @@ and poloidal-flux grid. Scotty expects the keys ``R``, ``Z``, ``Br``, ``Bt``,
 using the OMFIT export is preferable to assembling the JSON by hand. The
 flattening follows TORBEAM's column-major (Fortran) grid order.
 
+The file has this structure (the bracketed items below stand for the full
+numeric arrays exported by OMFIT):
+
+.. code-block:: text
+
+   {
+     "R": [R grid values],
+     "Z": [Z grid values],
+     "Br": [flattened radial-field grid],
+     "Bt": [flattened toroidal-field grid],
+     "Bz": [flattened vertical-field grid],
+     "pol_flux": [flattened poloidal-flux grid]
+   }
+
 The OMFIT file provides the magnetic equilibrium, not the density profile.
 Scotty still reads a separate ``ne{input_filename_suffix}.dat`` from
 ``ne_data_path`` when using ``density_fit_method="smoothing-spline-file"``.
 The density file's first line is ignored (commonly it contains the number of
-profile points). The following rows have two whitespace-separated columns:
+profile points). The following rows have two columns separated by one or more
+spaces or tabs:
 
 1. :math:`\rho = \sqrt{\psi}`, the square root of the normalised poloidal-flux
    label;
