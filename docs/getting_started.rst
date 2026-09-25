@@ -94,7 +94,21 @@ The main groups are:
 ``analysis``
    Derived quantities, including beam geometry and localization results.
 
-For a fuller description of the variables and file format, see :ref:`output`.
+For a first look, compare the ray coordinates with the density and poloidal
+flux along the same samples:
+
+.. code-block:: python
+
+   print(saved_results.solver_output.q_R)
+   print(saved_results.analysis.electron_density)
+   print(saved_results.analysis.poloidal_flux)
+
+The arrays use labelled coordinates, so you can select by the ``tau``
+coordinate or by index. The ``tau`` coordinate is the solver's integration
+parameter, not physical distance; use ``analysis.distance_along_line`` for
+distance along the ray. See :ref:`output` for how to interpret the main
+quantities and :ref:`input` when replacing the synthetic case with files from
+an experiment.
 
 Next steps
 ----------
