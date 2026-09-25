@@ -66,6 +66,24 @@ Scotty identifies this point from the minimum wavevector magnitude along the
 computed trajectory. Treat it as an estimate from that run, and check that the
 trajectory and equilibrium cover the region you intend to study.
 
+Plot the R-Z ray path and the density sampled along its physical distance:
+
+.. code-block:: python
+
+   import matplotlib.pyplot as plt
+
+   fig, (ray_ax, density_ax) = plt.subplots(1, 2, figsize=(10, 4))
+   ray_ax.plot(ray.q_R, ray.q_Z)
+   ray_ax.scatter(cutoff_R, cutoff_Z, marker="x", label="cutoff estimate")
+   ray_ax.set(xlabel="R [m]", ylabel="Z [m]", title="Ray path")
+   ray_ax.set_aspect("equal")
+   ray_ax.legend()
+
+   density_ax.plot(analysis.distance_along_line, analysis.electron_density)
+   density_ax.set(xlabel="Distance along ray [m]", ylabel="Electron density")
+   fig.tight_layout()
+   plt.show()
+
 Useful variables
 ----------------
 
@@ -92,10 +110,10 @@ its ``row`` and ``col`` coordinates label cylindrical components.
   This extra analysis can be disabled with ``detailed_analysis_flag=False``.
 
 Use xarray's named dimensions to select data. For example,
-``analysis.electron_density.sel(tau=...)`` selects the sample nearest a chosen
-``tau`` coordinate; ``.isel(tau=...)`` selects by integer index. For matrix
-components, select labels such as ``row="R"`` and ``col="Z"`` instead of
-relying on their storage order.
+``analysis.electron_density.sel(tau=value, method="nearest")`` selects the
+sample nearest a chosen ``tau`` value; ``.isel(tau=index)`` selects by integer
+index. For matrix components, select labels such as ``row="R"`` and
+``col="Z"`` instead of relying on their storage order.
 
 Output files
 ------------
