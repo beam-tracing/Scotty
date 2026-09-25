@@ -1,133 +1,168 @@
 .. _output:
 
-Reading and interpreting results
-================================
+Plotting and reading results
+============================
 
-:func:`scotty.beam_me_up.beam_me_up` returns an ``xarray.DataTree`` and saves
-the same tree to an HDF5 file. The tree groups related ``xarray.Dataset``
-objects together; each variable has named dimensions and coordinates, which
-makes it possible to select and plot parts of the result without guessing
-array indices.
+Scotty returns an ``xarray.DataTree`` and saves it to an HDF5 file. A good
+first look at a run is the plotting workflow used in ``Examples/plot.py``: open
+the saved tree and pass it to functions from ``scotty.plotting``.
 
-Explore a result
+Open a saved run
 ----------------
 
-Open a saved result with the ``h5netcdf`` engine:
+Load the file with the ``h5netcdf`` engine:
 
 .. code-block:: python
 
-   import xarray as xr
-
-   tree = xr.open_datatree("results/scotty_output_example.h5", engine="h5netcdf")
-   print(tree)
-
-The main groups are:
-
-``inputs``
-   The settings and input grids used for the run, including launch
-   configuration, input paths, and magnetic geometry.
-``solver_output``
-   The beam trajectory, wavevector components, and propagated complex-valued
-   ``Psi_3D`` wave/beam tensor.
-``analysis``
-   Derived quantities evaluated along the trajectory, such as magnetic field,
-   density, poloidal flux, beam geometry, and localization.
-
-For example, inspect the ray and density along it:
-
-.. code-block:: python
-
-   ray = tree.solver_output
-   analysis = tree.analysis
-
-   print(ray.q_R)                   # major radius, in metres
-   print(ray.q_zeta)                # toroidal angle, in radians
-   print(ray.q_Z)                   # vertical position, in metres
-   print(analysis.electron_density) # density along the ray
-
-The core coordinates are cylindrical: ``q_R`` is major radius, ``q_zeta`` is
-toroidal angle, and ``q_Z`` is height. Cartesian trajectory coordinates are
-also available in ``analysis.beam_cartesian``. The solver's independent
-coordinate ``tau`` parametrizes integration along the beam; it is not the
-physical distance travelled. Use ``analysis.distance_along_line`` for distance
-from the launch point, or ``analysis.l_lc`` for signed distance from the
-analysis cutoff location.
-
-Find the analysis cutoff point and inspect the corresponding ray location:
-
-.. code-block:: python
-
-   cutoff_index = int(analysis.cutoff_index.item())
-   cutoff_R = ray.q_R.isel(tau=cutoff_index).item()
-   cutoff_Z = ray.q_Z.isel(tau=cutoff_index).item()
-   print(f"Cutoff estimate: R={cutoff_R:.3f} m, Z={cutoff_Z:.3f} m")
-
-Scotty identifies this point from the minimum wavevector magnitude along the
-computed trajectory. Treat it as an estimate from that run, and check that the
-trajectory and equilibrium cover the region you intend to study.
-
-Plot the R-Z ray path and the density sampled along its physical distance:
-
-.. code-block:: python
+   from pathlib import Path
 
    import matplotlib.pyplot as plt
+   import xarray as xr
 
-   fig, (ray_ax, density_ax) = plt.subplots(1, 2, figsize=(10, 4))
-   ray_ax.plot(ray.q_R, ray.q_Z)
-   ray_ax.scatter(cutoff_R, cutoff_Z, marker="x", label="cutoff estimate")
-   ray_ax.set(xlabel="R [m]", ylabel="Z [m]", title="Ray path")
-   ray_ax.set_aspect("equal")
-   ray_ax.legend()
+   from scotty.plotting import (
+       plot_dispersion_relation,
+       plot_poloidal_beam_path,
+       plot_toroidal_beam_path,
+   )
 
-   density_ax.plot(analysis.distance_along_line, analysis.electron_density)
-   density_ax.set(xlabel="Distance along ray [m]", ylabel="Electron density")
-   fig.tight_layout()
+   results_file = Path("results/scotty_output_example.h5")
+   tree = xr.open_datatree(results_file, engine="h5netcdf")
+
+The result tree has three main groups:
+
+``inputs``
+   Run settings, input paths, and the equilibrium grid used in the simulation.
+``solver_output``
+   The propagated trajectory, wavevector, and complex ``Psi_3D`` beam tensor.
+``analysis``
+   Derived quantities sampled along the ray, including density, poloidal flux,
+   beam geometry, and localization terms.
+
+Plot the ray in the poloidal plane
+----------------------------------
+
+The most useful first plot is usually ``plot_poloidal_beam_path``:
+
+.. code-block:: python
+
+   ax = plot_poloidal_beam_path(tree, zoom=True)
    plt.show()
 
-Useful variables
-----------------
+This plot shows poloidal-flux contours from the run's input equilibrium, the
+launch position, the central ray through vacuum and plasma, and dashed lines
+indicating the beam width. ``zoom=True`` frames the view around the beam. The
+function returns a Matplotlib ``Axes``, so you can add annotations or change
+labels. It does not mark the cutoff automatically; to annotate Scotty's cutoff
+estimate, add it to the plot explicitly:
 
-``solver_output`` contains the direct solver quantities. The trajectory
-``q_R``, ``q_zeta``, and ``q_Z``, the wavevector components ``K_R`` and ``K_Z``,
-and ``Psi_3D`` are sampled along ``tau``. ``Psi_3D`` is a complex-valued tensor;
-its ``row`` and ``col`` coordinates label cylindrical components.
+.. code-block:: python
 
-``analysis`` contains quantities that help check and interpret a run:
+   analysis = tree["analysis"]
+   cutoff_index = int(analysis.cutoff_index.item())
+   cutoff_R = analysis.q_R.isel(tau=cutoff_index).item()
+   cutoff_Z = analysis.q_Z.isel(tau=cutoff_index).item()
 
-* ``poloidal_flux`` and ``electron_density`` show where the ray travels
-  relative to the plasma profile.
-* ``K_magnitude`` and ``cutoff_index`` locate Scotty's cutoff estimate;
-  ``theta`` and ``theta_m`` describe beam/magnetic-field and wavevector/field
-  angles, respectively.
-* ``Psi_xx``, ``Psi_xy``, and ``Psi_yy`` are beam-tensor components in the
-  transverse beam basis. Their imaginary parts are related to beam width;
-  they are generally complex and should not be treated as ordinary positions.
-* ``loc_b``, ``loc_r``, ``loc_s``, ``loc_m``, and ``loc_p`` are factors in the
-  localization model. ``loc_b_r_s`` and ``loc_b_r`` are combined localization
-  quantities. They are model outputs, not probabilities.
-* If detailed analysis is available, names such as ``loc_b_r_s_delta_l`` and
-  ``cum_loc_b_r_s`` report localization widths and cumulative localization.
-  This extra analysis can be disabled with ``detailed_analysis_flag=False``.
+   ax = plot_poloidal_beam_path(tree, zoom=True)
+   ax.scatter(cutoff_R, cutoff_Z, marker="x", color="red", label="cutoff estimate")
+   ax.legend()
+   plt.show()
 
-Use xarray's named dimensions to select data. For example,
-``analysis.electron_density.sel(tau=value, method="nearest")`` selects the
-sample nearest a chosen ``tau`` value; ``.isel(tau=index)`` selects by integer
-index. For matrix components, select labels such as ``row="R"`` and
-``col="Z"`` instead of relying on their storage order.
+Scotty's cutoff estimate is the point where the wavevector magnitude is
+smallest along the computed trajectory. Treat it as an estimate from the run:
+first check that the ray path and equilibrium cover the region of interest.
+
+Other useful plots
+------------------
+
+``plot_toroidal_beam_path(tree)``
+   Shows the ray and beam width in the Cartesian X-Y (toroidal) plane, along
+   with the last closed flux surface and magnetic axis.
+``plot_dispersion_relation(tree["analysis"])``
+   Compares the absolute dispersion-relation solutions calculated by two
+   methods as a function of distance from the cutoff. Use it as a numerical
+   check: the physical branch should remain close to zero along the ray. The
+   plotted branch labels are not a substitute for checking the selected mode.
+``plot_widths(tree)``
+   Plots the two principal beam widths against physical distance along the ray.
+``plot_instrumentation_functions(tree)``
+   Plots the localization factors and their combined response. These are
+   model-dependent analysis quantities, not probabilities.
+``plot_psi(tree)``
+   Plots poloidal flux and the real and imaginary parts of the transverse beam
+   tensor components along the solver parameter ``tau``.
+
+The plotting functions are in ``scotty.plotting``. Most accept the whole
+DataTree; ``plot_dispersion_relation`` takes the ``analysis`` group. They
+generally return Matplotlib axes (or axes arrays), which can be used to
+customize the figure. ``plot_psi`` creates its own figure. For batch processing,
+pass a filename stem; the functions append ``.png``. Create the output
+directory first:
+
+.. code-block:: python
+
+   figure_dir = Path("plots")
+   figure_dir.mkdir(parents=True, exist_ok=True)
+
+   plot_poloidal_beam_path(tree, filename=figure_dir / "poloidal", zoom=True)
+   plot_toroidal_beam_path(tree, filename=figure_dir / "toroidal")
+   plot_dispersion_relation(tree["analysis"], filename=figure_dir / "dispersion")
+
+To create the standard quick-look figures during a simulation, leave
+``figure_flag=True`` (the default). Scotty creates poloidal ray and dispersion
+figures in ``output_path``, using ``output_filename_suffix`` in their names.
+Set ``figure_flag=False`` to skip these figures and make plots later from the
+saved DataTree.
+
+Inspect the underlying data
+---------------------------
+
+The plotting helpers are a starting point; the underlying values remain
+available for custom analysis. For example:
+
+.. code-block:: python
+
+   ray = tree["solver_output"]
+   analysis = tree["analysis"]
+
+   print(ray.q_R)                    # major radius, in metres
+   print(ray.q_zeta)                 # toroidal angle
+   print(ray.q_Z)                    # vertical position, in metres
+   print(analysis.electron_density)  # density sampled along the ray
+   print(analysis.poloidal_flux)     # flux label sampled along the ray
+
+The trajectory coordinates are cylindrical: ``q_R`` is major radius,
+``q_zeta`` is toroidal angle, and ``q_Z`` is height. ``tau`` is the solver's
+integration parameter, not physical distance. Use
+``analysis.distance_along_line`` for distance from launch and
+``analysis.l_lc`` for signed distance from the estimated cutoff. The
+``analysis.beam_cartesian`` variable contains Cartesian trajectory coordinates.
+
+Use xarray's named dimensions to select values: ``.isel(tau=index)`` selects a
+sample by integer index, while ``.sel(tau=value, method="nearest")`` selects
+the sample nearest a coordinate value. For matrix-valued data such as
+``Psi_3D``, use its ``row`` and ``col`` labels (``"R"``, ``"zeta"``, ``"Z"``)
+rather than relying on array order. ``Psi_3D`` is complex-valued; inspect its
+real and imaginary components separately when needed.
 
 Output files
 ------------
 
 By default, Scotty writes ``scotty_output.h5`` in the current directory. The
-``output_path`` argument chooses another directory, and
-``output_filename_suffix`` is appended to the filename. For example,
+``output_path`` argument selects another directory, and
+``output_filename_suffix`` is appended to the file name. For example,
 ``output_path="results"`` and ``output_filename_suffix="_example"`` produce
-``results/scotty_output_example.h5``. Create the output directory before the
-run if it does not already exist.
+``results/scotty_output_example.h5``. Create the directory before the run if
+it does not already exist.
 
-The file uses the HDF5 container and ``h5netcdf`` engine because Scotty stores
-complex beam quantities. To load results from a prior run, install the package
-dependencies and use `xarray.open_datatree
-<https://docs.xarray.dev/en/stable/generated/xarray.open_datatree.html>`_ with
-``engine="h5netcdf"`` as shown above. See :ref:`input` for the input profile
-and equilibrium formats.
+The HDF5 file uses ``h5netcdf`` because Scotty stores complex beam quantities.
+Reopen it with `xarray.open_datatree
+<https://docs.xarray.dev/en/stable/generated/xarray.open_datatree.html>`_ and
+``engine="h5netcdf"`` as shown above. Close the tree when finished with the
+file:
+
+.. code-block:: python
+
+   tree.close()
+
+See :ref:`input` for details on the equilibrium and profile files used to
+produce a result.
