@@ -6,16 +6,18 @@
 Welcome to Scotty's documentation!
 ==================================
 
-The main interface to Scotty is through `beam_me_up()
-<scotty.beam_me_up.beam_me_up>`. Many standard cases are provided
-through `get_parameters_for_Scotty()
-<scotty.get_parameters_for_Scotty>`.
+New to Scotty? Start with :ref:`getting_started` for a self-contained example.
+The :ref:`input` and :ref:`output` guides explain how to supply equilibrium and
+profile files and how to explore the results. The main simulation interface is
+:func:`scotty.beam_me_up.beam_me_up`; diagnostic presets are provided by
+:func:`scotty.init_bruv.get_parameters_for_Scotty`.
 
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
+   getting_started
    input
    output
    references

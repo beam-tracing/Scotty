@@ -658,7 +658,11 @@ def beam_me_up(
         {
             "solver_status": solver_status,
             "q_R": (["tau"], q_R_array, {"long_name": "R", "units": "m"}),
-            "q_zeta": (["tau"], q_zeta_array, {"long_name": r"$\zeta$", "units": "m"}),
+            "q_zeta": (
+                ["tau"],
+                q_zeta_array,
+                {"long_name": r"$\zeta$", "units": "rad"},
+            ),
             "q_Z": (["tau"], q_Z_array, {"long_name": "Z", "units": "m"}),
             "K_R": (["tau"], K_R_array),
             "K_Z": (["tau"], K_Z_array),
@@ -751,8 +755,9 @@ def default_plots(
     """
 
     print("Making figures")
-    plot_poloidal_beam_path(dt, filename=(output_path / f"Ray1_{suffix}.png"))
-    plot_dispersion_relation(dt.analysis, filename=(output_path / f"H_{suffix}.png"))
+    figure_suffix = f"_{suffix.lstrip('_')}" if suffix else ""
+    plot_poloidal_beam_path(dt, filename=output_path / f"Ray1{figure_suffix}")
+    plot_dispersion_relation(dt.analysis, filename=output_path / f"H{figure_suffix}")
     print("Figures have been saved")
 
 
