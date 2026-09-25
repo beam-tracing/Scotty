@@ -16,6 +16,7 @@ through `get_parameters_for_Scotty()
    :maxdepth: 2
    :caption: Contents:
 
+   getting_started
    input
    output
    references
