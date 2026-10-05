@@ -144,7 +144,7 @@ class Hamiltonian:
         B_magnitude = self.field.magnitude(q0, q1, q2)
         b_hat = self.field.unitvector(q0, q1, q2)
         K_vec = self._K_vec(K0, K1, K2, q_R=q0)
-        K_magnitude = np.linalg.norm(K_vec, axis=0, keepdims=True)
+        K_magnitude = np.linalg.norm(K_vec, axis=0)
         K_hat = K_vec / K_magnitude
 
         sin_theta_m = np.dot(b_hat, K_hat) if np.size(q0) == 1 else dot(b_hat, K_hat.T) # when given multiple points, b_hat.shape is (len_tau, N) while K_hat.shape (N, len_tau)

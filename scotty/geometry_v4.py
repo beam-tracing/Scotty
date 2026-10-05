@@ -360,7 +360,7 @@ class MagneticField_Cartesian(ABC):
         B_X = self.B_X(X,Y,Z)
         B_Y = self.B_Y(X,Y,Z)
         B_Z = self.B_Z(X,Y,Z)
-        B_vec = np.array([ B_X, B_Y, B_Z ])
+        B_vec = np.array([ B_X, B_Y, B_Z ]) # (3,N)
 
         if vector: toreturn.append(B_vec.T)
         if unitvector or magnitude:

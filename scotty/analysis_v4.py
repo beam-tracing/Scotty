@@ -19,6 +19,9 @@ def _temp(name, value):
     else:                 log.info(f"{name} -- {value} -- {value}")
     return value
 
+def _temp_print_dict(analysis_dict: dict):
+    for k, v in analysis_dict.items(): log.info(f"{k} -- {v if v is None else v[-1].shape} -- {v if v is None else v[-1]}")
+
 def basic_analysis(
     inputs: xr.Dataset,
     solver_output: xr.Dataset,
@@ -50,72 +53,73 @@ def basic_analysis(
     ##################################################
     # Position and wavevector stuff
     ##################################################
-    q_vec_cart = np.array(solver_output["q_output_cartesian"][()]).T   # (N,3) -> (3,N)
-    q_vec_cyld = np.array(solver_output["q_output_cylindrical"][()]).T # (N,3) -> (3,N)
-    K_vec_cart = np.array(solver_output["K_output_cartesian"][()]).T   # (N,3) -> (3,N)
-    K_vec_cyld = np.array(solver_output["K_output_cylindrical"][()]).T # (N,3) -> (3,N)
+    q_vec_cart = np.array(solver_output["q_output_cartesian"][()])   # (N,3)
+    q_vec_cyld = np.array(solver_output["q_output_cylindrical"][()]) # (N,3)
+    K_vec_cart = np.array(solver_output["K_output_cartesian"][()])   # (N,3)
+    K_vec_cyld = np.array(solver_output["K_output_cylindrical"][()]) # (N,3)
     K_mag = np.array(solver_output["K_output_magnitude"][()]) # (N,)
 
     ##################################################
     # Booker Hamiltonian stuff
     ##################################################
-    if cart: q_vec, K_vec = q_vec_cart, K_vec_cart # (3,N) each
-    else:    q_vec, K_vec = q_vec_cyld, K_vec_cyld # (3,N) each
-    dH = hamiltonian.derivatives(q_vec, K_vec, second_order=btf)
+    if cart: q_vec, K_vec = q_vec_cart, K_vec_cart # (N,3) each
+    else:    q_vec, K_vec = q_vec_cyld, K_vec_cyld # (N,3) each
+    q_vec_T, K_vec_T = q_vec.T, K_vec.T
+    dH = hamiltonian.derivatives(q_vec_T, K_vec_T, second_order=btf)
     analysis_dict.update({
-        "H_Booker": (["tau"], hamiltonian(*q_vec, *K_vec)), # (N,) # type: ignore
-        "H_Booker_other": (["tau"], hamiltonian_other(*q_vec, *K_vec)), # (N,) # type: ignore
+        "H_Booker": (["tau"], hamiltonian(*q_vec_T, *K_vec_T)), # (N,) # type: ignore
+        "H_Booker_other": (["tau"], hamiltonian_other(*q_vec_T, *K_vec_T)), # (N,) # type: ignore
     })
 
     # TO REMOVE
-    for k, v in analysis_dict.items(): log.info(f"{k} -- {v if v is None else v[-1].shape} -- {v if v is None else v[-1]}")
+    _temp_print_dict(analysis_dict)
 
     ##################################################
     # Magnetic field and poloidal flux stuff
     ##################################################
     if cart:
         # field.all?
-        B_X = _temp("B_X" , field.B_X(*q_vec)) # (N,)
-        B_Y = _temp("B_Y" , field.B_Y(*q_vec)) # (N,)
-        B_Z = _temp("B_Z" , field.B_Z(*q_vec)) # (N,)
-        B_mag = _temp("B_mag" , field.magnitude(*q_vec)) # (N,)
-        b_hat_cart = _temp("b_hat" , field.unitvector(*q_vec)) # (N,3)
-        dbhat_dX = _temp("dbhat_dX" , derivative(field.unitvector_cartesian, dims="X", args={"X": q_vec[0], "Y": q_vec[1], "Z": q_vec[2]}, spacings=hamiltonian.delta_X)) # (N,3)
-        dbhat_dY = _temp("dbhat_dY" , derivative(field.unitvector_cartesian, dims="Y", args={"X": q_vec[0], "Y": q_vec[1], "Z": q_vec[2]}, spacings=hamiltonian.delta_Y)) # (N,3)
-        dbhat_dZ = _temp("dbhat_dZ" , derivative(field.unitvector_cartesian, dims="Z", args={"X": q_vec[0], "Y": q_vec[1], "Z": q_vec[2]}, spacings=hamiltonian.delta_Z)) # (N,3)
+        B_X = _temp("B_X" , field.B_X(*q_vec_T)) # (N,)
+        B_Y = _temp("B_Y" , field.B_Y(*q_vec_T)) # (N,)
+        B_Z = _temp("B_Z" , field.B_Z(*q_vec_T)) # (N,)
+        B_mag = _temp("B_mag" , field.magnitude(*q_vec_T)) # (N,)
+        b_hat_cart = _temp("b_hat" , field.unitvector(*q_vec_T)) # (N,3)
+        dbhat_dX = _temp("dbhat_dX" , derivative(field.unitvector_cartesian, dims="X", args={"X": q_vec_T[0], "Y": q_vec_T[1], "Z": q_vec_T[2]}, spacings=hamiltonian.delta_X)) # (N,3)
+        dbhat_dY = _temp("dbhat_dY" , derivative(field.unitvector_cartesian, dims="Y", args={"X": q_vec_T[0], "Y": q_vec_T[1], "Z": q_vec_T[2]}, spacings=hamiltonian.delta_Y)) # (N,3)
+        dbhat_dZ = _temp("dbhat_dZ" , derivative(field.unitvector_cartesian, dims="Z", args={"X": q_vec_T[0], "Y": q_vec_T[1], "Z": q_vec_T[2]}, spacings=hamiltonian.delta_Z)) # (N,3)
         grad_bhat_cart = _temp("grad_bhat" , np.stack((dbhat_dX, dbhat_dY, dbhat_dZ), axis=1)) # (N,3,3)
 
-        polflux = _temp("polflux" , field.polflux(*q_vec)) # (N,)
-        dp_dX = _temp("dp_dX" , field.d_polflux_dX(*q_vec, hamiltonian.delta_X)) # (N,)
-        dp_dY = _temp("dp_dY" , field.d_polflux_dY(*q_vec, hamiltonian.delta_Y)) # (N,)
-        dp_dZ = _temp("dp_dZ" , field.d_polflux_dZ(*q_vec, hamiltonian.delta_Z)) # (N,)
+        polflux = _temp("polflux" , field.polflux(*q_vec_T)) # (N,)
+        dp_dX = _temp("dp_dX" , field.d_polflux_dX(*q_vec_T, hamiltonian.delta_X)) # (N,)
+        dp_dY = _temp("dp_dY" , field.d_polflux_dY(*q_vec_T, hamiltonian.delta_Y)) # (N,)
+        dp_dZ = _temp("dp_dZ" , field.d_polflux_dZ(*q_vec_T, hamiltonian.delta_Z)) # (N,)
     else:
-        # B_R = field.B_R(*q_vec)
-        # B_T = field.B_T(*q_vec)
-        # B_Z = field.B_Z(*q_vec)
-        # B_mag = field.magnitude(*q_vec)
-        # b_hat = field.unitvector(*q_vec)
-        # dbhat_dR = derivative(field.unitvector, dims="R", args={"R": q_vec[0], "_": q_vec[1], "Z": q_vec[2]}, spacings=hamiltonian.delta_R)
-        # dbhat_dZ = derivative(field.unitvector, dims="Z", args={"R": q_vec[0], "_": q_vec[1], "Z": q_vec[2]}, spacings=hamiltonian.delta_Z)
+        # B_R = field.B_R(*q_vec_T)
+        # B_T = field.B_T(*q_vec_T)
+        # B_Z = field.B_Z(*q_vec_T)
+        # B_mag = field.magnitude(*q_vec_T)
+        # b_hat = field.unitvector(*q_vec_T)
+        # dbhat_dR = derivative(field.unitvector, dims="R", args={"R": q_vec_T[0], "_": q_vec_T[1], "Z": q_vec_T[2]}, spacings=hamiltonian.delta_R)
+        # dbhat_dZ = derivative(field.unitvector, dims="Z", args={"R": q_vec_T[0], "_": q_vec_T[1], "Z": q_vec_T[2]}, spacings=hamiltonian.delta_Z)
         # grad_bhat = np.zeros([len_tau, 3, 3])
         # grad_bhat[:,0,:] = dbhat_dR
         # grad_bhat[:,2,:] = dbhat_dZ
-        # grad_bhat[:,1,0] = -B_T / (B_mag * q_vec[0])
-        # grad_bhat[:,1,1] = B_R / (B_mag * q_vec[0])
-        B_X = field.B_X(*q_vec)
-        B_Y = field.B_Y(*q_vec)
-        B_Z = field.B_Z(*q_vec)
-        B_mag = field.magnitude(*q_vec)
-        b_hat_cart = field.unitvector_cartesian(*q_vec)
-        dbhat_dX = derivative(field.unitvector_cartesian, dims="X", args={"X": q_vec_cart[0], "Y": q_vec_cart[1], "Z": q_vec_cart[2]}, spacings=hamiltonian.delta_R)
-        dbhat_dY = derivative(field.unitvector_cartesian, dims="Y", args={"X": q_vec_cart[0], "Y": q_vec_cart[1], "Z": q_vec_cart[2]}, spacings=hamiltonian.delta_R)
-        dbhat_dZ = derivative(field.unitvector_cartesian, dims="Z", args={"X": q_vec_cart[0], "Y": q_vec_cart[1], "Z": q_vec_cart[2]}, spacings=hamiltonian.delta_Z)
+        # grad_bhat[:,1,0] = -B_T / (B_mag * q_vec_T[0])
+        # grad_bhat[:,1,1] = B_R / (B_mag * q_vec_T[0])
+        B_X = field.B_X(*q_vec_T)
+        B_Y = field.B_Y(*q_vec_T)
+        B_Z = field.B_Z(*q_vec_T)
+        B_mag = field.magnitude(*q_vec_T)
+        b_hat_cart = field.unitvector_cartesian(*q_vec_T)
+        dbhat_dX = derivative(field.unitvector_cartesian, dims="X", args={"X": q_vec_cart.T[0], "Y": q_vec_cart.T[1], "Z": q_vec_cart.T[2]}, spacings=hamiltonian.delta_R)
+        dbhat_dY = derivative(field.unitvector_cartesian, dims="Y", args={"X": q_vec_cart.T[0], "Y": q_vec_cart.T[1], "Z": q_vec_cart.T[2]}, spacings=hamiltonian.delta_R)
+        dbhat_dZ = derivative(field.unitvector_cartesian, dims="Z", args={"X": q_vec_cart.T[0], "Y": q_vec_cart.T[1], "Z": q_vec_cart.T[2]}, spacings=hamiltonian.delta_Z)
         grad_bhat_cart = np.stack((dbhat_dX, dbhat_dY, dbhat_dZ), axis=1)
         
-        polflux = field.polflux(*q_vec)
-        dp_dX = field.d_polflux_dX(*q_vec, hamiltonian.delta_R)
-        dp_dY = field.d_polflux_dY(*q_vec, hamiltonian.delta_R)
-        dp_dZ = field.d_polflux_dZ(*q_vec, hamiltonian.delta_Z)
+        polflux = field.polflux(*q_vec_T)
+        dp_dX = field.d_polflux_dX(*q_vec_T, hamiltonian.delta_R)
+        dp_dY = field.d_polflux_dY(*q_vec_T, hamiltonian.delta_R)
+        dp_dZ = field.d_polflux_dZ(*q_vec_T, hamiltonian.delta_Z)
 
     analysis_dict.update({
         "B_X": (["tau"], B_X),
@@ -134,7 +138,7 @@ def basic_analysis(
     })
 
     # TO REMOVE
-    for k, v in analysis_dict.items(): log.info(f"{k} -- {v if v is None else v[-1].shape} -- {v if v is None else v[-1]}")
+    _temp_print_dict(analysis_dict)
      
     ##################################################
     # Plasma properties along path
@@ -173,30 +177,15 @@ def basic_analysis(
     })
 
     # TO REMOVE
-    for k, v in analysis_dict.items(): log.info(f"{k} -- {v if v is None else v[-1].shape} -- {v if v is None else v[-1]}")
+    _temp_print_dict(analysis_dict)
 
     ##################################################
     # Ray properties along path
     ##################################################
-    sin_theta_m = np.sum(b_hat_cart.T * K_vec_cart, axis=1)
+    sin_theta_m = np.sum(b_hat_cart * K_vec_cart/K_mag[:, np.newaxis], axis=1)
     theta_m = np.sign(sin_theta_m) * np.arcsin(np.abs(sin_theta_m))
 
-    if cart:
-        # use find_g_cartesian?
-        g_vec_cart, g_mag, g_hat_cart = find_g_cartesian(cart, *q_vec, dH) # type: ignore
-    else:
-        # g_vec = np.stack((dH["dH_dKR"], dH["dH_dKzeta"] * q_vec_cyld[0], dH["dH_dKZ"]), axis=1)
-        # g_mag = np.linalg.norm(g_vec, axis=1)
-        # g_hat = g_vec / g_mag[:, np.newaxis]
-        g_vec_cart, g_mag, g_hat_cart = find_g_cartesian(cart, *q_vec, dH) # type: ignore
-
-    log.info(f"""\n\n\n
-q_vec.shape {q_vec.shape}
-b_hat_cart.shape {b_hat_cart.shape}
-g_vec_cart.shape {g_vec_cart.shape}
-g_mag.shape {g_mag.shape}
-g_hat_cart.shape {g_hat_cart.shape}
-\n\n\n""")
+    g_vec_cart, g_mag, g_hat_cart = find_g_cartesian(cart, *q_vec_T, dH) # type: ignore
     y_hat_cart = make_unit_vector_from_cross_product(b_hat_cart, g_hat_cart)
     x_hat_cart = make_unit_vector_from_cross_product(y_hat_cart, g_hat_cart)
 
@@ -211,7 +200,7 @@ g_hat_cart.shape {g_hat_cart.shape}
     })
 
     # TO REMOVE
-    for k, v in analysis_dict.items(): log.info(f"{k} -- {v if v is None else v[-1].shape} -- {v if v is None else v[-1]}")
+    _temp_print_dict(analysis_dict)
 
     ##################################################
     # Dispersion relation and polarisation vector
@@ -251,7 +240,7 @@ g_hat_cart.shape {g_hat_cart.shape}
         else:
             grad_grad_H_cyld, gradK_grad_H_cyld, gradK_gradK_H_cyld = hessians(dH, cartesian=cart)
             grad_grad_H_cart, gradK_grad_H_cart, gradK_gradK_H_cart = None, None, None # convert_hessians(
-            #     q_start = q_vec_cyld,
+            #     q_start = q_vec_cyld.T,
             #     dH = dH,
             #     grad_grad_H_start = grad_grad_H_cyld,
             #     gradK_grad_H_start = gradK_grad_H_cyld,
@@ -275,10 +264,10 @@ g_hat_cart.shape {g_hat_cart.shape}
         Psi_w_output_beamframe_cartesian[:, 0, 0] = Psi_xx_output_beamframe_cartesian
         Psi_w_output_beamframe_cartesian[:, 0, 1] = Psi_w_output_beamframe_cartesian[:, 1, 0] = Psi_xy_output_beamframe_cartesian
         Psi_w_output_beamframe_cartesian[:, 1, 1] = Psi_yy_output_beamframe_cartesian
-        curv1, curv2, width1, width2 = find_beam_widths_and_curvs(Psi_w_output_beamframe_cartesian, K_vec_cart.T, g_vec_cart.T)
+        curv1, curv2, width1, width2 = find_beam_widths_and_curvs(Psi_w_output_beamframe_cartesian, K_vec_cart, g_vec_cart)
 
     # TO REMOVE
-    for k, v in analysis_dict.items(): log.info(f"{k} -- {v if v is None else v[-1].shape} -- {v if v is None else v[-1]}")
+    _temp_print_dict(analysis_dict)
 
 
 
