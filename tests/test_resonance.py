@@ -1120,6 +1120,10 @@ def test_flag_false(tmp_path):
             float(output["q_zeta"][-1]),
         ],
         [1.8843654461072583, 0.21790749800723794, -0.012727702274718262],
+        # The end point is the last output point before the ray leaves the plasma, along
+        # a long unphysical path; it shifts by ~2 cm between platforms (Windows/Linux, scipy
+        # versions), so a looser tolerance. Still catches the ray stopping at the resonance
+        # or leaving through the inboard side.
         rtol=1e-2,
-        atol=1e-2,
+        atol=5e-2,
     )
