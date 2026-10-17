@@ -13,7 +13,7 @@ import datatree
 from scotty.geometry import (
     MagneticField,
     CircularCrossSectionField,
-    ConstantCurrentDensityField,
+    CircularFluxSurfaceField,
     InterpolatedField,
     CurvySlabField,
     EFITField,
@@ -75,7 +75,7 @@ Rmesh = np.array(dt.inputs.poloidalFlux_grid.coords['R'])
 Zmesh =  np.array(dt.inputs.poloidalFlux_grid.coords['Z'])
 polflux = np.array(dt.inputs.poloidalFlux_grid)
 ###Figure out the magnetic field (use scotty code)
-fieldGenerator = ConstantCurrentDensityField(float(dt.inputs.B_T_axis), float(dt.inputs.R_axis), float(dt.inputs.minor_radius_a), float(dt.inputs.B_p_a))
+fieldGenerator = CircularFluxSurfaceField(float(dt.inputs.B_T_axis), float(dt.inputs.R_axis), float(dt.inputs.minor_radius_a), float(dt.inputs.B_p_a))
 B_r_dat = np.zeros((len(Rmesh),len(Zmesh)))
 B_z_dat = np.zeros((len(Rmesh),len(Zmesh)))
 B_t_dat = np.zeros((len(Rmesh),len(Zmesh)))

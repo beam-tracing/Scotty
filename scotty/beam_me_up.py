@@ -76,6 +76,7 @@ from scotty.profile_fit import profile_fit, ProfileFitLike
 from scotty.geometry import (
     MagneticField,
     CircularCrossSectionField,
+    CircularFluxSurfaceField,
     ConstantCurrentDensityField,
     InterpolatedField,
     CurvySlabField,
@@ -256,8 +257,11 @@ def beam_me_up(
         - ``"omfit"`` is similar to ``"torbeam"`` but reads the data
           from JSON files
         - ``"UDA_saved"`` reads EFIT data from numpy's ``.npz`` files
-        - ``"analytical"`` uses a constant current density circular
-          equilibrium
+        - ``"analytical"`` uses circular flux surfaces with a poloidal
+          field linear in minor radius (`CircularFluxSurfaceField`).
+          Before this version it used `ConstantCurrentDensityField`
+          (deprecated); pass an instance of that class as
+          ``find_B_method`` to reproduce older runs
 
         Or pass a `MagneticField` instance directly.
 
@@ -839,7 +843,7 @@ def create_magnetic_geometry(
     # Analytical geometries
 
     if find_B_method == "analytical":
-        print("Analytical constant current density geometry")
+        print("Analytical circular flux surface geometry")
         if B_T_axis is None:
             raise ValueError(missing_arg("B_T_axis"))
         if R_axis is None:
@@ -849,7 +853,7 @@ def create_magnetic_geometry(
         if B_p_a is None:
             raise ValueError(missing_arg("B_p_a"))
 
-        return ConstantCurrentDensityField(B_T_axis, R_axis, minor_radius_a, B_p_a)
+        return CircularFluxSurfaceField(B_T_axis, R_axis, minor_radius_a, B_p_a)
 
     if find_B_method == "curvy_slab":
         print("Analytical curvy slab geometry")

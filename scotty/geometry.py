@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from abc import ABC
 import pathlib
+import warnings
 from typing import Callable, Optional, Tuple
 
 from h5netcdf.legacyapi import Dataset
@@ -99,7 +100,13 @@ class MagneticField(ABC):
 
 
 class CircularCrossSectionField(MagneticField):
-    """Simple circular cross-section magnetic geometry
+    r"""Simple circular cross-section magnetic geometry
+
+    .. deprecated::
+        Use `CircularFluxSurfaceField`. Here ``B_p_a`` is a flux-like normalisation, not the
+        poloidal field at ``minor_radius_a``: :math:`|B_p| = B_{p,a}/(R a)` is uniform in the
+        minor radius, and :math:`\psi_{pol} = r/a`. Kept unchanged for the existing tests.
+        TODO: remove once Scotty v4 is released.
 
     Parameters
     ----------
@@ -128,6 +135,12 @@ class CircularCrossSectionField(MagneticField):
         Z_points: int = 101,
         grid_buffer_factor: float = 1.0,
     ):
+        warnings.warn(
+            "`CircularCrossSectionField` is deprecated and will be removed in Scotty v4; "
+            "use `CircularFluxSurfaceField` instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.B_T_axis = B_T_axis
         self.R_axis = R_axis
         self.minor_radius_a = minor_radius_a
@@ -172,7 +185,13 @@ class CircularCrossSectionField(MagneticField):
 
 
 class ConstantCurrentDensityField(MagneticField):
-    """Circular cross-section magnetic geometry with constant current density
+    r"""Circular cross-section magnetic geometry with constant current density
+
+    .. deprecated::
+        Use `CircularFluxSurfaceField`. Despite the name, this field has :math:`|B_p| = B_{p,a}`
+        everywhere (current density :math:`\propto 1/r`), :math:`\psi_{pol} = r/a`, and
+        :math:`\nabla \cdot \mathbf{B} \neq 0` (no :math:`1/R` factor in :math:`B_p`). Kept
+        unchanged for reproducibility of older runs. TODO: remove once Scotty v4 is released.
 
     TODO
     ----
@@ -205,6 +224,12 @@ class ConstantCurrentDensityField(MagneticField):
         Z_points: int = 101,
         grid_buffer_factor: float = 1,
     ):
+        warnings.warn(
+            "`ConstantCurrentDensityField` is deprecated and will be removed in Scotty v4; "
+            "use `CircularFluxSurfaceField` instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.B_T_axis = B_T_axis
         self.R_axis = R_axis
         self.minor_radius_a = minor_radius_a
@@ -236,6 +261,92 @@ class ConstantCurrentDensityField(MagneticField):
     def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
         q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
         return self.rho(q_R, q_Z) / self.minor_radius_a
+
+
+class CircularFluxSurfaceField(MagneticField):
+    r"""Circular flux surfaces with a poloidal field that increases linearly in minor radius
+
+    .. math::
+
+        \psi_{pol} = \left(\frac{r}{a}\right)^2, \qquad
+        B_p = B_{p,a} \frac{r}{a} \frac{R_{axis}}{R}, \qquad
+        B_T = B_{T,axis} \frac{R_{axis}}{R},
+
+    where :math:`r = \sqrt{(R - R_{axis})^2 + Z^2}` is the minor radius, so
+    :math:`\rho_{pol} = r/a`. The poloidal field is exactly
+    :math:`\nabla \Psi \times \nabla \zeta` with the dimensional flux
+    :math:`\Psi = B_{p,a} a R_{axis} \psi_{pol} / 2`, so it is divergence-free and
+    tangent to the flux surfaces. In the large-aspect-ratio limit this is the field
+    of a constant current density; at finite aspect ratio the toroidal current
+    density varies as :math:`(1 + R_{axis}/R)/R`.
+
+    Compared with Sec. 2.4 of Hall-Chen, Parra & Hillesheim, PPCF 64, 095002
+    (2022), this field adds the :math:`R_{axis}/R` factor in :math:`B_p`, fixes the
+    sign of :math:`B_R, B_Z` (printed eqs. 81-82 are not tangent to the flux
+    surfaces) and uses :math:`\psi_{pol} = (r/a)^2`. The figures in that paper were
+    made with Scotty v2.3.0 or earlier (``B_p = B_{p,a} r/a`` with the printed
+    signs, :math:`\psi_{pol} = r/a`); use that version to reproduce them exactly.
+
+    Parameters
+    ----------
+    B_T_axis:
+        Toroidal magnetic field at the magnetic axis (Tesla)
+    R_axis:
+        Major radius of the magnetic axis (metres)
+    minor_radius_a:
+        Minor radius of the last closed flux surface (metres)
+    B_p_a:
+        Poloidal magnetic field on the last closed flux surface at
+        ``R = R_axis`` (Tesla)
+    R_points:
+    Z_points:
+        Number of points for sample ``(R, Z)`` grid
+    grid_buffer_factor:
+        Multiplicative factor to increase size of sample grid by
+    """
+
+    def __init__(
+        self,
+        B_T_axis: float,
+        R_axis: float,
+        minor_radius_a: float,
+        B_p_a: float,
+        R_points: int = 101,
+        Z_points: int = 101,
+        grid_buffer_factor: float = 1.0,
+    ):
+        self.B_T_axis = B_T_axis
+        self.R_axis = R_axis
+        self.minor_radius_a = minor_radius_a
+        self.B_p_a = B_p_a
+
+        grid_width = grid_buffer_factor * minor_radius_a
+        self.R_coord = np.linspace(R_axis - grid_width, R_axis + grid_width, R_points)
+        self.Z_coord = np.linspace(-grid_width, grid_width, Z_points)
+        self.poloidalFlux_grid = self.poloidal_flux(
+            *np.meshgrid(self.R_coord, self.Z_coord, indexing="ij")
+        )
+
+    def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
+        return self.B_p_a * self.R_axis * q_Z / (q_R * self.minor_radius_a)
+
+    def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
+        return self.B_T_axis * (self.R_axis / q_R)
+
+    def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
+        return (
+            -self.B_p_a
+            * self.R_axis
+            * (q_R - self.R_axis)
+            / (q_R * self.minor_radius_a)
+        )
+
+    def poloidal_flux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        q_R, q_Z = np.asarray(q_R), np.asarray(q_Z)
+        return ((q_R - self.R_axis) ** 2 + q_Z**2) / self.minor_radius_a**2
 
 
 class CurvySlabField(MagneticField):
