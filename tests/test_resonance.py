@@ -34,6 +34,9 @@ np.set_printoptions(linewidth=120, threshold=100)
 # the trajectory is plotted on this same plot. If the trajectory stops at the curve, it means that the function is working
 # These tests are for circular flux surfaces.
 # cutoff_and_resonance_surfaces_circ_flux.py file can be used to plot surfaces to check whether trajectory stops at the correct position
+# The expected end points use find_B_method="analytical" = CircularFluxSurfaceField. Those of the five
+# relativistic cases that change and of test_flag_false were regenerated when "analytical" switched to it,
+# after checking each trajectory against the relativistic resonance surfaces.
 
 # Test_fund: tests whether the beam will be absorbed when its frequency is equal
 # to the fundamental electron cyclotron frequency.
@@ -290,7 +293,7 @@ def test_fund_3_rel(tmp_path):
             float(output["q_Z"][-1]),
             float(output["q_zeta"][-1]),
         ],
-        [1.889134378242231, 0.1504157503711391, 0.0006146164855220494],
+        [1.8345510858149414, 0.17316950433821163, 0.0023098532726736633],
         rtol=1e-2,
         atol=1e-2,
     )
@@ -371,7 +374,7 @@ def test_fund_4_rel(tmp_path):
             float(output["q_Z"][-1]),
             float(output["q_zeta"][-1]),
         ],
-        [1.7729485069975504, 0.01730988891262524, 1.4602626722329214e-05],
+        [1.7307657759972634, 0.015302520233810981, 1.7185443880748966e-05],
         rtol=1e-2,
         atol=1e-2,
     )
@@ -626,7 +629,7 @@ def test_sec_harm_1_rel(tmp_path):
             float(output["q_Z"][-1]),
             float(output["q_zeta"][-1]),
         ],
-        [1.8975282918693326, -0.015842580414156197, -2.0258121032266632e-05],
+        [1.8631895522670991, -0.016173229853573817, -4.274971098350256e-05],
         rtol=1e-2,
         atol=1e-2,
     )
@@ -788,7 +791,7 @@ def test_sec_harm_3_rel(tmp_path):
             float(output["q_Z"][-1]),
             float(output["q_zeta"][-1]),
         ],
-        [1.743676653710253, -0.17490610912314625, 0.03228998311608891],
+        [1.7142201582176726, -0.19048766599900008, 0.03326574032585646],
         rtol=1e-2,
         atol=1e-2,
     )
@@ -1032,7 +1035,7 @@ def test_sec_harm_6_rel(tmp_path):
             float(output["q_Z"][-1]),
             float(output["q_zeta"][-1]),
         ],
-        [1.8727077745502694, -0.14516056979886102, 0.00040192846208131653],
+        [1.8134002015544437, -0.16923651161742756, 0.0012300719829534358],
         rtol=1e-2,
         atol=1e-2,
     )
@@ -1080,6 +1083,9 @@ def test_flag_true(tmp_path):
 
 
 def test_flag_false(tmp_path):
+    # Regression check only: with resonance_flag=False the ray carries on past f_ce = f, but there the root
+    # selected by mode_flag switches from O to X, H jumps from 0 to -1 and stays there, so the rest of the ray is
+    # unphysical (the LCFS acts as a cutoff). This checks that Scotty keeps doing the same thing.
     kwargs_dict = {
         "poloidal_launch_angle_Torbeam": 3,
         "toroidal_launch_angle_Torbeam": 0,
@@ -1113,7 +1119,7 @@ def test_flag_false(tmp_path):
             float(output["q_Z"][-1]),
             float(output["q_zeta"][-1]),
         ],
-        [1.1957606076131668, -0.387656945685278, -0.02299510661920331],
+        [1.8843654461072583, 0.21790749800723794, -0.012727702274718262],
         rtol=1e-2,
         atol=1e-2,
     )

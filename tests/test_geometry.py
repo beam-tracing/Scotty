@@ -173,3 +173,60 @@ def test_interpolated():
         circular_field.poloidal_flux(R_midplane, 0.0),
         rtol=1e-3,
     )
+
+
+def test_circular_flux_surface():
+    B_T_axis = 1.0
+    R_axis = 2.0
+    minor_radius_a = 1.0
+    B_p_a = 0.5
+    field = geometry.CircularFluxSurfaceField(
+        B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
+    )
+
+    # psi_pol = (r/a)^2, so rho_pol = r/a
+    npt.assert_allclose(field.poloidal_flux(R_axis + 0.5, 0.0), 0.25)
+    npt.assert_allclose(field.poloidal_flux(R_axis, -minor_radius_a), 1.0)
+
+    # B_p_a is the poloidal field on the LCFS at R = R_axis, and B_p is linear in r
+    # at fixed R
+    assert np.isclose(field.B_R(R_axis, minor_radius_a), B_p_a), "top"
+    assert np.isclose(field.B_R(R_axis, 0.5 * minor_radius_a), 0.5 * B_p_a), "half"
+    assert np.isclose(field.magnitude(R_axis, 0.0), B_T_axis), "on axis"
+    npt.assert_allclose(field.unit(R_axis, 0.0), [0, 1, 0])
+
+    # B_p = grad(Psi) x grad(zeta) with Psi = B_p_a a R_axis psi_pol / 2
+    width = minor_radius_a + 0.05
+    R = np.linspace(R_axis - width, R_axis + width, 99)
+    Z = np.linspace(-width, width, 101)
+    R_grid, Z_grid = np.meshgrid(R, Z, indexing="ij")
+    B_R = field.B_R(R_grid, Z_grid)
+    B_Z = field.B_Z(R_grid, Z_grid)
+    Psi = 0.5 * B_p_a * minor_radius_a * R_axis * field.poloidal_flux(R_grid, Z_grid)
+    dPsi_dR, dPsi_dZ = np.gradient(Psi, R, Z, edge_order=2)
+    npt.assert_allclose(B_R, dPsi_dZ / R_grid, rtol=1e-6, atol=1e-6)
+    npt.assert_allclose(B_Z, -dPsi_dR / R_grid, rtol=1e-6, atol=1e-6)
+
+    # Divergence-free: (1/R) d(R B_R)/dR + dB_Z/dZ = 0
+    divergence = np.gradient(R_grid * B_R, R, axis=0, edge_order=2) / R_grid + np.gradient(
+        B_Z, Z, axis=1, edge_order=2
+    )
+    npt.assert_allclose(divergence, 0.0, atol=1e-10)
+
+    # Same direction of rotation as CircularCrossSectionField
+    total_sign = np.sign(B_R) * np.sign(B_Z)
+    assert total_sign[0, 0] == -1, "Top left"
+    assert total_sign[0, -1] == 1, "Top right"
+    assert total_sign[-1, 0] == 1, "Bottom left"
+    assert total_sign[-1, -1] == -1, "Bottom right"
+
+
+def test_deprecated_circular_fields_warn():
+    import pytest
+
+    for cls in (
+        geometry.CircularCrossSectionField,
+        geometry.ConstantCurrentDensityField,
+    ):
+        with pytest.warns(DeprecationWarning, match="Scotty v4"):
+            cls(B_T_axis=1.0, R_axis=2.0, minor_radius_a=1.0, B_p_a=0.5)
