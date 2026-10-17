@@ -208,9 +208,9 @@ def test_circular_flux_surface():
     npt.assert_allclose(B_Z, -dPsi_dR / R_grid, rtol=1e-6, atol=1e-6)
 
     # Divergence-free: (1/R) d(R B_R)/dR + dB_Z/dZ = 0
-    divergence = np.gradient(R_grid * B_R, R, axis=0, edge_order=2) / R_grid + np.gradient(
-        B_Z, Z, axis=1, edge_order=2
-    )
+    divergence = np.gradient(
+        R_grid * B_R, R, axis=0, edge_order=2
+    ) / R_grid + np.gradient(B_Z, Z, axis=1, edge_order=2)
     npt.assert_allclose(divergence, 0.0, atol=1e-10)
 
     # Same direction of rotation as CircularCrossSectionField
