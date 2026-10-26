@@ -126,10 +126,6 @@ def find_K_plasma(
 
         # Getting magnetic field quantities
         B_vec, b_hat, B_magnitude = field.all(*q_entry)
-        # TO REMOVE -- leaving here just in case
-        # B_vec = field.vector(*q_entry)
-        # B_magnitude = field.magnitude(*q_entry)
-        # b_hat = field.unitvector(*q_entry)
 
         # Check plasma cutoff and hybrid frequencies
         (   normalised_plasma_freq,
@@ -161,7 +157,7 @@ def find_K_plasma(
         ##################################################
         """)
 
-        # TO REMOVE -- need to rewrite andf refactor this properly. 12 Nov
+        # TODO -- need to rewrite andf refactor this properly. 12 Nov
         mode_flag_sign = 1 # find_mode_flag_sign(electron_density_p, B_magnitude, launch_angular_frequency, temperature)
         if ((mode_flag_sign * mode_flag ==  1 and normalised_plasma_freq >= 1) or
             (mode_flag_sign * mode_flag == -1 and normalised_LH_cutoff_freq >= 1) or
@@ -425,53 +421,6 @@ def find_Psi_3D_plasma(
         Psi_YZ_v = Psi_3D_vacuum_labframe[1,2]
         Psi_ZZ_v = Psi_3D_vacuum_labframe[2,2]
 
-
-        """
-        # TO REMOVE
-        FOR DEBUGGING MISMATCH OF Re[Psi_YZ]
-        13 OCTOBER 2026
-        for MASTU 51353, 410ms
-        modeflag -1
-        52.5 GHz, pol 7, tor 0
-        width 0.05, curv -1.5
-        launchpos [2.35, 0, 0]
-        """
-        # K_vacuum = np.array([-1092.1170282617509, 1.2171098275448104e-13, -134.09510976970412])
-        # K_plasma = np.array([-1087.6302602044418, 1.2171098275448104e-13, -135.06788712852506])
-
-        # Psi_XX_v = 29.254412058819245 + 20.303695227198308j
-        # Psi_XY_v = 0.0 + 0.0j
-        # Psi_XZ_v = -238.25806635374164 - 165.36032769831752j
-        # Psi_YY_v = 1969.7106437030507 + 1367.0554894457j
-        # Psi_YZ_v = 0.0 + 0.0j
-        # Psi_ZZ_v = 1940.4562316442316 + 1346.751794218502j
-
-        # dH_dX = -1.0866082358929052
-        # dH_dY = 0.0 # by default
-        # dH_dZ = 0.23415371211477076
-        # dH_dKx = -0.0017966143140940583
-        # dH_dKy = -7.61154327344471e-07
-        # dH_dKz = -0.00022377251051808322
-
-        # dp_dX = 3.020102766827291
-        # dp_dY = 0.0
-        # dp_dZ = -0.6547892726694808
-        # d2p_dX2 = -2.8464063509182944
-        # d2p_dY2 = 0.0
-        # d2p_dZ2 = 5.038813976261604
-        # d2p_dXdY = 0.0
-        # d2p_dXdZ = -1.5450856875986865
-        # d2p_dYdZ = 0.0
-
-        # interface_matrix = np.array([
-        #     [0, 0, 0, 1, 0, 0],
-        #     [dp_dZ**2, 0, -2*dp_dX*dp_dZ, 0, 0, dp_dX**2],
-        #     [0,  -dp_dZ, 0, 0, dp_dX, 0],
-        #     [dH_dKx,    dH_dKy,        dH_dKz,                   0,         0,                       0                 ],
-        #     [0,         dH_dKx,        0,                        dH_dKy,    dH_dKz,                  0                 ],
-        #     [0,         0,             dH_dKx,                   0,         dH_dKy,                  dH_dKz            ],
-        # ], dtype=np.float64)
-
         # Now we set up the interface matrix using 6 linearly
         # independent equations to obtain a relation between the
         # entries of "Psi_v" and "Psi_p". Note that this matrix
@@ -526,8 +475,6 @@ def find_Psi_3D_plasma(
             eta_XY  = -0.5 * (d2p_dX2*dp_dY**2 + 2*d2p_dXdY*dp_dX*dp_dY + d2p_dY2*dp_dX**2) / (dp_dX**2 + dp_dY**2)
             eta_XZ  = -0.5 * (d2p_dX2*dp_dZ**2 + 2*d2p_dXdZ*dp_dX*dp_dZ + d2p_dZ2*dp_dX**2) / (dp_dX**2 + dp_dZ**2)
             eta_XYZ = -0.5 * (d2p_dX2*dp_dZ**2 + d2p_dY2*dp_dZ**2 + d2p_dZ2*(dp_dX + dp_dY)**2 + 2*d2p_dXdY*dp_dZ**2 + 2*d2p_dXdZ*dp_dZ*(dp_dX + dp_dY) + 2*d2p_dYdZ*dp_dZ*(dp_dX + dp_dY)) / ( dp_dX**2 + dp_dY**2 + dp_dZ**2 )
-            # seems like this (below) has some issues; reverting back to the one in BC_3D.py (above)
-            # ((d2p_dX2 + 2*d2p_dXdY + d2p_dY2)*dp_dZ**2 + d2p_dZ2*(dp_dX + dp_dY)**2 - 2*(d2p_dXdZ + d2p_dYdZ)*dp_dZ*(dp_dX + dp_dY)) / ( dp_dX**2 + dp_dY**2 + dp_dZ**2 )
 
             log.debug(f"""
         #
@@ -541,9 +488,6 @@ def find_Psi_3D_plasma(
             np.dot(Psi_v_vector, interface_matrix[0]) + 2*eta_XY *np.dot(delta_K, np.array([dp_dX, dp_dY, 0])),
             np.dot(Psi_v_vector, interface_matrix[1]) + 2*eta_XZ *np.dot(delta_K, np.array([dp_dX, 0, dp_dZ])),
             np.dot(Psi_v_vector, interface_matrix[2]) + 2*eta_XYZ*np.dot(delta_K, np.array([dp_dX, dp_dY, dp_dZ])),
-            # (Psi_XX_v * dp_dY**2) + (Psi_YY_v * dp_dX**2) - (2 * Psi_XY_v * dp_dX * dp_dY) + 2*(delta_K[0])*dp_dX*eta_XY + 2*(delta_K[1])*dp_dY*eta_XY,
-            # (Psi_XX_v * dp_dZ**2) + (Psi_ZZ_v * dp_dX**2) - (2 * Psi_XZ_v * dp_dX * dp_dZ) + 2*(delta_K[0])*dp_dX*eta_XZ + 2*(delta_K[2])*dp_dZ*eta_XZ,
-            # Psi_XX_v*dp_dZ**2 + Psi_YY_v*dp_dZ**2 + Psi_ZZ_v*(dp_dX + dp_dY)**2 + 2*Psi_XY_v*dp_dZ**2 - 2*Psi_XZ_v*dp_dZ*(dp_dX + dp_dY) - 2*Psi_YZ_v*dp_dZ*(dp_dX + dp_dY) + 2*(delta_K[0])*dp_dX*eta_XYZ + 2*(delta_K[1])*dp_dY*eta_XYZ + 2*(delta_K[2])*dp_dZ*eta_XYZ,
             -dH_dX,
             -dH_dY,
             -dH_dZ,
@@ -609,63 +553,6 @@ def find_Psi_3D_plasma(
         #
         ##################################################
         """) # pyright: ignore[reportPossiblyUnbound]
-
-    from scotty.fun_general_v4 import find_Psi_3D_labframe_cart_to_cyl
-    Psi_3D_vacuum_labframe_cylindrical = find_Psi_3D_labframe_cart_to_cyl(Psi_3D_vacuum_labframe, K_vacuum, q_entry)
-    Psi_3D_plasma_labframe_cylindrical = find_Psi_3D_labframe_cart_to_cyl(Psi_3D_plasma_labframe, K_plasma, q_entry)
-    
-    log.warning(f"""
-
-
-q_entry cartesian
-{q_entry}
-
-K_vacuum cartesian
-{K_vacuum}
-
-K_plasma cartesian
-{K_plasma}
-
-K_plasma cylindrical
-{find_K_labframe_cart_to_cyl(K_plasma, q_entry)}
-
-Psi_3D_vacuum_labframe, cartesian
-XX {Psi_3D_vacuum_labframe[0,0]}
-XY {Psi_3D_vacuum_labframe[0,1]}
-XZ {Psi_3D_vacuum_labframe[0,2]}
-YY {Psi_3D_vacuum_labframe[1,1]}
-YZ {Psi_3D_vacuum_labframe[1,2]}
-ZZ {Psi_3D_vacuum_labframe[2,2]}
-
-Psi_3D_vacuum_labframe, cylindrical
-RR {Psi_3D_vacuum_labframe_cylindrical[0,0]}
-Rp {Psi_3D_vacuum_labframe_cylindrical[0,1]}
-RZ {Psi_3D_vacuum_labframe_cylindrical[0,2]}
-pp {Psi_3D_vacuum_labframe_cylindrical[1,1]}
-pZ {Psi_3D_vacuum_labframe_cylindrical[1,2]}
-ZZ {Psi_3D_vacuum_labframe_cylindrical[2,2]}
-
-Psi_3D_plasma_labframe, cartesian
-XX {Psi_3D_plasma_labframe[0,0]}
-XY {Psi_3D_plasma_labframe[0,1]}
-XZ {Psi_3D_plasma_labframe[0,2]}
-YY {Psi_3D_plasma_labframe[1,1]}
-YZ {Psi_3D_plasma_labframe[1,2]}
-ZZ {Psi_3D_plasma_labframe[2,2]}
-
-Psi_3D_plasma_labframe, cylindrical
-RR {Psi_3D_plasma_labframe_cylindrical[0,0]}
-Rp {Psi_3D_plasma_labframe_cylindrical[0,1]}
-RZ {Psi_3D_plasma_labframe_cylindrical[0,2]}
-pp {Psi_3D_plasma_labframe_cylindrical[1,1]}
-pZ {Psi_3D_plasma_labframe_cylindrical[1,2]}
-ZZ {Psi_3D_plasma_labframe_cylindrical[2,2]}
-
-RHS_vector[2]
-{np.dot(Psi_v_vector, interface_matrix[2]) + 2*eta_XYZ*np.dot(delta_K, np.array([dp_dX, dp_dY, dp_dZ]))}
-
-
-""")
 
     return Psi_3D_plasma_labframe
 

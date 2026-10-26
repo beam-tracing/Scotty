@@ -140,7 +140,7 @@ class MagneticField_Cylindrical(ABC):
     R_coord: FloatArray #: Sample locations for the major radius coordinate
     Z_coord: FloatArray #: Sample locations for the vertical coordinate
     poloidalFlux_grid: FloatArray #: Value of the poloidal magnetic flux, :math:`\psi`, on ``(R_coord, Z_coord)``
-    # TODO: Include B_R grid, B_T grid, B_Z grids # TO REMOVE
+    # TODO: Include B_R grid, B_T grid, B_Z grids
 
     def B_R(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike: raise NotImplementedError
     def B_T(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike: raise NotImplementedError
@@ -206,31 +206,6 @@ class MagneticField_Cylindrical(ABC):
         Input: cylindrical (R, zeta, Z)
         """
         return self._calculate_incyl_outcyl(R,_,Z, vector=False, unitvector=False, magnitude=True)[0]
-    
-    # TO REMOVE -- incomplete 25 Apr 2026
-    # def _calculate_incyl_outcart(self, R: ArrayLike, zeta: ArrayLike, Z: ArrayLike) -> FloatArray:
-    
-    # TO REMOVE -- incomplete 25 Apr 2026
-    # def _calculate(self, q1: ArrayLike, q2: ArrayLike, q3: ArrayLike, in_coords: str = "cylindrical", out_coords: str = "cylindrical", vector: bool = False, unitvector: bool = False, magnitude: bool = False) -> List[FloatArray]:
-    #     if   in_coords in ["cart", "cartesian"]:  R, zeta, Z = np.sqrt(q1**2 + q2**2), np.arctan2(q2, q1), q3
-    #     elif in_coords in ["cyl", "cylindrical"]: R, zeta, Z = q1, q2, q3
-    #     else: raise ValueError(f"`in_coords` must be one of ['cartesian', 'cylindrical'], but got {in_coords}")
-
-    #     toreturn = []
-    #     B_R = self.B_R(R, zeta, Z)
-    #     B_T = self.B_T(R, zeta, Z)
-    #     B_Z = self.B_Z(R, zeta, Z)
-        
-    #     if out_coords in ["cart", "cartesian"]:
-    #         B_1 = self.B_X(R, zeta, Z)
-    #         B_2 = self.B_Y(R, zeta, Z)
-    #     elif out_coords in ["cyl", "cylindrical"]:
-    #         B_1 = self.B_R(R, zeta, Z)
-    #         B_2 = self.B_T(R, zeta, Z)
-    #     else: raise ValueError(f"`out_coords` must be one of ['cartesian', 'cylindrical'], but got {out_coords}")
-        
-    #     B_3 = self.B_Z(R, zeta, Z)
-    #     B_vec = np.array([ B_1, B_2, B_3 ])
 
     # For abstraction purposes
     def B_X(self, R: ArrayLike, zeta: ArrayLike, Z: ArrayLike) -> ArrayLike: return self.B_R(R,zeta,Z)*np.cos(zeta) - self.B_T(R,zeta,Z)*np.sin(zeta)
@@ -338,7 +313,7 @@ class MagneticField_Cartesian(ABC):
     X_coord: FloatArray
     Y_coord: FloatArray
     Z_coord: FloatArray
-    # TODO: Include B_X, B_Y, B_Z, psi grids # TO REMOVE
+    # TODO: Include B_X, B_Y, B_Z, psi grids
 
     def B_X(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike: raise NotImplementedError
     def B_Y(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike: raise NotImplementedError
@@ -465,7 +440,7 @@ class InterpolatedField_Cartesian(MagneticField_Cartesian):
     def B_Z(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike: return self._interp_B_Z(X,Y,Z)
     def polflux(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike: return self._interp_polflux(X,Y,Z)
 
-    # TO REMOVE -- 30 September 2026
+    # TODO -- 30 September 2026
     # Defining class attributes for first order derivatives of B field -- for future work?
     # Need to compare with dbhats in analysis.py
     # These are from scotty 3D
@@ -487,7 +462,7 @@ class InterpolatedField_Cartesian(MagneticField_Cartesian):
     #     return self._spline_B_Y((X,Y,Z), nu=[0,0,1])
     # def d_B_Z_dZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return self._spline_B_Z((X,Y,Z), nu=[0,0,1])
-    # NOTE NEED TO RENAME: this isnt actually d(bhat)/dX, but d(Bvec)/dX
+    # TODO NEED TO RENAME: this isnt actually d(bhat)/dX, but d(Bvec)/dX
     # Need to use chain rule to get d(bhat)/dX, so might actually be less computationally expensive to use finite differences
     # def d_bhat_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return np.array( [self.d_B_X_dX(X,Y,Z), self.d_B_Y_dX(X,Y,Z), self.d_B_Z_dX(X,Y,Z)] ).T
@@ -520,7 +495,7 @@ class InterpolatedField_Cartesian(MagneticField_Cartesian):
     def d2_polflux_dYdZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float, delta_Z: float) -> ArrayLike:
         return derivative(self.polflux, ("Y", "Z"), {"X": X, "Y": Y, "Z": Z}, {"Y": delta_Y, "Z": delta_Z})
 
-    # TO REMOVE -- 30 September 2026
+    # TODO -- 30 September 2026
     # Defining class attributes for poloidal flux derivatives
     # These are from scotty 3D
     # def d_polflux_dX_TEST(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
@@ -538,7 +513,6 @@ class InterpolatedField_Cartesian(MagneticField_Cartesian):
 #
 ##################################################
 
-# TO REMOVE -- see if can find a more elegant solution instead of interp_order_str/int
 def create_magnetic_geometry(
     geometry: Literal["cylindrical", "cartesian"],
     find_B_method: Union[str, MagneticField_Cylindrical, MagneticField_Cartesian],
@@ -552,47 +526,6 @@ def create_magnetic_geometry(
     **kwargs: Optional[dict]
 ) -> Union[MagneticField_Cylindrical, MagneticField_Cartesian]:
     
-    log.debug(f"Reading and creating field profile")
-
-    # TO REMOVE 17 sep 26 -- this is for benchmarking
-    # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
-    # elif isinstance(find_B_method, (MagneticField_Cylindrical)) and geometry == "cartesian":
-    log.debug(f"Creating a 3-D field profile from the given 2-D profile")
-    min_X, max_X = np.min(find_B_method.R_coord), np.max(find_B_method.R_coord)
-    min_Z, max_Z = np.min(find_B_method.Z_coord), np.max(find_B_method.Z_coord)
-    X_coords = find_B_method.R_coord # np.linspace(min_X, max_X, round((max_X-min_X)/0.01+1))
-    Y_coords = np.linspace(-1, 1, 101) # np.linspace(-0.25, 0.1, 36)
-    Z_coords = find_B_method.Z_coord # np.linspace(min_Z, max_Z, round((max_Z-min_Z)/0.01+1))
-
-    XX, YY, ZZ = np.meshgrid(X_coords, Y_coords, Z_coords, indexing="ij")
-    RR = np.sqrt(XX**2 + YY**2)
-
-    B_R = find_B_method.B_R(RR, ZZ)
-    B_T = find_B_method.B_T(RR, ZZ)
-    B_X = (B_R*XX - B_T*YY) / RR
-    B_Y = (B_R*YY + B_T*XX) / RR
-    B_Z = find_B_method.B_Z(RR, ZZ)
-    polflux = find_B_method.poloidal_flux(RR, ZZ)
-
-    (
-        field,
-        duration_field_interpolation
-    ) = timer(InterpolatedField_Cartesian)(
-        X_coords, Y_coords, Z_coords,
-        B_X, B_Y, B_Z, polflux,
-        interp_order_str)
-    
-    log.debug(f"Converting the field profile took {duration_field_interpolation} s")
-
-    return field
-
-
-    # the problem with this script is that the 2nd elif (if we get Mag_cyld but geom is cart)
-    # is not consistent. because this is for scotty v3's mag_cyld, but we are using scotty v4's
-    # mag_cyld. solving should be simple, like importing the scotty v3 cyld interpolated field
-    # and then using that to check the instance type
-
-    # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
     log.debug(f"Reading and creating field profile")
 
     # If the user passes an interpolated field, then just use that    

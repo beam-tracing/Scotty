@@ -198,12 +198,12 @@ class Parameters:
          self.interp_order_magnetic_data_int) = self._check_interp_order("magnetic", interp_order)
 
         self.ne_data_path = self._check_data_path("ne", ne_data_path)
-        _, self.interp_order_ne_data = self._check_interp_order("ne", interp_order) # TO REMOVE -- is this needed? or same interp_order for B and ne?
+        _, self.interp_order_ne_data = self._check_interp_order("ne", interp_order) # TODO -- is this needed? or same interp_order for B and ne?
         self.density_fit_parameters = density_fit_parameters
         self.density_fit_method = density_fit_method
 
         self.Te_data_path = self._check_data_path("Te", Te_data_path)
-        self.interp_order_Te_data = None # TO REMOVE -- not implemented yet?
+        self.interp_order_Te_data = None # TODO -- not implemented yet? implement together with temp. profile
         self.temperature_fit_parameters = temperature_fit_parameters
         self.temperature_fit_method = temperature_fit_method
 
@@ -219,7 +219,7 @@ class Parameters:
         self.further_analysis_flag = further_analysis_flag
         self.detailed_analysis_flag = detailed_analysis_flag
 
-        # Untested stuff # TO REMOVE?
+        # TODO should check this works properly again
         self._check_mode_flag_launch_and_launch_flag(mode_flag_launch=mode_flag_launch, launch_flag=launch_flag)
         self._unpack_kwargs_for_circular_flux_surfaces(extras = kwargs)
         self._unpack_kwargs_for_plasma_launch(extras = kwargs)
@@ -313,7 +313,7 @@ class Parameters:
         R_axis         = extras.pop("R_axis", None)
         minor_radius_a = extras.pop("minor_radius_a", None)
         
-        # TO REMOVE -- do we do it like this?
+        # TODO -- do we do it like this?
         # either all of them are defined, or none of them are
         # should also insert type hinting and checks
         _sum = bool(B_T_axis) + bool(B_p_a) + bool(R_axis) + bool(minor_radius_a)
@@ -376,12 +376,6 @@ class Parameters:
         if (self.density_fit_parameters is None) and (self.density_fit_method in [None, "smoothing-spline-file"]):
             self.ne_filename = self.ne_data_path / f"ne{self.input_filename_suffix}.dat"
             self.density_fit_parameters = [self.ne_filename, self.interp_order_ne_data, self.interp_smoothing]
-
-            # TO REMOVE?
-            # FIXME: Read data so it can be saved later
-            ne_data = np.fromfile(self.ne_filename, dtype=float, sep="   ")
-            # ne_data_density_array = ne_data[2::2]
-            # ne_data_radialcoord_array = ne_data[1::2]
         else: self.ne_filename = None
 
     def coordinate_conversions(self):

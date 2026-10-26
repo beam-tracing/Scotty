@@ -327,18 +327,6 @@ def find_Psi_3D_labframe_cyl_to_cart(Psi_3D_labframe_cylindrical: ComplexFloatAr
 
     Psi_cart = np.matmul(np.matmul(rotation_matrix_xi, Psi_temp), rotation_matrix_xi_inverse)
 
-    # TO REMOVE manually solved via Gaussian elimination
-    # Psi_cart = np.zeros([N,3,3], dtype="complex128")
-    # Psi_cart[:, 0, 0] = 2*(K_zeta + Psi_zetazeta) / (q_R**2 * (1-np.cos(2*q_zeta)))
-    # Psi_cart[:, 0, 1] = (-K_zeta + q_R*Psi_Rzeta) / (q_R**2 * np.cos(2*q_zeta))
-    # Psi_cart[:, 0, 2] = (-Psi_zetaZ) / (q_R*np.sin(q_zeta))
-    # Psi_cart[:, 1, 1] = (-2*Psi_RR) / (np.cos(2*q_zeta)-1)
-    # Psi_cart[:, 1, 2] = Psi_RZ / np.sin(q_zeta)
-    # Psi_cart[:, 2, 2] = Psi_ZZ
-    # Psi_cart[:, 1, 0] = Psi_cart[:, 0, 1]
-    # Psi_cart[:, 2, 0] = Psi_cart[:, 0, 2]
-    # Psi_cart[:, 2, 1] = Psi_cart[:, 1, 2]
-
     return Psi_cart[0] if squeeze else Psi_cart
 
 def find_vector_and_q_cyl_to_cart(vector_labframe_cyl: FloatArray, q_labframe_cyl: FloatArray) -> Tuple[FloatArray, FloatArray]:
@@ -540,7 +528,7 @@ def poloidal_flux_difference_along_ray_line(
     if polflux is np.nan: return polflux
     else: return polflux - poloidal_flux_enter
 
-# TO REMOVE -- rewrite using Einstein summation convention?
+# TODO -- rewrite using Einstein summation convention?
 def dot(a: Array, b: Array) -> Array:
     """
     Dot product of arrays of vectors or matrices, which covers the case

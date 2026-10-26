@@ -15,11 +15,6 @@ import xarray as xr
 
 log = logging.getLogger(__name__)
 
-def _temp_print_dict(analysis_dict: dict):
-    for k, v in analysis_dict.items():
-        if v[-1] is None: log.debug(f"{k} -- {v} -- {v}")
-        else:             log.debug(f"{k} -- {v[-1].shape} -- {v[-1]}")
-
 def basic_analysis(
     inputs: xr.Dataset,
     solver_output: xr.Dataset,

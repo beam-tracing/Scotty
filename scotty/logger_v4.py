@@ -110,7 +110,6 @@ def ralt(log: logging.Logger, msg: str, f: Callable[..., Any], *args, **kwargs):
 
 P = ParamSpec("P")
 R = TypeVar("R")
-# TO REMOVE -- use a decorator instead?
 def timer(func: Callable[P, R]) -> Callable[P, Tuple[R, float]]:
     @wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> Tuple[Any, float]:

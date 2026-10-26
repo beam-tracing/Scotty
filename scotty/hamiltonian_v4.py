@@ -157,12 +157,6 @@ class Hamiltonian:
             electron_density = electron_density,
             temperature = temperature,
         )
-        # TO REMOVE -- old code, putting for reference
-        # epsilon = DielectricTensor(self.angular_frequency, B_magnitude, electron_density, temperature)
-        # e_bb, e_11, e_12 = epsilon.e_bb, epsilon.e_11, epsilon.e_12
-        # Booker_alpha = (e_bb * sin_theta_m_sq) + e_11 * (1 - sin_theta_m_sq)
-        # Booker_beta  = (-e_11 * e_bb * (1 + sin_theta_m_sq)) - (e_11**2 - e_12**2) * (1 - sin_theta_m_sq)
-        # Booker_gamma = e_bb * (e_11**2 - e_12**2)
 
         H_discriminant = np.maximum(np.zeros_like(Booker_beta), Booker_beta**2 - 4 * Booker_alpha * Booker_gamma)
 
@@ -269,8 +263,6 @@ class Hamiltonian:
                 "dH_dKY":    apply_stencil(("K1",), "d1_CFD2"),
                 "dH_dKZ":    apply_stencil(("K2",), "d1_CFD2"),
             }
-
-            # log.warning(f"dH_dY = {dH["dH_dY"]}")
 
             if second_order:
                 dH.update({
@@ -496,7 +488,8 @@ def convert_hessians(
     start: Literal["cartesian", "cylindrical"],
     end: Literal["cylindrical", "cartesian"]
 ) -> Tuple[FloatArray, FloatArray, FloatArray]:
-    """
+    """***TODO from the previous code; not sure if mixed derivatives are correct or not***
+
     Convert Hessians from Cartesian to cylindrical or vice versa
 
     Parameters
@@ -548,7 +541,7 @@ def convert_hessians(
         d2H_dR_dKR, d2H_dzeta_dKR, d2H_dZ_dKR, d2H_dR_dKzeta, d2H_dzeta_dKzeta, d2H_dZ_dKzeta, d2H_dR_dKZ, d2H_dzeta_dKZ, d2H_dZ_dKZ = gradK_grad_H_start.reshape(gradK_grad_H_start.shape[0], 9).T
         d2H_dKR2, d2H_dKR_dKzeta, d2H_dKR_dKZ, d2H_dKzeta2, d2H_dKzeta_dKZ, d2H_dKZ2 = gradK_gradK_H_start[:, ij[0], ij[1]].T
 
-        # TO REMOVE from the previous code; not sure if mixed derivatives are correct or not
+        # TODO from the previous code; not sure if mixed derivatives are correct or not
         d2H_dX2   = cos2*d2H_dR2 - 2*sincos/R*d2H_dR_dzeta + sin2/R2*d2H_dzeta2 + sin2/R*dH_dR + 2*sincos/R2*dH_dzeta
         d2H_dX_dY = sincos*d2H_dR2 + (cos2-sin2)/R*d2H_dR_dzeta - sincos/R2*d2H_dzeta2 - sincos/R*dH_dR + (sin2-cos2)/R2*dH_dzeta
         d2H_dX_dZ = cos*d2H_dR_dZ - sin/R*d2H_dzeta_dZ

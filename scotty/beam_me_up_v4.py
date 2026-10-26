@@ -1,4 +1,3 @@
-# import datatree # TO REMOVE -- find a replacement for this? if not, uncoment the -> for def beam_me_up
 import datetime
 import logging
 import numpy as np
@@ -18,7 +17,7 @@ from scotty.profile_fit import ProfileFitLike, profile_fit
 from scotty.ray_solver_v4 import ray_tracing
 from scotty.typing import FloatArray, PathLike
 from scotty._version import __version__
-from typing import Optional, Sequence, Tuple, Union, Literal, cast
+from typing import Optional, Sequence, Tuple, Union, Literal, cast, overload
 import uuid
 import xarray as xr
 
@@ -82,7 +81,7 @@ def beam_me_up(
     figure_flag: bool = True,
     further_analysis_flag: bool = False,
     detailed_analysis_flag: bool = False,
-    # TO REMOVE -- need to put individual flags for each plot
+    # TODO -- need to put individual flags for each plot
 
     # Additional flags
     benchmarking_flag: bool = False,
@@ -92,7 +91,7 @@ def beam_me_up(
     # Keeping the extra kwargs for parsing later
     **kwargs,
 
-):# -> datatree.DataTree:
+) -> Union[xr.DataTree, Tuple[xr.DataTree, MagneticField_Cylindrical | MagneticField_Cartesian]]:
     
     # INSERT DOC STRING HERE
 
@@ -211,7 +210,7 @@ def beam_me_up(
         parameters = params.density_fit_parameters,
         filename = params.ne_filename)
     
-    # TO REMOVE # TODO THIS SOON
+    # TODO THIS SOON
     # Using the temperature data, create a spline fit as a
     # function of poloidal flux, i.e.:
     # temperature_fit(poloidal_flux) = temperature
@@ -419,31 +418,8 @@ def beam_me_up(
         invalid_netcdf = True,
     )
 
-    # TO REMOVE 14 Sep 26 -- this is for benchmarking
-    if benchmarking_flag:
-        # print(params.q_output.shape)
-        # print(params.K_output.shape)
-        _dH = hamiltonian.derivatives(params.q_output.T, params.K_output.T)
-        _g_magnitude = np.sqrt( _dH["dH_dKX"]**2 + _dH["dH_dKY"]**2 + _dH["dH_dKZ"]**2 )
-        _g_hat = (np.block([[_dH["dH_dKX"]], [_dH["dH_dKY"]], [_dH["dH_dKZ"]]]) / _g_magnitude).T
-        _y_hat = make_unit_vector_from_cross_product(field.unitvector(params.q_output.T[0], params.q_output.T[1], params.q_output.T[2]), _g_hat)
-        _x_hat = make_unit_vector_from_cross_product(_y_hat, _g_hat)
-
-        Psi_w = np.zeros((len(params.Psi_3D_output_labframe), 2, 2), dtype=np.complex128)
-        Psi_w[:, 0, 0] = dot(_x_hat, dot(params.Psi_3D_output_labframe, _x_hat))
-        Psi_w[:, 0, 1] = Psi_w[:, 1, 0] = dot(_x_hat, dot(params.Psi_3D_output_labframe, _y_hat))
-        Psi_w[:, 1, 1] = dot(_y_hat, dot(params.Psi_3D_output_labframe, _y_hat))
-        return field, params.solver_status, params.tau_output, params.q_output.T, params.K_output.T, params.Psi_3D_output_labframe, (_g_hat, _x_hat, _y_hat), Psi_w
-    
-
-
-
-
-
-
-
-
-
+    if return_dt_field: return dt, field
+    else:               return dt
 
 def make_fit(
     method: Optional[Union[str, ProfileFitLike]],
