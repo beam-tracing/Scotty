@@ -306,7 +306,7 @@ def find_plasma_entry_parameters(
     # calculate the K and Psi, and plus other stuff
     # This, however, is fully implemented -- TO REMOVE this msg
     else:
-        log.debug(f"`launch_flag` = {launch_flag}. Launching directly from the plasma boundary")
+        log.debug(f"`launch_flag` = {launch_flag}. Launching from outside the plasma boundary")
         poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_deg_Torbeam)
         toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_deg_Torbeam)
 

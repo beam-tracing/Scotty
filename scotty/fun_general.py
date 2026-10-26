@@ -1164,18 +1164,23 @@ def apply_discontinuous_BC(
     )
 
     print("\n\n\n")
-    print("fun_general:1167")
+    print("TO REMOVE from fun_general:1167")
     print("dH_dR", dH["dH_dR"])
     print("dH_dzeta 0 by default")
     print("dH_dZ", dH["dH_dZ"])
     print("dH_dKR", dH["dH_dKR"])
     print("dH_dKzeta", dH["dH_dKzeta"])
     print("dH_dKZ", dH["dH_dKZ"])
+    print()
     print("dp/dR", d_poloidal_flux_dR_boundary)
     print("dp/dZ", d_poloidal_flux_dZ_boundary)
     print("d2p/dR2", d2_poloidal_flux_dR2_boundary)
     print("d2p/dZ2", d2_poloidal_flux_dZ2_boundary)
     print("d2p/dRdZ", d2_poloidal_flux_dRdZ_boundary)
+    print()
+    print("q_R", q_R)
+    print("q_Z", q_Z)
+    print("\n\n\n")
 
     return K_plasma, Psi_3D_plasma
 

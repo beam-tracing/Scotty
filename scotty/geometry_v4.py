@@ -142,16 +142,16 @@ class MagneticField_Cylindrical(ABC):
     poloidalFlux_grid: FloatArray #: Value of the poloidal magnetic flux, :math:`\psi`, on ``(R_coord, Z_coord)``
     # TODO: Include B_R grid, B_T grid, B_Z grids # TO REMOVE
 
-    def B_R(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray: raise NotImplementedError
-    def B_T(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray: raise NotImplementedError
-    def B_Z(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray: raise NotImplementedError
-    def polflux(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray: raise NotImplementedError
+    def B_R(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike: raise NotImplementedError
+    def B_T(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike: raise NotImplementedError
+    def B_Z(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike: raise NotImplementedError
+    def polflux(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike: raise NotImplementedError
 
-    def d_polflux_dR(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float) -> FloatArray: raise NotImplementedError
-    def d_polflux_dZ(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_Z: float) -> FloatArray: raise NotImplementedError
-    def d2_polflux_dR2(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float) -> FloatArray: raise NotImplementedError
-    def d2_polflux_dZ2(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_Z: float) -> FloatArray: raise NotImplementedError
-    def d2_polflux_dRdZ(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float, delta_Z: float) -> FloatArray: raise NotImplementedError
+    def d_polflux_dR(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float) -> ArrayLike: raise NotImplementedError
+    def d_polflux_dZ(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_Z: float) -> ArrayLike: raise NotImplementedError
+    def d2_polflux_dR2(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float) -> ArrayLike: raise NotImplementedError
+    def d2_polflux_dZ2(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_Z: float) -> ArrayLike: raise NotImplementedError
+    def d2_polflux_dRdZ(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float, delta_Z: float) -> ArrayLike: raise NotImplementedError
 
     def _calculate_incyl_outcyl(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, vector: bool = False, unitvector: bool = False, magnitude: bool = False) -> List[FloatArray]:
         toreturn = []
@@ -200,7 +200,7 @@ class MagneticField_Cylindrical(ABC):
         """
         return self._calculate_incyl_outcyl(R,_,Z, vector=False, unitvector=True, magnitude=False)[0]
     
-    def magnitude(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+    def magnitude(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike:
         r"""Returns :math:`|B|`, the magnitude of the magnetic field
 
         Input: cylindrical (R, zeta, Z)
@@ -233,19 +233,20 @@ class MagneticField_Cylindrical(ABC):
     #     B_vec = np.array([ B_1, B_2, B_3 ])
 
     # For abstraction purposes
-    def B_X(self, R: ArrayLike, zeta: ArrayLike, Z: ArrayLike) -> FloatArray: return self.B_R(R,zeta,Z)*np.cos(zeta) - self.B_T(R,zeta,Z)*np.sin(zeta)
-    def B_Y(self, R: ArrayLike, zeta: ArrayLike, Z: ArrayLike) -> FloatArray: return self.B_R(R,zeta,Z)*np.sin(zeta) + self.B_T(R,zeta,Z)*np.cos(zeta)
+    def B_X(self, R: ArrayLike, zeta: ArrayLike, Z: ArrayLike) -> ArrayLike: return self.B_R(R,zeta,Z)*np.cos(zeta) - self.B_T(R,zeta,Z)*np.sin(zeta)
+    def B_Y(self, R: ArrayLike, zeta: ArrayLike, Z: ArrayLike) -> ArrayLike: return self.B_R(R,zeta,Z)*np.sin(zeta) + self.B_T(R,zeta,Z)*np.cos(zeta)
 
     def unitvector_cartesian(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
         r"""Returns :math:`\mathbf{B}/|B|`, the unit vector of the magnetic field"""
         R, zeta, Z = find_q_labframe_cart_to_cyl(np.array([X, Y, Z]))
         magnitude = self.magnitude(R, zeta, Z)
         vector = np.array( [self.B_X(R, zeta, Z), self.B_Y(R, zeta, Z), self.B_Z(R, zeta, Z)] )
-        return (vector / magnitude).T
+        unitvector = cast(FloatArray, (vector / magnitude).T)
+        return unitvector
 
-    def polflux_cartesian(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self.polflux(np.sqrt(X**2 + Y**2), 0, Z)
-    def d_polflux_dX(self, R: ArrayLike, zeta: ArrayLike, Z: ArrayLike, delta_R: float) -> FloatArray: return np.cos(zeta) * self.d_polflux_dR(R, zeta, Z, delta_R)
-    def d_polflux_dY(self, R: ArrayLike, zeta: ArrayLike, Z: ArrayLike, delta_R: float) -> FloatArray: return np.sin(zeta) * self.d_polflux_dR(R, zeta, Z, delta_R)
+    def polflux_cartesian(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike: return self.polflux(np.sqrt(X**2 + Y**2), 0, Z)
+    def d_polflux_dX(self, R: ArrayLike, zeta: ArrayLike, Z: ArrayLike, delta_R: float) -> ArrayLike: return np.cos(zeta) * self.d_polflux_dR(R, zeta, Z, delta_R)
+    def d_polflux_dY(self, R: ArrayLike, zeta: ArrayLike, Z: ArrayLike, delta_R: float) -> ArrayLike: return np.sin(zeta) * self.d_polflux_dR(R, zeta, Z, delta_R)
 
 
 
@@ -310,17 +311,17 @@ class InterpolatedField_Cylindrical(MagneticField_Cylindrical):
             self._d2psi_dRdZ = super().d2_polflux_dRdZ
 
     # Defining class attributes for B_R, B_T, B_Z, and polflux
-    def B_R(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray: return self._interp_B_R(R,_,Z)
-    def B_T(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray: return self._interp_B_T(R,_,Z)
-    def B_Z(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray: return self._interp_B_Z(R,_,Z)
-    def polflux(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray: return self._interp_polflux(R,_,Z)
+    def B_R(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike: return self._interp_B_R(R,_,Z)
+    def B_T(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike: return self._interp_B_T(R,_,Z)
+    def B_Z(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike: return self._interp_B_Z(R,_,Z)
+    def polflux(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike: return self._interp_polflux(R,_,Z)
 
     # Defining the class attributes for the first- and second-order derivatives of polflux
-    def d_polflux_dR(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float) -> FloatArray: return self._dpsi_dR(R,_,Z, delta_R)
-    def d_polflux_dZ(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_Z: float) -> FloatArray: return self._dpsi_dZ(R,_,Z, delta_Z)
-    def d2_polflux_dR2(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float) -> FloatArray: return self._d2psi_dR2(R,_,Z, delta_R)
-    def d2_polflux_dZ2(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_Z: float) -> FloatArray: return self._d2psi_dZ2(R,_,Z, delta_Z)
-    def d2_polflux_dRdZ(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float, delta_Z: float) -> FloatArray: return self._d2psi_dRdZ(R,_,Z, delta_R, delta_Z)
+    def d_polflux_dR(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float) -> ArrayLike: return self._dpsi_dR(R,_,Z, delta_R)
+    def d_polflux_dZ(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_Z: float) -> ArrayLike: return self._dpsi_dZ(R,_,Z, delta_Z)
+    def d2_polflux_dR2(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float) -> ArrayLike: return self._d2psi_dR2(R,_,Z, delta_R)
+    def d2_polflux_dZ2(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_Z: float) -> ArrayLike: return self._d2psi_dZ2(R,_,Z, delta_Z)
+    def d2_polflux_dRdZ(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float, delta_Z: float) -> ArrayLike: return self._d2psi_dRdZ(R,_,Z, delta_R, delta_Z)
 
 
 
@@ -339,21 +340,21 @@ class MagneticField_Cartesian(ABC):
     Z_coord: FloatArray
     # TODO: Include B_X, B_Y, B_Z, psi grids # TO REMOVE
 
-    def B_X(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: raise NotImplementedError
-    def B_Y(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: raise NotImplementedError
-    def B_Z(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: raise NotImplementedError
-    def polflux(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: raise NotImplementedError
+    def B_X(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike: raise NotImplementedError
+    def B_Y(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike: raise NotImplementedError
+    def B_Z(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike: raise NotImplementedError
+    def polflux(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike: raise NotImplementedError
 
-    def d_polflux_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float) -> FloatArray: raise NotImplementedError
-    def d_polflux_dY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float) -> FloatArray: raise NotImplementedError
-    def d_polflux_dZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Z: float) -> FloatArray: raise NotImplementedError
+    def d_polflux_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float) -> ArrayLike: raise NotImplementedError
+    def d_polflux_dY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float) -> ArrayLike: raise NotImplementedError
+    def d_polflux_dZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Z: float) -> ArrayLike: raise NotImplementedError
 
-    def d2_polflux_dX2(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float) -> FloatArray: raise NotImplementedError
-    def d2_polflux_dY2(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float) -> FloatArray: raise NotImplementedError
-    def d2_polflux_dZ2(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Z: float) -> FloatArray: raise NotImplementedError
-    def d2_polflux_dXdY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float, delta_Y: float) -> FloatArray: raise NotImplementedError
-    def d2_polflux_dXdZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float, delta_Z: float) -> FloatArray: raise NotImplementedError
-    def d2_polflux_dYdZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float, delta_Z: float) -> FloatArray: raise NotImplementedError
+    def d2_polflux_dX2(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float) -> ArrayLike: raise NotImplementedError
+    def d2_polflux_dY2(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float) -> ArrayLike: raise NotImplementedError
+    def d2_polflux_dZ2(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Z: float) -> ArrayLike: raise NotImplementedError
+    def d2_polflux_dXdY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float, delta_Y: float) -> ArrayLike: raise NotImplementedError
+    def d2_polflux_dXdZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float, delta_Z: float) -> ArrayLike: raise NotImplementedError
+    def d2_polflux_dYdZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float, delta_Z: float) -> ArrayLike: raise NotImplementedError
 
     def _calculate_incart_outcart(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, vector: bool = False, unitvector: bool = False, magnitude: bool = False) -> List[FloatArray]:
         toreturn = []
@@ -401,7 +402,7 @@ class MagneticField_Cartesian(ABC):
         """
         return self._calculate_incart_outcart(X,Y,Z, vector=False, unitvector=True, magnitude=False)[0]
     
-    def magnitude(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
+    def magnitude(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
         r"""Returns :math:`|B|`, the magnitude of the magnetic field
 
         Input: cartesian (X, Y, Z)
@@ -410,7 +411,7 @@ class MagneticField_Cartesian(ABC):
     
     # For abstraction purposes
     def unitvector_cartesian(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self.unitvector(X,Y,Z)
-    def polflux_cartesian(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self.polflux(X,Y,Z)
+    def polflux_cartesian(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike: return self.polflux(X,Y,Z)
 
 
 
@@ -459,74 +460,74 @@ class InterpolatedField_Cartesian(MagneticField_Cartesian):
         self.grid_coords = self._spline_B_X.grid
     
     # Defining the class attributes for B_X, B_Y, B_Z, and polflux
-    def B_X(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self._interp_B_X(X,Y,Z)
-    def B_Y(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self._interp_B_Y(X,Y,Z)
-    def B_Z(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self._interp_B_Z(X,Y,Z)
-    def polflux(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray: return self._interp_polflux(X,Y,Z)
+    def B_X(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike: return self._interp_B_X(X,Y,Z)
+    def B_Y(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike: return self._interp_B_Y(X,Y,Z)
+    def B_Z(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike: return self._interp_B_Z(X,Y,Z)
+    def polflux(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike: return self._interp_polflux(X,Y,Z)
 
     # TO REMOVE -- 30 September 2026
     # Defining class attributes for first order derivatives of B field -- for future work?
     # Need to compare with dbhats in analysis.py
     # These are from scotty 3D
-    # def d_B_X_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
+    # def d_B_X_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return self._spline_B_X((X,Y,Z), nu=[1,0,0])
-    # def d_B_Y_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
+    # def d_B_Y_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return self._spline_B_Y((X,Y,Z), nu=[1,0,0])
-    # def d_B_Z_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
+    # def d_B_Z_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return self._spline_B_Z((X,Y,Z), nu=[1,0,0])
-    # def d_B_X_dY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
+    # def d_B_X_dY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return self._spline_B_X((X,Y,Z), nu=[0,1,0])
-    # def d_B_Y_dY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
+    # def d_B_Y_dY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return self._spline_B_Y((X,Y,Z), nu=[0,1,0])
-    # def d_B_Z_dY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
+    # def d_B_Z_dY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return self._spline_B_Z((X,Y,Z), nu=[0,1,0])
-    # def d_B_X_dZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
+    # def d_B_X_dZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return self._spline_B_X((X,Y,Z), nu=[0,0,1])
-    # def d_B_Y_dZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
+    # def d_B_Y_dZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return self._spline_B_Y((X,Y,Z), nu=[0,0,1])
-    # def d_B_Z_dZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
+    # def d_B_Z_dZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return self._spline_B_Z((X,Y,Z), nu=[0,0,1])
     # NOTE NEED TO RENAME: this isnt actually d(bhat)/dX, but d(Bvec)/dX
     # Need to use chain rule to get d(bhat)/dX, so might actually be less computationally expensive to use finite differences
-    # def d_bhat_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
+    # def d_bhat_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return np.array( [self.d_B_X_dX(X,Y,Z), self.d_B_Y_dX(X,Y,Z), self.d_B_Z_dX(X,Y,Z)] ).T
     
     # Defining the class attributes for the first- and second-order derivatives of polflux
-    def d_polflux_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float) -> FloatArray:
+    def d_polflux_dX(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float) -> ArrayLike:
         return derivative(self.polflux, ("X"), {"X": X, "Y": Y, "Z": Z}, {"X": delta_X})
     
-    def d_polflux_dY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float) -> FloatArray:
+    def d_polflux_dY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float) -> ArrayLike:
         return derivative(self.polflux, ("Y"), {"X": X, "Y": Y, "Z": Z}, {"Y": delta_Y})
     
-    def d_polflux_dZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Z: float) -> FloatArray:
+    def d_polflux_dZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Z: float) -> ArrayLike:
         return derivative(self.polflux, ("Z"), {"X": X, "Y": Y, "Z": Z}, {"Z": delta_Z})
     
-    def d2_polflux_dX2(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float) -> FloatArray:
+    def d2_polflux_dX2(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float) -> ArrayLike:
         return derivative(self.polflux, ("X", "X"), {"X": X, "Y": Y, "Z": Z}, {"X": delta_X})
     
-    def d2_polflux_dY2(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float) -> FloatArray:
+    def d2_polflux_dY2(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float) -> ArrayLike:
         return derivative(self.polflux, ("Y", "Y"), {"X": X, "Y": Y, "Z": Z}, {"Y": delta_Y})
     
-    def d2_polflux_dZ2(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Z: float) -> FloatArray:
+    def d2_polflux_dZ2(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Z: float) -> ArrayLike:
         return derivative(self.polflux, ("Z", "Z"), {"X": X, "Y": Y, "Z": Z}, {"Z": delta_Z})
     
-    def d2_polflux_dXdY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float, delta_Y: float) -> FloatArray:
+    def d2_polflux_dXdY(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float, delta_Y: float) -> ArrayLike:
         return derivative(self.polflux, ("X", "Y"), {"X": X, "Y": Y, "Z": Z}, {"X": delta_X, "Y": delta_Y})
     
-    def d2_polflux_dXdZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float, delta_Z: float) -> FloatArray:
+    def d2_polflux_dXdZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float, delta_Z: float) -> ArrayLike:
         return derivative(self.polflux, ("X", "Z"), {"X": X, "Y": Y, "Z": Z}, {"X": delta_X, "Z": delta_Z})
     
-    def d2_polflux_dYdZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float, delta_Z: float) -> FloatArray:
+    def d2_polflux_dYdZ(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float, delta_Z: float) -> ArrayLike:
         return derivative(self.polflux, ("Y", "Z"), {"X": X, "Y": Y, "Z": Z}, {"Y": delta_Y, "Z": delta_Z})
 
     # TO REMOVE -- 30 September 2026
     # Defining class attributes for poloidal flux derivatives
     # These are from scotty 3D
-    # def d_polflux_dX_TEST(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
+    # def d_polflux_dX_TEST(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return self._spline_polflux((X,Y,Z), nu=[1,0,0])
-    # def d_polflux_dY_TEST(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
+    # def d_polflux_dY_TEST(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return self._spline_polflux((X,Y,Z), nu=[0,1,0])
-    # def d_polflux_dZ_TEST(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> FloatArray:
+    # def d_polflux_dZ_TEST(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
     #     return self._spline_polflux((X,Y,Z), nu=[0,0,1])
 
 
@@ -560,7 +561,7 @@ def create_magnetic_geometry(
     min_X, max_X = np.min(find_B_method.R_coord), np.max(find_B_method.R_coord)
     min_Z, max_Z = np.min(find_B_method.Z_coord), np.max(find_B_method.Z_coord)
     X_coords = find_B_method.R_coord # np.linspace(min_X, max_X, round((max_X-min_X)/0.01+1))
-    Y_coords = np.linspace(-0.25, 0.1, 36) # np.linspace(-1, 1, 51)
+    Y_coords = np.linspace(-1, 1, 101) # np.linspace(-0.25, 0.1, 36)
     Z_coords = find_B_method.Z_coord # np.linspace(min_Z, max_Z, round((max_Z-min_Z)/0.01+1))
 
     XX, YY, ZZ = np.meshgrid(X_coords, Y_coords, Z_coords, indexing="ij")
@@ -581,21 +582,55 @@ def create_magnetic_geometry(
         B_X, B_Y, B_Z, polflux,
         interp_order_str)
     
-    # log.debug(f"Converting the field profile took {duration_field_interpolation} s")
+    log.debug(f"Converting the field profile took {duration_field_interpolation} s")
 
     return field
+
+
+    # the problem with this script is that the 2nd elif (if we get Mag_cyld but geom is cart)
+    # is not consistent. because this is for scotty v3's mag_cyld, but we are using scotty v4's
+    # mag_cyld. solving should be simple, like importing the scotty v3 cyld interpolated field
+    # and then using that to check the instance type
+
     # ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+    log.debug(f"Reading and creating field profile")
 
     # If the user passes an interpolated field, then just use that    
-    if ((isinstance(find_B_method, MagneticField_Cylindrical) and geometry == "cylindrical") or
-        (isinstance(find_B_method, MagneticField_Cartesian)   and geometry == "cartesian")):
+    if ((isinstance(find_B_method, (MagneticField_Cylindrical, InterpolatedField_Cylindrical)) and geometry == "cylindrical") or
+        (isinstance(find_B_method, (MagneticField_Cartesian,   InterpolatedField_Cartesian))   and geometry == "cartesian")):
         log.debug(f"Using existing field profile of type `{type(find_B_method)}` passed from `find_B_method`")
         return find_B_method
 
     # If the interpolated field doesnt match the user's geometry, raise an error
-    elif ((isinstance(find_B_method, MagneticField_Cylindrical) and geometry == "cartesian") or
-          (isinstance(find_B_method, MagneticField_Cartesian)   and geometry == "cylindrical")):
+    elif ((isinstance(find_B_method, (MagneticField_Cylindrical, InterpolatedField_Cylindrical)) and geometry == "cartesian") or
+          (isinstance(find_B_method, (MagneticField_Cartesian,   InterpolatedField_Cartesian))   and geometry == "cylindrical")):
         raise RuntimeError(f"Using existing field profile of type `{type(find_B_method)}` passed from `find_B_method` is incompatible with `geometry` = {geometry}")
+
+    elif isinstance(find_B_method, (MagneticField_Cylindrical, InterpolatedField_Cylindrical)) and geometry == "cartesian":
+        log.info(f"Creating a 3-D field profile from the given 2-D profile")
+        min_X, max_X = np.min(find_B_method.R_coord), np.max(find_B_method.R_coord)
+        min_Z, max_Z = np.min(find_B_method.Z_coord), np.max(find_B_method.Z_coord)
+        X_coords = find_B_method.R_coord # np.linspace(min_X, max_X, round((max_X-min_X)/0.01+1))
+        Y_coords = np.linspace(-1, 1, 101) # np.linspace(-0.25, 0.1, 36)
+        Z_coords = find_B_method.Z_coord # np.linspace(min_Z, max_Z, round((max_Z-min_Z)/0.01+1))
+        XX, YY, ZZ = np.meshgrid(X_coords, Y_coords, Z_coords, indexing="ij")
+        RR = np.sqrt(XX**2 + YY**2)
+        B_R = find_B_method.B_R(RR, ZZ)
+        B_T = find_B_method.B_T(RR, ZZ)
+        B_X = (B_R*XX - B_T*YY) / RR
+        B_Y = (B_R*YY + B_T*XX) / RR
+        B_Z = find_B_method.B_Z(RR, ZZ)
+        polflux = find_B_method.poloidal_flux(RR, ZZ)
+        (
+            field,
+            duration_field_interpolation
+        ) = timer(InterpolatedField_Cartesian)(
+            X_coords, Y_coords, Z_coords,
+            B_X, B_Y, B_Z, polflux,
+            interp_order_str)
+        
+        log.info(f"Converting the B and poloidal flux profiles took {duration_field_interpolation} s")
+        return field
 
     # If a string, then interpolate as per normal
     elif isinstance(find_B_method, str):
@@ -636,7 +671,7 @@ def create_magnetic_geometry(
                 interp_order = interp_order_str,
             )
 
-        log.info(f"Interpolating B and poloidal flux profiles took {duration_field_interpolation}")
+        log.info(f"Interpolating B and poloidal flux profiles took {duration_field_interpolation} s")
 
         return field
     

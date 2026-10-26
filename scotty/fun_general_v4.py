@@ -5,7 +5,7 @@ from scipy import constants
 # from scotty.checks_v4 import VALID_LAUNCH_MODE_FLAGS
 from scotty.logger_v4 import arr2str
 from scotty.typing import ArrayLike, Array, FloatArray, ComplexFloatArray
-from typing import Callable, Union, Tuple, Optional, List
+from typing import Callable, Union, Tuple, Optional, List, Literal
 
 log = logging.getLogger(__name__)
 
@@ -670,15 +670,6 @@ def find_g_cartesian(cartesian: bool, q0: ArrayLike, q1: ArrayLike, q2: ArrayLik
     g_magnitude = np.linalg.norm(g_vec_cart, axis=1)
     g_hat_cart = g_vec_cart / g_magnitude[:, np.newaxis]
 
-    log.info(f"""\n\n\n
-q0.shape {q0.shape}
-q1.shape {q1.shape}
-q2.shape {q2.shape}
-dH_dKx.shape {dH_dKx.shape}
-dH_dKy.shape {dH_dKy.shape}
-dH_dKz.shape {dH_dKz.shape}
-\n\n\n""")
-
     return g_vec_cart, g_magnitude, g_hat_cart
 
 def find_K_magnitude(cartesian: bool, K0: ArrayLike, K1: ArrayLike, K2: ArrayLike, q0: ArrayLike) -> ArrayLike:
@@ -1149,16 +1140,42 @@ def find_H_Cardano_eigh(launch_angular_freq: float, K_magnitude: ArrayLike, epsi
 
     D_tensor = np.zeros([length, 3, 3], dtype=np.complex128)
     D_tensor[:, 0, 0] = D_11
-    D_tensor[:, 0, 1] = -1j * D_12
-    D_tensor[:, 0, 2] = D_1b
     D_tensor[:, 1, 1] = D_22
     D_tensor[:, 2, 2] = D_bb
+    D_tensor[:, 0, 1] = -1j * D_12
+    D_tensor[:, 1, 0] = 1j * D_12
+    D_tensor[:, 0, 2] = D_tensor[:, 2, 0] = D_1b
     eigvals, eigvecs = np.linalg.eigh(D_tensor)
 
     return np.squeeze(eigvals), np.squeeze(eigvecs)
 
 def find_H_Cardano_formula(launch_angular_freq: float, K_magnitude: ArrayLike, epsilon_para: ArrayLike, epsilon_perp: ArrayLike, epsilon_g: ArrayLike, theta_m: ArrayLike) -> Tuple[FloatArray, FloatArray, FloatArray]:
+    r"""
+    Finds the Cardano solutions for the cold plasma dispersion
+    relation tensor with finite mismatch
 
+    Parameters
+    ----------
+    launch_angular_freq : float
+        Angular frequency, in rad/s, at launch
+    K_magnitude : (N,) ArrayLike
+        Magnitude of the wavevector at the points in the plasma to be
+        queried
+    epsilon_para : (N,) ArrayLike
+        `epsilon_para` at the points in the plasma to be queried
+    epsilon_perp : (N,) ArrayLike
+        `epsilon_perp` at the points in the plasma to be queried
+    epsilon_g : (N,) ArrayLike
+        `epsilon_g` at the points in the plasma to be queried
+    theta_m : (N,) ArrayLike
+        `theta_m` at the points in the plasma to be queried
+
+    Returns
+    ----------
+    H_Cardano_1 : (N,) ArrayLike
+    H_Cardano_2 : (N,) ArrayLike
+    H_Cardano_3 : (N,) ArrayLike
+    """
     D_11, D_22, D_bb, D_12, D_1b = find_D_terms(launch_angular_freq, K_magnitude, epsilon_para, epsilon_perp, epsilon_g, theta_m)
     
     h_0_coeff = (D_22 * D_1b**2) + (D_bb * D_12**2) - (D_11 * D_22 * D_bb)
@@ -1195,7 +1212,7 @@ def find_H_Cardano_formula(launch_angular_freq: float, K_magnitude: ArrayLike, e
     )
     return H_1_Cardano, H_2_Cardano, H_3_Cardano
 
-def find_mode_index_and_ehat(mode_flag: VALID_LAUNCH_MODE_FLAGS, H_Cardanos: FloatArray, ehats: ComplexFloatArray, tol_H: float = 1e-5, tol_O_mode_polarisation: float = 0.25) -> Tuple[int, float, ComplexFloatArray]:
+def find_mode_index_and_ehat(mode_flag: Literal[1,-1,"O","X"], H_Cardanos: FloatArray, ehats: ComplexFloatArray, tol_H: float = 1e-5, tol_O_mode_polarisation: float = 0.25) -> Tuple[int, float, ComplexFloatArray]:
     """
     Given an array `H_Cardanos` of shape (3,) and an array of `ehats` of
     shape (3,3) where `H_Cardanos[i]` corresponds to `ehats[:,i]`, choose
@@ -1309,7 +1326,7 @@ def find_beam_widths_and_curvs(Psi_w: ComplexFloatArray, K_vec: FloatArray, g_ha
     if curvs.ndim == 1: return curvs[0], curvs[1], widths[0], widths[1]
     else:               return curvs[:, 0], curvs[:, 1], widths[:, 0], widths[:, 1]
 
-def check_eigval_order(eigvals: FloatArray, eigvecs: FloatArray, diff_tol: float = 0.1) -> Tuple[FloatArray]:
+def check_eigval_order(eigvals: FloatArray, eigvecs: FloatArray, diff_tol: float = 0.1) -> FloatArray:
     """
     Check if the eigenvalues are correctly ordered by comparing
     each eigenvector of `eigvec1`

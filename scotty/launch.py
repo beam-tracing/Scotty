@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 from scotty.fun_general import (
+    find_Psi_3D_lab_Cartesian,
     make_array_3x3,
     find_Psi_3D_lab,
     apply_discontinuous_BC,
@@ -284,22 +285,35 @@ def launch_beam(
         Psi_3D_lab_initial = Psi_3D_lab_entry
     
     print("\n\n\n")
-    print("launch.py:287")
+    print("TO REMOVE from launch.py:287")
     print("\nlaunch position (R, zeta, Z) =", launch_position)
+    print("\nentry position (R, zeta, Z) =", entry_position)
     print("\nK_entry (K_R, K_zeta, K_Z) =", K_R_entry, K_zeta_entry, K_Z_entry)
     print("\nK_initial (K_R, K_zeta, K_Z) =", K_initial[0], K_initial[1], K_initial[2])
-    print(f"\nPsi_3D_lab_entry, cartesian =")
-    print(Psi_3D_lab_entry_cartersian[0])
-    print(Psi_3D_lab_entry_cartersian[1])
-    print(Psi_3D_lab_entry_cartersian[2])
-    print(f"\nPsi_3D_lab_entry, cylindrical =")
-    print(Psi_3D_lab_entry[0])
-    print(Psi_3D_lab_entry[1])
-    print(Psi_3D_lab_entry[2])
-    print(f"\nPsi_3D_plasma, cylindrical =")
-    print(Psi_3D_lab_initial[0])
-    print(Psi_3D_lab_initial[1])
-    print(Psi_3D_lab_initial[2])
+    print(f"\nPsi_3D_lab_entry, cartesian")
+    print("XX", Psi_3D_lab_entry_cartersian[0,0])
+    print("XY", Psi_3D_lab_entry_cartersian[0,1])
+    print("XZ", Psi_3D_lab_entry_cartersian[0,2])
+    print("YY", Psi_3D_lab_entry_cartersian[1,1])
+    print("YZ", Psi_3D_lab_entry_cartersian[1,2])
+    print("ZZ", Psi_3D_lab_entry_cartersian[2,2])
+    # print(f"\nPsi_3D_lab_entry, cylindrical =")
+    # print(Psi_3D_lab_entry[0])
+    # print(Psi_3D_lab_entry[1])
+    # print(Psi_3D_lab_entry[2])
+    # print(f"\nPsi_3D_plasma, cylindrical =")
+    # print(Psi_3D_lab_initial[0])
+    # print(Psi_3D_lab_initial[1])
+    # print(Psi_3D_lab_initial[2])
+    Psi_3D_lab_initial_cartesian = find_Psi_3D_lab_Cartesian(Psi_3D_lab_initial, entry_position[0], entry_position[1], K_initial[0], K_initial[1])
+    print()
+    print(f"Psi_3D_lab_initial, cartesian")
+    print("XX", Psi_3D_lab_initial_cartesian[0,0])
+    print("XY", Psi_3D_lab_initial_cartesian[0,1])
+    print("XZ", Psi_3D_lab_initial_cartesian[0,2])
+    print("YY", Psi_3D_lab_initial_cartesian[1,1])
+    print("YZ", Psi_3D_lab_initial_cartesian[1,2])
+    print("ZZ", Psi_3D_lab_initial_cartesian[2,2])
     print("\n\n\n")
 
     return (

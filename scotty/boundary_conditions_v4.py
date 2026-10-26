@@ -347,16 +347,16 @@ def find_Psi_3D_plasma(
                 "dH_dKZ": dH["dH_dKZ"],
 
                 # First derivatives of poloidal flux
-                "dp_dR": (tmp := field.d_polflux_dR(*q_entry, delta_R=delta_R)),
+                "dp_dR": (tmp := field.d_polflux_dR(*q_entry, delta_R=delta_R)), # type: ignore
                 "dp_dzeta": np.zeros_like(tmp),
-                "dp_dZ": field.d_polflux_dZ(*q_entry, delta_Z=delta_Z),
+                "dp_dZ": field.d_polflux_dZ(*q_entry, delta_Z=delta_Z), # type: ignore
 
                 # Second derivatives of poloidal flux
-                "d2p_dR2": field.d2_polflux_dR2(*q_entry, delta_R=delta_R),
+                "d2p_dR2": field.d2_polflux_dR2(*q_entry, delta_R=delta_R), # type: ignore
                 "d2p_dzeta2": dH["dH_dzeta"],
-                "d2p_dZ2": field.d2_polflux_dZ2(*q_entry, delta_Z=delta_Z),
+                "d2p_dZ2": field.d2_polflux_dZ2(*q_entry, delta_Z=delta_Z), # type: ignore
                 "d2p_dRdzeta": dH["dH_dzeta"],
-                "d2p_dRdZ": field.d2_polflux_dRdZ(*q_entry, delta_R=delta_R, delta_Z=delta_Z),
+                "d2p_dRdZ": field.d2_polflux_dRdZ(*q_entry, delta_R=delta_R, delta_Z=delta_Z), # type: ignore
                 "d2p_dzetadZ": dH["dH_dzeta"],
             }
         
@@ -366,17 +366,17 @@ def find_Psi_3D_plasma(
             delta_X, delta_Y, delta_Z = hamiltonian.spacings["q0"], hamiltonian.spacings["q1"], hamiltonian.spacings["q2"]
             derivatives.update({
                 # First derivatives of poloidal flux
-                "dp_dX": field.d_polflux_dX(*q_entry, delta_X=delta_X),
-                "dp_dY": field.d_polflux_dY(*q_entry, delta_Y=delta_Y),
-                "dp_dZ": field.d_polflux_dZ(*q_entry, delta_Z=delta_Z),
+                "dp_dX": field.d_polflux_dX(*q_entry, delta_X=delta_X), # type: ignore
+                "dp_dY": field.d_polflux_dY(*q_entry, delta_Y=delta_Y), # type: ignore
+                "dp_dZ": field.d_polflux_dZ(*q_entry, delta_Z=delta_Z), # type: ignore
 
                 # Second derivatives of poloidal flux
-                "d2p_dX2": field.d2_polflux_dX2(*q_entry, delta_X=delta_X),
-                "d2p_dY2": field.d2_polflux_dY2(*q_entry, delta_Y=delta_Y),
-                "d2p_dZ2": field.d2_polflux_dZ2(*q_entry, delta_Z=delta_Z),
-                "d2p_dXdY": field.d2_polflux_dXdY(*q_entry, delta_X=delta_X, delta_Y=delta_Y),
-                "d2p_dXdZ": field.d2_polflux_dXdZ(*q_entry, delta_X=delta_X, delta_Z=delta_Z),
-                "d2p_dYdZ": field.d2_polflux_dYdZ(*q_entry, delta_Y=delta_Y, delta_Z=delta_Z),
+                "d2p_dX2": field.d2_polflux_dX2(*q_entry, delta_X=delta_X), # type: ignore
+                "d2p_dY2": field.d2_polflux_dY2(*q_entry, delta_Y=delta_Y), # type: ignore
+                "d2p_dZ2": field.d2_polflux_dZ2(*q_entry, delta_Z=delta_Z), # type: ignore
+                "d2p_dXdY": field.d2_polflux_dXdY(*q_entry, delta_X=delta_X, delta_Y=delta_Y), # type: ignore
+                "d2p_dXdZ": field.d2_polflux_dXdZ(*q_entry, delta_X=delta_X, delta_Z=delta_Z), # type: ignore
+                "d2p_dYdZ": field.d2_polflux_dYdZ(*q_entry, delta_Y=delta_Y, delta_Z=delta_Z), # type: ignore
             })
         
         _printmsg = "\n".join(f"        #   - {k} = {v}" for k, v in derivatives.items())
@@ -424,6 +424,53 @@ def find_Psi_3D_plasma(
         Psi_YY_v = Psi_3D_vacuum_labframe[1,1]
         Psi_YZ_v = Psi_3D_vacuum_labframe[1,2]
         Psi_ZZ_v = Psi_3D_vacuum_labframe[2,2]
+
+
+        """
+        # TO REMOVE
+        FOR DEBUGGING MISMATCH OF Re[Psi_YZ]
+        13 OCTOBER 2026
+        for MASTU 51353, 410ms
+        modeflag -1
+        52.5 GHz, pol 7, tor 0
+        width 0.05, curv -1.5
+        launchpos [2.35, 0, 0]
+        """
+        # K_vacuum = np.array([-1092.1170282617509, 1.2171098275448104e-13, -134.09510976970412])
+        # K_plasma = np.array([-1087.6302602044418, 1.2171098275448104e-13, -135.06788712852506])
+
+        # Psi_XX_v = 29.254412058819245 + 20.303695227198308j
+        # Psi_XY_v = 0.0 + 0.0j
+        # Psi_XZ_v = -238.25806635374164 - 165.36032769831752j
+        # Psi_YY_v = 1969.7106437030507 + 1367.0554894457j
+        # Psi_YZ_v = 0.0 + 0.0j
+        # Psi_ZZ_v = 1940.4562316442316 + 1346.751794218502j
+
+        # dH_dX = -1.0866082358929052
+        # dH_dY = 0.0 # by default
+        # dH_dZ = 0.23415371211477076
+        # dH_dKx = -0.0017966143140940583
+        # dH_dKy = -7.61154327344471e-07
+        # dH_dKz = -0.00022377251051808322
+
+        # dp_dX = 3.020102766827291
+        # dp_dY = 0.0
+        # dp_dZ = -0.6547892726694808
+        # d2p_dX2 = -2.8464063509182944
+        # d2p_dY2 = 0.0
+        # d2p_dZ2 = 5.038813976261604
+        # d2p_dXdY = 0.0
+        # d2p_dXdZ = -1.5450856875986865
+        # d2p_dYdZ = 0.0
+
+        # interface_matrix = np.array([
+        #     [0, 0, 0, 1, 0, 0],
+        #     [dp_dZ**2, 0, -2*dp_dX*dp_dZ, 0, 0, dp_dX**2],
+        #     [0,  -dp_dZ, 0, 0, dp_dX, 0],
+        #     [dH_dKx,    dH_dKy,        dH_dKz,                   0,         0,                       0                 ],
+        #     [0,         dH_dKx,        0,                        dH_dKy,    dH_dKz,                  0                 ],
+        #     [0,         0,             dH_dKx,                   0,         dH_dKy,                  dH_dKz            ],
+        # ], dtype=np.float64)
 
         # Now we set up the interface matrix using 6 linearly
         # independent equations to obtain a relation between the
@@ -570,6 +617,8 @@ def find_Psi_3D_plasma(
     log.warning(f"""
 
 
+q_entry cartesian
+{q_entry}
 
 K_vacuum cartesian
 {K_vacuum}
@@ -577,28 +626,40 @@ K_vacuum cartesian
 K_plasma cartesian
 {K_plasma}
 
-K_plasma cylindrical / K_initial
+K_plasma cylindrical
 {find_K_labframe_cart_to_cyl(K_plasma, q_entry)}
 
-Psi_3D_vacuum_labframe cartesian
-{Psi_3D_vacuum_labframe[0]}
-{Psi_3D_vacuum_labframe[1]}
-{Psi_3D_vacuum_labframe[2]}
+Psi_3D_vacuum_labframe, cartesian
+XX {Psi_3D_vacuum_labframe[0,0]}
+XY {Psi_3D_vacuum_labframe[0,1]}
+XZ {Psi_3D_vacuum_labframe[0,2]}
+YY {Psi_3D_vacuum_labframe[1,1]}
+YZ {Psi_3D_vacuum_labframe[1,2]}
+ZZ {Psi_3D_vacuum_labframe[2,2]}
 
-Psi_3D_vacuum_labframe_cylindrical
-{Psi_3D_vacuum_labframe_cylindrical[0]}
-{Psi_3D_vacuum_labframe_cylindrical[1]}
-{Psi_3D_vacuum_labframe_cylindrical[2]}
+Psi_3D_vacuum_labframe, cylindrical
+RR {Psi_3D_vacuum_labframe_cylindrical[0,0]}
+Rp {Psi_3D_vacuum_labframe_cylindrical[0,1]}
+RZ {Psi_3D_vacuum_labframe_cylindrical[0,2]}
+pp {Psi_3D_vacuum_labframe_cylindrical[1,1]}
+pZ {Psi_3D_vacuum_labframe_cylindrical[1,2]}
+ZZ {Psi_3D_vacuum_labframe_cylindrical[2,2]}
 
-Psi_3D_plasma_labframe cartesian
-{Psi_3D_plasma_labframe[0]}
-{Psi_3D_plasma_labframe[1]}
-{Psi_3D_plasma_labframe[2]}
+Psi_3D_plasma_labframe, cartesian
+XX {Psi_3D_plasma_labframe[0,0]}
+XY {Psi_3D_plasma_labframe[0,1]}
+XZ {Psi_3D_plasma_labframe[0,2]}
+YY {Psi_3D_plasma_labframe[1,1]}
+YZ {Psi_3D_plasma_labframe[1,2]}
+ZZ {Psi_3D_plasma_labframe[2,2]}
 
-Psi_3D_plasma_labframe_cylindrical
-{Psi_3D_plasma_labframe_cylindrical[0]}
-{Psi_3D_plasma_labframe_cylindrical[1]}
-{Psi_3D_plasma_labframe_cylindrical[2]}
+Psi_3D_plasma_labframe, cylindrical
+RR {Psi_3D_plasma_labframe_cylindrical[0,0]}
+Rp {Psi_3D_plasma_labframe_cylindrical[0,1]}
+RZ {Psi_3D_plasma_labframe_cylindrical[0,2]}
+pp {Psi_3D_plasma_labframe_cylindrical[1,1]}
+pZ {Psi_3D_plasma_labframe_cylindrical[1,2]}
+ZZ {Psi_3D_plasma_labframe_cylindrical[2,2]}
 
 RHS_vector[2]
 {np.dot(Psi_v_vector, interface_matrix[2]) + 2*eta_XYZ*np.dot(delta_K, np.array([dp_dX, dp_dY, dp_dZ]))}

@@ -1,9 +1,9 @@
 import numpy as np
 import plotly.graph_objects as pgo
 import plotly.io as pio
-from scotty.geometry_v4 import MagneticField_Cartesian, MagneticField_Cylindrical
+from scotty.geometry_v4 import InterpolatedField_Cartesian, MagneticField_Cartesian, MagneticField_Cylindrical
 from scotty.typing import FloatArray
-from typing import Union, Tuple, Optional
+from typing import Union, Tuple, Optional, cast
 
 
 
@@ -15,9 +15,9 @@ def make_fig_if_None(existing_fig: Optional[pgo.Figure] = None) -> pgo.Figure:
 
 def plot_3d_flux_surfaces(
     field: Union[MagneticField_Cartesian, MagneticField_Cylindrical],
-    xlims: Optional[Tuple[float, float, float]] = (0, 2.5, 101),
-    ylims: Optional[Tuple[float, float, float]] = (-0.5, 0.5, 41),
-    zlims: Optional[Tuple[float, float, float]] = (-1.5, 1.5, 121),
+    xlims: Tuple[float, float, float] = (0, 2.5, 101),
+    ylims: Tuple[float, float, float] = (-0.5, 0.5, 41),
+    zlims: Tuple[float, float, float] = (-1.5, 1.5, 121),
     existing_fig: Optional[pgo.Figure] = None,
     use_rho: bool = False,
     show_graph: bool = False,
@@ -25,17 +25,22 @@ def plot_3d_flux_surfaces(
     show_axes: bool = True,
 ) -> pgo.Figure:
 
-    # if isinstance(field, MagneticField_Cartesian):
-    X = field.X_coord if xlims is None else np.linspace(*xlims) # type: ignore
-    Y = field.Y_coord if ylims is None else np.linspace(*ylims) # type: ignore
-    # else: # elif isinstance(field, MagneticField_Cylindrical):
-    #     X = field.R_coord if xlims is None else np.linspace(*xlims) # type: ignore
-    #     Y = np.linspace(-0.5, 0.5, 41) if ylims is None else np.linspace(*ylims) # type: ignore
-    
     Z = field.Z_coord if zlims is None else np.linspace(*zlims) # type: ignore
-    XX, YY, ZZ = np.meshgrid(X, Y, Z, indexing="ij")
-    flux_coord = np.sqrt(field.polflux_cartesian(XX, YY, ZZ)) if use_rho else field.polflux_cartesian(XX, YY, ZZ)
 
+    if isinstance(field, (MagneticField_Cartesian, InterpolatedField_Cartesian)):
+        X = field.X_coord if xlims is None else np.linspace(*xlims) # type: ignore
+        Y = field.Y_coord if ylims is None else np.linspace(*ylims) # type: ignore
+        XX, YY, ZZ = np.meshgrid(X, Y, Z, indexing="ij")
+        flux_coord = np.sqrt(field.polflux_cartesian(XX, YY, ZZ)) if use_rho else field.polflux_cartesian(XX, YY, ZZ)
+        flux_coord = cast(FloatArray, flux_coord)
+
+    else: # elif isinstance(field, MagneticField_Cylindrical, InterpolatedField_Cylindrical):
+        X = field.R_coord if xlims is None else np.linspace(*xlims) # type: ignore
+        Y = np.linspace(-0.5, 0.5, 41) if ylims is None else np.linspace(*ylims) # type: ignore
+        XX, YY, ZZ = np.meshgrid(X, Y, Z, indexing="ij")
+        flux_coord = np.sqrt(field.poloidal_flux(np.sqrt(XX**2 + YY**2), ZZ)) if use_rho else field.poloidal_flux(np.sqrt(XX**2 + YY**2), ZZ)
+        flux_coord = cast(FloatArray, flux_coord)
+    
     # masking to remove NaNs and outside LCFS, to see if we can speed up plotting time
     # flux_threshold = 1.0 + 0.1 # leave this here just in case we want to implement this in the future
     mask = np.isfinite(flux_coord) # & (flux_coord <= flux_threshold) # masking like this prevents plotly from plotting, see if can fix

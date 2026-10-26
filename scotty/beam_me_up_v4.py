@@ -1,14 +1,16 @@
 # import datatree # TO REMOVE -- find a replacement for this? if not, uncoment the -> for def beam_me_up
+import datetime
 import logging
 import numpy as np
 import pathlib
-from scotty.analysis_v4 import basic_analysis
+from scotty.analysis_v4 import basic_analysis, dbs_analysis
 from scotty.beam_solver_v4 import beam_tracing
 from scotty.checks_v4 import VALID_GEOMETRIES, VALID_LAUNCH_FLAGS, VALID_LAUNCH_MODE_FLAGS, VALID_BOUNDARY_FLAGS, Parameters, check_input_before_ray_tracing
-from scotty.data_io_v4 import inputs_to_dataset, solver_output_to_dataset
+from scotty.data_io_v4 import inputs_to_dicts, solver_output_to_dicts, dict_to_dataset
 from scotty.fun_general import make_unit_vector_from_cross_product
-from scotty.fun_general_v4 import find_K_magnitude, dot
+from scotty.fun_general_v4 import dot
 from scotty.geometry_v4 import MagneticField_Cylindrical, MagneticField_Cartesian, create_magnetic_geometry
+from scotty.hamiltonian import Hamiltonian
 from scotty.hamiltonian_v4 import initialise_hamiltonians, assign_hamiltonians
 from scotty.launch_v4 import find_plasma_entry_position, find_auto_delta_signs, find_plasma_entry_parameters
 from scotty.logger_v4 import config_logger, arr2str
@@ -18,6 +20,7 @@ from scotty.typing import FloatArray, PathLike
 from scotty._version import __version__
 from typing import Optional, Sequence, Tuple, Union, Literal, cast
 import uuid
+import xarray as xr
 
 def beam_me_up(
     
@@ -369,11 +372,14 @@ def beam_me_up(
     # Coordinate conversions for later
     params.coordinate_conversions()
 
-    # Once the ray/beam-tracing is complete, save the data in params
+    # Once the ray/beam-tracing is complete, save the data from params
     # as xarray datasets
-    inputs_ds = inputs_to_dataset(params, field)
-    solver_output_ds = solver_output_to_dataset(params)
-    basic_analysis(
+    inputs_ds = dict_to_dataset(*inputs_to_dicts(params, field))
+    solver_output_ds = dict_to_dataset(*solver_output_to_dicts(params))
+
+    # Then do basic analysis (i.e. no DBS) and also DBS analysis and
+    # convert both to xarray datasets
+    analysis_ds = dict_to_dataset(*basic_analysis(
         inputs = inputs_ds,
         solver_output = solver_output_ds,
         hamiltonian = hamiltonian,
@@ -381,9 +387,37 @@ def beam_me_up(
         field = field,
         density_fit = density_fit,
         temperature_fit = temperature_fit,
+    ))
+
+    dbs_analysis_ds = dict_to_dataset(*dbs_analysis(
+        inputs = inputs_ds,
+        solver_output = solver_output_ds,
+        analysis = analysis_ds,
+        hamiltonian = hamiltonian,
+        hamiltonian_other = hamiltonian_other,
+        field = field,
+        density_fit = density_fit,
+        temperature_fit = temperature_fit,
+    ))
+
+    dt = xr.DataTree.from_dict({
+        "inputs": inputs_ds,
+        "solver_output": solver_output_ds,
+        "analysis": analysis_ds,
+        "dbs_analysis": dbs_analysis_ds,
+    })
+    dt.attrs = {
+        "title": output_filename_suffix,
+        "software_name": "scotty-beam-tracing",
+        "software_version": __version__,
+        "date_created": str(datetime.datetime.now()),
+        # "id": str(run_id),
+    }
+    dt.to_netcdf(
+        filepath = output_path / f"scotty_output{output_filename_suffix}.h5",
+        engine = "h5netcdf",
+        invalid_netcdf = True,
     )
-
-
 
     # TO REMOVE 14 Sep 26 -- this is for benchmarking
     if benchmarking_flag:
@@ -400,7 +434,6 @@ def beam_me_up(
         Psi_w[:, 0, 1] = Psi_w[:, 1, 0] = dot(_x_hat, dot(params.Psi_3D_output_labframe, _y_hat))
         Psi_w[:, 1, 1] = dot(_y_hat, dot(params.Psi_3D_output_labframe, _y_hat))
         return field, params.solver_status, params.tau_output, params.q_output.T, params.K_output.T, params.Psi_3D_output_labframe, (_g_hat, _x_hat, _y_hat), Psi_w
-
     
 
 
