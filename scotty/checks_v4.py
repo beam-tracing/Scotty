@@ -1,4 +1,5 @@
 import logging
+from multiprocessing.managers import ValueProxy
 from pathlib import Path
 from scotty.fun_general_v4 import (
     find_K_labframe_cart_to_cyl,
@@ -9,10 +10,10 @@ from scotty.fun_general_v4 import (
     find_q_labframe_cart_to_cyl,
     find_q_labframe_cyl_to_cart,
 )
-from scotty.geometry_v4 import MagneticField_Cylindrical, MagneticField_Cartesian
+from scotty.geometry_v4 import MagneticField_Cylindrical, MagneticField_Cartesian, InterpolatedField_Cylindrical, InterpolatedField_Cartesian
 from scotty.profile_fit import ProfileFitLike
-from scotty.typing import FloatArray, ComplexFloatArray
-from typing import Literal, Optional, Sequence, Union, Tuple
+from scotty.typing import ArrayLike, FloatArray, ComplexFloatArray
+from typing import Literal, Optional, Sequence, Union, Tuple, cast, get_args
 import numpy as np
 import os
 
@@ -26,7 +27,7 @@ VALID_GEOMETRIES = Literal["cylindrical", "cartesian"]
 VALID_LAUNCH_MODE_FLAGS = Literal[1, -1, "O", "X"]
 VALID_LAUNCH_FLAGS = Literal["plasma", "vacuum"]
 VALID_BOUNDARY_FLAGS = Optional[Literal["continuous", "discontinuous"]]
-VALID_FIELDS = Union[MagneticField_Cylindrical, MagneticField_Cartesian]
+VALID_FIELDS = Union[MagneticField_Cylindrical, MagneticField_Cartesian, InterpolatedField_Cylindrical, InterpolatedField_Cartesian]
 VALID_SOLVER_STATUS = Literal[-1, 0, 1]
 
 ##################################################
@@ -142,8 +143,8 @@ class Parameters:
         #
         ##################################################
 
-        self.geometry = geometry
-        self.cartesian_flag = geometry == "cartesian" # isinstance(geometry, MagneticField_Cartesian)
+        self.geometry = self._check_geometry(geometry=geometry)
+        self.cartesian_flag = self.geometry == "cartesian"
 
         # TORBEAM antenna angles are anti-clockwise from negative X-axis,
         # so we need to rotate the toroidal angle by pi. This will take
@@ -165,7 +166,7 @@ class Parameters:
         self.launch_beam_width = self._check_positive("launch_beam_width", launch_beam_width)
         self.launch_beam_curvature = launch_beam_curvature
         self.q_launch = q_launch
-        self.mode_flag_launch = mode_flag_launch
+        self.mode_flag_launch = self._check_mode_flag(mode_flag_launch)
 
         ##################################################
         #
@@ -182,9 +183,9 @@ class Parameters:
         self.len_tau = int(self._check_positive("len_tau", len_tau))
         self.rtol = rtol
         self.atol = atol
-        self.poloidal_flux_enter = self._check_positive("poloidal_flux_enter", poloidal_flux_enter)
-        self.poloidal_flux_zero_density = self._check_positive("poloidal_flux_zero_density", poloidal_flux_zero_density)
-        self.poloidal_flux_zero_temperature = self._check_positive("poloidal_flux_zero_temperature", poloidal_flux_zero_temperature)
+        (self.poloidal_flux_enter,
+         self.poloidal_flux_zero_density,
+         self.poloidal_flux_zero_temperature) = self._check_poloidal_flux_arguments(poloidal_flux_enter, poloidal_flux_zero_density, poloidal_flux_zero_temperature, relativistic_flag)
 
         ##################################################
         #
@@ -249,6 +250,8 @@ class Parameters:
              self.delta_K_Z) = deltas_cartesian
             
             self.deltas = deltas_cartesian
+
+        else: raise ValueError(f"`geometry` must be one of 'cylindrical' or 'cartesian' but got {geometry}")
     
     ##################################################
     #
@@ -271,9 +274,27 @@ class Parameters:
     #
     ##################################################
 
+    def _check_geometry(self, geometry: str) -> VALID_GEOMETRIES:
+        geometry = geometry.lower()
+        if geometry not in get_args(VALID_GEOMETRIES): raise ValueError(f"`geometry` must be one of {get_args(VALID_GEOMETRIES)}, but got {geometry}")
+        else: return cast(VALID_GEOMETRIES, geometry)
+
     def _check_positive(self, name: str, value: Union[int, float]) -> Union[int, float]:
         if value <= 0: raise ValueError(f"`{name}` must be positive, but got {value}")
         else: return value
+
+    def _check_mode_flag(self, mode_flag_launch: Union[str, int]) -> VALID_LAUNCH_MODE_FLAGS:
+        if mode_flag_launch not in get_args(VALID_LAUNCH_MODE_FLAGS): raise ValueError(f"`mode_flag` must be one of {get_args(VALID_LAUNCH_MODE_FLAGS)}, but got {mode_flag_launch}")
+        else: return cast(VALID_LAUNCH_MODE_FLAGS, mode_flag_launch)
+
+    def _check_poloidal_flux_arguments(self, poloidal_flux_enter: float, poloidal_flux_zero_density: float, poloidal_flux_zero_temperature: float, relativistic_flag: bool) -> Tuple[float, float, float]:
+        self._check_positive("poloidal_flux_enter", poloidal_flux_enter)
+        self._check_positive("poloidal_flux_zero_density", poloidal_flux_zero_density)
+        self._check_positive("poloidal_flux_zero_temperature", poloidal_flux_zero_temperature)
+        if poloidal_flux_zero_density < poloidal_flux_enter: raise ValueError(f"`poloidal_flux_zero_density` must be less than or equals to `poloidal_flux_enter`, but got `poloidal_flux_zero_density` = {poloidal_flux_zero_density} and `poloidal_flux_enter` = {poloidal_flux_enter}")
+        if poloidal_flux_zero_temperature < poloidal_flux_enter: raise ValueError(f"`poloidal_flux_zero_density` must be less than or equals to `poloidal_flux_enter`, but got `poloidal_flux_zero_density` = {poloidal_flux_zero_density} and `poloidal_flux_enter` = {poloidal_flux_enter}")
+        if poloidal_flux_zero_density != poloidal_flux_zero_temperature and relativistic_flag: log.warning(f"`poloidal_flux_zero_density` ({poloidal_flux_zero_density}) and `poloidal_flux_zero_temperature` ({poloidal_flux_zero_temperature}) are set to different values. This may cause issues because `relativistic_flag` = {relativistic_flag}")
+        return poloidal_flux_enter, poloidal_flux_zero_density, poloidal_flux_zero_temperature
     
     def _check_data_path(self, name: Literal["magnetic", "ne", "Te", "output"], path: Union[str, Path]) -> Path:
         path = Path(path)
@@ -302,10 +323,9 @@ class Parameters:
         return new_orders
 
     def _check_mode_flag_launch_and_launch_flag(self, mode_flag_launch: VALID_LAUNCH_MODE_FLAGS, launch_flag: VALID_LAUNCH_FLAGS):
-        if launch_flag == "plasma" and mode_flag_launch in ["O", "X"]:
-            raise ValueError(f"""
-    `mode_flag` (at launch) cannot be "O" or "X" if `launch_flag` is "plasma", but got `mode_flag` = {mode_flag_launch} and `launch_flag` = {launch_flag}
-    """)
+        if launch_flag == "vacuum": pass
+        elif launch_flag == "plasma" and mode_flag_launch in ["O", "X"]: raise ValueError(f"`mode_flag` (at launch) must be '1' or '-1' if `launch_flag` = 'plasma', but got `mode_flag` = {mode_flag_launch} and `launch_flag` = {launch_flag}")
+        else: raise ValueError(f"`launch_flag` must be one of {get_args(VALID_LAUNCH_FLAGS)}, but got {launch_flag}")
     
     def _unpack_kwargs_for_circular_flux_surfaces(self, **extras):
         B_T_axis       = extras.pop("B_T_axis", None)
@@ -464,6 +484,19 @@ class Parameters:
 #
 ##################################################
 
-def check_input_before_ray_tracing(params: Parameters):
-    log.info(f"Checking the validity of inputs before ray tracing")
-    log.info(f"No checks implemented yet")
+def check_H_output(H_arr: ArrayLike, H_tol: float = 1e-2) -> None:
+    log.debug("Checking `H` output along the ray (it should be zero)")
+
+    H_max = np.abs(np.max(H_arr))
+    if   H_max > 1.0: raise ValueError(f"`H_output` is unphysically large! `|max(H_output)|` = {H_max}")
+    elif H_max > H_tol:    log.warning(f"`H_output` is unphysically large! `|max(H_output)|` = {H_max} but `H_tol` = {H_tol}")
+
+def check_Psi_output(Psi_xg_output: FloatArray, Psi_yg_output: FloatArray, Psi_gg_output: FloatArray, Psi_tol: float = 1e-3) -> None:
+    log.debug("Checking Im(Psi) g-components along ray (it should be zero)")
+
+    max_xg = np.abs(np.max(Psi_xg_output))
+    max_yg = np.abs(np.max(Psi_yg_output))
+    max_gg = np.abs(np.max(Psi_gg_output))
+    if max_xg > Psi_tol: log.warning(f"`Psi_xg` is unphysically large! `|max(Psi_xg)|` = {max_xg} but `Psi_tol` = {Psi_tol}")
+    if max_yg > Psi_tol: log.warning(f"`Psi_yg` is unphysically large! `|max(Psi_yg)|` = {max_yg} but `Psi_tol` = {Psi_tol}")
+    if max_gg > Psi_tol: log.warning(f"`Psi_gg` is unphysically large! `|max(Psi_gg)|` = {max_gg} but `Psi_tol` = {Psi_tol}")

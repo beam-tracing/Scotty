@@ -1,12 +1,10 @@
-from ctypes import Array
 import logging
 import numpy as np
 from scipy import constants as const
-from scotty.checks_v4 import VALID_FIELDS
-from scotty.data_io_v4 import CYLINDRICAL_VECTOR_COMPONENTS, CARTESIAN_VECTOR_COMPONENTS, SOLUTION_COMPONENTS
+from scotty.checks_v4 import VALID_FIELDS, check_H_output, check_Psi_output
+from scotty.data_io_v4 import CARTESIAN_VECTOR_COMPONENTS, SOLUTION_COMPONENTS
 from scotty.derivatives import derivative
-from scotty.fun_general import make_unit_vector_from_cross_product, dot, find_waist
-from scotty.fun_general_v4 import find_H_Cardano_eigh, find_H_Cardano_formula, find_beam_widths_and_curvs, find_g_cartesian, find_normalised_angular_freqs, find_electron_mass
+from scotty.fun_general_v4 import find_H_Cardano_eigh, find_H_Cardano_formula, find_beam_widths_and_curvs, find_g_cartesian, find_normalised_angular_freqs, find_electron_mass, make_unit_vector_from_cross_product, dot, find_waist
 from scotty.hamiltonian_v4 import DielectricTensor, Hamiltonian, convert_hessians, hessians
 from scotty.profile_fit import ProfileFitLike
 from scotty.typing import ArrayLike
@@ -73,9 +71,13 @@ def basic_analysis(
     if cart: q_vec, K_vec = q_vec_cart, K_vec_cart # (N,3) each
     else:    q_vec, K_vec = q_vec_cyld, K_vec_cyld # (N,3) each
     q_vec_T, K_vec_T = q_vec.T, K_vec.T
+    H_Booker = hamiltonian(*q_vec_T, *K_vec_T)
+    check_H_output(H_Booker)
+
     dH = hamiltonian.derivatives(q_vec_T, K_vec_T, second_order=btf)
+
     analysis_dict.update({
-        "H_Booker": (["tau"], hamiltonian(*q_vec_T, *K_vec_T)), # (N,) # type: ignore
+        "H_Booker": (["tau"], H_Booker), # (N,) # type: ignore
         "H_Booker_other": (["tau"], hamiltonian_other(*q_vec_T, *K_vec_T)), # (N,) # type: ignore
     })
 
@@ -240,6 +242,8 @@ def basic_analysis(
     elif np.all(min_H_Cardano_all == 2): mode_index_Cardano, H_Cardano_solution = 2, H_Cardano_3
     else: raise ValueError(f"Unable to select correct mode index for H_Cardano")
 
+    check_H_output(H_Cardano_solution)
+
     def _H_Cardano(K_X: ArrayLike, K_Y: ArrayLike, K_Z: ArrayLike) -> ArrayLike:
         return find_H_Cardano_formula(
             launch_angular_freq = omega_launch,
@@ -337,6 +341,8 @@ def basic_analysis(
         Psi_yg_output_beamframe_cartesian = dot(y_hat_cart, dot(Psi_3D_output_labframe_cartesian, g_hat_cart))
         Psi_gg_output_beamframe_cartesian = dot(g_hat_cart, dot(Psi_3D_output_labframe_cartesian, g_hat_cart))
 
+        check_Psi_output(Psi_xg_output_beamframe_cartesian, Psi_yg_output_beamframe_cartesian, Psi_gg_output_beamframe_cartesian)
+
         Psi_w_output_beamframe_cartesian = np.zeros((len_tau, 2, 2), dtype=np.complex128) # (N, 2, 2)
         Psi_w_output_beamframe_cartesian[:, 0, 0] = Psi_xx_output_beamframe_cartesian
         Psi_w_output_beamframe_cartesian[:, 0, 1] = Psi_w_output_beamframe_cartesian[:, 1, 0] = Psi_xy_output_beamframe_cartesian
@@ -353,7 +359,7 @@ def basic_analysis(
             "Psi_yy": (["tau"], Psi_yy_output_beamframe_cartesian),
             "Psi_yg": (["tau"], Psi_yg_output_beamframe_cartesian),
             "Psi_gg": (["tau"], Psi_gg_output_beamframe_cartesian),
-            # "Psi_w": (["tau", #, #], Psi_w_output_beamframe_cartesian), # commented out because "col/row_cart" is 3d but Psi_w is 2d
+            # "Psi_w": (["tau", #, #], Psi_w_output_beamframe_cartesian), # TODO commented out because "col/row_cart" is 3d but Psi_w is 2d
             "curvature_1": (["tau"], curv1),
             "curvature_2": (["tau"], curv2),
             "width_1": (["tau"], width1),

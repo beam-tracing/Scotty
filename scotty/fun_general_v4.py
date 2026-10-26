@@ -373,326 +373,6 @@ def find_vector_and_q_cyl_to_cart(vector_labframe_cyl: FloatArray, q_labframe_cy
 
 ##################################################
 #
-# GENERAL FUNCTIONS
-#
-##################################################
-
-def ray_line(
-    q_X_launch: float, q_Y_launch: float, q_Z_launch: float,
-    tau: Union[float, int, FloatArray],
-    poloidal_launch_angle_deg_Torbeam: float,
-    toroidal_launch_angle_deg_Torbeam: float,
-) -> FloatArray:
-    """
-    Calculates the position vectors of a straight-line trajectory
-    parametrised by `tau` from a launch position `(q_X_launch, q_Y_launch,
-    q_Z_launch)` with launch angles `poloidal_launch_angle_deg_Torbeam`
-    and `toroidal_launch_angle_deg_Torbeam`
-
-    Parameters
-    ----------
-    q_X_launch, q_Y_launch, q_Z_launch : float
-        Position of the launch position
-    tau : float, int, FloatArray
-        Parameter of the ray trajectory
-    poloidal_launch_angle_deg_Torbeam : float
-        Poloidal launch angle, in the TORBEAM convention, in degrees
-    toroidal_launch_angle_deg_Torbeam : float
-        Toroidal launch angle, in the TORBEAM convention, in degrees
-
-    Returns
-    ----------
-    output : (3,) or (3,N) FloatArray
-        Coordinates, in Cartesian, of the ray trajectory at points `tau`,
-        with the same length as `tau`
-    """
-
-    XYZ_start = np.array([q_X_launch, q_Y_launch, q_Z_launch])
-
-    # This parametrises the ray in a line away from the antenna,
-    # at a/up to some values of the parameter `tau`
-    poloidal_launch_angle = -np.deg2rad(poloidal_launch_angle_deg_Torbeam)
-    toroidal_launch_angle =  np.deg2rad(toroidal_launch_angle_deg_Torbeam) + np.pi
-    XYZ_step = np.array([
-        np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle),
-        np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle),
-        np.sin(poloidal_launch_angle)
-    ])
-
-    ray_line_positions = XYZ_start + np.outer(tau, XYZ_step)
-
-    return np.squeeze(ray_line_positions).T
-
-def poloidal_flux_along_ray_line(
-    q_X_launch: float, q_Y_launch: float, q_Z_launch: float,
-    tau: Union[float, int, FloatArray],
-    poloidal_launch_angle_deg_Torbeam: float,
-    toroidal_launch_angle_deg_Torbeam: float,
-    _field_cart_polflux: Callable,
-) -> FloatArray:
-    """
-    Calculates the poloidal flux values along a straight-line trajectory
-    parametrised by `tau` from a launch position `(q_X_launch, q_Y_launch,
-    q_Z_launch)` with launch angles `poloidal_launch_angle_deg_Torbeam`
-    and `toroidal_launch_angle_deg_Torbeam`
-
-    Parameters
-    ----------
-    q_X_launch, q_Y_launch, q_Z_launch : float
-        Position of the launch position
-    tau : float, int, FloatArray
-        Parameter of the ray trajectory
-    poloidal_launch_angle_deg_Torbeam : float
-        Poloidal launch angle, in the TORBEAM convention, in degrees
-    toroidal_launch_angle_deg_Torbeam : float
-        Toroidal launch angle, in the TORBEAM convention, in degrees
-    _field_cart_polflux : Callable
-        Function which takes in Cartesian coordinates and returns the
-        poloidal flux at those points
-
-    Returns
-    ----------
-    output : (3,) or (3,N) FloatArray
-        Poloidal flux values along the ray trajectory at points `tau`,
-        with the same length as `tau`
-    """
-    
-    positions = ray_line(q_X_launch, q_Y_launch, q_Z_launch, tau, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam)
-
-    # Get the poloidal flux values at a particular point or point(s).
-    # If there are NaNs, then replace those with the first non-NaN instance
-    # in the array (i.e. the poloidal flux of the first point in the field)
-    if positions.ndim == 1:
-        polflux = _field_cart_polflux(*positions)
-        if np.isnan(polflux):
-            log.warning(f"Poloidal flux is NaN at [X,Y,Z] = [{arr2str(positions)}]. Returning None instead")
-            polflux = np.nan
-    
-    elif positions.ndim == 2:
-        polflux = _field_cart_polflux(positions[:, 0], positions[:, 1], positions[:, 2])
-        if np.all(np.isnan(polflux)):
-            _printmsg = "\n".join(f"            - [{position}]" for position in positions)
-            log.warning(f"""
-        Poloidal fluxes are NaNs at all points queried: [X,Y,Z] = \n{_printmsg}
-        """)
-            polflux = np.nan
-        else:
-            NaN_replacement_value = polflux[~np.isnan(polflux)][0]
-            polflux = np.nan_to_num(polflux, nan=NaN_replacement_value)
-
-    else: raise ValueError(f"Ray line positions must have only 1 or 2 dimensions but got {positions.ndim}")
-    
-    return polflux # type: ignore
-
-def poloidal_flux_difference_along_ray_line(
-    q_X_launch: float, q_Y_launch: float, q_Z_launch: float,
-    tau: Union[float, int, FloatArray],
-    poloidal_launch_angle_deg_Torbeam: float,
-    toroidal_launch_angle_deg_Torbeam: float,
-    _field_cart_polflux: Callable,
-    poloidal_flux_enter: float,
-) -> FloatArray:
-    """
-    Calculates the poloidal flux difference, relative to the
-    `poloidal_flux_enter`, along a straight-line trajectory
-    parametrised by `tau` from a launch position `(q_X_launch, q_Y_launch,
-    q_Z_launch)` with launch angles `poloidal_launch_angle_deg_Torbeam`
-    and `toroidal_launch_angle_deg_Torbeam`
-
-    Parameters
-    ----------
-    q_X_launch, q_Y_launch, q_Z_launch : float
-        Position of the launch position
-    tau : float, int, FloatArray
-        Parameter of the ray trajectory
-    poloidal_launch_angle_deg_Torbeam : float
-        Poloidal launch angle, in the TORBEAM convention, in degrees
-    toroidal_launch_angle_deg_Torbeam : float
-        Toroidal launch angle, in the TORBEAM convention, in degrees
-    _field_cart_polflux : Callable
-        Function which takes in Cartesian coordinates and returns the
-        poloidal flux at those points
-    poloidal_flux_enter : float
-        Poloidal flux value to begin the ray-/beam-tracing calculations at
-
-    Returns
-    ----------
-    output : (3,) or (3,N) FloatArray
-        Poloidal flux difference, relative to `poloidal_flux_enter` along
-        the ray trajectory at points `tau`, with the same length as `tau`
-    """
-    
-    polflux = poloidal_flux_along_ray_line(q_X_launch, q_Y_launch, q_Z_launch, tau, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam, _field_cart_polflux)
-
-    # If NaN, then just return NaN
-    if polflux is np.nan: return polflux
-    else: return polflux - poloidal_flux_enter
-
-# TODO -- rewrite using Einstein summation convention?
-def dot(a: Array, b: Array) -> Array:
-    """
-    Dot product of arrays of vectors or matrices, which covers the case
-    that `matmul` and `dot` don't do very elegantly, and avoids having to
-    use a for loop to iterate over the array slices. Replaces the
-    deprecated `contract_special`
-
-    Parameters
-    ----------
-    arg_a, arg_b:
-        One of:
-        - matrix with shape TxMxN and a vector with TxN or TxM
-        - two vectors of shape TxN
-
-        For each T, independently compute the dot product of the
-        matrices/vectors
-    """
-    return np.array(list(map(np.dot, a, b)))
-
-def make_array_3x3(arr: Array) -> Array:
-    r"""
-    Convert a 2x2 array into a 3x3 by appending zeros on the outside:
-
-    .. math::
-
-        \begin{pmatrix}
-            a & b \\
-            c & d
-        \end{pmatrix}
-        \Rightarrow
-        \begin{pmatrix}
-            a & b & 0 \\
-            c & d & 0 \\
-            0 & 0 & 0
-        \end{pmatrix}
-    
-    Parameters
-    ----------
-    arr : Array
-        The input 2x2 array to expand
-    
-    Returns
-    ----------
-    output : Array
-        A 3x3 array with zeroes appended to the right and bottom
-    """
-    if arr.shape != (2, 2): raise ValueError(f"Expected array shape to be (2, 2), got {arr.shape}")
-    out = np.zeros((3, 3), dtype=arr.dtype)
-    out[:2, :2] = arr
-    return out
-
-def find_inverse_2D(matrix_2D: Array) -> Array:
-    """
-    Find the inverse M^-1 of a 2x2 matrix M; i.e. M x M^-1 = I. If matrix
-    M is close to singular, then raise an error; i.e. when | det(M) | < 1e-5
-
-    Parameters
-    ----------
-    matrix_2D : (2,2) Array
-        The input 2x2 array to invert
-
-    Returns
-    ----------
-    matrix_2D_inverse : (2,2) Array
-        The inverse array
-    """
-    # Finds the inverse of a 2x2 matrix
-    matrix_2D_inverse = np.zeros([2, 2], dtype=matrix_2D.dtype)
-    det = matrix_2D[0, 0] * matrix_2D[1, 1] - matrix_2D[0, 1] * matrix_2D[1, 0]
-    if np.abs(det) < 1e-5: log.warning(f"Matrix is close to singular")
-    matrix_2D_inverse[0, 0] =  matrix_2D[1, 1] / det
-    matrix_2D_inverse[1, 1] =  matrix_2D[0, 0] / det
-    matrix_2D_inverse[0, 1] = -matrix_2D[0, 1] / det
-    matrix_2D_inverse[1, 0] = -matrix_2D[1, 0] / det
-    return matrix_2D_inverse
-
-def find_g_cartesian(cartesian: bool, q0: ArrayLike, q1: ArrayLike, q2: ArrayLike, dH: dict) -> Tuple[ArrayLike, ArrayLike, ArrayLike]:
-    """
-    Find, in Cartesian coordinates:
-    (1) the group velocity vector, `g`;
-    (2) its magnitude, `|g|`; and
-    (3) its unit vector, `g_hat`.
-
-    Parameters
-    ----------
-    cartesian : bool
-        `True` for Cartesian geometry and `False` for cylindrical
-    q0 : ArrayLike
-        `q_X` for Cartesian geometry and `q_R` for cylindrical
-    q1 : ArrayLike
-        `q_Y` for Cartesian geometry and `q_zeta` for cylindrical
-    q2 : ArrayLike
-        `q_Z` for both Cartesian and cylindrical geometry
-    K0 : ArrayLike
-        `K_X` for Cartesian geometry and `K_R` for cylindrical
-    K1 : ArrayLike
-        `K_Y` for Cartesian geometry and `K_zeta` for cylindrical
-    K2 : ArrayLike
-        `K_Z` for both Cartesian and cylindrical geometry
-    dH : dict
-        Dictionary of derivatives of the Hamiltonian, i.e. `dH = hamiltonian.derivatives(...)`
-
-    Returns
-    ----------
-    g_vec : ArrayLike
-        Group velocity, in Cartesian coordinates
-    g_mag : ArrayLike
-        Magnitude of the group velocity
-    g_hat : ArrayLike
-        Unit vector of the group velocity, in Cartesian coordinates
-    """
-    if cartesian:
-        dH_dKx = dH["dH_dKX"]
-        dH_dKy = dH["dH_dKY"]
-        dH_dKz = dH["dH_dKZ"]
-    else: # cylindrical
-        q_R, q_zeta, q_Z = q0, q1, q2
-        sin_zeta = np.sin(q_zeta)
-        cos_zeta = np.cos(q_zeta)
-        dH_dKR = dH["dH_dKR"]
-        dH_dKzeta = dH["dH_dKzeta"]
-        dH_dKx = cos_zeta*dH_dKR - q_R*sin_zeta*dH_dKzeta
-        dH_dKy = sin_zeta*dH_dKR + q_R*cos_zeta*dH_dKzeta
-        dH_dKz = dH["dH_dKZ"]
-    
-    g_vec_cart = np.stack((dH_dKx, dH_dKy, dH_dKz), axis=1)
-    g_magnitude = np.linalg.norm(g_vec_cart, axis=1)
-    g_hat_cart = g_vec_cart / g_magnitude[:, np.newaxis]
-
-    return g_vec_cart, g_magnitude, g_hat_cart
-
-def find_K_magnitude(cartesian: bool, K0: ArrayLike, K1: ArrayLike, K2: ArrayLike, q0: ArrayLike) -> ArrayLike:
-    """
-    Find the magnitude of the wavevector. If in cylindrical geometry (i.e.
-    `K_lab_cyl`) then account for the fact that `K_lab_cyl[1]` is the
-    toroidal mode number
-
-    Parameters
-    ----------
-    cartesian : bool
-        `True` for Cartesian geometry and `False` for cylindrical
-    K0 : ArrayLike
-        `K_X` for Cartesian geometry and `K_R` for cylindrical
-    K1 : ArrayLike
-        `K_Y` for Cartesian geometry and `K_zeta` for cylindrical
-    K2 : ArrayLike
-        `K_Z` for both Cartesian and cylindrical geometry
-    q0 : ArrayLike
-        `q_R` for cylindrical geometry; unused if Cartesian
-
-    Returns
-    ----------
-    output : ArrayLike
-        Magnitude of the wavevector
-    """
-    return np.sqrt(K0**2 + K1**2 + K2**2) if cartesian else np.sqrt(K0**2 + (K1/q0)**2 + K2**2)
-
-def reshape_33N_to_N33(array: FloatArray):
-    """Such that shape is [points,3,3] instead of [3,3,points]"""
-    if array.ndim == 2: return array
-    return np.moveaxis(np.squeeze(array), 2, 0)
-
-##################################################
-#
 # PLASMA CALCULATIONS
 #
 ##################################################
@@ -1346,3 +1026,369 @@ def check_eigval_order(eigvals: FloatArray, eigvecs: FloatArray, diff_tol: float
             eigval2[idx:] = _temp
 
     return np.array([eigval1, eigval2]).T # (N, 2)
+
+##################################################
+#
+# GENERAL FUNCTIONS
+#
+##################################################
+
+def ray_line(
+    q_X_launch: float, q_Y_launch: float, q_Z_launch: float,
+    tau: Union[float, int, FloatArray],
+    poloidal_launch_angle_deg_Torbeam: float,
+    toroidal_launch_angle_deg_Torbeam: float,
+) -> FloatArray:
+    """
+    Calculates the position vectors of a straight-line trajectory
+    parametrised by `tau` from a launch position `(q_X_launch, q_Y_launch,
+    q_Z_launch)` with launch angles `poloidal_launch_angle_deg_Torbeam`
+    and `toroidal_launch_angle_deg_Torbeam`
+
+    Parameters
+    ----------
+    q_X_launch, q_Y_launch, q_Z_launch : float
+        Position of the launch position
+    tau : float, int, FloatArray
+        Parameter of the ray trajectory
+    poloidal_launch_angle_deg_Torbeam : float
+        Poloidal launch angle, in the TORBEAM convention, in degrees
+    toroidal_launch_angle_deg_Torbeam : float
+        Toroidal launch angle, in the TORBEAM convention, in degrees
+
+    Returns
+    ----------
+    output : (3,) or (3,N) FloatArray
+        Coordinates, in Cartesian, of the ray trajectory at points `tau`,
+        with the same length as `tau`
+    """
+
+    XYZ_start = np.array([q_X_launch, q_Y_launch, q_Z_launch])
+
+    # This parametrises the ray in a line away from the antenna,
+    # at a/up to some values of the parameter `tau`
+    poloidal_launch_angle = -np.deg2rad(poloidal_launch_angle_deg_Torbeam)
+    toroidal_launch_angle =  np.deg2rad(toroidal_launch_angle_deg_Torbeam) + np.pi
+    XYZ_step = np.array([
+        np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle),
+        np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle),
+        np.sin(poloidal_launch_angle)
+    ])
+
+    ray_line_positions = XYZ_start + np.outer(tau, XYZ_step)
+
+    return np.squeeze(ray_line_positions).T
+
+def poloidal_flux_along_ray_line(
+    q_X_launch: float, q_Y_launch: float, q_Z_launch: float,
+    tau: Union[float, int, FloatArray],
+    poloidal_launch_angle_deg_Torbeam: float,
+    toroidal_launch_angle_deg_Torbeam: float,
+    _field_cart_polflux: Callable,
+) -> FloatArray:
+    """
+    Calculates the poloidal flux values along a straight-line trajectory
+    parametrised by `tau` from a launch position `(q_X_launch, q_Y_launch,
+    q_Z_launch)` with launch angles `poloidal_launch_angle_deg_Torbeam`
+    and `toroidal_launch_angle_deg_Torbeam`
+
+    Parameters
+    ----------
+    q_X_launch, q_Y_launch, q_Z_launch : float
+        Position of the launch position
+    tau : float, int, FloatArray
+        Parameter of the ray trajectory
+    poloidal_launch_angle_deg_Torbeam : float
+        Poloidal launch angle, in the TORBEAM convention, in degrees
+    toroidal_launch_angle_deg_Torbeam : float
+        Toroidal launch angle, in the TORBEAM convention, in degrees
+    _field_cart_polflux : Callable
+        Function which takes in Cartesian coordinates and returns the
+        poloidal flux at those points
+
+    Returns
+    ----------
+    output : (3,) or (3,N) FloatArray
+        Poloidal flux values along the ray trajectory at points `tau`,
+        with the same length as `tau`
+    """
+    
+    positions = ray_line(q_X_launch, q_Y_launch, q_Z_launch, tau, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam)
+
+    # Get the poloidal flux values at a particular point or point(s).
+    # If there are NaNs, then replace those with the first non-NaN instance
+    # in the array (i.e. the poloidal flux of the first point in the field)
+    if positions.ndim == 1:
+        polflux = _field_cart_polflux(*positions)
+        if np.isnan(polflux):
+            log.warning(f"Poloidal flux is NaN at [X,Y,Z] = [{arr2str(positions)}]. Returning None instead")
+            polflux = np.nan
+    
+    elif positions.ndim == 2:
+        polflux = _field_cart_polflux(positions[:, 0], positions[:, 1], positions[:, 2])
+        if np.all(np.isnan(polflux)):
+            _printmsg = "\n".join(f"            - [{position}]" for position in positions)
+            log.warning(f"""
+        Poloidal fluxes are NaNs at all points queried: [X,Y,Z] = \n{_printmsg}
+        """)
+            polflux = np.nan
+        else:
+            NaN_replacement_value = polflux[~np.isnan(polflux)][0]
+            polflux = np.nan_to_num(polflux, nan=NaN_replacement_value)
+
+    else: raise ValueError(f"Ray line positions must have only 1 or 2 dimensions but got {positions.ndim}")
+    
+    return polflux # type: ignore
+
+def poloidal_flux_difference_along_ray_line(
+    q_X_launch: float, q_Y_launch: float, q_Z_launch: float,
+    tau: Union[float, int, FloatArray],
+    poloidal_launch_angle_deg_Torbeam: float,
+    toroidal_launch_angle_deg_Torbeam: float,
+    _field_cart_polflux: Callable,
+    poloidal_flux_enter: float,
+) -> FloatArray:
+    """
+    Calculates the poloidal flux difference, relative to the
+    `poloidal_flux_enter`, along a straight-line trajectory
+    parametrised by `tau` from a launch position `(q_X_launch, q_Y_launch,
+    q_Z_launch)` with launch angles `poloidal_launch_angle_deg_Torbeam`
+    and `toroidal_launch_angle_deg_Torbeam`
+
+    Parameters
+    ----------
+    q_X_launch, q_Y_launch, q_Z_launch : float
+        Position of the launch position
+    tau : float, int, FloatArray
+        Parameter of the ray trajectory
+    poloidal_launch_angle_deg_Torbeam : float
+        Poloidal launch angle, in the TORBEAM convention, in degrees
+    toroidal_launch_angle_deg_Torbeam : float
+        Toroidal launch angle, in the TORBEAM convention, in degrees
+    _field_cart_polflux : Callable
+        Function which takes in Cartesian coordinates and returns the
+        poloidal flux at those points
+    poloidal_flux_enter : float
+        Poloidal flux value to begin the ray-/beam-tracing calculations at
+
+    Returns
+    ----------
+    output : (3,) or (3,N) FloatArray
+        Poloidal flux difference, relative to `poloidal_flux_enter` along
+        the ray trajectory at points `tau`, with the same length as `tau`
+    """
+    
+    polflux = poloidal_flux_along_ray_line(q_X_launch, q_Y_launch, q_Z_launch, tau, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam, _field_cart_polflux)
+
+    # If NaN, then just return NaN
+    if polflux is np.nan: return polflux
+    else: return polflux - poloidal_flux_enter
+
+# TODO -- rewrite using Einstein summation convention?
+def dot(arr_a: Array, arr_b: Array) -> Array:
+    """
+    Dot product of arrays of vectors or matrices, which covers the case
+    that `matmul` and `dot` don't do very elegantly, and avoids having to
+    use a for loop to iterate over the array slices. Replaces the
+    deprecated `contract_special`
+
+    Parameters
+    ----------
+    arg_a, arg_b:
+        One of:
+        - matrix with shape TxMxN and a vector with TxN or TxM
+        - two vectors of shape TxN
+
+        For each T, independently compute the dot product of the
+        matrices/vectors
+    """
+    return np.array(list(map(np.dot, arr_a, arr_b)))
+
+def make_array_3x3(arr: Array) -> Array:
+    r"""
+    Convert a 2x2 array into a 3x3 by appending zeros on the outside:
+
+    .. math::
+
+        \begin{pmatrix}
+            a & b \\
+            c & d
+        \end{pmatrix}
+        \Rightarrow
+        \begin{pmatrix}
+            a & b & 0 \\
+            c & d & 0 \\
+            0 & 0 & 0
+        \end{pmatrix}
+    
+    Parameters
+    ----------
+    arr : Array
+        The input 2x2 array to expand
+    
+    Returns
+    ----------
+    output : Array
+        A 3x3 array with zeroes appended to the right and bottom
+    """
+    if arr.shape != (2, 2): raise ValueError(f"Expected array shape to be (2, 2), got {arr.shape}")
+    out = np.zeros((3, 3), dtype=arr.dtype)
+    out[:2, :2] = arr
+    return out
+
+def make_unit_vector_from_cross_product(vector_a: FloatArray, vector_b: FloatArray) -> FloatArray:
+    """
+    Take the cross product of two vectors and then normalise
+
+    Old documentation:
+        Assume np.shape(vector_a) = np.shape(vector_b) = (n,3)
+        or
+        np.shape(vector_a) = (n,3) , np.shape(vector_b) = (3)
+
+    Parameters
+    ----------
+    vector_a : (3,) or (N,3) FloatArray
+    vector_b : (3,) or (N,3) FloatArray
+
+    Returns
+    ----------
+    output_unit_vector : (3,) or (N,3) FloatArray
+    """
+    output_vector = np.cross(vector_a, vector_b)
+    output_vector_magnitude = np.linalg.norm(output_vector, axis=-1)
+    output_unit_vector = output_vector / np.tile(output_vector_magnitude, (3, 1)).T
+
+    return output_unit_vector
+
+def find_inverse_2D(matrix_2D: Array) -> Array:
+    """
+    Find the inverse M^-1 of a 2x2 matrix M; i.e. M x M^-1 = I. If matrix
+    M is close to singular, then raise an error; i.e. when | det(M) | < 1e-5
+
+    Parameters
+    ----------
+    matrix_2D : (2,2) Array
+        The input 2x2 array to invert
+
+    Returns
+    ----------
+    matrix_2D_inverse : (2,2) Array
+        The inverse array
+    """
+    # Finds the inverse of a 2x2 matrix
+    matrix_2D_inverse = np.zeros([2, 2], dtype=matrix_2D.dtype)
+    det = matrix_2D[0, 0] * matrix_2D[1, 1] - matrix_2D[0, 1] * matrix_2D[1, 0]
+    if np.abs(det) < 1e-5: log.warning(f"Matrix is close to singular")
+    matrix_2D_inverse[0, 0] =  matrix_2D[1, 1] / det
+    matrix_2D_inverse[1, 1] =  matrix_2D[0, 0] / det
+    matrix_2D_inverse[0, 1] = -matrix_2D[0, 1] / det
+    matrix_2D_inverse[1, 0] = -matrix_2D[1, 0] / det
+    return matrix_2D_inverse
+
+def find_g_cartesian(cartesian: bool, q0: ArrayLike, q1: ArrayLike, q2: ArrayLike, dH: dict) -> Tuple[ArrayLike, ArrayLike, ArrayLike]:
+    """
+    Find, in Cartesian coordinates:
+    (1) the group velocity vector, `g`;
+    (2) its magnitude, `|g|`; and
+    (3) its unit vector, `g_hat`.
+
+    Parameters
+    ----------
+    cartesian : bool
+        `True` for Cartesian geometry and `False` for cylindrical
+    q0 : ArrayLike
+        `q_X` for Cartesian geometry and `q_R` for cylindrical
+    q1 : ArrayLike
+        `q_Y` for Cartesian geometry and `q_zeta` for cylindrical
+    q2 : ArrayLike
+        `q_Z` for both Cartesian and cylindrical geometry
+    K0 : ArrayLike
+        `K_X` for Cartesian geometry and `K_R` for cylindrical
+    K1 : ArrayLike
+        `K_Y` for Cartesian geometry and `K_zeta` for cylindrical
+    K2 : ArrayLike
+        `K_Z` for both Cartesian and cylindrical geometry
+    dH : dict
+        Dictionary of derivatives of the Hamiltonian, i.e. `dH = hamiltonian.derivatives(...)`
+
+    Returns
+    ----------
+    g_vec : ArrayLike
+        Group velocity, in Cartesian coordinates
+    g_mag : ArrayLike
+        Magnitude of the group velocity
+    g_hat : ArrayLike
+        Unit vector of the group velocity, in Cartesian coordinates
+    """
+    if cartesian:
+        dH_dKx = dH["dH_dKX"]
+        dH_dKy = dH["dH_dKY"]
+        dH_dKz = dH["dH_dKZ"]
+    else: # cylindrical
+        q_R, q_zeta, q_Z = q0, q1, q2
+        sin_zeta = np.sin(q_zeta)
+        cos_zeta = np.cos(q_zeta)
+        dH_dKR = dH["dH_dKR"]
+        dH_dKzeta = dH["dH_dKzeta"]
+        dH_dKx = cos_zeta*dH_dKR - q_R*sin_zeta*dH_dKzeta
+        dH_dKy = sin_zeta*dH_dKR + q_R*cos_zeta*dH_dKzeta
+        dH_dKz = dH["dH_dKZ"]
+    
+    g_vec_cart = np.stack((dH_dKx, dH_dKy, dH_dKz), axis=1)
+    g_magnitude = np.linalg.norm(g_vec_cart, axis=1)
+    g_hat_cart = g_vec_cart / g_magnitude[:, np.newaxis]
+
+    return g_vec_cart, g_magnitude, g_hat_cart
+
+def find_K_magnitude(cartesian: bool, K0: ArrayLike, K1: ArrayLike, K2: ArrayLike, q0: ArrayLike) -> ArrayLike:
+    """
+    Find the magnitude of the wavevector. If in cylindrical geometry (i.e.
+    `K_lab_cyl`) then account for the fact that `K_lab_cyl[1]` is the
+    toroidal mode number
+
+    Parameters
+    ----------
+    cartesian : bool
+        `True` for Cartesian geometry and `False` for cylindrical
+    K0 : ArrayLike
+        `K_X` for Cartesian geometry and `K_R` for cylindrical
+    K1 : ArrayLike
+        `K_Y` for Cartesian geometry and `K_zeta` for cylindrical
+    K2 : ArrayLike
+        `K_Z` for both Cartesian and cylindrical geometry
+    q0 : ArrayLike
+        `q_R` for cylindrical geometry; unused if Cartesian
+
+    Returns
+    ----------
+    output : ArrayLike
+        Magnitude of the wavevector
+    """
+    return np.sqrt(K0**2 + K1**2 + K2**2) if cartesian else np.sqrt(K0**2 + (K1/q0)**2 + K2**2)
+
+def reshape_33N_to_N33(array: FloatArray):
+    """Such that shape is [points,3,3] instead of [3,3,points]"""
+    if array.ndim == 2: return array
+    return np.moveaxis(np.squeeze(array), 2, 0)
+
+##################################################
+#
+# GAUSSIAN BEAM FUNCTIONS
+#
+##################################################
+
+def find_waist(width: float, wavenumber: float, curvature: float):
+    """
+    Finds the size of the waist assuming vacuum propagation and circular beam
+
+    Parameters
+    ----------
+    width : float
+    wavenumber : float
+    curvature : float
+
+    Returns
+    ----------
+    beam_waist : float
+    """
+    return width / np.sqrt(1 + curvature**2 * width**4 * wavenumber**2 / 4)
