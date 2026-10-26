@@ -539,7 +539,8 @@ def create_magnetic_geometry(
           (isinstance(find_B_method, (MagneticField_Cartesian,   InterpolatedField_Cartesian))   and geometry == "cylindrical")):
         raise RuntimeError(f"Using existing field profile of type `{type(find_B_method)}` passed from `find_B_method` is incompatible with `geometry` = {geometry}")
 
-    elif isinstance(find_B_method, (MagneticField_Cylindrical, InterpolatedField_Cylindrical)) and geometry == "cartesian":
+    # elif isinstance(find_B_method, (MagneticField_Cylindrical, InterpolatedField_Cylindrical)) and geometry == "cartesian":
+    else:
         log.info(f"Creating a 3-D field profile from the given 2-D profile")
         min_X, max_X = np.min(find_B_method.R_coord), np.max(find_B_method.R_coord)
         min_Z, max_Z = np.min(find_B_method.Z_coord), np.max(find_B_method.Z_coord)
@@ -566,46 +567,46 @@ def create_magnetic_geometry(
         return field
 
     # If a string, then interpolate as per normal
-    elif isinstance(find_B_method, str):
-        (   q0, q1, q2,
-            B0, B1, B2,
-            psi,
-        ) = get_profile_data(
-            find_B_method = find_B_method.lower(),
-            geometry = geometry,
-            magnetic_data_path = magnetic_data_path,
-            input_filename_suffix = input_filename_suffix,
-        )
+    # elif isinstance(find_B_method, str):
+    #     (   q0, q1, q2,
+    #         B0, B1, B2,
+    #         psi,
+    #     ) = get_profile_data(
+    #         find_B_method = find_B_method.lower(),
+    #         geometry = geometry,
+    #         magnetic_data_path = magnetic_data_path,
+    #         input_filename_suffix = input_filename_suffix,
+    #     )
 
-        if geometry == "cylindrical":
-            (   field,
-                duration_field_interpolation,
-            ) = timer(InterpolatedField_Cylindrical)(
-                R_coord = q0,
-                Z_coord = q2,
-                B_R = B0,
-                B_T = B1,
-                B_Z = B2,
-                psi = psi,
-                interp_order = interp_order_int,
-                interp_smoothing = interp_smoothing,
-            )
-        else: # geometry == "cartesian":
-            (   field,
-                duration_field_interpolation,
-            ) = timer(InterpolatedField_Cartesian)(
-                X_coord = q0,
-                Y_coord = q1,
-                Z_coord = q2,
-                B_X = B0,
-                B_Y = B1,
-                B_Z = B2,
-                psi = psi,
-                interp_order = interp_order_str,
-            )
+    #     if geometry == "cylindrical":
+    #         (   field,
+    #             duration_field_interpolation,
+    #         ) = timer(InterpolatedField_Cylindrical)(
+    #             R_coord = q0,
+    #             Z_coord = q2,
+    #             B_R = B0,
+    #             B_T = B1,
+    #             B_Z = B2,
+    #             psi = psi,
+    #             interp_order = interp_order_int,
+    #             interp_smoothing = interp_smoothing,
+    #         )
+    #     else: # geometry == "cartesian":
+    #         (   field,
+    #             duration_field_interpolation,
+    #         ) = timer(InterpolatedField_Cartesian)(
+    #             X_coord = q0,
+    #             Y_coord = q1,
+    #             Z_coord = q2,
+    #             B_X = B0,
+    #             B_Y = B1,
+    #             B_Z = B2,
+    #             psi = psi,
+    #             interp_order = interp_order_str,
+    #         )
 
-        log.info(f"Interpolating B and poloidal flux profiles took {duration_field_interpolation} s")
+    #     log.info(f"Interpolating B and poloidal flux profiles took {duration_field_interpolation} s")
 
-        return field
+    #     return field
     
-    else: raise ValueError(f"`find_B_method` = '{find_B_method}' is not supported")
+    # else: raise ValueError(f"`find_B_method` = '{find_B_method}' is not supported")

@@ -5,7 +5,7 @@ from scipy import constants
 # from scotty.checks_v4 import VALID_LAUNCH_MODE_FLAGS
 from scotty.logger_v4 import arr2str
 from scotty.typing import ArrayLike, Array, FloatArray, ComplexFloatArray
-from typing import Callable, Union, Tuple, Optional, List, Literal
+from typing import Callable, Union, Tuple, Optional, List, Literal, TextIO
 
 log = logging.getLogger(__name__)
 
@@ -1032,6 +1032,26 @@ def check_eigval_order(eigvals: FloatArray, eigvecs: FloatArray, diff_tol: float
 # GENERAL FUNCTIONS
 #
 ##################################################
+
+def read_floats_into_list_until(terminator: str, lines: TextIO) -> FloatArray:
+    """Reads the lines of a file until the string (terminator) is read.
+
+    Currently used to read topfile.
+
+    Written by NE Bricknell
+    """
+    lst: List[float] = []
+    while True:
+        try:
+            line = lines.readline()
+        except StopIteration:
+            break
+        if terminator in line:
+            break
+        elif not line:
+            break
+        lst.extend(map(float, line.split()))
+    return np.asarray(lst)
 
 def ray_line(
     q_X_launch: float, q_Y_launch: float, q_Z_launch: float,

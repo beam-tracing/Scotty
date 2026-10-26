@@ -406,10 +406,6 @@ def find_Psi_3D_plasma(
         d2p_dXdZ = derivatives["d2p_dXdZ" if cart else "d2p_dRdZ"]
         d2p_dYdZ = derivatives["d2p_dYdZ" if cart else "d2p_dzetadZ"]
 
-        log.warning(
-"\n".join(f"{k}: {v}" for k, v in derivatives.items())
-)
-
         # At the plasma-vacuum boundary, we have two Psi matrices:
         # one corresponding to Psi in the vacuum (entry), and the
         # other corresponding to Psi in the plasma (initial). We

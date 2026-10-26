@@ -339,7 +339,7 @@ def ray_tracing(
             q0, _, _, K0, K1, K2 = soln_interp(tau)
             return np.sqrt(K0**2 + K1**2 + K2**2) if isinstance(hamiltonian.field, MagneticField_Cartesian) else np.sqrt(K0**2 + (K1/q0)**2 + K2**2)
         
-        tau_cutoff = minimize_scalar(fun=K_magnitude, bounds=[0, tau_arr_resampled[-1]], tol=atol)
+        tau_cutoff = minimize_scalar(fun=K_magnitude, bounds=[0, tau_arr_resampled[-1]], options={"xatol": atol})
         tau_arr_resampled = np.sort(np.append(np.linspace(start=0, stop=tau_terminating_event, num=len_tau-1, endpoint=False), tau_cutoff.x))
     
     else:

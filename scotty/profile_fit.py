@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: GPL-3.0
 
 from __future__ import annotations
+import logging
+import numpy as np
+from scipy.interpolate import UnivariateSpline
+from scotty.typing import PathLike, ArrayLike
 from typing import Callable, Optional, List, Dict, Union, Sequence
 from warnings import warn
 
-from scotty.typing import PathLike, ArrayLike
-
-import numpy as np
-from scipy.interpolate import UnivariateSpline
-
+log = logging.getLogger(__name__)
 
 ProfileFitLike = Callable[[ArrayLike], ArrayLike]
 """A callable that can parameterise density/temperature in 1D"""
@@ -393,7 +393,7 @@ def _guess_profile_fit_method(
     parameters: Sequence, filename: Optional[PathLike]
 ) -> str:
     if filename is not None:
-        print("ne(psi): loading from input file")
+        log.info(f"Loading ne(psi) from input file")
         return "smoothing-spline-file"
 
     FIT_LENGTH_MAPPINGS = {
@@ -405,7 +405,7 @@ def _guess_profile_fit_method(
 
     try:
         name, fit_method = FIT_LENGTH_MAPPINGS[len(parameters)]
-        print(f"ne(psi): Using {name}")
+        log.info(f"Using {name} for ne(psi)e")
         return fit_method
     except KeyError:
         raise ValueError(

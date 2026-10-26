@@ -43,17 +43,14 @@ Version history
     instead of ik
 
 """
+
 from __future__ import annotations
 import argparse
-import pathlib
-
-import numpy as np
 import freeqdsk._fileutils as fortran
-
-from scotty.fun_general import read_floats_into_list_until
-from scotty.geometry import ConstantCurrentDensityField
+import numpy as np
+import pathlib
+from scotty.fun_general_v4 import read_floats_into_list_until
 from scotty.typing import PathLike
-
 
 class Torbeam:
     """Utility class for reading/writing TORBEAM geometry files
@@ -223,39 +220,6 @@ def n_e_fun(nedata_psi, core_ne):
 
     nedata_ne[-1] = 0.001
     return nedata_ne
-
-
-def write_torbeam_file(
-    major_radius: float,
-    minor_radius: float,
-    buffer_factor: float,
-    x_grid_length: int,
-    z_grid_length: int,
-    B_toroidal_max: float,
-    B_poloidal_max: float,
-    torbeam_directory_path: pathlib.Path,
-):
-    """Write a TORBEAM magnetic geometry file based on a constant
-    current density equilibrium"""
-
-    field = ConstantCurrentDensityField(
-        B_toroidal_max,
-        major_radius,
-        minor_radius,
-        B_poloidal_max,
-        x_grid_length,
-        z_grid_length,
-        buffer_factor,
-    )
-    x_meshgrid, z_meshgrid = np.meshgrid(field.R_coord, field.Z_coord, indexing="ij")
-    B_t = field.B_T(x_meshgrid, z_meshgrid)
-    B_r = field.B_R(x_meshgrid, z_meshgrid)
-    B_z = field.B_Z(x_meshgrid, z_meshgrid)
-    psi = field.poloidal_flux(x_meshgrid, z_meshgrid)
-
-    Torbeam(field.R_coord, field.Z_coord, B_r, B_t, B_z, psi).write(
-        torbeam_directory_path / "topfile"
-    )
 
 
 def main(

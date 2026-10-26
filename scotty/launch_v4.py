@@ -207,7 +207,7 @@ def find_mode_index_and_ehat(mode_flag: VALID_LAUNCH_MODE_FLAGS, H_Cardanos: Flo
         ehat = soln_ehats
     
     elif soln_idxs.shape == (2,) and mode_flag in [1, -1]:
-        log.warning(f"Specific mode to be used not specified (`mode_flag` = {mode_flag}) and unable to determine which mode indices correspond to O- and X-mode. Perhaps `tol_H` may be too large, so try selecting a deeper `poloidal_flux_enter` or use `boundary_flag` = `continuous` instead ")
+        log.warning(f"Specific mode to be used not specified (`mode_flag` = {mode_flag}) and unable to determine which mode indices correspond to O- and X-mode. Perhaps `tol_H` may be too large, so try selecting a deeper `poloidal_flux_enter` or use `boundary_flag` = `continuous` instead")
         log.warning(f"Selecting min(H) as the solution")
         mode_idx = np.argmin(np.abs(H_Cardanos))
         H = H_Cardanos[mode_idx]
@@ -226,7 +226,7 @@ def find_mode_index_and_ehat(mode_flag: VALID_LAUNCH_MODE_FLAGS, H_Cardanos: Flo
         idx = 0 if abs_Re_e0_b > abs_Re_e1_b else 1
         mode_idx = soln_idxs[idx]
         H = soln_H[idx]
-        ehat = soln_ehats[idx]
+        ehat = soln_ehats.T[idx] # because soln_ehats.shape == (3,2)
     
     return cast(int, np.squeeze(mode_idx)), np.squeeze(H), np.squeeze(ehat)
 

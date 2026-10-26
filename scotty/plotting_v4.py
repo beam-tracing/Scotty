@@ -5,6 +5,8 @@ from scotty.geometry_v4 import InterpolatedField_Cartesian, MagneticField_Cartes
 from scotty.typing import FloatArray
 from typing import Union, Tuple, Optional, cast
 
+# TODO implement original scotty plotting functions
+
 
 
 def make_fig_if_None(existing_fig: Optional[pgo.Figure] = None) -> pgo.Figure:
