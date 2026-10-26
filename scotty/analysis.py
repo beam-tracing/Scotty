@@ -1,11 +1,11 @@
 import logging
 import numpy as np
 from scipy import constants as const
-from scotty.checks_v4 import VALID_FIELDS, check_H_output, check_Psi_output
-from scotty.data_io_v4 import CARTESIAN_VECTOR_COMPONENTS, SOLUTION_COMPONENTS
+from scotty.checks import VALID_FIELDS, check_H_output, check_Psi_output
+from scotty.data_io import CARTESIAN_VECTOR_COMPONENTS, SOLUTION_COMPONENTS
 from scotty.derivatives import derivative
-from scotty.fun_general_v4 import find_H_Cardano_eigh, find_H_Cardano_formula, find_beam_widths_and_curvs, find_g_cartesian, find_normalised_angular_freqs, find_electron_mass, make_unit_vector_from_cross_product, dot, find_waist
-from scotty.hamiltonian_v4 import DielectricTensor, Hamiltonian, convert_hessians, hessians
+from scotty.fun_general import find_H_Cardano_eigh, find_H_Cardano_formula, find_beam_widths_and_curvs, find_g_cartesian, find_normalised_angular_freqs, find_electron_mass, make_unit_vector_from_cross_product, dot, find_waist
+from scotty.hamiltonian import DielectricTensor, Hamiltonian, convert_hessians, hessians
 from scotty.profile_fit import ProfileFitLike
 from scotty.typing import ArrayLike
 from typing import Optional, Tuple

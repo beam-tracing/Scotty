@@ -2,9 +2,9 @@ import logging
 import numpy as np
 from scipy.interpolate import CubicSpline
 from scipy.optimize import minimize_scalar, root_scalar
-from scotty.boundary_conditions_v4 import apply_boundary_conditions
-from scotty.checks_v4 import VALID_FIELDS, VALID_LAUNCH_FLAGS, VALID_LAUNCH_MODE_FLAGS, VALID_BOUNDARY_FLAGS
-from scotty.fun_general_v4 import (
+from scotty.boundary_conditions import apply_boundary_conditions
+from scotty.checks import VALID_FIELDS, VALID_LAUNCH_FLAGS, VALID_LAUNCH_MODE_FLAGS, VALID_BOUNDARY_FLAGS
+from scotty.fun_general import (
     find_K_labframe_cart_to_cyl,
     find_K_magnitude,
     find_q_labframe_cart_to_cyl,
@@ -17,9 +17,9 @@ from scotty.fun_general_v4 import (
     find_epsilon_terms,
     find_H_Cardano_eigh,
 )
-from scotty.geometry_v4 import MagneticField_Cylindrical
-from scotty.hamiltonian_v4 import DielectricTensor, Hamiltonian
-from scotty.logger_v4 import arr2str
+from scotty.geometry import MagneticField_Cylindrical
+from scotty.hamiltonian import DielectricTensor, Hamiltonian
+from scotty.logger import arr2str
 from scotty.typing import FloatArray, ComplexFloatArray
 from typing import cast, Optional, Tuple, Union, List, Literal
 

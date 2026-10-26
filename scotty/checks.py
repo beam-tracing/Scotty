@@ -1,7 +1,7 @@
 import logging
 from multiprocessing.managers import ValueProxy
 from pathlib import Path
-from scotty.fun_general_v4 import (
+from scotty.fun_general import (
     find_K_labframe_cart_to_cyl,
     find_K_labframe_cyl_to_cart,
     find_K_magnitude,
@@ -10,7 +10,7 @@ from scotty.fun_general_v4 import (
     find_q_labframe_cart_to_cyl,
     find_q_labframe_cyl_to_cart,
 )
-from scotty.geometry_v4 import MagneticField_Cylindrical, MagneticField_Cartesian, InterpolatedField_Cylindrical, InterpolatedField_Cartesian
+from scotty.geometry import MagneticField_Cylindrical, MagneticField_Cartesian, InterpolatedField_Cylindrical, InterpolatedField_Cartesian
 from scotty.profile_fit import ProfileFitLike
 from scotty.typing import ArrayLike, FloatArray, ComplexFloatArray
 from typing import Literal, Optional, Sequence, Union, Tuple, cast, get_args
@@ -132,7 +132,7 @@ class Parameters:
         **kwargs,
         ):
 
-        from scotty.fun_general_v4 import (
+        from scotty.fun_general import (
             freq_GHz_to_angular_frequency,
             angular_frequency_to_wavenumber
         )

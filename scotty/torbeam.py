@@ -49,7 +49,7 @@ import argparse
 import freeqdsk._fileutils as fortran
 import numpy as np
 import pathlib
-from scotty.fun_general_v4 import read_floats_into_list_until
+from scotty.fun_general import read_floats_into_list_until
 from scotty.typing import PathLike
 
 class Torbeam:

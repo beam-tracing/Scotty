@@ -4,8 +4,8 @@ import numpy as np
 import pathlib
 from scipy.interpolate import RectBivariateSpline, RegularGridInterpolator
 from scotty.derivatives import derivative
-from scotty.fun_general_v4 import find_q_labframe_cart_to_cyl
-from scotty.logger_v4 import logging, timer
+from scotty.fun_general import find_q_labframe_cart_to_cyl
+from scotty.logger import logging, timer
 from scotty.torbeam import Torbeam
 from scotty.typing import ArrayLike, FloatArray
 from typing import cast, Callable, Literal, Optional, Tuple, Union, List

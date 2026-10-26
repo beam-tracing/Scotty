@@ -1,10 +1,10 @@
 import logging
 import numpy as np
 from scipy.integrate import solve_ivp
-from scotty.checks_v4 import VALID_SOLVER_STATUS
-from scotty.geometry_v4 import MagneticField_Cartesian
-from scotty.hamiltonian_v4 import Hamiltonian, hessians
-from scotty.logger_v4 import timer
+from scotty.checks import VALID_SOLVER_STATUS
+from scotty.geometry import MagneticField_Cartesian
+from scotty.hamiltonian import Hamiltonian, hessians
+from scotty.logger import timer
 from scotty.typing import FloatArray, ComplexFloatArray
 from typing import Tuple
 

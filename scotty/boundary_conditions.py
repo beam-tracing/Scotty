@@ -1,8 +1,8 @@
 import logging
 import numpy as np
 from scipy.optimize import newton
-from scotty.checks_v4 import VALID_BOUNDARY_FLAGS, VALID_FIELDS, MagneticField_Cylindrical, MagneticField_Cartesian
-from scotty.fun_general_v4 import (
+from scotty.checks import VALID_BOUNDARY_FLAGS, VALID_FIELDS, MagneticField_Cylindrical, MagneticField_Cartesian
+from scotty.fun_general import (
     angular_frequency_to_wavenumber,
     find_normalised_angular_freqs,
     find_q_labframe_cyl_to_cart,
@@ -14,8 +14,8 @@ from scotty.fun_general_v4 import (
     find_Psi_3D_labframe_cyl_to_cart,
     find_Booker_terms,
 )
-from scotty.hamiltonian_v4 import Hamiltonian
-from scotty.logger_v4 import arr2str
+from scotty.hamiltonian import Hamiltonian
+from scotty.logger import arr2str
 from scotty.typing import ArrayLike, FloatArray, ComplexFloatArray
 from typing import Tuple, Literal, Optional, cast
 

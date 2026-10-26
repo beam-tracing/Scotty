@@ -2,16 +2,16 @@ import datetime
 import logging
 import numpy as np
 import pathlib
-from scotty.analysis_v4 import basic_analysis, dbs_analysis
-from scotty.beam_solver_v4 import beam_tracing
-from scotty.checks_v4 import VALID_GEOMETRIES, VALID_LAUNCH_FLAGS, VALID_LAUNCH_MODE_FLAGS, VALID_BOUNDARY_FLAGS, Parameters
-from scotty.data_io_v4 import inputs_to_dicts, solver_output_to_dicts, dict_to_dataset
-from scotty.geometry_v4 import MagneticField_Cylindrical, MagneticField_Cartesian, create_magnetic_geometry
-from scotty.hamiltonian_v4 import initialise_hamiltonians, assign_hamiltonians
-from scotty.launch_v4 import find_plasma_entry_position, find_auto_delta_signs, find_plasma_entry_parameters
-from scotty.logger_v4 import config_logger, arr2str
+from scotty.analysis import basic_analysis, dbs_analysis
+from scotty.beam_solver import beam_tracing
+from scotty.checks import VALID_GEOMETRIES, VALID_LAUNCH_FLAGS, VALID_LAUNCH_MODE_FLAGS, VALID_BOUNDARY_FLAGS, Parameters
+from scotty.data_io import inputs_to_dicts, solver_output_to_dicts, dict_to_dataset
+from scotty.geometry import MagneticField_Cylindrical, MagneticField_Cartesian, create_magnetic_geometry
+from scotty.hamiltonian import initialise_hamiltonians, assign_hamiltonians
+from scotty.launch import find_plasma_entry_position, find_auto_delta_signs, find_plasma_entry_parameters
+from scotty.logger import config_logger, arr2str
 from scotty.profile_fit import ProfileFitLike, profile_fit
-from scotty.ray_solver_v4 import ray_tracing
+from scotty.ray_solver import ray_tracing
 from scotty.typing import FloatArray, PathLike
 from scotty._version import __version__
 from typing import Optional, Sequence, Tuple, Union, Literal, cast, overload

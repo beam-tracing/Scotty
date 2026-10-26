@@ -1,5 +1,5 @@
 import logging
-from scotty.checks_v4 import Parameters, VALID_FIELDS
+from scotty.checks import Parameters, VALID_FIELDS
 from typing import Tuple
 import xarray as xr
 

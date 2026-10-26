@@ -1,10 +1,10 @@
 import logging
 from multiprocessing import Value
 import numpy as np
-from scotty.checks_v4 import VALID_FIELDS, VALID_LAUNCH_MODE_FLAGS
+from scotty.checks import VALID_FIELDS, VALID_LAUNCH_MODE_FLAGS
 from scotty.derivatives import derivative
-from scotty.fun_general_v4 import find_normalised_plasma_ang_freq, find_normalised_gyro_ang_freq, angular_frequency_to_wavenumber, dot, find_Booker_terms, reshape_33N_to_N33
-from scotty.geometry_v4 import MagneticField_Cylindrical, MagneticField_Cartesian
+from scotty.fun_general import find_normalised_plasma_ang_freq, find_normalised_gyro_ang_freq, angular_frequency_to_wavenumber, dot, find_Booker_terms, reshape_33N_to_N33
+from scotty.geometry import MagneticField_Cylindrical, MagneticField_Cartesian
 from scotty.profile_fit import ProfileFitLike
 from scotty.typing import ArrayLike, FloatArray
 from typing import Any, Callable, Dict, Literal, Optional, Tuple, Union, cast

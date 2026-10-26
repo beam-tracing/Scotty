@@ -1,7 +1,7 @@
 import numpy as np
 import plotly.graph_objects as pgo
 import plotly.io as pio
-from scotty.geometry_v4 import InterpolatedField_Cartesian, MagneticField_Cartesian, MagneticField_Cylindrical
+from scotty.geometry import InterpolatedField_Cartesian, MagneticField_Cartesian, MagneticField_Cylindrical
 from scotty.typing import FloatArray
 from typing import Union, Tuple, Optional, cast
 

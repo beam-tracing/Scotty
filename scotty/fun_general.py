@@ -2,8 +2,8 @@ from __future__ import annotations
 import logging
 import numpy as np
 from scipy import constants
-# from scotty.checks_v4 import VALID_LAUNCH_MODE_FLAGS
-from scotty.logger_v4 import arr2str
+# from scotty.checks import VALID_LAUNCH_MODE_FLAGS
+from scotty.logger import arr2str
 from scotty.typing import ArrayLike, Array, FloatArray, ComplexFloatArray
 from typing import Callable, Union, Tuple, Optional, List, Literal, TextIO
 

@@ -3,11 +3,11 @@ import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.integrate._ivp.ivp import OdeSolution
 from scipy.optimize import minimize_scalar
-from scotty.checks_v4 import VALID_SOLVER_STATUS
-from scotty.fun_general_v4 import find_normalised_gyro_ang_freq, find_K_magnitude
-from scotty.geometry_v4 import MagneticField_Cartesian, MagneticField_Cylindrical
-from scotty.hamiltonian_v4 import Hamiltonian
-from scotty.logger_v4 import timer
+from scotty.checks import VALID_SOLVER_STATUS
+from scotty.fun_general import find_normalised_gyro_ang_freq, find_K_magnitude
+from scotty.geometry import MagneticField_Cartesian, MagneticField_Cylindrical
+from scotty.hamiltonian import Hamiltonian
+from scotty.logger import timer
 from scotty.typing import FloatArray
 # from sklearn.utils import Bunch
 from typing import Any, Callable, Dict, Literal, Protocol, Union, Tuple, cast
