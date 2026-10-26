@@ -34,9 +34,7 @@ def test_find_nearest():
 
 
 def test_read_floats_into_list():
-    data = io.StringIO(
-        dedent(
-            """
+    data = io.StringIO(dedent("""
             5.00000000e-01
             1.00000000e+00
             1.50000000e+00
@@ -45,9 +43,7 @@ def test_read_floats_into_list():
             0.061111111   0.18333333   0.30555556   0.42777778   0.55
             Magnetic field: B_R
             1 2 3 4
-            """
-        )
-    )
+            """))
     x_coords = read_floats_into_list_until("Z-coordinates", data)
     z_coords = read_floats_into_list_until("B_R", data)
     B_r = read_floats_into_list_until("not in file", data)
@@ -84,9 +80,7 @@ def test_find_Psi_3D_lab_symmetry():
     Psi_lab_Cartesian = random_symmetric_matrix()
 
     Psi_lab_cylindrical = find_Psi_3D_labframe_cart_to_cyl(
-        Psi_lab_Cartesian,
-        np.array([42, 64, 0]),
-        np.array([2, np.pi, 0.123])
+        Psi_lab_Cartesian, np.array([42, 64, 0]), np.array([2, np.pi, 0.123])
     )
 
     # result should be symmetric
@@ -208,6 +202,7 @@ def test_K_magnitude():
     q_R = 2
     expected_K = 15
     assert find_K_magnitude(False, K_R, K_zeta, K_Z, q_R) == expected_K
+
 
 @pytest.mark.parametrize(
     ("cartesian", "expected_cylindrical"),

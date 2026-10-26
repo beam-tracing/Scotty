@@ -7,6 +7,7 @@ import numpy as np
 
 try:
     from numpy.typing import NDArray
+
     Array = NDArray[np.number]
     FloatArray = NDArray[np.float64]
     ComplexFloatArray = NDArray[np.complex128]

@@ -33,11 +33,11 @@ def cache(func):
         )
 
         try:
-            result = wrapper_cache.cache[cache_key] # type: ignore
+            result = wrapper_cache.cache[cache_key]  # type: ignore
             hits += 1
         except KeyError:
             result = func(*args, **kwargs)
-            wrapper_cache.cache[cache_key] = result # type: ignore
+            wrapper_cache.cache[cache_key] = result  # type: ignore
             misses += 1
 
         return result
@@ -47,8 +47,8 @@ def cache(func):
         nonlocal hits, misses
         return {"hits": hits, "misses": misses}
 
-    wrapper_cache.cache = {} # type: ignore
-    wrapper_cache.cache_info = cache_info # type: ignore
+    wrapper_cache.cache = {}  # type: ignore
+    wrapper_cache.cache_info = cache_info  # type: ignore
     return wrapper_cache
 
 
@@ -234,7 +234,7 @@ def derivative(
         if full_result is None:
             full_result = np.zeros_like(result)
         full_result += result
-    
+
     # If float, return float
     # If FloatArray, return FloatArray
     final_result = cast(FloatArray, full_result) / np.prod(dim_spacings)

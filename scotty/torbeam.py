@@ -52,6 +52,7 @@ import pathlib
 from scotty.fun_general import read_floats_into_list_until
 from scotty.typing import PathLike
 
+
 class Torbeam:
     """Utility class for reading/writing TORBEAM geometry files
 
@@ -84,7 +85,8 @@ class Torbeam:
         """Read TORBEAM geometry file"""
 
         with open(filename) as f:
-            while "Radial grid coordinates" not in f.readline(): pass # Start reading only from X-coords onwards
+            while "Radial grid coordinates" not in f.readline():
+                pass  # Start reading only from X-coords onwards
             R_grid = read_floats_into_list_until("Vertical grid coordinates", f)
             Z_grid = read_floats_into_list_until("B_r", f)
             R_points = len(R_grid)
