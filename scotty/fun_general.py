@@ -1053,6 +1053,15 @@ def read_floats_into_list_until(terminator: str, lines: TextIO) -> FloatArray:
         lst.extend(map(float, line.split()))
     return np.asarray(lst)
 
+def find_nearest(array: ArrayLike, value: Any) -> int:
+    """Returns the index of the first element in ``array`` closest in
+    absolute value to ``value``
+
+    """
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return int(idx)
+
 def ray_line(
     q_X_launch: float, q_Y_launch: float, q_Z_launch: float,
     tau: Union[float, int, FloatArray],
