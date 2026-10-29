@@ -6,7 +6,7 @@ from scipy import constants
 # from scotty.checks import VALID_LAUNCH_MODE_FLAGS
 from scotty.logger import arr2str
 from scotty.typing import ArrayLike, Array, FloatArray, ComplexFloatArray
-from typing import Callable, Union, Tuple, Optional, List, Literal, TextIO
+from typing import Callable, Union, Tuple, Optional, List, Literal, TextIO, cast
 
 log = logging.getLogger(__name__)
 
@@ -1766,6 +1766,22 @@ def reshape_33N_to_N33(array: FloatArray):
 ##################################################
 
 
+def find_Rayleigh_length(waist: float, wavenumber: float):
+    """
+    Finds the Rayleigh length (assumes vacuum propagation and circular beam)
+    
+    Parameters
+    ----------
+    waist : float
+    wavenumber : float
+    
+    Returns
+    ----------
+    rayleigh_length : float
+    """
+    return 0.5 * wavenumber * waist**2
+
+
 def find_waist(width: float, wavenumber: float, curvature: float):
     """
     Finds the size of the waist assuming vacuum propagation and circular beam
@@ -1781,3 +1797,292 @@ def find_waist(width: float, wavenumber: float, curvature: float):
     beam_waist : float
     """
     return width / np.sqrt(1 + curvature**2 * width**4 * wavenumber**2 / 4)
+
+
+def find_distance_from_waist(width: float, wavenumber: float, curvature: float):
+    """
+    Finds how far (signed distance) you are from the waist (assumes vacuum propagation and circular beam)
+
+    Parameters
+    ----------
+    width : float
+    wavenumber : float
+    curvature : float
+
+    Returns
+    ----------
+    distance_from_waist : float
+        Signed distance from the waist; negative for distance to, positive for distance
+        after waist
+    """
+    waist_sq = find_waist(width, wavenumber, curvature) ** 2
+    return np.sign(curvature) * np.sqrt(
+        (width**2 - waist_sq) * waist_sq * wavenumber**2 / 4
+    )
+
+
+def propagate_beam(Psi_w_cartesian: ComplexFloatArray, propagation_distance: float, freq_GHz: float) -> ComplexFloatArray:
+    """
+    Uses the vacuum solution of the beam tracing equations to propagate the beam
+    (works for arbitrary Gaussian beam in vacuum)
+
+    Parameters
+    ----------
+    Psi_w_cartesian : (2,2) ComplexFloatArray
+    propagation_distance : float
+    freq_GHz : float
+
+    Returns
+    ----------
+    Psi_w_cartesian_output : (2,2) ComplexFloatArray
+    """
+    wavenumber_K0 = freq_GHz_to_wavenumber(freq_GHz)
+
+    Psi_w_inv_cartesian = find_inverse_2D(Psi_w_cartesian)
+
+    Psi_w_inv_final_cartesian = (
+        propagation_distance / (wavenumber_K0) * np.eye(2)
+        + Psi_w_inv_cartesian
+    )
+
+    Psi_w_final_cartesian = find_inverse_2D(Psi_w_inv_final_cartesian)
+
+    return cast(ComplexFloatArray, Psi_w_final_cartesian)
+
+
+def propagate_circular_beam(width: float, curvature: float, propagation_distance: float, freq_GHz: float) -> Tuple[float, float]:
+    """
+    Directly uses the width and curvature formulae to calculate circular
+    beam propagation (assumes vacuum propagation and circular beam)
+
+    Parameters
+    ----------
+    width : float
+    curvature : float
+    propagation_distance : float
+    freq_GHZ : float
+
+    Returns
+    ----------
+    width : float
+    curvature : float
+    """
+    wavenumber = freq_GHz_to_wavenumber(freq_GHz)
+
+    w0 = find_waist(width, wavenumber, curvature)
+    z0 = find_distance_from_waist(width, wavenumber, curvature)
+    z_R = find_Rayleigh_length(w0, wavenumber)
+
+    z = z0 + propagation_distance
+
+    widths = w0 * np.sqrt(1 + (z / z_R) ** 2)
+    curvatures = z / (z**2 + z_R**2)
+    return widths, curvatures
+
+
+##################################################
+#
+# LAUNCH ANGLES FUNCTIONS
+#
+##################################################
+
+
+def use_deg_args(func, *args, **kwargs):
+    "Transform args from degrees to radians before calling"
+    return func(*[a * np.pi / 180 for a in args], **kwargs)
+
+
+def tilt_trns_RZ_make(t: float) -> FloatArray:
+    """
+    Tilts R ([1,0,0]) in to Z ([0,0,1]) using angle in radians
+            
+    Parameters
+    ----------
+    t : float
+        Tilt angle in radians
+    
+    Returns
+    ----------
+    rot_matrix : (3,3) FloatArray
+        Rotation matrix in RZ corresponding to a tilt of `t` radians
+    """
+    ctilt = np.cos(t)
+    stilt = np.sin(t)
+    return np.array([[ctilt, 0, stilt], [0, 1, 0], [-stilt, 0, ctilt]])
+
+
+def tilt_trns_TZ_make(t: float) -> FloatArray:
+    """
+    Tilts T ([0,1,0]) in to Z ([0,0,1]) using angle in radians
+        
+    Parameters
+    ----------
+    t : float
+        Tilt angle in radians
+    
+    Returns
+    ----------
+    rot_matrix : (3,3) FloatArray
+        Rotation matrix in TZ corresponding to a tilt of `t` radians
+    """
+    ctilt = np.cos(t)
+    stilt = np.sin(t)
+    return np.array([[1, 0, 0], [0, ctilt, -stilt], [0, stilt, ctilt]])
+
+
+def rot_trns_make(r: float) -> FloatArray:
+    """
+    Rotates R ([1,0,0]) into T ([0,1,0]) using angle in radians
+    
+    Parameters
+    ----------
+    r : float
+        Rotation angle in radians
+    
+    Returns
+    ----------
+    rot_matrix : (3,3) FloatArray
+        Rotation matrix in RT corresponding to a rotation of `r` radians
+    """
+    crot = np.cos(r)
+    srot = np.sin(r)
+    return np.array([[crot, -srot, 0], [srot, crot, 0], [0, 0, 1]])
+
+
+def mirrornorm_make_with_rot_tilt_operators(r: float, t: float) -> FloatArray:
+    """
+    Makes norm vector for mirror using tilt and rot operators (in that order) given
+    angles in radians
+
+    Parameters
+    ----------
+    r : float
+        Rotation angle in radians
+    t : float
+        Tilt angle in radians
+    
+    Returns
+    ----------
+    mirrornorm : (3,) FloatArray
+        Mirror normal vector
+    """
+    mirrornorm0 = np.array([0, 1, 0])
+    tilt_trns = tilt_trns_TZ_make(t)
+    rot_trns = rot_trns_make(np.pi / 4 + r)
+    mirrornorm = rot_trns @ (tilt_trns @ mirrornorm0)
+    return mirrornorm
+
+
+def mirrornorm_make(r: float, t: float) -> FloatArray:
+    """
+    Makes norm vector for mirror directly using angles in radians
+
+    Parameters
+    ----------
+    r : float
+        Rotation angle in radians
+    t : float
+        Tilt angle in radians
+    
+    Returns
+    ----------
+    mirror_norm : (3,) FloatArray
+        Mirror normal vector
+    """
+    return np.array(
+        [
+            *(np.cos(t) * np.array([-np.sin(r + np.pi / 4), np.cos(r + np.pi / 4)])),
+            np.sin(t),
+        ]
+    )
+
+
+def reflector_make_from_mirrornorm(mirrornorm: FloatArray) -> FloatArray:
+    """
+    Makes Householder (reflector) matrix for mirror using norm vector for mirror
+    
+    Parameters
+    ----------
+    mirror_norm : (3,) FloatArray
+        Mirror normal vector
+    
+    Returns
+    ----------
+    reflector : (3,3) FloatArray
+        Reflector matrix
+    """
+    reflector = np.eye(3) - 2 * mirrornorm[:, np.newaxis] @ mirrornorm[np.newaxis, :]
+    return reflector
+
+
+def reflector_make(r: float, t: float) -> FloatArray:
+    """
+    Makes Householder (reflector) matrix for mirror using angles in radians
+    
+    Parameters
+    ----------
+    r : float
+        Rotation angle in radians
+    t : float
+        Tilt angle in radians
+    
+    Returns
+    ----------
+    reflector : (3,3) FloatArray
+        Reflector matrix
+    """
+    mirrornorm = mirrornorm_make(r, t)
+    reflector = reflector_make_from_mirrornorm(mirrornorm)
+    return reflector
+
+
+def genray_angles_from_mirror_angles(
+    rot_ang_deg: ArrayLike,
+    tilt_ang_deg: ArrayLike,
+    offset_for_window_norm_to_R: ArrayLike = 3.0,
+) -> Tuple[ArrayLike, ArrayLike]:
+    """
+    Compute the GENRAY-equivalent angles from mirror angles
+
+    ``rot_ang_deg = 0``, ``tilt_ang_deg = 0`` implies beam propagates
+    in negative window normal direction.
+
+    Can get from ``rot_ang_deg, tilt_ang_deg`` by using toroidal and
+    poloidal "genray angles" (``tor_ang, pol_ang``) in IDL savefile
+    log. The angles were calculated according to the logic::
+
+        tor_ang = 3.0 - rot_ang_deg
+        pol_ang = tilt_ang_deg
+
+
+    Parameters
+    ----------
+    rot_ang_deg : ArrayLike
+        Steering mirror rotation angle in degrees
+    tilt_ang_deg : ArrayLike
+        Steering mirror tilt angle in degrees
+    offset_for_window_norm_to_R : ArrayLike, default = 3.0
+        Toroidal angle in degrees of window normal to major radial
+        position, such that for ``rot_ang_deg = 0``, ``tilt_ang_deg =
+        0`` beam would have toroidal angle given by
+        ``offset_for_window_norm_to_R``.
+    """
+
+    beam0 = np.array([0, -1, 0])
+    rdeg = rot_ang_deg if np.isscalar(rot_ang_deg) else rot_ang_deg.flat[0]
+    tdeg = tilt_ang_deg if np.isscalar(tilt_ang_deg) else tilt_ang_deg.flat[0]
+    reflector = use_deg_args(reflector_make, rdeg, tdeg)
+    beam_windowframe = reflector @ beam0
+    # rotate from window frame to port frame:
+    beam = use_deg_args(rot_trns_make, -offset_for_window_norm_to_R) @ beam_windowframe
+
+    tor_ang_genray = np.arctan2(
+        beam[1], -beam[0]
+    )  # +offset_for_window_norm_to_R*np.pi/180
+    pol_ang_genray = np.arctan2(beam[2], np.sqrt(beam[0] ** 2 + beam[1] ** 2))
+    tor_ang_genray_deg, pol_ang_genray_deg = (
+        tor_ang_genray * 180 / np.pi,
+        pol_ang_genray * 180 / np.pi,
+    )
+
+    return tor_ang_genray_deg, pol_ang_genray_deg
