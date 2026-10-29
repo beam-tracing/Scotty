@@ -29,11 +29,20 @@ def test_stencil_order_of_accuracy(stencil):
     order = int(stencil[-1])
 
     def error(h):
-        value = derivative(f, DIMS[kind], {"x": X0, "y": Y0}, spacings=h, stencil=stencil, use_cache=False)
+        value = derivative(
+            f,
+            DIMS[kind],
+            {"x": X0, "y": Y0},
+            spacings=h,
+            stencil=stencil,
+            use_cache=False,
+        )
         return abs(value - EXACT[kind])
 
     observed_order = np.log2(error(1e-2) / error(5e-3))
-    assert observed_order > order - 0.3, f"{stencil}: observed order {observed_order:.2f}, expected {order}"
+    assert (
+        observed_order > order - 0.3
+    ), f"{stencil}: observed order {observed_order:.2f}, expected {order}"
 
 
 @pytest.mark.xfail(
@@ -43,4 +52,11 @@ def test_stencil_order_of_accuracy(stencil):
 )
 def test_stencil_dimension_mismatch_raises():
     with pytest.raises(ValueError):
-        derivative(f, ("x", "y"), {"x": X0, "y": Y0}, spacings=1e-3, stencil="d1_CFD2", use_cache=False)
+        derivative(
+            f,
+            ("x", "y"),
+            {"x": X0, "y": Y0},
+            spacings=1e-3,
+            stencil="d1_CFD2",
+            use_cache=False,
+        )

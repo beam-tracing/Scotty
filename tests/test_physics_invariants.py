@@ -109,10 +109,15 @@ def test_g_magnitude_matches_independent_cartesian_gradient(case):
     def to_cartesian(v):
         return v[:, :1] * R_hat + v[:, 1:2] * zeta_hat + v[:, 2:] * Z_hat
 
-    K_cyl = np.stack([analysis["K_R"].values, K_zeta / q_R, analysis["K_Z"].values], axis=-1)
+    K_cyl = np.stack(
+        [analysis["K_R"].values, K_zeta / q_R, analysis["K_Z"].values], axis=-1
+    )
     K_cart = to_cartesian(K_cyl)
     b_cart = to_cartesian(np.real(analysis["b_hat"].values))
-    eps = [np.real(analysis[name].values) for name in ("epsilon_para", "epsilon_perp", "epsilon_g")]
+    eps = [
+        np.real(analysis[name].values)
+        for name in ("epsilon_para", "epsilon_perp", "epsilon_g")
+    ]
 
     # The eigenvalue that is zero on the ray
     root = np.argmin(np.abs(eigenvalue_of_D(K_cart, b_cart, omega, *eps)), axis=-1)
@@ -146,9 +151,18 @@ def test_toroidal_rotation_invariance(tmp_path):
     rotated = run_synthetic(tmp_path / "rotated", 8.0, 1, launch_position=shifted)
 
     for name in ("q_R", "q_Z", "K_R", "K_Z"):
-        np.testing.assert_allclose(rotated["solver_output"][name], base["solver_output"][name], rtol=1e-6, atol=1e-9, err_msg=name)
+        np.testing.assert_allclose(
+            rotated["solver_output"][name],
+            base["solver_output"][name],
+            rtol=1e-6,
+            atol=1e-9,
+            err_msg=name,
+        )
     np.testing.assert_allclose(
-        rotated["solver_output"]["q_zeta"], base["solver_output"]["q_zeta"] + 0.5, rtol=0, atol=1e-6
+        rotated["solver_output"]["q_zeta"],
+        base["solver_output"]["q_zeta"] + 0.5,
+        rtol=0,
+        atol=1e-6,
     )
 
 
