@@ -443,13 +443,24 @@ def further_analysis(
         # ALERT: This may not always be the case! Check the output
         # figure to make sure that the appropriate solution is indeed
         # 0 along the ray
+
+        # theta_m depends on the direction of K, so it must be recomputed
+        # from the K being evaluated here. Holding it at its value on the
+        # ray would only differentiate H through |K|, making grad_K H
+        # parallel to K instead of to the group velocity
+        K_magnitude_K = K_magnitude(K_R, K_zeta, K_Z, df.q_R)
+        sin_theta_m_K = (
+            df.b_hat.sel(col="R") * K_R
+            + df.b_hat.sel(col="zeta") * K_zeta / df.q_R
+            + df.b_hat.sel(col="Z") * K_Z
+        ) / K_magnitude_K
         result = find_H_Cardano(
-            K_magnitude(K_R, K_zeta, K_Z, df.q_R),
+            K_magnitude_K,
             inputs.launch_angular_frequency,
             df.epsilon_para,
             df.epsilon_perp,
             df.epsilon_g,
-            theta_m,
+            np.arcsin(sin_theta_m_K),
         )
         if inputs.mode_flag == 1:
             return result[2]
@@ -464,10 +475,18 @@ def further_analysis(
         )
 
     g_R_Cardano = grad_H_Cardano("K_R", inputs.delta_K_R)
-    g_zeta_Cardano = grad_H_Cardano("K_zeta", inputs.delta_K_zeta)
+    # K_zeta is the toroidal mode number, so the physical toroidal component
+    # of g is q_R dH/dK_zeta, as for g_magnitude in immediate_analysis
+    g_zeta_Cardano = df.q_R * grad_H_Cardano("K_zeta", inputs.delta_K_zeta)
     g_Z_Cardano = grad_H_Cardano("K_Z", inputs.delta_K_Z)
     # This has maximum imaginary component of like 1e-16 -- should just be real?
     g_magnitude_Cardano = np.sqrt(g_R_Cardano**2 + g_zeta_Cardano**2 + g_Z_Cardano**2)
+    # On the ray, this is parallel (or antiparallel) to g_hat from the Booker
+    # dispersion relation, since both dispersion relations vanish there
+    g_hat_Cardano = (
+        np.stack([g_R_Cardano, g_zeta_Cardano, g_Z_Cardano], axis=-1)
+        / np.asarray(g_magnitude_Cardano)[:, np.newaxis]
+    )
 
     ##
     # From here on, we use the shorthand
@@ -629,6 +648,7 @@ def further_analysis(
         "kperp1_hat": (["tau", "col"], kperp1_hat),
         "theta": (["tau"], theta),
         "g_magnitude_Cardano": g_magnitude_Cardano,
+        "g_hat_Cardano": (["tau", "col"], np.real(g_hat_Cardano)),
         "poloidal_flux_on_midplane": (["R_midplane"], poloidal_flux_on_midplane),
         "loc_b": loc_b,
         "loc_p": loc_p,
