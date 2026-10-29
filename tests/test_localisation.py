@@ -13,7 +13,11 @@ import pytest
 from scipy import constants
 
 
-@pytest.fixture(scope="module", params=[(0.0, 1), (10.0, 1), (10.0, -1)], ids=["O-tor0", "O-tor10", "X-tor10"])
+@pytest.fixture(
+    scope="module",
+    params=[(0.0, 1), (10.0, 1), (10.0, -1)],
+    ids=["O-tor0", "O-tor10", "X-tor10"],
+)
 def steered_run(request, tmp_path_factory):
     toroidal_angle, mode_flag = request.param
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
@@ -33,7 +37,9 @@ def test_loc_r_vacuum_limit(steered_run):
     g_first = float(np.real(analysis["g_magnitude_Cardano"].values[0]))
 
     assert np.isclose(g_first * omega / (2 * constants.c), 1.0, rtol=1e-5, atol=0)
-    assert np.isclose(float(np.real(analysis["loc_r"].values[0])), 1.0, rtol=1e-5, atol=0)
+    assert np.isclose(
+        float(np.real(analysis["loc_r"].values[0])), 1.0, rtol=1e-5, atol=0
+    )
 
 
 def test_g_Cardano_parallel_to_g_Booker(steered_run):
@@ -43,7 +49,9 @@ def test_g_Cardano_parallel_to_g_Booker(steered_run):
     component has the wrong units, or if theta_m is held fixed while K is
     varied (which makes g parallel to K instead)"""
     analysis = steered_run["analysis"]
-    cos_angle = np.abs(np.sum(analysis["g_hat_Cardano"].values * analysis["g_hat"].values, axis=-1))
+    cos_angle = np.abs(
+        np.sum(analysis["g_hat_Cardano"].values * analysis["g_hat"].values, axis=-1)
+    )
     angle_deg = np.degrees(np.arccos(np.clip(cos_angle, -1.0, 1.0)))
 
     assert angle_deg.max() < 0.1
