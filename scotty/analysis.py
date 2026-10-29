@@ -448,19 +448,19 @@ def further_analysis(
         # from the K being evaluated here. Holding it at its value on the
         # ray would only differentiate H through |K|, making grad_K H
         # parallel to K instead of to the group velocity
-        K_magnitude_K = K_magnitude(K_R, K_zeta, K_Z, df.q_R)
-        sin_theta_m_K = (
+        K_magnitude_trial = K_magnitude(K_R, K_zeta, K_Z, df.q_R)
+        sin_theta_m_trial = (
             df.b_hat.sel(col="R") * K_R
             + df.b_hat.sel(col="zeta") * K_zeta / df.q_R
             + df.b_hat.sel(col="Z") * K_Z
-        ) / K_magnitude_K
+        ) / K_magnitude_trial
         result = find_H_Cardano(
-            K_magnitude_K,
+            K_magnitude_trial,
             inputs.launch_angular_frequency,
             df.epsilon_para,
             df.epsilon_perp,
             df.epsilon_g,
-            np.arcsin(sin_theta_m_K),
+            np.arcsin(sin_theta_m_trial),
         )
         if inputs.mode_flag == 1:
             return result[2]
