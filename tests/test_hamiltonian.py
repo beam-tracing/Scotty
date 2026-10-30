@@ -1,5 +1,5 @@
 from scotty.fun_general import freq_GHz_to_angular_frequency
-from scotty.geometry import MagneticField_Cylindrical
+from scotty.geometry import CircularFluxSurfaceField, MagneticField_Cylindrical
 from scotty.hamiltonian import Hamiltonian, hessians
 from scotty.logger import config_logger
 from scotty.profile_fit import QuadraticFit
@@ -144,11 +144,13 @@ def test_hamiltonian_derivatives_scaling(derivative, expected):
 ##################################################
 
 
-class ToroidalField(MagneticField_Cylindrical):
-    """Purely toroidal field, B_T = B0 R0 / R, with circular flux surfaces"""
+class ToroidalField(CircularFluxSurfaceField):
+    """Purely toroidal field, B_T = B0 R0 / R, with circular flux surfaces
+    psi = sqrt((R - R0)^2 + Z^2) / a"""
 
     def __init__(self, R0=1.5, a=0.5, B0=1.0):
         self.R0, self.a, self.B0 = R0, a, B0
+        self.R_axis, self.minor_radius_a = R0, a
 
     def B_R(self, R, _, Z):
         return np.zeros_like(R * Z, dtype=float)
@@ -158,9 +160,6 @@ class ToroidalField(MagneticField_Cylindrical):
 
     def B_Z(self, R, _, Z):
         return np.zeros_like(R * Z, dtype=float)
-
-    def polflux(self, R, _, Z):
-        return np.sqrt((R - self.R0) ** 2 + Z**2) / self.a
 
 
 @pytest.fixture(scope="module", autouse=False)
