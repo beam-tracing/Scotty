@@ -75,3 +75,9 @@ def test_make_profile_fit(ne_dat):
     _, _, filename = ne_dat
     fit = profile_fit(None, LCFS, [filename, 5, 0], filename=filename)
     assert isinstance(fit, SmoothingSplineFit)
+
+
+def test_polynomial_fit_repr():
+    # The coefficients are numbers, so repr must convert them to strings
+    fit = PolynomialFit(1.0, -4.0, 2.0, 3.5)
+    assert repr(fit) == "PolynomialFit(1.0, -4.0, 2.0, 3.5)"

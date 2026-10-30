@@ -8,7 +8,7 @@ import pathlib
 import warnings
 from typing import Callable, Optional, Tuple
 
-from h5netcdf.legacyapi import Dataset
+import h5py
 import numpy as np
 from scipy.interpolate import RectBivariateSpline, UnivariateSpline
 
@@ -581,25 +581,30 @@ class EFITField(InterpolatedField):
         interp_order: int,
         interp_smoothing: int,
     ):
-        with Dataset(filename) as dataset:
-            efitpp_times = dataset.variables["time"][:]
+        # Read with h5py: h5netcdf's legacy API (1.8.x) builds variable paths
+        # from the group's short name, so it cannot open variables two groups
+        # deep, such as output/profiles2D/poloidalFlux
+        with h5py.File(filename, "r") as efitpp:
+            efitpp_times = efitpp["time"][:]
             time_idx = find_nearest(efitpp_times, equil_time)
             print("EFIT++ time", efitpp_times[time_idx])
 
-            output_group = dataset.groups["output"]
-            profiles2D = output_group.groups["profiles2D"]
+            profiles2D = efitpp["output/profiles2D"]
             # unnormalised, as a function of R and Z
-            unnorm_psi_2D = profiles2D.variables["poloidalFlux"][time_idx][:][:]
-            data_R_coord = profiles2D.variables["r"][time_idx][:]
-            data_Z_coord = profiles2D.variables["z"][time_idx][:]
+            unnorm_psi_2D = profiles2D["poloidalFlux"][time_idx]
+            data_R_coord = profiles2D["r"][time_idx]
+            data_Z_coord = profiles2D["z"][time_idx]
 
-            fluxFunctionProfiles = output_group.groups["fluxFunctionProfiles"]
-            norm_psi_1D = fluxFunctionProfiles.variables["normalizedPoloidalFlux"][:]
+            fluxFunctionProfiles = efitpp["output/fluxFunctionProfiles"]
+            norm_psi_1D = fluxFunctionProfiles["normalizedPoloidalFlux"][:]
             # poloidalFlux as a function of normalised poloidal flux
-            unorm_psi_1D = fluxFunctionProfiles.variables["poloidalFlux"][time_idx][:]
-            rBphi = fluxFunctionProfiles.variables["rBphi"][time_idx][:]
+            unorm_psi_1D = fluxFunctionProfiles["poloidalFlux"][time_idx]
+            rBphi = fluxFunctionProfiles["rBphi"][time_idx]
 
         # linear fit
+        # psi_norm = m psi + c, so psi is -c/m on axis and (1 - c)/m at the
+        # boundary: EFITField needs psi_boundary - psi_axis = dpsi/dpsi_norm =
+        # 1/m (passing m made B_p wrong by a factor m^2)
         polflux_const_m, polflux_const_c = np.polyfit(unorm_psi_1D, norm_psi_1D, 1)
         norm_psi_2D = unnorm_psi_2D * polflux_const_m + polflux_const_c
 
@@ -609,8 +614,8 @@ class EFITField(InterpolatedField):
             rBphi=rBphi,
             psi_norm_2D=norm_psi_2D,
             psi_norm_1D=norm_psi_1D,
-            psi_unnorm_axis=0.0,
-            psi_unnorm_boundary=polflux_const_m,
+            psi_unnorm_axis=-polflux_const_c / polflux_const_m,
+            psi_unnorm_boundary=(1 - polflux_const_c) / polflux_const_m,
             delta_R=delta_R,
             delta_Z=delta_Z,
             interp_order=interp_order,
