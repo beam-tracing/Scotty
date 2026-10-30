@@ -1,6 +1,11 @@
 from scotty.fun_general import freq_GHz_to_angular_frequency
-from scotty.geometry import CircularFieldBase, MagneticField_Cylindrical
+from scotty.geometry import (
+    CircularFieldBase,
+    MagneticField_Cylindrical,
+    create_magnetic_geometry,
+)
 from scotty.hamiltonian import Hamiltonian, hessians
+from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.logger import config_logger
 from scotty.profile_fit import QuadraticFit
 import numpy as np
@@ -224,6 +229,34 @@ def test_golden(trace_level):
     """
     H = _make_hamiltonian(1)
     assert np.isclose(H(1.75, 0.0, 0.1, 1, 1, 1), -0.27056056863516875)
+
+
+def test_golden_v3(trace_level):
+    """master's (v3) golden answer: the `DBS_synthetic` preset on the unit-test
+    field, at R = 1.75, Z = 0.1 and K_R = K_zeta = K_Z = 1"""
+    kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
+    field = create_magnetic_geometry(
+        geometry="cylindrical",
+        find_B_method="unit-tests",
+        interp_order_str="5",
+        interp_order_int=5,
+        interp_smoothing=0,
+        magnetic_data_path=None,
+        B_T_axis=kwargs_dict["B_T_axis"],
+        R_axis=kwargs_dict["R_axis"],
+        minor_radius_a=kwargs_dict["minor_radius_a"],
+        B_p_a=kwargs_dict["B_p_a"],
+    )
+    H = Hamiltonian(
+        launch_angular_freq=freq_GHz_to_angular_frequency(
+            kwargs_dict["launch_freq_GHz"]
+        ),
+        mode_flag=kwargs_dict["mode_flag"],
+        deltas=np.full(5, 1e-3),
+        field=field,
+        density_fit=kwargs_dict["density_fit_method"],
+    )
+    assert np.isclose(H(1.75, 0.0, 0.1, 1, 1, 1), -0.2632447148279265)
 
 
 def test_two_argument_call(trace_level):
