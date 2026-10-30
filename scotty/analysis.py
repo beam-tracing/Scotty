@@ -319,13 +319,21 @@ def basic_analysis(
     check_H_output(H_Cardano_solution)
 
     def _H_Cardano(K_X: ArrayLike, K_Y: ArrayLike, K_Z: ArrayLike) -> ArrayLike:
+        # theta_m depends on the direction of K, so it must be recomputed
+        # from the K being evaluated here. Holding it at its value on the
+        # ray would only differentiate H through |K|, making grad_K H
+        # parallel to K instead of to the group velocity
+        K_magnitude_trial = np.sqrt(K_X**2 + K_Y**2 + K_Z**2)
+        sin_theta_m_trial = (
+            b_hat_cart[:, 0] * K_X + b_hat_cart[:, 1] * K_Y + b_hat_cart[:, 2] * K_Z
+        ) / K_magnitude_trial
         return find_H_Cardano_formula(
             launch_angular_freq=omega_launch,
-            K_magnitude=np.sqrt(K_X**2 + K_Y**2 + K_Z**2),
+            K_magnitude=K_magnitude_trial,
             epsilon_para=epsilon.e_bb,
             epsilon_perp=epsilon.e_11,
             epsilon_g=epsilon.e_12,
-            theta_m=theta_m,
+            theta_m=np.arcsin(sin_theta_m_trial),
         )[mode_index_Cardano]
 
     def _grad_H_Cardano(direction: str, spacing: float) -> ArrayLike:
@@ -348,6 +356,10 @@ def basic_analysis(
     )
     g_Z_Cardano = _grad_H_Cardano("K_Z", float(inputs["delta_K_Z"][()]))
     g_magnitude_Cardano = np.sqrt(g_X_Cardano**2 + g_Y_Cardano**2 + g_Z_Cardano**2)
+    g_hat_Cardano = (
+        np.stack([g_X_Cardano, g_Y_Cardano, g_Z_Cardano], axis=-1)
+        / g_magnitude_Cardano[:, np.newaxis]
+    )
 
     analysis_dict.update(
         {
@@ -360,6 +372,7 @@ def basic_analysis(
             "g_Y_Cardano": (["tau"], g_Y_Cardano),
             "g_Z_Cardano": (["tau"], g_Z_Cardano),
             "g_magnitude_Cardano": (["tau"], g_magnitude_Cardano),
+            "g_hat_Cardano": (["tau", "col_cart"], g_hat_Cardano),
         }
     )
 
