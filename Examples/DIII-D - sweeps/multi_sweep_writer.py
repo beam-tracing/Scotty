@@ -7,7 +7,6 @@ Created on Fri Aug  2 17:13:01 2024
 from matplotlib.ticker import FormatStrFormatter
 import xarray as xr
 import numpy as np
-import datatree
 import matplotlib.pyplot as plt
 from math import *
 import scipy
@@ -36,7 +35,7 @@ def multisweep(pol_launch_angles,tor_launch_angles,launch_freqs_GHz, folder_path
                     launch_freqs_GHz[j]
                     )
                 path = folder_path+'scotty_output'+outputsuffix+".h5"
-                dt = datatree.open_datatree(path, engine="h5netcdf")
+                dt = xr.open_datatree(path, engine="h5netcdf")
                 cutoffindex = int(dt.analysis.cutoff_index)
                 delta_theta = float(dt.analysis.delta_theta_m[cutoffindex])
                 thetam = float(dt.analysis.theta_m[cutoffindex])
@@ -85,7 +84,7 @@ def multisweep(pol_launch_angles,tor_launch_angles,launch_freqs_GHz, folder_path
                     launch_freqs_GHz[j]
                     )
                 path = folder_path+'scotty_output'+outputsuffix+".h5"
-                dt = datatree.open_datatree(path, engine="h5netcdf")
+                dt = xr.open_datatree(path, engine="h5netcdf")
                 delta_theta = interp_delta(toroidalzeromismatch[j],launch_freqs_GHz[j])[0][0] #this gives us delta_theta 
                 thetam = float(dt.analysis.theta_m[cutoffindex])
                 loc_m[k,i,j] = exp(-2 * thetam**2/ delta_theta**2 )
@@ -107,7 +106,7 @@ def multisweep(pol_launch_angles,tor_launch_angles,launch_freqs_GHz, folder_path
     },
 )
     
-    dt = datatree.DataTree.from_dict({"outputs": outputs})
+    dt = xr.DataTree.from_dict({"outputs": outputs})
     dt.to_netcdf(
         "sweep_main.h5",
         engine="h5netcdf",

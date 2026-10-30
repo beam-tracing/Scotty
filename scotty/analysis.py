@@ -380,6 +380,11 @@ def basic_analysis(
 
     analysis_dict.update(
         {
+            # all three roots on one array, as master (v3.2) stores them
+            "H_Cardano": (
+                ["tau", "solution"],
+                np.vstack([H_Cardano_1, H_Cardano_2, H_Cardano_3]).T,
+            ),
             "H_Cardano_1": (["tau"], H_Cardano_1),
             "H_Cardano_2": (["tau"], H_Cardano_2),
             "H_Cardano_3": (["tau"], H_Cardano_3),

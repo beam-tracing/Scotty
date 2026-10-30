@@ -11,7 +11,7 @@ TODO: Different options for plotting.
 - Plot groups 'all', 'basic', 'advanced', 'troubleshooting'
 """
 
-import datatree
+import xarray as xr
 from scotty.plotting import (
     plot_dispersion_relation,
     plot_poloidal_beam_path,
@@ -19,7 +19,7 @@ from scotty.plotting import (
     )
 
 path = 'D:\\Dropbox\\VHChen2022\\Code - Testing Scotty\\Various cases\\DIII-D - DBS240\\Output\\'
-dt = datatree.open_datatree(path+"scotty_output.h5", engine="h5netcdf")
+dt = xr.open_datatree(path+"scotty_output.h5", engine="h5netcdf")
 
 
 # plot_dispersion_relation(dt['analysis'])

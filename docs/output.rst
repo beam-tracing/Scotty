@@ -46,14 +46,14 @@ netCDF (although this has been fixed and should be available in the
 next netCDF release). For this reason, the default filename is
 ``scotty_output.h5``.
 
-The best way to read these files with `datatree`_, specifying the
+The best way to read these files with `open_datatree`_, specifying the
 ``h5netcdf`` engine::
 
-  import datatree
+  import xarray
 
-  dt = datatree.open_datatree("scotty_output.h5", engine="h5netcdf")
+  dt = xarray.open_datatree("scotty_output.h5", engine="h5netcdf")
 
 
 .. _xarray: https://xarray.pydata.org
 .. _h5netcdf: https://h5netcdf.org
-.. _datatree: https://xarray-datatree.readthedocs.io/en/latest/
+.. _DataTree: https://docs.xarray.dev/en/stable/generated/xarray.open_datatree.html#xarray-open-datatree
