@@ -7,8 +7,10 @@ from scotty.init_bruv import get_parameters_for_Scotty
 
 
 def test_initial_position_is_the_start_of_the_ray(tmp_path):
-    """q_initial is where the solver starts (plasma entry), not the launch
-    position, in both coordinate systems"""
+    """q_initial is the first point in the plasma, where the solver starts;
+    not q_launch (the vacuum launch position) and, by up to a small nudge
+    inwards, not the plasma boundary ("entry") either. In both coordinate
+    systems"""
     kwargs = get_parameters_for_Scotty("DBS_synthetic")
     kwargs.update(len_tau=52, interp_smoothing=0)
     so = beam_me_up(**kwargs, output_path=tmp_path)["solver_output"]
