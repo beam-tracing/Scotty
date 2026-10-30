@@ -15,18 +15,11 @@ test_flag_true and test_flag_false check resonance_flag.
 
 import numpy as np
 from numpy.testing import assert_allclose
-import pytest
 from scotty.beam_me_up import beam_me_up
 
 # Print more of arrays in failed tests
 np.set_printoptions(linewidth=120, threshold=100)
 
-# As in tests/test_resonance.py: the plasma entry search is too short for inboard launches
-XFAIL_INBOARD_LAUNCH = pytest.mark.xfail(
-    reason="TODO v4: find_plasma_entry_position only searches up to "
-    "max(q_launch_cartesian) along the ray, too short for inboard launches",
-    strict=False,
-)
 
 
 
@@ -243,7 +236,6 @@ def test_fund_5_rel(tmp_path):
     )
 
 
-@XFAIL_INBOARD_LAUNCH
 def test_fund_6_rel(tmp_path):
     kwargs_dict = {
         "geometry": "cylindrical",
@@ -424,7 +416,6 @@ def test_sec_harm_3_rel(tmp_path):
     )
 
 
-@XFAIL_INBOARD_LAUNCH
 def test_sec_harm_4_rel(tmp_path):
     kwargs_dict = {
         "geometry": "cylindrical",
@@ -467,7 +458,6 @@ def test_sec_harm_4_rel(tmp_path):
     )
 
 
-@XFAIL_INBOARD_LAUNCH
 def test_sec_harm_5_rel(tmp_path):
     kwargs_dict = {
         "geometry": "cylindrical",
