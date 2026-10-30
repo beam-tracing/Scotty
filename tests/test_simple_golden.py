@@ -1,10 +1,10 @@
-from scotty.beam_me_up import beam_me_up, create_magnetic_geometry, profile_fit
+from scotty.beam_me_up import beam_me_up, create_magnetic_geometry, make_fit
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.torbeam import Torbeam
 from scotty.geometry import CircularCrossSectionField, MagneticField_Cylindrical
 from scotty.fun_general import freq_GHz_to_angular_frequency
 from scotty.profile_fit import QuadraticFit
-from scotty.hamiltonian import Hamiltonian
+from scotty.hamiltonian import initialise_hamiltonians
 from scotty.launch import (
     find_auto_delta_signs,
     find_plasma_entry_position,
@@ -22,14 +22,6 @@ from typing import cast
 
 # Print more of arrays in failed tests
 np.set_printoptions(linewidth=120, threshold=100)
-
-# Known v4 failures, tracked in the README ("Known issues in v4"). These are
-# non-strict, so a test that starts passing is reported as XPASS
-XFAIL_LAUNCH_INTERFACE = pytest.mark.xfail(
-    reason="TODO v4: profile_fit no longer accepts ProfileFit objects, and "
-    "find_plasma_entry_parameters now needs the Hamiltonians",
-    strict=False,
-)
 
 
 def synthetic_parameters() -> dict:
@@ -1514,8 +1506,11 @@ def test_EFIT_geometry(tmp_path, generator):
         # pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file"),
     ],
 )
-@XFAIL_LAUNCH_INTERFACE
 def test_launch_golden_answer(tmp_path, generator):
+    """The same golden values as v3's test_launch_golden_answer, called the v4
+    way: a ProfileFit object goes through make_fit (as in beam_me_up, and as
+    v3's make_density_fit did), and find_plasma_entry_parameters is given the
+    Hamiltonians for both modes, as beam_me_up does"""
     args = generator(tmp_path)
     field = make_field(args)
     ne_data_path = args.get("ne_data_path", None)
@@ -1526,16 +1521,16 @@ def test_launch_golden_answer(tmp_path, generator):
         parameters = None
         ne_filename = None
 
-    density_fit = profile_fit(
+    density_fit = make_fit(
         args["density_fit_method"],
         args["poloidal_flux_zero_density"],
         parameters,
         ne_filename,
     )
 
-    hamiltonian = Hamiltonian(
+    # v3's steps: delta_R = -1e-3 (into the plasma), delta_Z = 1e-3, delta_K = 0.1
+    hamiltonian_pos1, hamiltonian_neg1 = initialise_hamiltonians(
         launch_angular_freq=freq_GHz_to_angular_frequency(args["launch_freq_GHz"]),
-        mode_flag=args["mode_flag"],
         deltas=np.array([-1e-3, 1e-3, 0.1, 0.1, 0.1]),
         field=field,
         density_fit=density_fit,
@@ -1573,6 +1568,8 @@ def test_launch_golden_answer(tmp_path, generator):
         launch_beam_width=args["launch_beam_width"],
         launch_beam_curvature=args["launch_beam_curvature"],
         field=field,
+        hamiltonian_pos1=hamiltonian_pos1,
+        hamiltonian_neg1=hamiltonian_neg1,
     )
 
     expected_q_initial = np.array([1.99382564, -0.0, -0.07804514])
