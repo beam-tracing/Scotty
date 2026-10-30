@@ -14,6 +14,7 @@ launch_beam_curvatures = np.array([-0.74971565, -0.75653105, -0.76383412, -0.771
 
 """
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs
 import numpy as np
 
 kwargs_dict = {
@@ -48,4 +49,4 @@ kwargs_dict = {
 
 # sys.exit()
 
-beam_me_up(**kwargs_dict)
+beam_me_up(**from_v3_kwargs(kwargs_dict))

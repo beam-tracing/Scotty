@@ -9,6 +9,7 @@ Valerian Hongjie Hall-Chen
 """
 
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs
 import numpy as np
 
 from scotty.fun_general import (
@@ -73,4 +74,4 @@ N_sq = (
 ) / (2 * Booker_alpha)
 print("N", np.sqrt(N_sq))
 
-beam_me_up(**kwargs_dict)
+beam_me_up(**from_v3_kwargs(kwargs_dict))

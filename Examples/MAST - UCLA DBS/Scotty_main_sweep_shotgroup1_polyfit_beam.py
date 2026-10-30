@@ -12,6 +12,7 @@ I want efit_times[np.arange(0,10)*2 + 1]. 160ms, 170ms, ..., 250ms
 
 """
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs
 import numpy as np
 
 from scotty.init_bruv import get_parameters_for_Scotty
@@ -100,7 +101,7 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
             # if os.path.exists(an_output):
             #     continue
             # else:
-            #     beam_me_up(**kwargs_dict)
+            #     beam_me_up(**from_v3_kwargs(kwargs_dict))
 
             kwargs_dict["delta_R"] = -0.00001
             kwargs_dict["delta_Z"] = -0.00001
@@ -112,7 +113,7 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
             kwargs_dict["rtol"] = 1e-3
             kwargs_dict["atol"] = 1e-6
 
-            beam_me_up(**kwargs_dict)
+            beam_me_up(**from_v3_kwargs(kwargs_dict))
 
             counter = counter + 1
             # print('Sweep completion:' + str(counter) + ' of ' + str( len(equil_times)*len(mirror_rotations)*len(launch_freqs_GHz) ) )

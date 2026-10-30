@@ -10,6 +10,7 @@ For shot 29908, the EFIT++ times are efit_times = np.linspace(0.155,0.25,20)
 I want efit_times[np.arange(0,10)*2 + 1]. 160ms, 170ms, ..., 250ms
 """
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs
 from scotty.init_bruv import get_parameters_for_Scotty
 
 import numpy as np
@@ -25,7 +26,7 @@ for B_p_a in B_p_a_sweep:
     kwargs_dict["B_p_a"] = B_p_a
     kwargs_dict["output_filename_suffix"] = "_Bpa" + f"{B_p_a:.2f}"
 
-    beam_me_up(**kwargs_dict)
+    beam_me_up(**from_v3_kwargs(kwargs_dict))
 
 for tor_launch_angle in tor_launch_angles:
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
@@ -34,4 +35,4 @@ for tor_launch_angle in tor_launch_angles:
     kwargs_dict["B_p_a"] = 0.0
     kwargs_dict["output_filename_suffix"] = "_t" + f"{tor_launch_angle:.2f}"
 
-    beam_me_up(**kwargs_dict)
+    beam_me_up(**from_v3_kwargs(kwargs_dict))
