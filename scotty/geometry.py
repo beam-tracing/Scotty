@@ -613,13 +613,18 @@ class EFITField(InterpolatedField_Cylindrical):
             )
 
 
-class CircularFluxSurfaceField(MagneticField_Cylindrical):
+class CircularFieldBase(MagneticField_Cylindrical):
     r"""Base class for analytical geometries with circular flux surfaces,
     where the poloidal flux is :math:`\psi = \rho / a`, with
     :math:`\rho = \sqrt{(R - R_{axis})^2 + Z^2}` and :math:`a` the minor radius.
 
     Child classes must set ``R_axis`` and ``minor_radius_a``, and implement
-    ``B_R``, ``B_T`` and ``B_Z``.
+    ``B_R``, ``B_T`` and ``B_Z``. A child class with a different flux function
+    overrides ``polflux`` and its analytic derivatives too (see
+    `CircularFluxSurfaceField`).
+
+    Called ``CircularFluxSurfaceField`` before 2026-10-30; that name now
+    belongs to the divergence-free field of beam-tracing/Scotty#161, as in v3.
 
     The poloidal flux derivatives are exact (``derivative_method =
     "analytic"``) by default, or can be taken by finite differences of
@@ -701,7 +706,7 @@ class CircularFluxSurfaceField(MagneticField_Cylindrical):
         return -(R - self.R_axis) * Z / (self.minor_radius_a * self.rho(R, _, Z) ** 3)
 
 
-class ConstantCurrentDensityField(CircularFluxSurfaceField):
+class ConstantCurrentDensityField(CircularFieldBase):
     """Circular cross-section magnetic geometry with constant current density
 
     TODO
@@ -764,7 +769,7 @@ class ConstantCurrentDensityField(CircularFluxSurfaceField):
         return -self.B_p_a * (R - self.R_axis) / self.rho(R, _, Z)
 
 
-class CircularCrossSectionField(CircularFluxSurfaceField):
+class CircularCrossSectionField(CircularFieldBase):
     """Simple circular cross-section magnetic geometry
 
     Parameters
@@ -831,6 +836,137 @@ class CircularCrossSectionField(CircularFluxSurfaceField):
             * (R - self.R_axis)
             / (R * self.minor_radius_a * self.rho(R, _, Z)),
         )
+
+
+class CircularFluxSurfaceField(CircularFieldBase):
+    r"""Circular flux surfaces with a poloidal field that increases linearly in minor radius
+
+    .. math::
+
+        \psi_{pol} = \left(\frac{r}{a}\right)^2, \qquad
+        B_p = B_{p,a} \frac{r}{a} \frac{R_{axis}}{R}, \qquad
+        B_T = B_{T,axis} \frac{R_{axis}}{R},
+
+    where :math:`r = \sqrt{(R - R_{axis})^2 + Z^2}` is the minor radius, so
+    :math:`\rho_{pol} = r/a`. The poloidal field is the gradient of the
+    dimensional flux :math:`\Psi = B_{p,a} a R_{axis} \psi_{pol} / 2` crossed with
+    :math:`\nabla \zeta`, so it is divergence-free and tangent to the flux surfaces.
+    In the large-aspect-ratio limit this is the field of a constant current
+    density; at finite aspect ratio the toroidal current density varies as
+    :math:`(1 + R_{axis}/R)/R`.
+
+    This is the field of beam-tracing/Scotty#161 (v3), ported so that
+    ``find_B_method="analytical"`` describes the same plasma in v3 and v4, with
+    the same signs of :math:`B_R` and :math:`B_Z`. Compared with Sec. 2.4 of
+    Hall-Chen, Parra & Hillesheim, PPCF 64, 095002 (2022), it adds the
+    :math:`R_{axis}/R` factor in :math:`B_p`, fixes the sign of :math:`B_R, B_Z`
+    (printed eqs. 81-82 are not tangent to the flux surfaces) and uses
+    :math:`\psi_{pol} = (r/a)^2`.
+
+    Unlike the other circular fields, its flux derivatives are smooth on the
+    magnetic axis.
+
+    Parameters
+    ----------
+    B_T_axis : float
+        Toroidal magnetic field at the magnetic axis (Tesla)
+    R_axis : float
+        Major radius of the magnetic axis (metres)
+    minor_radius_a : float
+        Minor radius of the last closed flux surface (metres)
+    B_p_a : float
+        Poloidal magnetic field on the last closed flux surface at
+        ``R = R_axis`` (Tesla)
+    R_points : int
+    Z_points : int
+        Number of points for sample ``(R, Z)`` grid
+    grid_buffer_factor : float
+        Multiplicative factor to increase size of sample grid by
+    derivative_method : str
+        ``"analytic"`` (default) for exact poloidal flux derivatives, or
+        ``"numerical"`` for finite differences
+    """
+
+    def __init__(
+        self,
+        B_T_axis: float,
+        R_axis: float,
+        minor_radius_a: float,
+        B_p_a: float,
+        R_points: int = 101,
+        Z_points: int = 101,
+        grid_buffer_factor: float = 1.0,
+        derivative_method: Literal["analytic", "numerical"] = "analytic",
+    ):
+        self.B_T_axis = B_T_axis
+        self.R_axis = R_axis
+        self.minor_radius_a = minor_radius_a
+        self.B_p_a = B_p_a
+        self._set_derivative_method(derivative_method)
+
+        grid_width = grid_buffer_factor * minor_radius_a
+        self.R_coord = np.linspace(R_axis - grid_width, R_axis + grid_width, R_points)
+        self.Z_coord = np.linspace(-grid_width, grid_width, Z_points)
+        R_meshgrid, Z_meshgrid = np.meshgrid(self.R_coord, self.Z_coord, indexing="ij")
+        self.poloidalFlux_grid = self.polflux(R_meshgrid, 0.0, Z_meshgrid)
+
+    def B_R(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return self.B_p_a * self.R_axis * Z / (R * self.minor_radius_a)
+
+    def B_T(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return self.B_T_axis * (self.R_axis / R) * np.ones_like(Z)
+
+    def B_Z(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return -self.B_p_a * self.R_axis * (R - self.R_axis) / (R * self.minor_radius_a)
+
+    def polflux(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return ((R - self.R_axis) ** 2 + Z**2) / self.minor_radius_a**2
+
+    def d_polflux_dR(
+        self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float
+    ) -> FloatArray:
+        if self.derivative_method == "numerical":
+            return self._numerical_derivative("R", R, Z, {"R": delta_R})
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return 2 * (R - self.R_axis) / self.minor_radius_a**2 * np.ones_like(Z)
+
+    def d_polflux_dZ(
+        self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_Z: float
+    ) -> FloatArray:
+        if self.derivative_method == "numerical":
+            return self._numerical_derivative("Z", R, Z, {"Z": delta_Z})
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return 2 * Z / self.minor_radius_a**2 * np.ones_like(R)
+
+    def d2_polflux_dR2(
+        self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float
+    ) -> FloatArray:
+        if self.derivative_method == "numerical":
+            return self._numerical_derivative(("R", "R"), R, Z, {"R": delta_R})
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return np.full(np.broadcast(R, Z).shape, 2 / self.minor_radius_a**2)
+
+    def d2_polflux_dZ2(
+        self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_Z: float
+    ) -> FloatArray:
+        if self.derivative_method == "numerical":
+            return self._numerical_derivative(("Z", "Z"), R, Z, {"Z": delta_Z})
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return np.full(np.broadcast(R, Z).shape, 2 / self.minor_radius_a**2)
+
+    def d2_polflux_dRdZ(
+        self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float, delta_Z: float
+    ) -> FloatArray:
+        if self.derivative_method == "numerical":
+            return self._numerical_derivative(
+                ("R", "Z"), R, Z, {"R": delta_R, "Z": delta_Z}
+            )
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return np.zeros(np.broadcast(R, Z).shape)
 
 
 ##################################################
@@ -1275,8 +1411,8 @@ def create_magnetic_geometry(
             # poloidal flux derivatives
             derivative_method = kwargs.get("derivative_method", "analytic")
             if find_B_method == "analytical":
-                log.debug("Using analytical constant current density geometry")
-                field = ConstantCurrentDensityField(
+                log.debug("Using analytical circular flux surface geometry")
+                field = CircularFluxSurfaceField(
                     B_T_axis,
                     R_axis,
                     minor_radius_a,

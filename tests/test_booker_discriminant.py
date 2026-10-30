@@ -12,7 +12,7 @@ from scotty.fun_general import (
     find_Booker_terms,
     freq_GHz_to_angular_frequency,
 )
-from scotty.geometry import CircularFluxSurfaceField
+from scotty.geometry import CircularFieldBase
 from scotty.hamiltonian import Hamiltonian, hessians
 from scotty.logger import config_logger
 from scotty.profile_fit import QuadraticFit
@@ -56,7 +56,7 @@ def test_vacuum_limit():
     assert find_Booker_discriminant(OMEGA, 1.0, 0.3, 0.0) == 0.0
 
 
-class ToroidalField(CircularFluxSurfaceField):
+class ToroidalField(CircularFieldBase):
     def __init__(self, R0=1.5, a=0.5, B0=1.0):
         self.R0, self.a, self.B0 = R0, a, B0
         self.R_axis, self.minor_radius_a = R0, a

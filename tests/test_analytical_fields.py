@@ -7,6 +7,7 @@ benchmark printed."""
 
 from scotty.geometry import (
     CircularCrossSectionField,
+    CircularFieldBase,
     CircularFluxSurfaceField,
     ConstantCurrentDensityField,
     MagneticField_Cartesian,
@@ -31,6 +32,7 @@ DELTA = 1e-4
 FIELD_CLASSES = [
     pytest.param(CircularCrossSectionField, id="circular-cross-section"),
     pytest.param(ConstantCurrentDensityField, id="constant-current-density"),
+    pytest.param(CircularFluxSurfaceField, id="circular-flux-surface"),
 ]
 
 # (method name, number of step sizes it takes, tolerance factor). Second
@@ -150,7 +152,7 @@ def test_invalid_derivative_method(field_class):
 @pytest.mark.parametrize(
     ("find_B_method", "field_class"),
     [
-        ("analytical", ConstantCurrentDensityField),
+        ("analytical", CircularFluxSurfaceField),
         ("unit-tests", CircularCrossSectionField),
     ],
 )
@@ -177,7 +179,7 @@ def test_create_magnetic_geometry_passes_derivative_method(
 
 @pytest.mark.parametrize(
     "base_class",
-    [MagneticField_Cylindrical, MagneticField_Cartesian, CircularFluxSurfaceField],
+    [MagneticField_Cylindrical, MagneticField_Cartesian, CircularFieldBase],
 )
 def test_base_classes_cannot_be_instantiated(base_class):
     with pytest.raises(TypeError, match="abstract"):
@@ -240,3 +242,64 @@ def test_benchmark_derivative_timing(field_class, record_property):
     )
 
     assert np.isfinite(speedup)
+
+
+def test_circular_flux_surface_field():
+    """The field of beam-tracing/Scotty#161, as find_B_method="analytical" gives
+    in v3: psi_pol = (r/a)^2, B_p linear in r at fixed R, divergence-free and
+    tangent to the flux surfaces. Ported from #161's test_circular_flux_surface"""
+    B_T_axis, R_axis, a, B_p_a = 1.0, 2.0, 1.0, 0.5
+    field = CircularFluxSurfaceField(B_T_axis, R_axis, a, B_p_a)
+
+    # psi_pol = (r/a)^2, so rho_pol = r/a
+    assert_allclose(field.polflux(R_axis + 0.5, 0.0, 0.0), 0.25)
+    assert_allclose(field.polflux(R_axis, 0.0, -a), 1.0)
+
+    # B_p_a is the poloidal field on the LCFS at R = R_axis, and B_p is linear in r at fixed R
+    assert np.isclose(field.B_R(R_axis, 0.0, a), B_p_a), "top"
+    assert np.isclose(field.B_R(R_axis, 0.0, 0.5 * a), 0.5 * B_p_a), "half"
+    assert np.isclose(field.magnitude(R_axis, 0.0, 0.0), B_T_axis), "on axis"
+    assert_allclose(field.unitvector(R_axis, 0.0, 0.0), [0, 1, 0], atol=1e-15)
+
+    # B_R = (1/R) dPsi/dZ and B_Z = -(1/R) dPsi/dR with Psi = B_p_a a R_axis psi_pol / 2
+    width = a + 0.05
+    R = np.linspace(R_axis - width, R_axis + width, 99)
+    Z = np.linspace(-width, width, 101)
+    R_grid, Z_grid = np.meshgrid(R, Z, indexing="ij")
+    B_R = field.B_R(R_grid, 0.0, Z_grid)
+    B_Z = field.B_Z(R_grid, 0.0, Z_grid)
+    Psi = 0.5 * B_p_a * a * R_axis * field.polflux(R_grid, 0.0, Z_grid)
+    dPsi_dR, dPsi_dZ = np.gradient(Psi, R, Z, edge_order=2)
+    assert_allclose(B_R, dPsi_dZ / R_grid, rtol=1e-6, atol=1e-6)
+    assert_allclose(B_Z, -dPsi_dR / R_grid, rtol=1e-6, atol=1e-6)
+
+    # Divergence-free: (1/R) d(R B_R)/dR + dB_Z/dZ = 0
+    divergence = np.gradient(R_grid * B_R, R, axis=0, edge_order=2) / R_grid + np.gradient(
+        B_Z, Z, axis=1, edge_order=2
+    )
+    assert_allclose(divergence, 0.0, atol=1e-10)
+
+    # Tangent to the flux surfaces: B . grad(psi) = 0, with the exact derivatives
+    tangency = B_R * field.d_polflux_dR(R_grid, 0.0, Z_grid, DELTA) + B_Z * field.d_polflux_dZ(
+        R_grid, 0.0, Z_grid, DELTA
+    )
+    assert_allclose(tangency, 0.0, atol=1e-14)
+
+    # Same direction of rotation as CircularCrossSectionField
+    total_sign = np.sign(B_R) * np.sign(B_Z)
+    assert total_sign[0, 0] == -1, "Top left"
+    assert total_sign[0, -1] == 1, "Top right"
+    assert total_sign[-1, 0] == 1, "Bottom left"
+    assert total_sign[-1, -1] == -1, "Bottom right"
+
+
+def test_circular_flux_surface_derivatives_on_axis():
+    """psi_pol = (r/a)^2 is smooth on the magnetic axis, so its exact derivatives
+    are finite there (the r/a fields' are singular)"""
+    field = CircularFluxSurfaceField(B_T_AXIS, R_AXIS, MINOR_RADIUS_A, B_P_A)
+    a2 = MINOR_RADIUS_A**2
+    assert field.d_polflux_dR(R_AXIS, 0.0, 0.0, DELTA) == 0.0
+    assert field.d_polflux_dZ(R_AXIS, 0.0, 0.0, DELTA) == 0.0
+    assert np.isclose(field.d2_polflux_dR2(R_AXIS, 0.0, 0.0, DELTA), 2 / a2)
+    assert np.isclose(field.d2_polflux_dZ2(R_AXIS, 0.0, 0.0, DELTA), 2 / a2)
+    assert field.d2_polflux_dRdZ(R_AXIS, 0.0, 0.0, DELTA, DELTA) == 0.0

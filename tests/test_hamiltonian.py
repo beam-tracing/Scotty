@@ -1,5 +1,5 @@
 from scotty.fun_general import freq_GHz_to_angular_frequency
-from scotty.geometry import CircularFluxSurfaceField, MagneticField_Cylindrical
+from scotty.geometry import CircularFieldBase, MagneticField_Cylindrical
 from scotty.hamiltonian import Hamiltonian, hessians
 from scotty.logger import config_logger
 from scotty.profile_fit import QuadraticFit
@@ -144,7 +144,7 @@ def test_hamiltonian_derivatives_scaling(derivative, expected):
 ##################################################
 
 
-class ToroidalField(CircularFluxSurfaceField):
+class ToroidalField(CircularFieldBase):
     """Purely toroidal field, B_T = B0 R0 / R, with circular flux surfaces
     psi = sqrt((R - R0)^2 + Z^2) / a"""
 
