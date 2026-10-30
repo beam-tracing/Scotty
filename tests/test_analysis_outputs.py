@@ -96,3 +96,25 @@ def test_e_hat_belongs_to_the_traced_mode(beam_run):
         rtol=0,
         atol=1e-10,
     )
+
+
+def test_k_perp1_bs_splits_into_normal_and_binormal(beam_run):
+    """n_hat = grad psi / |grad psi| is perpendicular to b_hat (B lies in the
+    flux surface), and so is k_perp1_hat, so {n_hat, b_hat x n_hat} spans the
+    plane of k_perp1_hat: the two components add in quadrature to k_perp1_bs.
+    At the cut-off K is tangent to the flux surface, so the backscattered
+    wavevector is almost purely binormal (the usual DBS picture)"""
+    analysis, dbs = beam_run["analysis"], beam_run["dbs_analysis"]
+    b_hat = analysis["b_hat_cartesian"].values
+    normal_hat = dbs["normal_hat"].values
+    np.testing.assert_allclose(
+        np.einsum("ti,ti->t", normal_hat, b_hat), 0, rtol=0, atol=1e-6
+    )
+    k_total = dbs["k_perp1_bs"].values
+    k_normal = dbs["k_perp1_bs_normal"].values
+    k_binormal = dbs["k_perp1_bs_binormal"].values
+    np.testing.assert_allclose(
+        np.hypot(k_normal, k_binormal), np.abs(k_total), rtol=1e-6
+    )
+    cutoff = int(analysis["cutoff_index"])
+    assert abs(k_normal[cutoff]) < 0.05 * abs(k_total[cutoff])

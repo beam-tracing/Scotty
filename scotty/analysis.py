@@ -614,12 +614,11 @@ def dbs_analysis(
     normal_hat = normal_vec / normal_mag[:, np.newaxis]  # (N,3)
     binormal_hat = make_unit_vector_from_cross_product(b_hat_cart, normal_hat)  # (N,3)
     k_perp1_bs = -2 * K_mag * np.cos(theta + theta_m) / cos_theta  # (N,)
-    k_perp1_bs_normal = k_perp1_bs * dot(
-        k_perp1_hat, normal_hat
-    )  # TODO: Check that this works correctly
-    k_perp1_bs_binormal = k_perp1_bs * dot(
-        k_perp1_hat, binormal_hat
-    )  # TODO: Check that this works correctly
+    # normal_hat and binormal_hat span the plane perpendicular to b_hat, which
+    # contains k_perp1_hat, so these add in quadrature to k_perp1_bs; tested in
+    # tests/test_analysis_outputs.py
+    k_perp1_bs_normal = k_perp1_bs * dot(k_perp1_hat, normal_hat)
+    k_perp1_bs_binormal = k_perp1_bs * dot(k_perp1_hat, binormal_hat)
 
     dbs_analysis_dict.update(
         {
