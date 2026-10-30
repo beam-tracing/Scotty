@@ -64,7 +64,7 @@ def test_output_path_and_quick_run():
     kw = from_v3_kwargs({"output_path": "runs/case1/", "quick_run": True, "resonance_flag": False})
     assert kw["output_path"] == pathlib.Path("runs/case1")
     assert kw["ray_tracing_flag"] is True
-    assert "resonance_flag" not in kw
+    assert kw["resonance_flag"] is False  # v4 has resonance_flag since #151 was ported
 
 
 def test_plasma_launch_K_cylindrical_to_cartesian():

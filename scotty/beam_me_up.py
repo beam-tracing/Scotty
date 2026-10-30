@@ -47,6 +47,7 @@ def beam_me_up(
     launch_flag: VALID_LAUNCH_FLAGS,
     boundary_flag: VALID_BOUNDARY_FLAGS,
     relativistic_flag: bool = False,  # includes relativistic corrections to electron mass when set to True
+    resonance_flag: bool = True,  # stop the ray at a cyclotron (or, in X-mode, upper-hybrid) resonance
     auto_delta_sign: bool = True,  # For flipping signs to maintain forward difference
     delta_X: float = 1e-4,  # in the same units as data_X_coord
     delta_Y: float = 1e-4,  # in the same units as data_Y_coord
@@ -132,6 +133,7 @@ def beam_me_up(
         launch_flag=launch_flag,
         boundary_flag=boundary_flag,
         relativistic_flag=relativistic_flag,
+        resonance_flag=resonance_flag,
         auto_delta_sign=auto_delta_sign,
         deltas_cylindrical=np.array(
             [delta_R, delta_Z, delta_K_R, delta_K_zeta, delta_K_Z], dtype=float
@@ -232,15 +234,19 @@ def beam_me_up(
         filename=params.ne_filename,
     )
 
-    # TODO THIS SOON
-    # Using the temperature data, create a spline fit as a
-    # function of poloidal flux, i.e.:
-    # temperature_fit(poloidal_flux) = temperature
-    log.debug(f"Making temperature fit profile")
-    log.warning(
-        f"Skipping temperature fit profile -- code not done yet -- setting `temperature_fit` = `None`"
-    )
-    temperature_fit = None
+    # Using the temperature data, create a fit as a function of poloidal
+    # flux, i.e. temperature_fit(poloidal_flux) = temperature. Only used for
+    # relativistic corrections, as in v3 (beam-tracing/Scotty#151)
+    if params.relativistic_flag:
+        temperature_fit = make_fit(
+            method=params.temperature_fit_method,
+            poloidal_flux_zero_density=params.poloidal_flux_zero_temperature,
+            parameters=params.temperature_fit_parameters,
+            filename=params.Te_filename,
+            quantity="temperature",
+        )
+    else:
+        temperature_fit = None
 
     # Analytical field parameters can be passed directly to beam_me_up (as in
     # v3) or nested in `create_magnetic_geometry`; the nested ones take priority
@@ -379,6 +385,7 @@ def beam_me_up(
         rtol=params.rtol,
         atol=params.atol,
         len_tau=params.len_tau,
+        resonance_flag=params.resonance_flag,
         # tau_max = 1e5,
     )
 
@@ -497,10 +504,14 @@ def make_fit(
     poloidal_flux_zero_density: float,
     parameters: Optional[Sequence],
     filename: Optional[PathLike],
+    quantity: str = "density",
 ) -> ProfileFitLike:
+    """Profile fit for the electron density or temperature (``quantity``).
+    ``poloidal_flux_zero_density`` is the flux beyond which the profile is
+    zero, for whichever quantity it is"""
 
     log = logging.getLogger(__name__)
-    log.debug(f"Making density fit profile")
+    log.debug(f"Making {quantity} fit profile")
 
     if callable(method):
         return method
@@ -512,7 +523,7 @@ def make_fit(
 
     if parameters is None:
         raise ValueError(
-            f"Passing `density_fit_method` ({method}) as string or None requires a list or array of parameters"
+            f"Passing `{quantity}_fit_method` ({method}) as string or None requires a list or array of parameters"
         )
 
     return profile_fit(method, poloidal_flux_zero_density, parameters, filename)

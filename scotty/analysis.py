@@ -701,6 +701,9 @@ def dbs_analysis(
     n_e = np.array(analysis["electron_density"][()])
     w_launch = hamiltonian.angular_frequency
     temperature = analysis.get("electron_temperature")
+    if temperature is not None:
+        # a plain array, like the inputs above, so that loc_p is not a DataArray
+        temperature = np.array(temperature[()])
 
     # equilibrium dielectric tensor - identity matrix, i.e.
     # \bm{\epsilon}_{eq} - \bm{1}

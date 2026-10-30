@@ -36,6 +36,7 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "launch_flag": params.launch_flag,
         "boundary_flag": params.boundary_flag,
         "relativistic_flag": params.relativistic_flag,
+        "resonance_flag": params.resonance_flag,
         "auto_delta_sign": params.auto_delta_sign,
         **({"delta_X": params.delta_X} if cart else {"delta_R": params.delta_R}),
         **({"delta_Y": params.delta_Y} if cart else {}),

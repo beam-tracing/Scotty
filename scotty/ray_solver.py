@@ -4,7 +4,11 @@ from scipy.integrate import solve_ivp
 from scipy.integrate._ivp.ivp import OdeSolution
 from scipy.optimize import minimize_scalar
 from scotty.checks import VALID_SOLVER_STATUS
-from scotty.fun_general import find_normalised_gyro_ang_freq, find_K_magnitude
+from scotty.fun_general import (
+    find_K_magnitude,
+    find_normalised_gyro_ang_freq,
+    find_normalised_plasma_ang_freq,
+)
 from scotty.geometry import MagneticField_Cartesian, MagneticField_Cylindrical
 from scotty.hamiltonian import FIRST_ORDER_KEYS, Hamiltonian
 from scotty.logger import timer
@@ -46,6 +50,7 @@ def make_solver_events(
     poloidal_flux_enter: float,
     launch_angular_frequency: float,
     field: Union[MagneticField_Cartesian, MagneticField_Cylindrical],
+    resonance_flag: bool = True,
 ) -> Dict[str, Callable]:
 
     cart = True if isinstance(field, MagneticField_Cartesian) else False
@@ -87,44 +92,39 @@ def make_solver_events(
         )
         return +1 if is_inside else -1
 
-    # Triggers when the beam frequency is equal to the fundamental
-    # electron cyclotron frequency.
-    # ***Not implemented for relativistic temperatures
-    # ***Used to include a `delta_gyro_freq` where the event triggers
-    #    when the beam frequency is close to this frequency, but this
-    #    was removed because it worked unreliably
+    # Triggers when the beam frequency crosses a resonance: the fundamental
+    # or the second harmonic of the electron cyclotron frequency, and, for
+    # X-mode, the upper hybrid frequency (beam-tracing/Scotty#151). With a
+    # temperature profile, the cyclotron and plasma frequencies include the
+    # relativistic mass correction. The event is the product of the
+    # differences, so it changes sign at any of the resonances; with
+    # `resonance_flag = False` its absolute value is returned, so it never
+    # changes sign and the ray is not stopped.
+    # ***Two resonances crossed within one solver step would cancel in the
+    #    product and go unseen
     @_event(terminal=True, direction=0.0)
-    def event_cross_resonance(tau, ray_parameters, hamiltonian):
+    def event_cross_resonance(tau, ray_parameters, hamiltonian: Hamiltonian):
         q0, q1, q2, _, _, _ = ray_parameters
         B_magnitude = field.magnitude(q0, q1, q2)
+        polflux = field.polflux(q0, q1, q2)
+        temperature = (
+            hamiltonian.temperature(polflux) if hamiltonian.temperature else None
+        )
 
-        # Find the ratio of beam freq to electron cyclotron freq
-        gyro_freq = find_normalised_gyro_ang_freq(launch_angular_frequency, B_magnitude)
+        # Ratio of the electron cyclotron frequency to the beam frequency
+        gyro_freq = find_normalised_gyro_ang_freq(
+            launch_angular_frequency, B_magnitude, temperature
+        )
+        difference = (gyro_freq - 1) * (gyro_freq - 0.5)
 
-        # Find the difference. If the sign changes, it means the resonance
-        # frequency has been crossed
-        return gyro_freq - 1
+        if hamiltonian.mode_flag == -1:
+            plasma_freq = find_normalised_plasma_ang_freq(
+                launch_angular_frequency, hamiltonian.density(polflux), temperature
+            )
+            UH_freq = np.sqrt(gyro_freq**2 + plasma_freq**2)
+            difference = difference * (UH_freq - 1)
 
-    # Triggers when the beam frequency is equal to the second harmonic of
-    # the fundamental electron cyclotron frequency.
-    # ***Not implemented for relativistic temperatures
-    # ***Used to include a `delta_gyro_freq` where the event triggers
-    #    when the beam frequency is close to this frequency, but this
-    #    was removed because it worked unreliably
-    @_event(terminal=True, direction=0.0)
-    def event_cross_resonance2(tau, ray_parameters, hamiltonian):
-        q0, q1, q2, _, _, _ = ray_parameters
-        B_magnitude = field.magnitude(q0, q1, q2)
-
-        # Find the ratio of beam freq to electron cyclotron freq
-        gyro_freq = find_normalised_gyro_ang_freq(launch_angular_frequency, B_magnitude)
-
-        # Find the difference. If the sign changes, it means the resonance
-        # frequency has been crossed. We want 0.5, because the second
-        # harmonic is 2*\omega_c = \omega such that the normalised
-        # gyro frequency is \omega_c / \omega = 0.5
-        difference = gyro_freq - 0.5
-        return difference
+        return difference if resonance_flag else np.abs(difference)
 
     # Triggers when the cut-off location is reached (i.e. when the
     # wavenumber K is minimised)
@@ -158,7 +158,6 @@ def make_solver_events(
         "leave_LCFS": event_leave_LCFS,
         "leave_simulation": event_leave_simulation,
         "cross_resonance": event_cross_resonance,
-        "cross_resonance2": event_cross_resonance2,
         "reach_K_min": event_reach_K_min,
     }
 
@@ -207,10 +206,6 @@ def handle_terminating_event(
     if detected("cross_resonance"):
         log.info(f"Ray has crossed resonance")
         return tau_events["cross_resonance"][0]
-
-    if detected("cross_resonance2"):
-        log.info(f"Ray has crossed resonance 2")
-        return tau_events["cross_resonance2"][0]
 
     if detected("leave_plasma") and detected("leave_LCFS"):
         log.info(f"Ray has left plasma")
@@ -268,6 +263,7 @@ def ray_tracing(
     atol: float,
     len_tau: int,
     tau_max: float = 1e5,
+    resonance_flag: bool = True,
 ) -> Tuple[VALID_SOLVER_STATUS, int, float, FloatArray, Union[float, FloatArray]]:
     """Propagates a ray, given an initial position `q` and wavevector `K`, using
     `scipy.integrate.solve_ivp` until any of these terminating conditions are
@@ -295,7 +291,10 @@ def ray_tracing(
 
     # Creating arguments and events to be passed to solver
     solver_ray_events = make_solver_events(
-        poloidal_flux_enter, hamiltonian.angular_frequency, hamiltonian.field
+        poloidal_flux_enter,
+        hamiltonian.angular_frequency,
+        hamiltonian.field,
+        resonance_flag,
     )
     solver_arguments = (hamiltonian,)
 
@@ -350,10 +349,7 @@ def ray_tracing(
     )
 
     # Find the cut-off (i.e. `tau` where K_magnitude is minimised) if no resonance is reached
-    if (
-        len(tau_events["cross_resonance"]) == 0
-        and len(tau_events["cross_resonance2"]) == 0
-    ):
+    if len(tau_events["cross_resonance"]) == 0:
 
         def K_magnitude(tau):
             q0, _, _, K0, K1, K2 = soln_interp(tau)

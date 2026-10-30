@@ -28,8 +28,8 @@ What it converts:
   ``poloidal_flux_zero_temperature`` (1.01, raised to
   ``poloidal_flux_enter`` if that is larger, since v4 requires it).
 
-``vacuum_propagation_flag`` and ``resonance_flag`` have no v4 equivalent and
-are dropped with a warning.
+``vacuum_propagation_flag`` has no v4 equivalent and is dropped with a warning.
+``resonance_flag`` is passed through unchanged (v4 has it since #151 was ported).
 
 Output files
 ------------
@@ -65,7 +65,6 @@ V3_ONLY_ARGUMENTS = (
     "vacuumLaunch_flag",
     "vacuum_propagation_flag",
     "Psi_BC_flag",
-    "resonance_flag",
     "quick_run",
     "plasmaLaunch_K",
     "plasmaLaunch_Psi_3D_lab_Cartesian",
@@ -141,9 +140,11 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
             kw["ray_tracing_flag"] = quick_run
             _warn(f"`quick_run` -> `ray_tracing_flag` = {quick_run}")
 
-    for name in ("vacuum_propagation_flag", "resonance_flag"):
-        if name in kw:
-            _warn(f"dropped `{name}` = {kw.pop(name)!r}: it has no v4 equivalent")
+    if "vacuum_propagation_flag" in kw:
+        _warn(
+            f"dropped `vacuum_propagation_flag` = {kw.pop('vacuum_propagation_flag')!r}: "
+            "it has no v4 equivalent"
+        )
 
     # v3 built output file names by string concatenation; v4 joins Paths
     if isinstance(kw.get("output_path"), str):

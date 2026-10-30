@@ -100,6 +100,7 @@ class Parameters:
         launch_flag: VALID_LAUNCH_FLAGS,
         boundary_flag: VALID_BOUNDARY_FLAGS,
         relativistic_flag: bool,
+        resonance_flag: bool,
         auto_delta_sign: bool,
         deltas_cylindrical: FloatArray,
         deltas_cartesian: FloatArray,
@@ -197,6 +198,7 @@ class Parameters:
         self.launch_flag = launch_flag
         self.boundary_flag = boundary_flag
         self.relativistic_flag = relativistic_flag
+        self.resonance_flag = resonance_flag
         self.auto_delta_sign = auto_delta_sign
         self.len_tau = int(self._check_positive("len_tau", len_tau))
         self.rtol = rtol
@@ -236,9 +238,7 @@ class Parameters:
         self.density_fit_method = density_fit_method
 
         self.Te_data_path = self._check_data_path("Te", Te_data_path)
-        self.interp_order_Te_data = (
-            None  # TODO -- not implemented yet? implement together with temp. profile
-        )
+        _, self.interp_order_Te_data = self._check_interp_order("Te", interp_order)
         self.temperature_fit_parameters = temperature_fit_parameters
         self.temperature_fit_method = temperature_fit_method
 
@@ -524,6 +524,23 @@ class Parameters:
             ]
         else:
             self.ne_filename = None
+
+        # Temperature, only needed for relativistic corrections. As in v3
+        # (beam-tracing/Scotty#151), a file is read only when no parameters
+        # are given and the method is None or "smoothing-spline-file"
+        if (
+            self.relativistic_flag
+            and (self.temperature_fit_parameters is None)
+            and (self.temperature_fit_method in [None, "smoothing-spline-file"])
+        ):
+            self.Te_filename = self.Te_data_path / f"Te{self.input_filename_suffix}.dat"
+            self.temperature_fit_parameters = [
+                self.Te_filename,
+                self.interp_order_Te_data,
+                self.interp_smoothing,
+            ]
+        else:
+            self.Te_filename = None
 
     def coordinate_conversions(self):
         if self.cartesian_flag:
