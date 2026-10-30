@@ -682,7 +682,9 @@ def convert_hessians(
 
     # First derivatives dH/du_a; only a = R, zeta, K_R, K_zeta have curved u_a
     g = np.zeros((N, 6))
-    for a, key in enumerate(("dH_dR", "dH_dzeta", "dH_dZ", "dH_dKR", "dH_dKzeta", "dH_dKZ")):
+    for a, key in enumerate(
+        ("dH_dR", "dH_dzeta", "dH_dZ", "dH_dKR", "dH_dKzeta", "dH_dKZ")
+    ):
         if key in dH:
             g[:, a] = np.reshape(dH[key], -1)
 
@@ -733,4 +735,3 @@ def convert_hessians(
     if squeeze:
         return new_grad_grad_H[0], new_gradK_grad_H[0], new_gradK_gradK_H[0]
     return new_grad_grad_H, new_gradK_grad_H, new_gradK_gradK_H
-

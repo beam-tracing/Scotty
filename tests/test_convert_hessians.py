@@ -27,7 +27,13 @@ def H_cart(x, K):
     zeta = np.arctan2(x[1], x[0])
     n = 1.0 + 0.4 * (R - 1.5) ** 2 + 0.2 * Z**2 + 0.1 * R * Z
     BR, BT, BZ = 0.2 * Z, 1.0 / R, 0.3 * (R - 1.5)
-    b = np.array([BR * np.cos(zeta) - BT * np.sin(zeta), BR * np.sin(zeta) + BT * np.cos(zeta), BZ])
+    b = np.array(
+        [
+            BR * np.cos(zeta) - BT * np.sin(zeta),
+            BR * np.sin(zeta) + BT * np.cos(zeta),
+            BZ,
+        ]
+    )
     b = b / np.linalg.norm(b)
     return K @ K - n + C_ANISO * (b @ K) ** 2
 
@@ -55,14 +61,24 @@ def gradient_and_hessian(f, v, h=1e-4):
         g[i] = (f(v + ei) - f(v - ei)) / (2 * h)
         for j in range(n):
             ej = np.eye(n)[j] * h
-            Hm[i, j] = (f(v + ei + ej) - f(v + ei - ej) - f(v - ei + ej) + f(v - ei - ej)) / (4 * h * h)
+            Hm[i, j] = (
+                f(v + ei + ej) - f(v + ei - ej) - f(v - ei + ej) + f(v - ei - ej)
+            ) / (4 * h * h)
     return g, Hm
 
 
 def random_points(n, seed=3):
     rng = np.random.default_rng(seed)
-    q = np.column_stack([rng.uniform(1.2, 2.0, n), rng.uniform(-np.pi, np.pi, n), rng.uniform(-0.4, 0.4, n)])
-    p = np.column_stack([rng.uniform(-1, 1, n), rng.uniform(-1, 1, n) * q[:, 0], rng.uniform(-1, 1, n)])
+    q = np.column_stack(
+        [
+            rng.uniform(1.2, 2.0, n),
+            rng.uniform(-np.pi, np.pi, n),
+            rng.uniform(-0.4, 0.4, n),
+        ]
+    )
+    p = np.column_stack(
+        [rng.uniform(-1, 1, n), rng.uniform(-1, 1, n) * q[:, 0], rng.uniform(-1, 1, n)]
+    )
     return q, p
 
 
@@ -74,11 +90,22 @@ def cylindrical_inputs_and_exact(q, p):
     H_exact = np.empty((N, 6, 6))
     K_cart = np.empty((N, 3))
     for i in range(N):
-        g[i], H_cyl[i] = gradient_and_hessian(lambda v: H_cart(*to_cart(v[:3], v[3:])), np.concatenate([q[i], p[i]]))
+        g[i], H_cyl[i] = gradient_and_hessian(
+            lambda v: H_cart(*to_cart(v[:3], v[3:])), np.concatenate([q[i], p[i]])
+        )
         x, K = to_cart(q[i], p[i])
         K_cart[i] = K
-        _, H_exact[i] = gradient_and_hessian(lambda w: H_cart(w[:3], w[3:]), np.concatenate([x, K]))
-    dH = dict(dH_dR=g[:, 0], dH_dzeta=g[:, 1], dH_dZ=g[:, 2], dH_dKR=g[:, 3], dH_dKzeta=g[:, 4], dH_dKZ=g[:, 5])
+        _, H_exact[i] = gradient_and_hessian(
+            lambda w: H_cart(w[:3], w[3:]), np.concatenate([x, K])
+        )
+    dH = dict(
+        dH_dR=g[:, 0],
+        dH_dzeta=g[:, 1],
+        dH_dZ=g[:, 2],
+        dH_dKR=g[:, 3],
+        dH_dKzeta=g[:, 4],
+        dH_dKZ=g[:, 5],
+    )
     return dH, H_cyl, H_exact, K_cart
 
 
@@ -95,7 +122,14 @@ def test_cylindrical_to_cartesian_hessians(n_points):
     q, p = random_points(n_points)
     dH, H_cyl, H_exact, K_cart = cylindrical_inputs_and_exact(q, p)
     if n_points == 1:
-        args = (q[0], K_cart[0], {k: v[0] for k, v in dH.items()}, H_cyl[0, :3, :3], H_cyl[0, 3:, :3], H_cyl[0, 3:, 3:])
+        args = (
+            q[0],
+            K_cart[0],
+            {k: v[0] for k, v in dH.items()},
+            H_cyl[0, :3, :3],
+            H_cyl[0, 3:, :3],
+            H_cyl[0, 3:, 3:],
+        )
         expected = (H_exact[0, :3, :3], H_exact[0, 3:, :3], H_exact[0, 3:, 3:])
     else:
         args = (q.T, K_cart.T, dH, H_cyl[:, :3, :3], H_cyl[:, 3:, :3], H_cyl[:, 3:, 3:])
@@ -113,6 +147,8 @@ def test_cartesian_inputs_pass_through():
     q, p = random_points(3)
     _, H_cyl, _, K_cart = cylindrical_inputs_and_exact(q, p)
     blocks = (H_cyl[:, :3, :3], H_cyl[:, 3:, :3], H_cyl[:, 3:, 3:])
-    got = convert_hessians(q.T, K_cart.T, {}, *blocks, start="cartesian", end="cartesian")
+    got = convert_hessians(
+        q.T, K_cart.T, {}, *blocks, start="cartesian", end="cartesian"
+    )
     for g_, b_ in zip(got, blocks):
         assert_allclose(g_, b_)

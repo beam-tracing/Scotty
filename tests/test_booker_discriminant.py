@@ -114,7 +114,9 @@ def test_K_hessian_in_vacuum(mode_flag):
     # the O(X) correction to the Hessian is then far below rtol
     R = 1.5 + 0.5 * 0.9999995
     K0 = OMEGA / constants.c
-    dH = H.derivatives(np.array([R, 0.0, 0.0]), np.array([-1000.0, 50.0, 100.0]), second_order=True)
+    dH = H.derivatives(
+        np.array([R, 0.0, 0.0]), np.array([-1000.0, 50.0, 100.0]), second_order=True
+    )
     _, _, gradK_gradK_H = hessians(dH, cartesian=False)
 
     expected = np.diag([2 / K0**2, 2 / (K0**2 * R**2), 2 / K0**2])

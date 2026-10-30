@@ -100,7 +100,9 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         vacuum_launch = bool(kw.pop("vacuumLaunch_flag"))
         if "launch_flag" not in kw:
             kw["launch_flag"] = "vacuum" if vacuum_launch else "plasma"
-            _warn(f"`vacuumLaunch_flag` = {vacuum_launch} -> `launch_flag` = '{kw['launch_flag']}'")
+            _warn(
+                f"`vacuumLaunch_flag` = {vacuum_launch} -> `launch_flag` = '{kw['launch_flag']}'"
+            )
     elif "launch_flag" not in kw:
         kw["launch_flag"] = "vacuum"  # v3's default
         _warn("set `launch_flag` = 'vacuum' (v3's default `vacuumLaunch_flag` = True)")
@@ -132,9 +134,13 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
             _warn("`plasmaLaunch_K` (cylindrical) -> `plasmaLaunch_K_cartesian`")
     if "plasmaLaunch_Psi_3D_lab_Cartesian" in kw:
         Psi = kw.pop("plasmaLaunch_Psi_3D_lab_Cartesian")
-        if "plasmaLaunch_Psi_3D_lab_cartesian" not in kw and np.any(np.asarray(Psi) != 0):
+        if "plasmaLaunch_Psi_3D_lab_cartesian" not in kw and np.any(
+            np.asarray(Psi) != 0
+        ):
             kw["plasmaLaunch_Psi_3D_lab_cartesian"] = Psi
-            _warn("`plasmaLaunch_Psi_3D_lab_Cartesian` -> `plasmaLaunch_Psi_3D_lab_cartesian`")
+            _warn(
+                "`plasmaLaunch_Psi_3D_lab_Cartesian` -> `plasmaLaunch_Psi_3D_lab_cartesian`"
+            )
 
     if "quick_run" in kw:
         quick_run = bool(kw.pop("quick_run"))
@@ -167,7 +173,9 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
     for name in ("poloidal_flux_zero_density", "poloidal_flux_zero_temperature"):
         if name not in kw:
             kw[name] = max(V3_DEFAULT_POLOIDAL_FLUX_ZERO, enter)
-            _warn(f"set `{name}` = {kw[name]} (v3's default, at least `poloidal_flux_enter`)")
+            _warn(
+                f"set `{name}` = {kw[name]} (v3's default, at least `poloidal_flux_enter`)"
+            )
 
     return kw
 
@@ -226,12 +234,16 @@ class Rule:
 # components <-> Cartesian (X, Y, Z), at the ray's toroidal angle zeta
 def _cyl_to_cart(v: np.ndarray, ctx: Dict[str, np.ndarray]) -> np.ndarray:
     c, s = np.cos(ctx["zeta"]), np.sin(ctx["zeta"])
-    return np.stack([v[:, 0] * c - v[:, 1] * s, v[:, 0] * s + v[:, 1] * c, v[:, 2]], axis=1)
+    return np.stack(
+        [v[:, 0] * c - v[:, 1] * s, v[:, 0] * s + v[:, 1] * c, v[:, 2]], axis=1
+    )
 
 
 def _cart_to_cyl(v: np.ndarray, ctx: Dict[str, np.ndarray]) -> np.ndarray:
     c, s = np.cos(ctx["zeta"]), np.sin(ctx["zeta"])
-    return np.stack([v[:, 0] * c + v[:, 1] * s, -v[:, 0] * s + v[:, 1] * c, v[:, 2]], axis=1)
+    return np.stack(
+        [v[:, 0] * c + v[:, 1] * s, -v[:, 0] * s + v[:, 1] * c, v[:, 2]], axis=1
+    )
 
 
 def _launch_flag_to_v4(a, ctx):
@@ -263,34 +275,80 @@ CART_MAT = ("row_cart", "col_cart")
 RULES: List[Rule] = [
     # inputs
     Rule(("inputs", "Psi_BC_flag"), ("inputs", "boundary_flag"), to_v4=_boundary_to_v4),
-    Rule(("inputs", "vacuumLaunch_flag"), ("inputs", "launch_flag"),
-         to_v4=_launch_flag_to_v4, to_v3=_launch_flag_to_v3),
+    Rule(
+        ("inputs", "vacuumLaunch_flag"),
+        ("inputs", "launch_flag"),
+        to_v4=_launch_flag_to_v4,
+        to_v3=_launch_flag_to_v3,
+    ),
     Rule(("inputs", "quick_run"), ("inputs", "ray_tracing_flag")),
     Rule(("inputs", "interp_order"), ("inputs", "magnetic_data_interp_order")),
-    Rule(("inputs", "K_initial"), ("solver_output", "K_initial_cylindrical"), ("col",), ("col_cyld",)),
-    Rule(("inputs", "initial_position"), ("solver_output", "q_initial_cylindrical"), ("col",), ("col_cyld",)),
-    Rule(("inputs", "Psi_3D_lab_initial"), ("solver_output", "Psi_3D_initial_labframe_cylindrical"),
-         CYL_MAT, V4_CYL_MAT),
+    Rule(
+        ("inputs", "K_initial"),
+        ("solver_output", "K_initial_cylindrical"),
+        ("col",),
+        ("col_cyld",),
+    ),
+    Rule(
+        ("inputs", "initial_position"),
+        ("solver_output", "q_initial_cylindrical"),
+        ("col",),
+        ("col_cyld",),
+    ),
+    Rule(
+        ("inputs", "Psi_3D_lab_initial"),
+        ("solver_output", "Psi_3D_initial_labframe_cylindrical"),
+        CYL_MAT,
+        V4_CYL_MAT,
+    ),
     # the ray and beam
     Rule(("solver_output", "q_R"), ("solver_output", "q_R_output")),
     Rule(("solver_output", "q_Z"), ("solver_output", "q_Z_output")),
     Rule(("solver_output", "q_zeta"), ("solver_output", "q_zeta_output")),
     Rule(("solver_output", "K_R"), ("solver_output", "K_R_output")),
     Rule(("solver_output", "K_Z"), ("solver_output", "K_Z_output")),
-    Rule(("solver_output", "Psi_3D"), ("solver_output", "Psi_3D_output_labframe_cylindrical"),
-         ("tau",) + CYL_MAT, ("tau",) + V4_CYL_MAT),
+    Rule(
+        ("solver_output", "Psi_3D"),
+        ("solver_output", "Psi_3D_output_labframe_cylindrical"),
+        ("tau",) + CYL_MAT,
+        ("tau",) + V4_CYL_MAT,
+    ),
     Rule(("solver_output", "solver_status"), ("solver_output", "solver_status")),
-    Rule(("analysis", "K_zeta_initial"), ("solver_output", "K_zeta_output"), (), TAU,
-         to_v4=_K_zeta_to_v4, to_v3=_K_zeta_to_v3),
+    Rule(
+        ("analysis", "K_zeta_initial"),
+        ("solver_output", "K_zeta_output"),
+        (),
+        TAU,
+        to_v4=_K_zeta_to_v4,
+        to_v3=_K_zeta_to_v3,
+    ),
     Rule(("analysis", "K_magnitude"), ("solver_output", "K_output_magnitude")),
-    Rule(("analysis", "Psi_3D_Cartesian"), ("solver_output", "Psi_3D_output_labframe_cartesian")),
-    Rule(("analysis", "Psi_3D_lab_entry"), ("solver_output", "Psi_3D_entry_labframe_cylindrical"),
-         CYL_MAT, V4_CYL_MAT),
-    Rule(("analysis", "Psi_3D_lab_launch"), ("solver_output", "Psi_3D_launch_labframe_cylindrical"),
-         CYL_MAT, V4_CYL_MAT),
-    Rule(("analysis", "distance_from_launch_to_entry"), ("solver_output", "distance_from_launch_to_entry")),
-    Rule(("analysis", "beam_cartesian"), ("solver_output", "q_output_cartesian"),
-         ("tau", "col_cart"), ("tau", "row_cart")),
+    Rule(
+        ("analysis", "Psi_3D_Cartesian"),
+        ("solver_output", "Psi_3D_output_labframe_cartesian"),
+    ),
+    Rule(
+        ("analysis", "Psi_3D_lab_entry"),
+        ("solver_output", "Psi_3D_entry_labframe_cylindrical"),
+        CYL_MAT,
+        V4_CYL_MAT,
+    ),
+    Rule(
+        ("analysis", "Psi_3D_lab_launch"),
+        ("solver_output", "Psi_3D_launch_labframe_cylindrical"),
+        CYL_MAT,
+        V4_CYL_MAT,
+    ),
+    Rule(
+        ("analysis", "distance_from_launch_to_entry"),
+        ("solver_output", "distance_from_launch_to_entry"),
+    ),
+    Rule(
+        ("analysis", "beam_cartesian"),
+        ("solver_output", "q_output_cartesian"),
+        ("tau", "col_cart"),
+        ("tau", "row_cart"),
+    ),
     # analysis: renamed
     Rule(("analysis", "poloidal_flux"), ("analysis", "polflux")),
     Rule(("analysis", "normalised_gyro_freqs"), ("analysis", "normalised_omega_ce")),
@@ -299,29 +357,68 @@ RULES: List[Rule] = [
     Rule(("analysis", "x_hat_Cartesian"), ("analysis", "x_hat_cartesian")),
     Rule(("analysis", "y_hat_Cartesian"), ("analysis", "y_hat_cartesian")),
     # analysis: cylindrical in v3, Cartesian in v4
-    Rule(("analysis", "b_hat"), ("analysis", "b_hat_cartesian"), ("tau", "col"), ("tau", "col_cart"),
-         to_v4=_cyl_to_cart, to_v3=_cart_to_cyl),
+    Rule(
+        ("analysis", "b_hat"),
+        ("analysis", "b_hat_cartesian"),
+        ("tau", "col"),
+        ("tau", "col_cart"),
+        to_v4=_cyl_to_cart,
+        to_v3=_cart_to_cyl,
+    ),
 ]
 # analysis: same name and meaning in both
-for _name in ("B_Z", "B_magnitude", "H_Booker", "H_Booker_other", "H_eigvals", "Psi_xx", "Psi_xy", "Psi_yy",
-              "Psi_xg", "Psi_yg", "Psi_gg", "cutoff_index", "d_xhat_d_tau_dot_yhat", "electron_density",
-              "epsilon_g", "epsilon_para", "epsilon_perp", "g_magnitude", "g_magnitude_Cardano",
-              "kappa_dot_ghat", "kappa_dot_xhat", "kappa_dot_yhat", "theta_m"):
+for _name in (
+    "B_Z",
+    "B_magnitude",
+    "H_Booker",
+    "H_Booker_other",
+    "H_eigvals",
+    "Psi_xx",
+    "Psi_xy",
+    "Psi_yy",
+    "Psi_xg",
+    "Psi_yg",
+    "Psi_gg",
+    "cutoff_index",
+    "d_xhat_d_tau_dot_yhat",
+    "electron_density",
+    "epsilon_g",
+    "epsilon_para",
+    "epsilon_perp",
+    "g_magnitude",
+    "g_magnitude_Cardano",
+    "kappa_dot_ghat",
+    "kappa_dot_xhat",
+    "kappa_dot_yhat",
+    "theta_m",
+):
     RULES.append(Rule(("analysis", _name), ("analysis", _name)))
 # analysis in v3 -> dbs_analysis in v4
-for _v3, _v4 in (("M_w_inv_xx", "M_w_inv_xx"), ("M_w_inv_xy", "M_w_inv_xy"), ("M_w_inv_yy", "M_w_inv_yy"),
-                 ("M_xx", "M_xx"), ("M_xy", "M_xy"), ("d_theta_d_tau", "d_theta_d_tau"),
-                 ("delta_theta_m", "delta_theta_m"), ("delta_k_perp_2", "delta_k_perp2"),
-                 ("k_perp_1_bs", "k_perp1_bs"), ("k_perp_1_bs_normal", "k_perp1_bs_normal"),
-                 ("k_perp_1_bs_binormal", "k_perp1_bs_binormal"), ("theta", "theta"),
-                 ("loc_b", "loc_b"), ("loc_m", "loc_m"), ("loc_p", "loc_p"), ("loc_r", "loc_r"),
-                 ("loc_s", "loc_s_-13_3"),
-                 ("xhat_dot_grad_bhat_dot_xhat", "xhat_dot_grad_bhat_dot_xhat"),
-                 ("xhat_dot_grad_bhat_dot_yhat", "xhat_dot_grad_bhat_dot_yhat"),
-                 ("xhat_dot_grad_bhat_dot_ghat", "xhat_dot_grad_bhat_dot_ghat"),
-                 ("yhat_dot_grad_bhat_dot_xhat", "yhat_dot_grad_bhat_dot_xhat"),
-                 ("yhat_dot_grad_bhat_dot_yhat", "yhat_dot_grad_bhat_dot_yhat"),
-                 ("yhat_dot_grad_bhat_dot_ghat", "yhat_dot_grad_bhat_dot_ghat")):
+for _v3, _v4 in (
+    ("M_w_inv_xx", "M_w_inv_xx"),
+    ("M_w_inv_xy", "M_w_inv_xy"),
+    ("M_w_inv_yy", "M_w_inv_yy"),
+    ("M_xx", "M_xx"),
+    ("M_xy", "M_xy"),
+    ("d_theta_d_tau", "d_theta_d_tau"),
+    ("delta_theta_m", "delta_theta_m"),
+    ("delta_k_perp_2", "delta_k_perp2"),
+    ("k_perp_1_bs", "k_perp1_bs"),
+    ("k_perp_1_bs_normal", "k_perp1_bs_normal"),
+    ("k_perp_1_bs_binormal", "k_perp1_bs_binormal"),
+    ("theta", "theta"),
+    ("loc_b", "loc_b"),
+    ("loc_m", "loc_m"),
+    ("loc_p", "loc_p"),
+    ("loc_r", "loc_r"),
+    ("loc_s", "loc_s_-13_3"),
+    ("xhat_dot_grad_bhat_dot_xhat", "xhat_dot_grad_bhat_dot_xhat"),
+    ("xhat_dot_grad_bhat_dot_yhat", "xhat_dot_grad_bhat_dot_yhat"),
+    ("xhat_dot_grad_bhat_dot_ghat", "xhat_dot_grad_bhat_dot_ghat"),
+    ("yhat_dot_grad_bhat_dot_xhat", "yhat_dot_grad_bhat_dot_xhat"),
+    ("yhat_dot_grad_bhat_dot_yhat", "yhat_dot_grad_bhat_dot_yhat"),
+    ("yhat_dot_grad_bhat_dot_ghat", "yhat_dot_grad_bhat_dot_ghat"),
+):
     RULES.append(Rule(("analysis", _v3), ("dbs_analysis", _v4)))
 
 
@@ -346,7 +443,9 @@ def _convert(dt: xr.DataTree, source: str) -> xr.DataTree:
     groups: Dict[str, Dict[str, xr.DataArray]] = {}
     used = set()
     for rule in RULES:
-        (sg, sn), (tg, tn) = (rule.v3, rule.v4) if source == "v3" else (rule.v4, rule.v3)
+        (sg, sn), (tg, tn) = (
+            (rule.v3, rule.v4) if source == "v3" else (rule.v4, rule.v3)
+        )
         if sg not in dt.children or sn not in dt[sg].ds.data_vars:
             continue
         src = dt[sg].ds[sn]
@@ -354,21 +453,33 @@ def _convert(dt: xr.DataTree, source: str) -> xr.DataTree:
         dims = rule.v4_dims if source == "v3" else rule.v3_dims
         dims = src.dims if dims is None else dims
         values = np.asarray(transform(src.values, ctx))
-        groups.setdefault(tg, {})[tn] = xr.DataArray(values, dims=dims, attrs=dict(src.attrs))
+        groups.setdefault(tg, {})[tn] = xr.DataArray(
+            values, dims=dims, attrs=dict(src.attrs)
+        )
         used.add((sg, sn))
 
     # Inputs that keep their name
-    other_inputs = {r.v4[1] if source == "v3" else r.v3[1] for r in RULES if r.v3[0] == "inputs"}
+    other_inputs = {
+        r.v4[1] if source == "v3" else r.v3[1] for r in RULES if r.v3[0] == "inputs"
+    }
     for name, da in dt["inputs"].ds.data_vars.items():
-        if ("inputs", name) not in used and name not in other_inputs and name in _SAME_NAME_INPUTS:
+        if (
+            ("inputs", name) not in used
+            and name not in other_inputs
+            and name in _SAME_NAME_INPUTS
+        ):
             groups.setdefault("inputs", {})[name] = da.copy()
             used.add(("inputs", name))
     # The launch position is a data variable in v3's inputs, a coordinate in v4's
     if target == "v4":
-        groups.setdefault("inputs", {})["geometry"] = xr.DataArray(np.asarray("cylindrical"))
+        groups.setdefault("inputs", {})["geometry"] = xr.DataArray(
+            np.asarray("cylindrical")
+        )
         if "launch_position" in dt["inputs"].ds:
             launch = dt["inputs"].ds["launch_position"].values
-            groups["inputs"]["launch_position"] = xr.DataArray(launch, dims=("launch_position",))
+            groups["inputs"]["launch_position"] = xr.DataArray(
+                launch, dims=("launch_position",)
+            )
             used.add(("inputs", "launch_position"))
     elif "launch_position" in dt["inputs"].ds.coords:
         groups.setdefault("inputs", {})["launch_position"] = xr.DataArray(
@@ -380,7 +491,11 @@ def _convert(dt: xr.DataTree, source: str) -> xr.DataTree:
     if source == "v3":
         arc = dt["analysis"].ds.coords.get("distance_along_line")
     else:
-        arc = dt["dbs_analysis"].ds.coords.get("beam_path_length") if "dbs_analysis" in dt.children else None
+        arc = (
+            dt["dbs_analysis"].ds.coords.get("beam_path_length")
+            if "dbs_analysis" in dt.children
+            else None
+        )
     tree = {}
     for group, variables in groups.items():
         ds = xr.Dataset(variables)
@@ -409,12 +524,37 @@ def _convert(dt: xr.DataTree, source: str) -> xr.DataTree:
 
 # Inputs with the same name and meaning in v3 and v4
 _SAME_NAME_INPUTS = {
-    "atol", "rtol", "delta_K_R", "delta_K_Z", "delta_K_zeta", "delta_R", "delta_Z", "density_fit_method",
-    "detailed_analysis_flag", "equil_time", "figure_flag", "find_B_method", "input_filename_suffix",
-    "interp_smoothing", "launch_angular_frequency", "launch_beam_curvature", "launch_beam_width",
-    "launch_freq_GHz", "len_tau", "magnetic_data_path", "mode_flag", "ne_data_path", "output_filename_suffix",
-    "output_path", "poloidal_flux_enter", "poloidal_flux_zero_density", "poloidal_flux_zero_temperature",
-    "poloidal_launch_angle_Torbeam", "toroidal_launch_angle_Torbeam", "shot", "relativistic_flag",
+    "atol",
+    "rtol",
+    "delta_K_R",
+    "delta_K_Z",
+    "delta_K_zeta",
+    "delta_R",
+    "delta_Z",
+    "density_fit_method",
+    "detailed_analysis_flag",
+    "equil_time",
+    "figure_flag",
+    "find_B_method",
+    "input_filename_suffix",
+    "interp_smoothing",
+    "launch_angular_frequency",
+    "launch_beam_curvature",
+    "launch_beam_width",
+    "launch_freq_GHz",
+    "len_tau",
+    "magnetic_data_path",
+    "mode_flag",
+    "ne_data_path",
+    "output_filename_suffix",
+    "output_path",
+    "poloidal_flux_enter",
+    "poloidal_flux_zero_density",
+    "poloidal_flux_zero_temperature",
+    "poloidal_launch_angle_Torbeam",
+    "toroidal_launch_angle_Torbeam",
+    "shot",
+    "relativistic_flag",
 }
 
 

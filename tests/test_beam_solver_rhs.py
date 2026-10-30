@@ -24,6 +24,7 @@ def trace_level(tmp_path_factory):
     """The solvers use `log.trace`, a custom level registered by `config_logger`"""
     config_logger("warning", None, tmp_path_factory.mktemp("log"), "")
 
+
 K_Q = np.array([1.2, 0.0, 2.1])  # no zeta dependence, as in an axisymmetric field
 K_K = np.array([4.3, 5.4, 6.5])
 Q_POINT = np.array([1.2, 0.3, 2.3])
@@ -32,12 +33,18 @@ K_POINT = np.array([3.4, 4.5, 5.6])
 
 class ExponentialHamiltonian(Hamiltonian):
     def __init__(self, geometry):
-        spec = MagneticField_Cartesian if geometry == "cartesian" else MagneticField_Cylindrical
+        spec = (
+            MagneticField_Cartesian
+            if geometry == "cartesian"
+            else MagneticField_Cylindrical
+        )
         self.field = MagicMock(spec=spec)
         self.spacings = {name: 1e-4 for name in ("q0", "q1", "q2", "K0", "K1", "K2")}
 
     def __call__(self, q0, q1, q2, K0, K1, K2):
-        return np.exp(K_Q[0] * q0 + K_Q[2] * q2 + K_K[0] * K0 + K_K[1] * K1 + K_K[2] * K2)
+        return np.exp(
+            K_Q[0] * q0 + K_Q[2] * q2 + K_K[0] * K0 + K_K[1] * K1 + K_K[2] * K2
+        )
 
 
 @pytest.mark.parametrize("geometry", ["cylindrical", "cartesian"])

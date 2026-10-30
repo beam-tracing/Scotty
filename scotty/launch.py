@@ -34,9 +34,7 @@ from typing import cast, Optional, Tuple, Union, List, Literal
 log = logging.getLogger(__name__)
 
 
-def max_search_distance(
-    field: VALID_FIELDS, q_launch_cartesian: FloatArray
-) -> float:
+def max_search_distance(field: VALID_FIELDS, q_launch_cartesian: FloatArray) -> float:
     r"""Length of launch line that reaches every point of the field's domain.
 
     For a cylindrical field with grid R <= R_max, Z_min <= Z <= Z_max, any point
@@ -109,9 +107,7 @@ def find_plasma_entry_position(
     else:  # isinstance(field, MagneticField_Cartesian):
         cart = True
         q_launch_cartesian = q_launch
-    max_dist = max_search_distance(
-        field, np.asarray(q_launch_cartesian, dtype=float)
-    )
+    max_dist = max_search_distance(field, np.asarray(q_launch_cartesian, dtype=float))
 
     # Defining some wrapper functions for ease
     def _ray_line_wrapper(tau):

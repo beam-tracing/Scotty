@@ -105,7 +105,11 @@ def d_beam_parameters_d_tau(
     )
 
     q_keys, K_keys = FIRST_ORDER_KEYS[
-        "cartesian" if isinstance(hamiltonian.field, MagneticField_Cartesian) else "cylindrical"
+        (
+            "cartesian"
+            if isinstance(hamiltonian.field, MagneticField_Cartesian)
+            else "cylindrical"
+        )
     ]
     dq_dtau = np.array([dH[key] for key in K_keys])
     dK_dtau = -np.array([dH[key] for key in q_keys])

@@ -168,7 +168,6 @@ def beam_me_up(
 ) -> Union[
     xr.DataTree, Tuple[xr.DataTree, MagneticField_Cylindrical | MagneticField_Cartesian]
 ]:
-
     """Trace a beam and compute its DBS localisation.
 
     Scripts written for Scotty v3 use arguments that v4 renamed or removed

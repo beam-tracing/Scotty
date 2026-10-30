@@ -35,7 +35,9 @@ def field():
         pytest.param(np.array([1.1, 0.0, -0.1]), (1, 1), id="inboard-below"),
     ],
 )
-def test_steps_point_into_the_plasma_whatever_their_sign(field, q, expected_signs, sign):
+def test_steps_point_into_the_plasma_whatever_their_sign(
+    field, q, expected_signs, sign
+):
     deltas = sign * np.array([1e-5, 2e-5])
     result = find_auto_delta_signs(True, q, deltas, field)
     # down the flux gradient (into the plasma), with the magnitudes unchanged
@@ -44,7 +46,9 @@ def test_steps_point_into_the_plasma_whatever_their_sign(field, q, expected_sign
 
 def test_no_auto_sign_keeps_the_steps(field):
     deltas = np.array([-1e-5, 1e-5])
-    assert_allclose(find_auto_delta_signs(False, np.array([1.9, 0.0, 0.1]), deltas, field), deltas)
+    assert_allclose(
+        find_auto_delta_signs(False, np.array([1.9, 0.0, 0.1]), deltas, field), deltas
+    )
 
 
 def test_boundary_condition_independent_of_step_sign(tmp_path):
@@ -54,7 +58,11 @@ def test_boundary_condition_independent_of_step_sign(tmp_path):
     psi = {}
     for sign in (1, -1):
         kwargs = get_parameters_for_Scotty("DBS_synthetic")
-        kwargs.update(len_tau=52, interp_smoothing=0, delta_R=sign * 1e-5, delta_Z=sign * 1e-5)
-        out = beam_me_up(**kwargs, output_path=tmp_path, output_filename_suffix=f"_{sign}")
+        kwargs.update(
+            len_tau=52, interp_smoothing=0, delta_R=sign * 1e-5, delta_Z=sign * 1e-5
+        )
+        out = beam_me_up(
+            **kwargs, output_path=tmp_path, output_filename_suffix=f"_{sign}"
+        )
         psi[sign] = out["solver_output"]["Psi_3D_initial_labframe_cylindrical"].values
     assert_allclose(psi[-1], psi[1], rtol=1e-6)

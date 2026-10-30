@@ -249,7 +249,11 @@ def d_ray_parameters_d_tau(
     # f(t, y, y0), so we put the tau here so that it stops complaining
     dH = hamiltonian.derivatives(ray_parameters[:3], ray_parameters[-3:])
     q_keys, K_keys = FIRST_ORDER_KEYS[
-        "cartesian" if isinstance(hamiltonian.field, MagneticField_Cartesian) else "cylindrical"
+        (
+            "cartesian"
+            if isinstance(hamiltonian.field, MagneticField_Cartesian)
+            else "cylindrical"
+        )
     ]
     # dq/dtau = dH/dK, dK/dtau = -dH/dq, picked by name so that the order of
     # the derivative dictionary cannot change the equations of motion

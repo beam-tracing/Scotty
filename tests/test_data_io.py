@@ -17,5 +17,9 @@ def test_initial_position_is_the_start_of_the_ray(tmp_path):
 
     first = [so["q_R_output"][0], so["q_zeta_output"][0], so["q_Z_output"][0]]
     assert_allclose(so["q_initial_cylindrical"], first)
-    assert_allclose(so["q_initial_cartesian"], find_q_labframe_cyl_to_cart(np.asarray(first)), atol=1e-12)
+    assert_allclose(
+        so["q_initial_cartesian"],
+        find_q_labframe_cyl_to_cart(np.asarray(first)),
+        atol=1e-12,
+    )
     assert not np.allclose(so["q_initial_cylindrical"], so["q_launch_cylindrical"])

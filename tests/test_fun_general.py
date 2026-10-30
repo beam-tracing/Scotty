@@ -186,8 +186,7 @@ def _quadratic_phase_case(seed):
     K_cyl = np.array(
         [
             K_cart[0] * np.cos(q_cyl[1]) + K_cart[1] * np.sin(q_cyl[1]),
-            q_cyl[0]
-            * (-K_cart[0] * np.sin(q_cyl[1]) + K_cart[1] * np.cos(q_cyl[1])),
+            q_cyl[0] * (-K_cart[0] * np.sin(q_cyl[1]) + K_cart[1] * np.cos(q_cyl[1])),
             K_cart[2],
         ]
     )

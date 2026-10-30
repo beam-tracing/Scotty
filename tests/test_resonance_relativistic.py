@@ -21,8 +21,6 @@ from scotty.beam_me_up import beam_me_up
 np.set_printoptions(linewidth=120, threshold=100)
 
 
-
-
 def test_fund_1_rel(tmp_path):
     kwargs_dict = {
         "geometry": "cylindrical",
@@ -624,4 +622,3 @@ def test_flag_false(tmp_path):
     # stops (test_flag_true: R = 1.916 m; f_ce = 33 GHz at B = 1.18 T, R = 1.91 m), but carries on
     # well past it, to smaller R
     assert float(output["solver_output/q_R_output"][-1]) < 1.916 - 0.02
-

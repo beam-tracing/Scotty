@@ -274,15 +274,15 @@ def test_circular_flux_surface_field():
     assert_allclose(B_Z, -dPsi_dR / R_grid, rtol=1e-6, atol=1e-6)
 
     # Divergence-free: (1/R) d(R B_R)/dR + dB_Z/dZ = 0
-    divergence = np.gradient(R_grid * B_R, R, axis=0, edge_order=2) / R_grid + np.gradient(
-        B_Z, Z, axis=1, edge_order=2
-    )
+    divergence = np.gradient(
+        R_grid * B_R, R, axis=0, edge_order=2
+    ) / R_grid + np.gradient(B_Z, Z, axis=1, edge_order=2)
     assert_allclose(divergence, 0.0, atol=1e-10)
 
     # Tangent to the flux surfaces: B . grad(psi) = 0, with the exact derivatives
-    tangency = B_R * field.d_polflux_dR(R_grid, 0.0, Z_grid, DELTA) + B_Z * field.d_polflux_dZ(
+    tangency = B_R * field.d_polflux_dR(
         R_grid, 0.0, Z_grid, DELTA
-    )
+    ) + B_Z * field.d_polflux_dZ(R_grid, 0.0, Z_grid, DELTA)
     assert_allclose(tangency, 0.0, atol=1e-14)
 
     # Same direction of rotation as CircularCrossSectionField
