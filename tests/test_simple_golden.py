@@ -32,11 +32,6 @@ XFAIL_NO_TEMPERATURE = pytest.mark.xfail(
     "is no relativistic correction",
     strict=False,
 )
-XFAIL_X_MODE_ZERO_CROSSING = pytest.mark.xfail(
-    reason="TODO v4: K_R differs from v3 by ~2 where it crosses zero near "
-    "the cutoff (within 0.3% elsewhere); tolerance or physics to be decided",
-    strict=False,
-)
 XFAIL_INBOARD_LAUNCH = pytest.mark.xfail(
     reason="TODO v4: find_plasma_entry_position only searches up to "
     "max(q_launch_cartesian) along the ray, too short for inboard launches",
@@ -1121,6 +1116,35 @@ def check_Psi(
     assert_allclose(result[-1, ...], expected_final, rtol=1.8e-2, atol=0.1)
 
 
+def assert_ray_matches_golden(output, expected: dict, rtol=1e-2, atol=1e-2):
+    """Compare the ray with the golden values at matched tau.
+
+    The output grid is spaced tau_leave / (len_tau - 1), and tau_leave comes
+    from the ray solver's exit event, which at the default tolerance differs
+    between v3 and v4 by about 0.1%. Comparing the arrays index by index
+    therefore compares slightly different points, which near a zero crossing
+    of K_R (dK_R/dtau ~ 7 m^-1 here) gives differences of ~2 on values of
+    ~10. So tau is compared on its own, and every other array is interpolated
+    onto the golden tau first. On the same field, v3 and v4 at tight tolerance
+    agree to 3e-4 in K_R; at matched tau the default-tolerance run is within
+    0.1% of the golden values.
+    """
+    tau_key = "solver_output/tau"
+    tau_expected = expected[tau_key]
+    tau = np.asarray(output[tau_key])
+    assert_allclose(tau, tau_expected, rtol=rtol, atol=atol, err_msg=tau_key)
+
+    for key, value in expected.items():
+        if key == tau_key:
+            continue
+        result = np.asarray(output[key])
+        if np.ndim(value) == 0 or np.ndim(result) == 0:
+            assert_allclose(result, value, rtol=rtol, atol=atol, err_msg=key)
+        else:
+            matched = np.interp(tau_expected, tau, result)
+            assert_allclose(matched, value, rtol=rtol, atol=atol, err_msg=key)
+
+
 @pytest.mark.parametrize(
     "generator",
     [
@@ -1175,7 +1199,6 @@ def test_integrated_O_mode(tmp_path, generator):
         # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
-@XFAIL_X_MODE_ZERO_CROSSING
 def test_integrated_X_mode(tmp_path, generatorneg):
     """Golden answer test to check basic functionality using circular
     flux surfaces, mode flag set to -1."""
@@ -1189,8 +1212,7 @@ def test_integrated_X_mode(tmp_path, generatorneg):
 
     output = beam_me_up(**kwargs_dict)
 
-    for key, value in EXPECTED_NEG1.items():
-        assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
+    assert_ray_matches_golden(output, EXPECTED_NEG1)
 
     K_magnitude = np.hypot(
         output["solver_output/K_R_output"], output["solver_output/K_Z_output"]
@@ -1352,7 +1374,6 @@ def test_null_relativistic_O_mode(tmp_path, generator_nullrel):
         # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
-@XFAIL_X_MODE_ZERO_CROSSING
 def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
     """Golden answer test to check relativistic corrections with zero temperature array.
     Output should be identical to nonrelativistic outputs. Mode_flag = -1."""
@@ -1370,8 +1391,7 @@ def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
 
     output = beam_me_up(**kwargs_dict)
 
-    for key, value in EXPECTED_NEG1.items():
-        assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
+    assert_ray_matches_golden(output, EXPECTED_NEG1)
 
     K_magnitude = np.hypot(
         output["solver_output/K_R_output"], output["solver_output/K_Z_output"]

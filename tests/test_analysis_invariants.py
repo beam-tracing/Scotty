@@ -77,9 +77,10 @@ def test_dispersion_relation_satisfied_on_ray(steered_run, request):
         request.applymarker(
             pytest.mark.xfail(
                 strict=True,
-                reason="X-mode: the ray drifts to |H_Booker| ~ 4e-3 near the end "
-                "(also at toroidal angle 0); possibly the X-mode issue of the "
-                "XFAIL_X_MODE_ZERO_CROSSING golden tests",
+                reason="X-mode at 10 deg: |H_Booker| reaches ~4e-3 in the last few "
+                "points at the default rtol 1e-3 (5e-7 at rtol 1e-5): solver step "
+                "error on K ~ 1000 m^-1, not a Hamiltonian error. A tolerance-aware "
+                "check should replace this xfail",
             )
         )
     H_Booker = np.real(steered_run["analysis"]["H_Booker"].values)
