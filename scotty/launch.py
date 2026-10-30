@@ -31,6 +31,44 @@ from typing import cast, Optional, Tuple, Union, List, Literal
 log = logging.getLogger(__name__)
 
 
+def max_search_distance(
+    field: VALID_FIELDS, q_launch_cartesian: FloatArray
+) -> float:
+    r"""Length of launch line that reaches every point of the field's domain.
+
+    For a cylindrical field with grid R <= R_max, Z_min <= Z <= Z_max, any point
+    of the domain is within :math:`R_l + R_{max}` of the launch point
+    horizontally (triangle inequality through the axis, whatever the toroidal
+    angles), and within :math:`\max(|Z_{min} - Z_l|, |Z_{max} - Z_l|)`
+    vertically. For a Cartesian field it is the distance to the farthest
+    corner of the grid's box. This holds for inboard, outboard, off-midplane
+    and toroidally steered launches alike. v3 bounded the search the same
+    way; v4 had used max(q_launch_cartesian), which is not a length.
+    """
+    X_l, Y_l, Z_l = q_launch_cartesian
+    if isinstance(field, MagneticField_Cylindrical):
+        R_coord = getattr(field, "R_coord", None)
+        Z_coord = getattr(field, "Z_coord", None)
+        if R_coord is not None and Z_coord is not None:
+            horizontal = np.hypot(X_l, Y_l) + np.max(R_coord)
+            vertical = max(abs(np.min(Z_coord) - Z_l), abs(np.max(Z_coord) - Z_l))
+            return float(np.hypot(horizontal, vertical))
+    else:
+        coords = [getattr(field, f"{k}_coord", None) for k in "XYZ"]
+        if all(c is not None for c in coords):
+            extents = [(np.min(c), np.max(c)) for c in coords]
+            corners = np.array(np.meshgrid(*extents)).reshape(3, -1).T
+            distances = np.linalg.norm(corners - q_launch_cartesian, axis=1)
+            return float(np.max(distances))
+
+    distance = max(2 * float(np.linalg.norm(q_launch_cartesian)), 1.0)
+    log.warning(
+        f"{type(field).__name__} has no grid coordinates, so the plasma entry "
+        f"search along the launch line uses {distance:.3f} m"
+    )
+    return distance
+
+
 def find_plasma_entry_position(
     poloidal_launch_angle_deg_Torbeam: float,
     toroidal_launch_angle_deg_Torbeam: float,
@@ -40,7 +78,11 @@ def find_plasma_entry_position(
     poloidal_flux_enter: float,
     boundary_adjust: float = 1e-6,
 ) -> FloatArray:
-    r"""Returns `q_initial` in cartesian or cylindrical"""
+    r"""Returns `q_initial` in cartesian or cylindrical.
+
+    As in v3, the launch angles are taken in the TORBEAM convention for an
+    antenna at zeta = 0: the launch line's direction, like the launch K, is
+    measured from the X axis, so `q_launch` should have zeta = 0 (Y = 0)."""
 
     log.info(f"Finding plasma entry position")
 
@@ -61,11 +103,12 @@ def find_plasma_entry_position(
     if isinstance(field, MagneticField_Cylindrical):
         cart = False
         q_launch_cartesian = find_q_labframe_cyl_to_cart(q_launch)
-        max_dist = max(q_launch_cartesian)
     else:  # isinstance(field, MagneticField_Cartesian):
         cart = True
         q_launch_cartesian = q_launch
-        max_dist = max(q_launch_cartesian)
+    max_dist = max_search_distance(
+        field, np.asarray(q_launch_cartesian, dtype=float)
+    )
 
     # Defining some wrapper functions for ease
     def _ray_line_wrapper(tau):
@@ -74,14 +117,8 @@ def find_plasma_entry_position(
     def _poloidal_flux_difference_along_ray_line_wrapper(tau):
         return poloidal_flux_difference_along_ray_line(*q_launch_cartesian, tau, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam, field.polflux_cartesian, poloidal_flux_enter)  # type: ignore
 
-    # Given a particular field configuration, we find the maximum
-    # distance that can be travelled by a ray before 'striking the
-    # centre column', then parametrise the path into sections of
-    # 0.01m each, and find how many are needed. We also insist that
-    # there are at least 100 steps
-    # TODO: `max_dist = max(q_launch_cartesian)` assumes an outboard launch
-    # heading inwards. For inboard launches (e.g. R = 0.1 m) the search is
-    # far too short to reach the plasma; see "Known issues in v4" in README
+    # Search the launch line up to the far side of the field's domain
+    # (max_search_distance), in sections of 0.01 m, with at least 100 steps
 
     num_tau = int(max(max_dist / 0.01, 100))
     tau_arr = np.linspace(0, max_dist, num_tau)

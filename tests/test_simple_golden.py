@@ -34,11 +34,6 @@ XFAIL_CUTOFF_PSI_REL_X = pytest.mark.xfail(
     "cut-off Psi for this case was never updated in v3 either ('Not yet modified')",
     strict=False,
 )
-XFAIL_INBOARD_LAUNCH = pytest.mark.xfail(
-    reason="TODO v4: find_plasma_entry_position only searches up to "
-    "max(q_launch_cartesian) along the ray, too short for inboard launches",
-    strict=False,
-)
 XFAIL_LAUNCH_INTERFACE = pytest.mark.xfail(
     reason="TODO v4: profile_fit no longer accepts ProfileFit objects, and "
     "find_plasma_entry_parameters now needs the Hamiltonians",
@@ -1690,7 +1685,6 @@ def launch_parameters(start_point, end_point_poloidal_coords):
     ),
 )
 def test_find_plasma_entry_position(
-    request,
     tmp_path,
     generator,
     launch_position,
@@ -1698,11 +1692,6 @@ def test_find_plasma_entry_position(
     toroidal_launch_angle,
     expected_entry,
 ):
-    # The interpolated fields all fail this way; the analytic ones pass
-    interpolated = (torbeam_file, npz_file, UDA_saved)
-    if generator in interpolated and "inboard" in request.node.callspec.id:
-        request.applymarker(XFAIL_INBOARD_LAUNCH)
-
     args = generator(tmp_path)
     field = make_field(args)
     poloidal_flux_enter = args["poloidal_flux_enter"]
