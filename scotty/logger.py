@@ -38,6 +38,12 @@ def _add_log_level(levelname, levelvalue):
         _valid_log_level_dict[levelname] = levelvalue
 
 
+# Register "trace" (level 5) on import, not only in config_logger: modules
+# call log.trace, so scotty functions used without beam_me_up (scripts,
+# tests run on their own) would otherwise fail with AttributeError
+_add_log_level("trace", 5)
+
+
 def _validate_log_level(log_level: Union[str, int], log_location: str) -> int:
 
     if isinstance(log_level, str):
