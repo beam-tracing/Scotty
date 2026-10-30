@@ -187,7 +187,7 @@ def find_auto_delta_signs(
     # Now, we also perform auto_delta_sign checks (if the user specifies)
     # If the user does not want to flip the signs, just return them
     # Otherwise, check which geometry is being used and check the signs
-    if auto_delta_sign:
+    if not auto_delta_sign:
         return deltas
 
     log.info(f"Setting delta signs")

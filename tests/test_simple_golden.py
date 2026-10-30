@@ -5,7 +5,11 @@ from scotty.geometry import CircularCrossSectionField, MagneticField_Cylindrical
 from scotty.fun_general import freq_GHz_to_angular_frequency
 from scotty.profile_fit import QuadraticFit
 from scotty.hamiltonian import Hamiltonian
-from scotty.launch import find_plasma_entry_position, find_plasma_entry_parameters
+from scotty.launch import (
+    find_auto_delta_signs,
+    find_plasma_entry_position,
+    find_plasma_entry_parameters,
+)
 from scotty.typing import FloatArray
 
 import json
@@ -1631,6 +1635,51 @@ def test_find_plasma_entry_position_bug(tmp_path):
     )
 
     assert np.isclose(zeta, 0.0)
+
+
+@pytest.mark.parametrize(
+    ("q_initial", "expected_signs"),
+    [
+        # Outboard, below the midplane: the plasma is at smaller R and larger Z
+        pytest.param(np.array([1.99, 0, -0.08]), (-1, 1), id="outboard-below"),
+        # Outboard, above the midplane: smaller R and smaller Z
+        pytest.param(np.array([1.99, 0, 0.08]), (-1, -1), id="outboard-above"),
+        # Inboard, above the midplane: larger R and smaller Z
+        pytest.param(np.array([1.01, 0, 0.08]), (1, -1), id="inboard-above"),
+    ],
+)
+def test_auto_delta_signs_point_into_plasma(tmp_path, q_initial, expected_signs):
+    """With `auto_delta_sign`, the finite-difference steps used for the
+    one-sided Hamiltonian derivatives must point into the plasma, or the
+    boundary conditions use the vacuum side of the density discontinuity"""
+    field = make_field(simple(tmp_path))
+    deltas = np.array([1e-4, 1e-4])
+
+    flipped = find_auto_delta_signs(True, q_initial, deltas, field)
+    assert_allclose(flipped, np.array(expected_signs) * 1e-4)
+
+    unchanged = find_auto_delta_signs(False, q_initial, deltas, field)
+    assert_allclose(unchanged, deltas)
+
+
+def test_beam_me_up_uses_flipped_deltas(tmp_path):
+    """The flipped steps must reach the Hamiltonian, not just the saved
+    inputs: the initial Psi then matches v3's (which used delta_R < 0)"""
+    kwargs_dict = simple(tmp_path)
+    kwargs_dict["figure_flag"] = False
+    kwargs_dict["len_tau"] = 10
+    kwargs_dict["output_path"] = tmp_path
+    kwargs_dict["delta_R"] = 1e-4  # pointing out of the plasma at entry
+
+    output = beam_me_up(**kwargs_dict)
+
+    assert float(output["inputs/delta_R"]) < 0
+    assert_allclose(
+        output["solver_output/Psi_3D_output_labframe_cylindrical"][0],
+        PSI_START_EXPECTED_1,
+        rtol=1e-3,
+        atol=0.1,
+    )
 
 
 # @pytest.mark.parametrize(

@@ -295,6 +295,9 @@ def beam_me_up(
         params.delta_R, params.delta_Z = spatial_deltas
     elif params.geometry == "cartesian":
         params.delta_X, params.delta_Y, params.delta_Z = spatial_deltas
+    # The Hamiltonians below take their spacings from `params.deltas`, so
+    # update its spatial part as well
+    params.deltas = np.concatenate([spatial_deltas, params.deltas[-3:]])
 
     # Initialises the Hamiltonian H for `mode_flag`s +1 and -1
     (
