@@ -49,10 +49,10 @@ def parameters_DBS_NSTX_MAST(launch_freq_GHz: float) -> dict:
         "launch_position": np.array([2.43521, 0, 0]),
         "launch_beam_width": launch_beam.width,
         "launch_beam_curvature": launch_beam.curvature,
-        "Psi_BC_flag": "continuous",
+        "geometry": "cylindrical",
+        "launch_flag": "vacuum",
+        "boundary_flag": "continuous",
         "figure_flag": True,
-        "vacuum_propagation_flag": True,
-        "vacuumLaunch_flag": True,
     }
 
 
@@ -67,10 +67,10 @@ def parameters_DBS_UCLA_MAST_U(launch_freq_GHz: float) -> dict:
         "launch_position": np.array([2.278, 0, -0.01]),
         "launch_beam_width": launch_beam.width,
         "launch_beam_curvature": launch_beam.curvature,
-        "Psi_BC_flag": "continuous",
+        "geometry": "cylindrical",
+        "launch_flag": "vacuum",
+        "boundary_flag": "continuous",
         "figure_flag": True,
-        "vacuum_propagation_flag": True,
-        "vacuumLaunch_flag": True,
     }
 
 
@@ -87,10 +87,10 @@ def parameters_DBS_SWIP_MAST_U(launch_freq_GHz: float) -> dict:
         "launch_beam_curvature": launch_beam.curvature,
         # I'm checking what this actually is from Peng. Currently using the
         # MAST UCLA DBS as a guide
-        "Psi_BC_flag": "continuous",
+        "geometry": "cylindrical",
+        "launch_flag": "vacuum",
+        "boundary_flag": "continuous",
         "figure_flag": True,
-        "vacuum_propagation_flag": True,
-        "vacuumLaunch_flag": True,
     }
 
 
@@ -103,10 +103,10 @@ def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
         "launch_position": np.array([2.587, 0, -0.0157]),
         "launch_beam_width": launch_beam.width,
         "launch_beam_curvature": launch_beam.curvature,
-        "Psi_BC_flag": "continuous",
+        "geometry": "cylindrical",
+        "launch_flag": "vacuum",
+        "boundary_flag": "continuous",
         "figure_flag": True,
-        "vacuum_propagation_flag": True,
-        "vacuumLaunch_flag": True,
     }
 
 
@@ -125,10 +125,10 @@ def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
         "launch_position": np.array([2.587, 0, -0.0157]),
         "density_fit_method": ne_fit,
         "find_B_method": "analytical",
-        "Psi_BC_flag": "continuous",
+        "geometry": "cylindrical",
+        "launch_flag": "vacuum",
+        "boundary_flag": "continuous",
         "figure_flag": False,
-        "vacuum_propagation_flag": True,
-        "vacuumLaunch_flag": True,
         "poloidal_flux_zero_density": poloidal_flux_zero_density,
         "poloidal_flux_enter": 1.0,
         "B_T_axis": 1.0,

@@ -73,10 +73,10 @@ def test_parameters_DBS_NSTX_MAST():
         "launch_beam_width": 0.03629814335,
         "launch_beam_curvature": -0.7714837802263125,
         "launch_position": np.array([2.43521, 0.0, 0.0]),
-        "Psi_BC_flag": "continuous",
+        "geometry": "cylindrical",
+        "launch_flag": "vacuum",
+        "boundary_flag": "continuous",
         "figure_flag": True,
-        "vacuum_propagation_flag": True,
-        "vacuumLaunch_flag": True,
     }
     assert sorted(expected.keys()) == sorted(parameters.keys())
     for key, value in expected.items():
@@ -99,10 +99,10 @@ def test_parameters_DBS_UCLA_DIII_D_240():
         "launch_beam_width": 0.02173742019305591,
         "launch_beam_curvature": -1.2659055507320647,
         "launch_position": np.array([2.587, 0.0, -0.0157]),
-        "Psi_BC_flag": "continuous",
+        "geometry": "cylindrical",
+        "launch_flag": "vacuum",
+        "boundary_flag": "continuous",
         "figure_flag": True,
-        "vacuum_propagation_flag": True,
-        "vacuumLaunch_flag": True,
     }
     assert sorted(expected.keys()) == sorted(parameters.keys())
     for key, value in expected.items():

@@ -24,15 +24,9 @@ TODO_V4 = pytest.mark.skip(reason="TODO: find_B_method not yet ported to v4")
 
 
 def synthetic_parameters() -> dict:
-    """The DBS_synthetic preset, with its v3 launch flags replaced by the
-    v4 equivalents and the v3 interpolation settings the expected values
-    were generated with"""
+    """The DBS_synthetic preset, with the v3 interpolation smoothing the
+    expected values were generated with (v4 defaults to 5)"""
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
-    del kwargs_dict["vacuumLaunch_flag"]
-    del kwargs_dict["vacuum_propagation_flag"]
-    kwargs_dict["boundary_flag"] = kwargs_dict.pop("Psi_BC_flag")
-    kwargs_dict["geometry"] = "cylindrical"
-    kwargs_dict["launch_flag"] = "vacuum"
     kwargs_dict["interp_smoothing"] = 0
     return kwargs_dict
 
