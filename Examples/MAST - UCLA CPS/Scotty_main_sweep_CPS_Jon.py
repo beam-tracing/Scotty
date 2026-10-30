@@ -66,13 +66,13 @@ for ii, equil_time in enumerate(equil_times):
                     kwargs_dict["density_fit_parameters"] = None
                     kwargs_dict[
                         "ne_data_path"
-                    ] = "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST\\"
+                    ] = "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST\\"
                     kwargs_dict["input_filename_suffix"] = (
                         "_CPS_Jon_avr_" + f"{equil_time*1000:.0f}" + "ms"
                     )
                     kwargs_dict[
                         "magnetic_data_path"
-                    ] = "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST\\"
+                    ] = "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST\\"
 
                     kwargs_dict["poloidal_flux_enter"] = 1.03857452**2
                     kwargs_dict["Psi_BC_flag"] = True

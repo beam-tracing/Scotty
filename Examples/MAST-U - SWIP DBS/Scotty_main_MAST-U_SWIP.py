@@ -32,7 +32,7 @@ kwargs_dict['toroidal_launch_angle_Torbeam'] = toroidal_launch_angle_Torbeam
 kwargs_dict['poloidal_flux_enter'] = 1.22
 # kwargs_dict['output_path'] = os.path.dirname(os.path.abspath(__file__)) + '\\Output\\'
 kwargs_dict['density_fit_parameters'] = None
-kwargs_dict['ne_data_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\'
+kwargs_dict['ne_data_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST-U\\'
 kwargs_dict['input_filename_suffix'] = '_45304_780ms'
 
 kwargs_dict['figure_flag'] = False

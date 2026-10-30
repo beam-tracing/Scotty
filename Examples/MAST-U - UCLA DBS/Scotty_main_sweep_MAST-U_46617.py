@@ -96,10 +96,10 @@ for ii, equil_time in enumerate(equil_times):
                     kwargs_dict["density_fit_parameters"] = None
                     kwargs_dict[
                         "ne_data_path"
-                    ] = "D:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\"
+                    ] = "D:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST-U\\"
                     kwargs_dict[
                         "magnetic_data_path"
-                    ] = "D:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\"
+                    ] = "D:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST-U\\"
                     kwargs_dict["input_filename_suffix"] = (
                         "_" + str(kwargs_dict["shot"]) + "_" + f"{equil_time*1000:.0f}" + "ms"
                     )
