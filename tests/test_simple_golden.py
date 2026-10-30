@@ -968,6 +968,46 @@ def UDA_saved(path: pathlib.Path):
     return kwargs_dict
 
 
+
+def EFITpp_file(path: pathlib.Path):
+    """find_B_method = "EFITpp": a synthetic efitOut.nc with EFIT++'s layout"""
+    import h5py
+
+    kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
+
+    R_axis = kwargs_dict["R_axis"]
+    minor_radius = kwargs_dict["minor_radius_a"]
+    B_p_a = kwargs_dict["B_p_a"]
+
+    # A physically consistent file: the unnormalised flux is psi_unnorm =
+    # (psi_boundary - psi_axis) psi_norm, with psi_boundary - psi_axis = -B_p_a
+    # as in UDA_saved, so from_EFITpp's linear fit gives dpsi_norm/dpsi = 1/slope
+    slope = -B_p_a
+    R_midplane = np.linspace(R_axis, R_axis + minor_radius)
+    psi_norm_1D = np.linspace(0, 1, len(R_midplane))
+    rBphi = R_midplane * field.B_T(R_midplane, 0.0)
+    time = [100, 200, 300]
+
+    # Written with h5py: h5netcdf's legacy API cannot write (or read)
+    # variables two groups deep. EFIT++ output is netCDF4, i.e. HDF5
+    with h5py.File(path / "efitOut.nc", "w") as efitpp:
+        efitpp["time"] = time
+        profiles2D = efitpp.create_group("output/profiles2D")
+        profiles2D["poloidalFlux"] = add_timeslices(psi * slope)
+        profiles2D["r"] = add_timeslices(field.R_coord)
+        profiles2D["z"] = add_timeslices(field.Z_coord)
+        flux = efitpp.create_group("output/fluxFunctionProfiles")
+        flux["normalizedPoloidalFlux"] = psi_norm_1D
+        flux["poloidalFlux"] = add_timeslices(psi_norm_1D * slope)
+        flux["rBphi"] = add_timeslices(rBphi)
+
+    kwargs_dict["find_B_method"] = "EFITpp"
+    kwargs_dict["magnetic_data_path"] = path
+    kwargs_dict["equil_time"] = time[1]
+    kwargs_dict["delta_R"] = -0.0001
+    kwargs_dict["delta_Z"] = 0.0001
+    return kwargs_dict
+
 def UDA_saved_MAST_U(path: pathlib.Path):
     """find_B_method = "UDA_saved" with shot = None"""
     kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
@@ -1295,6 +1335,7 @@ def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
         pytest.param(npz_notime_file, id="test_notime-file"),
         pytest.param(UDA_saved, id="UDA-saved-file"),
         pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file"),
+        pytest.param(EFITpp_file, id="EFITpp-file"),
     ],
 )
 def test_create_magnetic_geometry(tmp_path, generator):
@@ -1321,8 +1362,15 @@ def test_create_magnetic_geometry(tmp_path, generator):
     )
 
 
-def test_EFIT_geometry(tmp_path):
-    kwargs_dict = UDA_saved(tmp_path)
+@pytest.mark.parametrize(
+    "generator",
+    [
+        pytest.param(UDA_saved, id="UDA-saved-file"),
+        pytest.param(EFITpp_file, id="EFITpp-file"),
+    ],
+)
+def test_EFIT_geometry(tmp_path, generator):
+    kwargs_dict = generator(tmp_path)
     field = create_magnetic_geometry(**kwargs_dict)
     field_golden = create_magnetic_geometry(**simple(tmp_path))
 
