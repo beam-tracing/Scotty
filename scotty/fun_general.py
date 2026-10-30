@@ -846,6 +846,57 @@ def find_Booker_terms(
     return toreturn
 
 
+def find_Booker_discriminant(
+    launch_angular_freq: float,
+    B_total: ArrayLike,
+    sin_theta_m_sq: ArrayLike,
+    electron_density: ArrayLike,
+    temperature: Optional[ArrayLike] = None,
+) -> ArrayLike:
+    r"""
+    The discriminant of the Booker quartic, :math:`\beta^2 - 4 \alpha \gamma`,
+    written as a sum of squares:
+
+    .. math::
+
+        \beta^2 - 4\alpha\gamma = (\epsilon_\perp^2 - \epsilon_g^2 - \epsilon_\parallel \epsilon_\perp)^2 \cos^4\theta_m
+                                  + 4 \epsilon_\parallel^2 \epsilon_g^2 \sin^2\theta_m
+
+    (Stix, Waves in Plasmas, eq. 1-27, with sin(theta_m) in place of Stix's
+    cos(theta)). This is identical to ``beta**2 - 4*alpha*gamma`` as a
+    polynomial, but it is never negative, and it does not cancel near zero
+    density, where the two roots nearly coincide. There ``beta**2 - 4*alpha*gamma``
+    is a small difference of O(1) numbers, and its square root turns rounding
+    into noise of order ``eps * beta**2 / (4 |alpha| sqrt(disc))`` in H, which
+    grows like 1/X towards the plasma edge and spoils finite differences of H.
+
+    Parameters
+    ----------
+    launch_angular_freq : float
+        Angular frequency, in rad/s, at launch
+    B_total : ArrayLike
+        Magnitude of the magnetic field, in Tesla
+    sin_theta_m_sq : ArrayLike
+        ( sin(theta_m) )^2
+    electron_density : ArrayLike
+        Electron density, in 10^19 m^-3
+    temperature : ArrayLike or None
+        Temperature, in keV
+
+    Returns
+    ----------
+    ArrayLike
+        The discriminant, non-negative
+    """
+    epsilon_para, epsilon_perp, epsilon_g = find_epsilon_terms(
+        launch_angular_freq, B_total, electron_density, temperature
+    )
+    cos_theta_m_sq = 1 - sin_theta_m_sq
+    return (epsilon_perp**2 - epsilon_g**2 - epsilon_para * epsilon_perp) ** 2 * (
+        cos_theta_m_sq**2
+    ) + 4 * epsilon_para**2 * epsilon_g**2 * sin_theta_m_sq
+
+
 def find_Booker_alpha(
     launch_angular_freq: float,
     B_total: ArrayLike,

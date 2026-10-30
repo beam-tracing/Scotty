@@ -17,6 +17,7 @@ from scotty.fun_general import (
     find_K_labframe_cyl_to_cart,
     find_Psi_3D_labframe_cart_to_cyl,
     find_Psi_3D_labframe_cyl_to_cart,
+    find_Booker_discriminant,
     find_Booker_terms,
 )
 from scotty.hamiltonian import Hamiltonian
@@ -108,13 +109,16 @@ def find_H_bar(
         temperature=temperature,
     )
 
+    H_discriminant = find_Booker_discriminant(
+        launch_angular_freq=launch_angular_frequency,
+        B_total=B_magnitude,
+        sin_theta_m_sq=sin_theta_m_sq,
+        electron_density=electron_density,
+        temperature=temperature,
+    )
+
     return K_magnitude**2 + K_0**2 * (
-        (
-            Booker_beta
-            - mode_flag
-            * np.sqrt(max(0, Booker_beta**2 - 4 * Booker_alpha * Booker_gamma))
-        )
-        / (2 * Booker_alpha)
+        (Booker_beta - mode_flag * np.sqrt(H_discriminant)) / (2 * Booker_alpha)
     )
 
 
@@ -306,19 +310,20 @@ def find_K_plasma(
         K_parallel_actual = np.dot(K_vacuum_actual, parallel_unitvector1)  # toroidal
         K_binormal_actual = np.dot(K_vacuum_actual, binormal_unitvector)  # poloidal
 
+        H_discriminant = find_Booker_discriminant(
+            launch_angular_freq=angular_freq,
+            B_total=B_magnitude,
+            sin_theta_m_sq=sin_theta_m_sq,
+            electron_density=electron_density_p,
+            temperature=temperature,
+        )
         K_normal_plasma_actual_initial_guess = np.sqrt(
             abs(
                 K_parallel_actual**2
                 + K_binormal_actual**2
                 + K0**2
                 * (
-                    (
-                        Booker_beta
-                        - mode_flag
-                        * np.sqrt(
-                            max(0, Booker_beta**2 - 4 * Booker_alpha * Booker_gamma)
-                        )
-                    )
+                    (Booker_beta - mode_flag * np.sqrt(H_discriminant))
                     / (2 * Booker_alpha)
                 )
             )

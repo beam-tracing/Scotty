@@ -8,6 +8,7 @@ from scotty.fun_general import (
     find_normalised_gyro_ang_freq,
     angular_frequency_to_wavenumber,
     dot,
+    find_Booker_discriminant,
     find_Booker_terms,
     reshape_33N_to_N33,
 )
@@ -230,8 +231,15 @@ class Hamiltonian:
             temperature=temperature,
         )
 
-        H_discriminant = np.maximum(
-            np.zeros_like(Booker_beta), Booker_beta**2 - 4 * Booker_alpha * Booker_gamma
+        # Sum-of-squares form of beta**2 - 4*alpha*gamma: identical as a
+        # polynomial, but free of the cancellation near zero density that puts
+        # rounding noise into H at the plasma edge
+        H_discriminant = find_Booker_discriminant(
+            launch_angular_freq=self.angular_frequency,
+            B_total=B_magnitude,
+            sin_theta_m_sq=sin_theta_m_sq,
+            electron_density=electron_density,
+            temperature=temperature,
         )
 
         H_Booker = (K_magnitude / self.wavenumber) ** 2 + (
