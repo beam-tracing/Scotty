@@ -1769,12 +1769,12 @@ def reshape_33N_to_N33(array: FloatArray):
 def find_Rayleigh_length(waist: float, wavenumber: float):
     """
     Finds the Rayleigh length (assumes vacuum propagation and circular beam)
-    
+
     Parameters
     ----------
     waist : float
     wavenumber : float
-    
+
     Returns
     ----------
     rayleigh_length : float
@@ -1821,7 +1821,9 @@ def find_distance_from_waist(width: float, wavenumber: float, curvature: float):
     )
 
 
-def propagate_beam(Psi_w_cartesian: ComplexFloatArray, propagation_distance: float, freq_GHz: float) -> ComplexFloatArray:
+def propagate_beam(
+    Psi_w_cartesian: ComplexFloatArray, propagation_distance: float, freq_GHz: float
+) -> ComplexFloatArray:
     """
     Uses the vacuum solution of the beam tracing equations to propagate the beam
     (works for arbitrary Gaussian beam in vacuum)
@@ -1841,8 +1843,7 @@ def propagate_beam(Psi_w_cartesian: ComplexFloatArray, propagation_distance: flo
     Psi_w_inv_cartesian = find_inverse_2D(Psi_w_cartesian)
 
     Psi_w_inv_final_cartesian = (
-        propagation_distance / (wavenumber_K0) * np.eye(2)
-        + Psi_w_inv_cartesian
+        propagation_distance / (wavenumber_K0) * np.eye(2) + Psi_w_inv_cartesian
     )
 
     Psi_w_final_cartesian = find_inverse_2D(Psi_w_inv_final_cartesian)
@@ -1850,7 +1851,9 @@ def propagate_beam(Psi_w_cartesian: ComplexFloatArray, propagation_distance: flo
     return cast(ComplexFloatArray, Psi_w_final_cartesian)
 
 
-def propagate_circular_beam(width: float, curvature: float, propagation_distance: float, freq_GHz: float) -> Tuple[float, float]:
+def propagate_circular_beam(
+    width: float, curvature: float, propagation_distance: float, freq_GHz: float
+) -> Tuple[float, float]:
     """
     Directly uses the width and curvature formulae to calculate circular
     beam propagation (assumes vacuum propagation and circular beam)
@@ -1895,12 +1898,12 @@ def use_deg_args(func, *args, **kwargs):
 def tilt_trns_RZ_make(t: float) -> FloatArray:
     """
     Tilts R ([1,0,0]) in to Z ([0,0,1]) using angle in radians
-            
+
     Parameters
     ----------
     t : float
         Tilt angle in radians
-    
+
     Returns
     ----------
     rot_matrix : (3,3) FloatArray
@@ -1914,12 +1917,12 @@ def tilt_trns_RZ_make(t: float) -> FloatArray:
 def tilt_trns_TZ_make(t: float) -> FloatArray:
     """
     Tilts T ([0,1,0]) in to Z ([0,0,1]) using angle in radians
-        
+
     Parameters
     ----------
     t : float
         Tilt angle in radians
-    
+
     Returns
     ----------
     rot_matrix : (3,3) FloatArray
@@ -1933,12 +1936,12 @@ def tilt_trns_TZ_make(t: float) -> FloatArray:
 def rot_trns_make(r: float) -> FloatArray:
     """
     Rotates R ([1,0,0]) into T ([0,1,0]) using angle in radians
-    
+
     Parameters
     ----------
     r : float
         Rotation angle in radians
-    
+
     Returns
     ----------
     rot_matrix : (3,3) FloatArray
@@ -1960,7 +1963,7 @@ def mirrornorm_make_with_rot_tilt_operators(r: float, t: float) -> FloatArray:
         Rotation angle in radians
     t : float
         Tilt angle in radians
-    
+
     Returns
     ----------
     mirrornorm : (3,) FloatArray
@@ -1983,7 +1986,7 @@ def mirrornorm_make(r: float, t: float) -> FloatArray:
         Rotation angle in radians
     t : float
         Tilt angle in radians
-    
+
     Returns
     ----------
     mirror_norm : (3,) FloatArray
@@ -2000,12 +2003,12 @@ def mirrornorm_make(r: float, t: float) -> FloatArray:
 def reflector_make_from_mirrornorm(mirrornorm: FloatArray) -> FloatArray:
     """
     Makes Householder (reflector) matrix for mirror using norm vector for mirror
-    
+
     Parameters
     ----------
     mirror_norm : (3,) FloatArray
         Mirror normal vector
-    
+
     Returns
     ----------
     reflector : (3,3) FloatArray
@@ -2018,14 +2021,14 @@ def reflector_make_from_mirrornorm(mirrornorm: FloatArray) -> FloatArray:
 def reflector_make(r: float, t: float) -> FloatArray:
     """
     Makes Householder (reflector) matrix for mirror using angles in radians
-    
+
     Parameters
     ----------
     r : float
         Rotation angle in radians
     t : float
         Tilt angle in radians
-    
+
     Returns
     ----------
     reflector : (3,3) FloatArray

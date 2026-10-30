@@ -9,7 +9,6 @@ import pytest
 from scipy import constants
 from unittest.mock import MagicMock
 
-
 k_q_R = 2.1
 k_q_Z = 3.2
 k_K_R = 4.3
@@ -24,8 +23,12 @@ class FakeHamiltonian(Hamiltonian):
     def __init__(self, delta_R, delta_Z, delta_K_R, delta_K_zeta, delta_K_Z):
         self.field = MagicMock(spec=MagneticField_Cylindrical)
         self.spacings = {
-            "q0": delta_R, "q1": delta_R, "q2": delta_Z,
-            "K0": delta_K_R, "K1": delta_K_zeta, "K2": delta_K_Z,
+            "q0": delta_R,
+            "q1": delta_R,
+            "q2": delta_Z,
+            "K0": delta_K_R,
+            "K1": delta_K_zeta,
+            "K2": delta_K_Z,
         }
 
     def __call__(self, q0, q1, q2, K0, K1, K2):

@@ -48,12 +48,12 @@ def test_fund_1(tmp_path):
         "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
-    output = beam_me_up(**kwargs_dict)["analysis"] # type: ignore
+    output = beam_me_up(**kwargs_dict)["analysis"]  # type: ignore
     assert_allclose(
         [
-            float(output["q_R"][-1]), # type: ignore
-            float(output["q_Z"][-1]), # type: ignore
-            float(output["q_zeta"][-1]), # type: ignore
+            float(output["q_R"][-1]),  # type: ignore
+            float(output["q_Z"][-1]),  # type: ignore
+            float(output["q_zeta"][-1]),  # type: ignore
         ],
         [1.9162396978780787, -0.05765344712076549, -7.654831340237264e-05],
         rtol=1e-2,
@@ -87,12 +87,12 @@ def test_fund_2(tmp_path):
         "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
-    output = beam_me_up(**kwargs_dict)["analysis"] # type: ignore
+    output = beam_me_up(**kwargs_dict)["analysis"]  # type: ignore
     assert_allclose(
         [
-            float(output["q_R"][-1]), # type: ignore
-            float(output["q_Z"][-1]), # type: ignore
-            float(output["q_zeta"][-1]), # type: ignore
+            float(output["q_R"][-1]),  # type: ignore
+            float(output["q_Z"][-1]),  # type: ignore
+            float(output["q_zeta"][-1]),  # type: ignore
         ],
         [1.9592789345742416, 0.10479082636734298, 2.669217726708174e-05],
         rtol=1e-2,
@@ -126,12 +126,12 @@ def test_fund_3(tmp_path):
         "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
-    output = beam_me_up(**kwargs_dict)["analysis"] # type: ignore
+    output = beam_me_up(**kwargs_dict)["analysis"]  # type: ignore
     assert_allclose(
         [
-            float(output["q_R"][-1]), # type: ignore
-            float(output["q_Z"][-1]), # type: ignore
-            float(output["q_zeta"][-1]), # type: ignore
+            float(output["q_R"][-1]),  # type: ignore
+            float(output["q_Z"][-1]),  # type: ignore
+            float(output["q_zeta"][-1]),  # type: ignore
         ],
         [1.9188624402871175, 0.1459755482521055, 0.0002667820559604742],
         rtol=1e-2,
@@ -165,12 +165,12 @@ def test_fund_4(tmp_path):
         "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
-    output = beam_me_up(**kwargs_dict)["analysis"] # type: ignore
+    output = beam_me_up(**kwargs_dict)["analysis"]  # type: ignore
     assert_allclose(
         [
-            float(output["q_R"][-1]), # type: ignore
-            float(output["q_Z"][-1]), # type: ignore
-            float(output["q_zeta"][-1]), # type: ignore
+            float(output["q_R"][-1]),  # type: ignore
+            float(output["q_Z"][-1]),  # type: ignore
+            float(output["q_zeta"][-1]),  # type: ignore
         ],
         [1.894834149051581, 0.023559742880371104, 2.6650767398267687e-06],
         rtol=1e-2,
@@ -204,12 +204,12 @@ def test_fund_5(tmp_path):
         "minor_radius_a": 0.7,
     }
     kwargs_dict["output_path"] = tmp_path
-    output = beam_me_up(**kwargs_dict)["analysis"] # type: ignore
+    output = beam_me_up(**kwargs_dict)["analysis"]  # type: ignore
     assert_allclose(
         [
-            float(output["q_R"][-1]), # type: ignore
-            float(output["q_Z"][-1]), # type: ignore
-            float(output["q_zeta"][-1]), # type: ignore
+            float(output["q_R"][-1]),  # type: ignore
+            float(output["q_Z"][-1]),  # type: ignore
+            float(output["q_zeta"][-1]),  # type: ignore
         ],
         [1.8959753930261396, -0.4072190857298863, -0.0004257007543867974],
         rtol=1e-2,
@@ -243,12 +243,12 @@ def test_fund_6(tmp_path):
         "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
-    output = beam_me_up(**kwargs_dict)["analysis"] # type: ignore
+    output = beam_me_up(**kwargs_dict)["analysis"]  # type: ignore
     assert_allclose(
         [
-            float(output["q_R"][-1]), # type: ignore
-            float(output["q_Z"][-1]), # type: ignore
-            float(output["q_zeta"][-1]), # type: ignore
+            float(output["q_R"][-1]),  # type: ignore
+            float(output["q_Z"][-1]),  # type: ignore
+            float(output["q_zeta"][-1]),  # type: ignore
         ],
         [1.0983935588516547, 0.26638074344861923, 3.1415778015244564],
         rtol=1e-2,
@@ -288,12 +288,12 @@ def test_sec_harm_1(tmp_path):
         "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
-    output = beam_me_up(**kwargs_dict)["analysis"] # type: ignore
+    output = beam_me_up(**kwargs_dict)["analysis"]  # type: ignore
     assert_allclose(
         [
-            float(output["q_R"][-1]), # type: ignore
-            float(output["q_Z"][-1]), # type: ignore
-            float(output["q_zeta"][-1]), # type: ignore
+            float(output["q_R"][-1]),  # type: ignore
+            float(output["q_Z"][-1]),  # type: ignore
+            float(output["q_zeta"][-1]),  # type: ignore
         ],
         [1.9249442300308424, -0.015775382056218094, -1.0554438814446962e-05],
         rtol=1e-2,
@@ -327,12 +327,12 @@ def test_sec_harm_2(tmp_path):
         "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
-    output = beam_me_up(**kwargs_dict)["analysis"] # type: ignore
+    output = beam_me_up(**kwargs_dict)["analysis"]  # type: ignore
     assert_allclose(
         [
-            float(output["q_R"][-1]), # type: ignore
-            float(output["q_Z"][-1]), # type: ignore
-            float(output["q_zeta"][-1]), # type: ignore
+            float(output["q_R"][-1]),  # type: ignore
+            float(output["q_Z"][-1]),  # type: ignore
+            float(output["q_zeta"][-1]),  # type: ignore
         ],
         [1.8406422101660265, -0.15099269051484762, -0.00044930268212935675],
         rtol=1e-2,
@@ -366,12 +366,12 @@ def test_sec_harm_3(tmp_path):
         "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
-    output = beam_me_up(**kwargs_dict)["analysis"] # type: ignore
+    output = beam_me_up(**kwargs_dict)["analysis"]  # type: ignore
     assert_allclose(
         [
-            float(output["q_R"][-1]), # type: ignore
-            float(output["q_Z"][-1]), # type: ignore
-            float(output["q_zeta"][-1]), # type: ignore
+            float(output["q_R"][-1]),  # type: ignore
+            float(output["q_Z"][-1]),  # type: ignore
+            float(output["q_zeta"][-1]),  # type: ignore
         ],
         [1.8013024517505818, -0.16041011588294915, 0.029613857265963682],
         rtol=1e-2,
@@ -405,12 +405,12 @@ def test_sec_harm_4(tmp_path):
         "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
-    output = beam_me_up(**kwargs_dict)["analysis"] # type: ignore
+    output = beam_me_up(**kwargs_dict)["analysis"]  # type: ignore
     assert_allclose(
         [
-            float(output["q_R"][-1]), # type: ignore
-            float(output["q_Z"][-1]), # type: ignore
-            float(output["q_zeta"][-1]), # type: ignore
+            float(output["q_R"][-1]),  # type: ignore
+            float(output["q_Z"][-1]),  # type: ignore
+            float(output["q_zeta"][-1]),  # type: ignore
         ],
         [1.4028531737131118, -0.34622305181939556, -2.9534075602992305],
         rtol=1e-2,
@@ -444,12 +444,12 @@ def test_sec_harm_5(tmp_path):
         "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
-    output = beam_me_up(**kwargs_dict)["analysis"] # type: ignore
+    output = beam_me_up(**kwargs_dict)["analysis"]  # type: ignore
     assert_allclose(
         [
-            float(output["q_R"][-1]), # type: ignore
-            float(output["q_Z"][-1]), # type: ignore
-            float(output["q_zeta"][-1]), # type: ignore
+            float(output["q_R"][-1]),  # type: ignore
+            float(output["q_Z"][-1]),  # type: ignore
+            float(output["q_zeta"][-1]),  # type: ignore
         ],
         [1.7972393930018864, -0.04033405267167445, 3.142860330914468],
         rtol=1e-2,
@@ -483,12 +483,12 @@ def test_sec_harm_6(tmp_path):
         "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
-    output = beam_me_up(**kwargs_dict)["analysis"] # type: ignore
+    output = beam_me_up(**kwargs_dict)["analysis"]  # type: ignore
     assert_allclose(
         [
-            float(output["q_R"][-1]), # type: ignore
-            float(output["q_Z"][-1]), # type: ignore
-            float(output["q_zeta"][-1]), # type: ignore
+            float(output["q_R"][-1]),  # type: ignore
+            float(output["q_Z"][-1]),  # type: ignore
+            float(output["q_zeta"][-1]),  # type: ignore
         ],
         [1.9247988276944217, -0.1334200438972866, 0.00010847150538311593],
         rtol=1e-2,

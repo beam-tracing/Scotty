@@ -9,7 +9,6 @@ from scotty.profile_fit import (
     profile_fit,
 )
 
-
 # Parameters for profile fits
 CENTRAL_DENSITY = 2.0
 LCFS = 1.0
