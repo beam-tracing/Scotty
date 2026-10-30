@@ -214,7 +214,7 @@ def test_K_magnitude():
     ),
 )
 def test_cartesian_to_cylindrical(cartesian, expected_cylindrical):
-    cylindrical = find_q_labframe_cart_to_cyl(*cartesian)
+    cylindrical = find_q_labframe_cart_to_cyl(np.array(cartesian))
     npt.assert_allclose(cylindrical, expected_cylindrical)
 
 
@@ -228,5 +228,5 @@ def test_cartesian_to_cylindrical(cartesian, expected_cylindrical):
     ),
 )
 def test_cylindrical_to_cylindrical(cylindrical, expected_cartesian):
-    cartesian = find_q_labframe_cyl_to_cart(*cylindrical)
+    cartesian = find_q_labframe_cyl_to_cart(np.array(cylindrical))
     npt.assert_allclose(cartesian, expected_cartesian, atol=1e-15)

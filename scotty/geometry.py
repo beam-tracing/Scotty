@@ -959,6 +959,10 @@ def create_magnetic_geometry(
 
         if find_B_method == "analytical":
             log.debug("Using analytical constant current density geometry")
+            B_T_axis = kwargs.get("B_T_axis")
+            R_axis = kwargs.get("R_axis")
+            minor_radius_a = kwargs.get("minor_radius_a")
+            B_p_a = kwargs.get("B_p_a")
             if B_T_axis is None:
                 raise ValueError(missing_arg("B_T_axis"))
             if R_axis is None:
