@@ -24,7 +24,6 @@ from typing import cast
 np.set_printoptions(linewidth=120, threshold=100)
 
 # Magnetic field sources from v3 that have not been ported to v4 yet
-TODO_V4 = pytest.mark.skip(reason="TODO: find_B_method not yet ported to v4")
 
 # Known v4 failures, tracked in the README ("Known issues in v4"). These are
 # non-strict, so a test that starts passing is reported as XPASS
@@ -1090,7 +1089,7 @@ def check_Psi(
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
-        pytest.param(npz_file, id="test-file", marks=TODO_V4),
+        pytest.param(npz_file, id="test-file"),
         # Following methods have errors of 30%, despite field being
         # idential to 1%, needs investigating
         # pytest.param(UDA_saved, id="UDA-saved-file"),
@@ -1132,7 +1131,7 @@ def test_integrated_O_mode(tmp_path, generator):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
-        pytest.param(npz_file, id="test-file", marks=TODO_V4),
+        pytest.param(npz_file, id="test-file"),
         # Following methods have errors of 30%, despite field being
         # idential to 1%, needs investigating
         # pytest.param(UDA_saved, id="UDA-saved-file"),
@@ -1175,7 +1174,7 @@ def test_integrated_X_mode(tmp_path, generatorneg):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
-        pytest.param(npz_file, id="test-file", marks=TODO_V4),
+        pytest.param(npz_file, id="test-file"),
         # Following methods have errors of 30%, despite field being
         # idential to 1%, needs investigating
         # pytest.param(UDA_saved, id="UDA-saved-file"),
@@ -1219,7 +1218,7 @@ def test_relativistic_O_mode(tmp_path, generator_rel):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
-        pytest.param(npz_file, id="test-file", marks=TODO_V4),
+        pytest.param(npz_file, id="test-file"),
         # Following methods have errors of 30%, despite field being
         # idential to 1%, needs investigating
         # pytest.param(UDA_saved, id="UDA-saved-file"),
@@ -1264,7 +1263,7 @@ def test_relativistic_X_mode(tmp_path, generator_relneg):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
-        pytest.param(npz_file, id="test-file", marks=TODO_V4),
+        pytest.param(npz_file, id="test-file"),
         # Following methods have errors of 30%, despite field being
         # idential to 1%, needs investigating
         # pytest.param(UDA_saved, id="UDA-saved-file"),
@@ -1309,7 +1308,7 @@ def test_null_relativistic_O_mode(tmp_path, generator_nullrel):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
-        pytest.param(npz_file, id="test-file", marks=TODO_V4),
+        pytest.param(npz_file, id="test-file"),
         # Following methods have errors of 30%, despite field being
         # idential to 1%, needs investigating
         # pytest.param(UDA_saved, id="UDA-saved-file"),
@@ -1356,10 +1355,10 @@ def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
         pytest.param(omfit_json, id="omfit-file"),
-        pytest.param(npz_file, id="test-file", marks=TODO_V4),
-        pytest.param(npz_notime_file, id="test_notime-file", marks=TODO_V4),
-        pytest.param(UDA_saved, id="UDA-saved-file", marks=TODO_V4),
-        pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file", marks=TODO_V4),
+        pytest.param(npz_file, id="test-file"),
+        pytest.param(npz_notime_file, id="test_notime-file"),
+        pytest.param(UDA_saved, id="UDA-saved-file"),
+        pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file"),
     ],
 )
 def test_create_magnetic_geometry(tmp_path, generator):
@@ -1390,7 +1389,6 @@ def test_create_magnetic_geometry(tmp_path, generator):
     )
 
 
-@TODO_V4
 def test_EFIT_geometry(tmp_path):
     kwargs_dict = UDA_saved(tmp_path)
     field = cast(MagneticField_Cylindrical, make_field(kwargs_dict))
@@ -1436,8 +1434,8 @@ def test_EFIT_geometry(tmp_path):
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
         pytest.param(omfit_json, id="omfit-file"),
-        pytest.param(npz_file, id="test-file", marks=TODO_V4),
-        pytest.param(npz_notime_file, id="test_notime-file", marks=TODO_V4),
+        pytest.param(npz_file, id="test-file"),
+        pytest.param(npz_notime_file, id="test_notime-file"),
         # pytest.param(UDA_saved, id="UDA-saved-file"),
         # pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file"),
     ],
@@ -1583,8 +1581,8 @@ def launch_parameters(start_point, end_point_poloidal_coords):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
-        pytest.param(npz_file, id="test-file", marks=TODO_V4),
-        pytest.param(UDA_saved, id="UDA-saved-file", marks=TODO_V4),
+        pytest.param(npz_file, id="test-file"),
+        pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
 @pytest.mark.parametrize(
@@ -1634,7 +1632,9 @@ def test_find_plasma_entry_position(
     toroidal_launch_angle,
     expected_entry,
 ):
-    if generator is torbeam_file and "inboard" in request.node.callspec.id:
+    # The interpolated fields all fail this way; the analytic ones pass
+    interpolated = (torbeam_file, npz_file, UDA_saved)
+    if generator in interpolated and "inboard" in request.node.callspec.id:
         request.applymarker(XFAIL_INBOARD_LAUNCH)
 
     args = generator(tmp_path)
