@@ -711,6 +711,13 @@ class ConstantCurrentDensityField(CircularFieldBase):
 
     TODO
     ----
+    Delete in the next round of v4 changes (supervisor, 2026-10-30). Superseded
+    by `CircularFluxSurfaceField`, which ``find_B_method="analytical"`` now uses,
+    as in v3 after beam-tracing/Scotty#161. Despite the name, this field has
+    :math:`|B_p| = B_{p,a}` everywhere, :math:`\\psi_{pol} = r/a`, and
+    :math:`\\nabla \\cdot \\mathbf{B} \\neq 0`. Kept, without a deprecation warning,
+    until then.
+
     Poloidal flux needs to be made consistent with B_{R,Z}
 
     Parameters
@@ -771,6 +778,16 @@ class ConstantCurrentDensityField(CircularFieldBase):
 
 class CircularCrossSectionField(CircularFieldBase):
     """Simple circular cross-section magnetic geometry
+
+    TODO
+    ----
+    Delete in the next round of v4 changes (supervisor, 2026-10-30), together
+    with ``find_B_method="unit-tests"``, once the golden tests have been moved to
+    `CircularFluxSurfaceField` and their expected values regenerated. Here
+    ``B_p_a`` is a flux-like normalisation, not the poloidal field at
+    ``minor_radius_a``: :math:`|B_p| = B_{p,a}/(R a)` is uniform in the minor
+    radius, and :math:`\\psi_{pol} = r/a`. Kept, without a deprecation warning,
+    until then, because the golden tests use it.
 
     Parameters
     ----------
