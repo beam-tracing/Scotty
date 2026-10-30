@@ -1,8 +1,7 @@
-from scotty.init_bruv import ne_settings, beam_settings, get_parameters_for_Scotty
-
 import numpy as np
 import numpy.testing as nt
 import pytest
+from scotty.init_bruv import ne_settings, beam_settings, get_parameters_for_Scotty
 
 
 def test_ne_settings():

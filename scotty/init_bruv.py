@@ -12,6 +12,8 @@ split into a set of dictionaries (`DEFAULT_DIAGNOSTIC_PARAMETERS`,
 
 """
 
+# TODO: go through this file; everything copied from v3
+
 
 from __future__ import annotations
 import logging

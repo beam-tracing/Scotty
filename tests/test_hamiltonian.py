@@ -1,5 +1,3 @@
-from unittest.mock import MagicMock
-
 from scotty.fun_general import freq_GHz_to_angular_frequency
 from scotty.geometry import MagneticField_Cylindrical
 from scotty.hamiltonian import Hamiltonian, hessians
@@ -7,8 +5,10 @@ from scotty.logger import config_logger
 from scotty.profile_fit import QuadraticFit
 import numpy as np
 from numpy.testing import assert_allclose
-from scipy import constants
 import pytest
+from scipy import constants
+from unittest.mock import MagicMock
+
 
 k_q_R = 2.1
 k_q_Z = 3.2

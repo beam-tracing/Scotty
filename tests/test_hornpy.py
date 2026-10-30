@@ -1,7 +1,6 @@
-from scotty.hornpy import make_my_horn, GoldsmithAsymmetricConicalHorn, inch2m
-
 import numpy as np
 import numpy.testing as nt
+from scotty.hornpy import make_my_horn, GoldsmithAsymmetricConicalHorn, inch2m
 
 
 def test_MAST_V_band():

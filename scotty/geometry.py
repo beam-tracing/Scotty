@@ -1,5 +1,6 @@
 from abc import ABC
 import json
+from multiprocessing.managers import ValueProxy
 import numpy as np
 import pathlib
 from scipy.interpolate import RectBivariateSpline, RegularGridInterpolator
@@ -57,7 +58,7 @@ def get_profile_data(
     ##############################################
     # TORBEAM
     ##############################################
-    elif find_B_method == "torbeam":
+    if find_B_method == "torbeam":
         log.info(f"Using TORBEAM input files for B and poloidal flux")
         topfile_path = magnetic_data_path / f"topfile{input_filename_suffix}"
         if geometry == "cylindrical":
@@ -406,6 +407,73 @@ class InterpolatedField_Cylindrical(MagneticField_Cylindrical):
         return self._d2psi_dRdZ(R, _, Z, delta_R, delta_Z)
 
 
+class ConstantCurrentDensityField(MagneticField):
+    """Circular cross-section magnetic geometry with constant current density
+
+    TODO
+    ----
+    Poloidal flux needs to be made consistent with B_{R,Z}
+
+    Parameters
+    ----------
+    B_T_axis : float
+        Toroidal magnetic field at the magnetic axis (Tesla)
+    R_axis : float
+        Major radius of the magnetic axis (metres)
+    minor_radius_a : float
+        Minor radius of the last closed flux surface (metres)
+    B_p_a : float
+        Poloidal magnetic field at ``minor_radius_a`` (Tesla)
+    R_points : int
+    Z_points : int
+        Number of points for sample ``(R, Z)`` grid
+    grid_buffer_factor:
+        Multiplicative factor to increase size of sample grid by
+    """
+
+    def __init__(
+        self,
+        B_T_axis: float,
+        R_axis: float,
+        minor_radius_a: float,
+        B_p_a: float,
+        R_points: int = 101,
+        Z_points: int = 101,
+        grid_buffer_factor: float = 1,
+    ):
+        self.B_T_axis = B_T_axis
+        self.R_axis = R_axis
+        self.minor_radius_a = minor_radius_a
+        self.B_p_a = B_p_a
+
+        grid_width = grid_buffer_factor * minor_radius_a
+        self.R_coord = np.linspace(R_axis - grid_width, R_axis + grid_width, R_points)
+        self.Z_coord = np.linspace(-grid_width, grid_width, Z_points)
+        self.poloidalFlux_grid = self.poloidal_flux(
+            *np.meshgrid(self.R_coord, self.Z_coord, indexing="ij")
+        )
+
+    def rho(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        q_R, q_Z = np.asarray(q_R, dtype=np.float64), np.asarray(q_Z, dtype=np.float64)
+        return np.sqrt((q_R - self.R_axis) ** 2 + q_Z**2)
+
+    def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        q_R, q_Z = np.asarray(q_R, dtype=np.float64), np.asarray(q_Z, dtype=np.float64)
+        return self.B_p_a * q_Z / self.rho(q_R, q_Z)
+
+    def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        q_R, q_Z = np.asarray(q_R, dtype=np.float64), np.asarray(q_Z, dtype=np.float64)
+        return self.B_T_axis * (self.R_axis / q_R)
+
+    def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        q_R, q_Z = np.asarray(q_R, dtype=np.float64), np.asarray(q_Z, dtype=np.float64)
+        return -self.B_p_a * (q_R - self.R_axis) / self.rho(q_R, q_Z)
+
+    def polflux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
+        q_R, q_Z = np.asarray(q_R, dtype=np.float64), np.asarray(q_Z, dtype=np.float64)
+        return self.rho(q_R, q_Z) / self.minor_radius_a
+
+
 ##################################################
 #
 # FIELD CLASSES, CARTESIAN
@@ -747,6 +815,9 @@ def create_magnetic_geometry(
 
     log.debug(f"Reading and creating field profile")
 
+    def missing_arg(argument: str) -> str:
+        return f"Missing '{argument}' for find_B_method='{find_B_method}'"
+
     # If the user passes an interpolated field, then just use that
     if (
         isinstance(
@@ -780,76 +851,91 @@ def create_magnetic_geometry(
             f"Using existing field profile of type `{type(find_B_method)}` passed from `find_B_method` is incompatible with `geometry` = {geometry}"
         )
 
+    # TODO to be refactored
     # elif isinstance(find_B_method, (MagneticField_Cylindrical, InterpolatedField_Cylindrical)) and geometry == "cartesian":
-    else:
-        log.info(f"Creating a 3-D field profile from the given 2-D profile")
-        min_X, max_X = np.min(find_B_method.R_coord), np.max(find_B_method.R_coord)
-        min_Z, max_Z = np.min(find_B_method.Z_coord), np.max(find_B_method.Z_coord)
-        X_coords = (
-            find_B_method.R_coord
-        )  # np.linspace(min_X, max_X, round((max_X-min_X)/0.01+1))
-        Y_coords = np.linspace(-1, 1, 101)  # np.linspace(-0.25, 0.1, 36)
-        Z_coords = (
-            find_B_method.Z_coord
-        )  # np.linspace(min_Z, max_Z, round((max_Z-min_Z)/0.01+1))
-        XX, YY, ZZ = np.meshgrid(X_coords, Y_coords, Z_coords, indexing="ij")
-        RR = np.sqrt(XX**2 + YY**2)
-        B_R = find_B_method.B_R(RR, ZZ)
-        B_T = find_B_method.B_T(RR, ZZ)
-        B_X = (B_R * XX - B_T * YY) / RR
-        B_Y = (B_R * YY + B_T * XX) / RR
-        B_Z = find_B_method.B_Z(RR, ZZ)
-        polflux = find_B_method.poloidal_flux(RR, ZZ)
-        field, duration_field_interpolation = timer(InterpolatedField_Cartesian)(
-            X_coords, Y_coords, Z_coords, B_X, B_Y, B_Z, polflux, interp_order_str
-        )
-
-        log.info(
-            f"Converting the B and poloidal flux profiles took {duration_field_interpolation} s"
-        )
-        return field
-
-    # If a string, then interpolate as per normal
-    # elif isinstance(find_B_method, str):
-    #     (   q0, q1, q2,
-    #         B0, B1, B2,
-    #         psi,
-    #     ) = get_profile_data(
-    #         find_B_method = find_B_method.lower(),
-    #         geometry = geometry,
-    #         magnetic_data_path = magnetic_data_path,
-    #         input_filename_suffix = input_filename_suffix,
+    # else:
+    #     log.info(f"Creating a 3-D field profile from the given 2-D profile")
+    #     min_X, max_X = np.min(find_B_method.R_coord), np.max(find_B_method.R_coord)
+    #     min_Z, max_Z = np.min(find_B_method.Z_coord), np.max(find_B_method.Z_coord)
+    #     X_coords = (
+    #         find_B_method.R_coord
+    #     )  # np.linspace(min_X, max_X, round((max_X-min_X)/0.01+1))
+    #     Y_coords = np.linspace(-1, 1, 101)  # np.linspace(-0.25, 0.1, 36)
+    #     Z_coords = (
+    #         find_B_method.Z_coord
+    #     )  # np.linspace(min_Z, max_Z, round((max_Z-min_Z)/0.01+1))
+    #     XX, YY, ZZ = np.meshgrid(X_coords, Y_coords, Z_coords, indexing="ij")
+    #     RR = np.sqrt(XX**2 + YY**2)
+    #     B_R = find_B_method.B_R(RR, ZZ)
+    #     B_T = find_B_method.B_T(RR, ZZ)
+    #     B_X = (B_R * XX - B_T * YY) / RR
+    #     B_Y = (B_R * YY + B_T * XX) / RR
+    #     B_Z = find_B_method.B_Z(RR, ZZ)
+    #     polflux = find_B_method.poloidal_flux(RR, ZZ)
+    #     field, duration_field_interpolation = timer(InterpolatedField_Cartesian)(
+    #         X_coords, Y_coords, Z_coords, B_X, B_Y, B_Z, polflux, interp_order_str
     #     )
 
-    #     if geometry == "cylindrical":
-    #         (   field,
-    #             duration_field_interpolation,
-    #         ) = timer(InterpolatedField_Cylindrical)(
-    #             R_coord = q0,
-    #             Z_coord = q2,
-    #             B_R = B0,
-    #             B_T = B1,
-    #             B_Z = B2,
-    #             psi = psi,
-    #             interp_order = interp_order_int,
-    #             interp_smoothing = interp_smoothing,
-    #         )
-    #     else: # geometry == "cartesian":
-    #         (   field,
-    #             duration_field_interpolation,
-    #         ) = timer(InterpolatedField_Cartesian)(
-    #             X_coord = q0,
-    #             Y_coord = q1,
-    #             Z_coord = q2,
-    #             B_X = B0,
-    #             B_Y = B1,
-    #             B_Z = B2,
-    #             psi = psi,
-    #             interp_order = interp_order_str,
-    #         )
-
-    #     log.info(f"Interpolating B and poloidal flux profiles took {duration_field_interpolation} s")
-
+    #     log.info(
+    #         f"Converting the B and poloidal flux profiles took {duration_field_interpolation} s"
+    #     )
     #     return field
 
-    # else: raise ValueError(f"`find_B_method` = '{find_B_method}' is not supported")
+    # If a string, then interpolate as per normal
+    elif isinstance(find_B_method, str):
+
+        find_B_method = find_B_method.lower()
+
+        if find_B_method == "analytical":
+            log.debug("Using analytical constant current density geometry")
+            if B_T_axis is None: raise ValueError(missing_arg("B_T_axis"))
+            if R_axis is None: raise ValueError(missing_arg("R_axis"))
+            if minor_radius_a is None: raise ValueError(missing_arg("minor_radius_a"))
+            if B_p_a is None: raise ValueError(missing_arg("B_p_a"))
+            field = ConstantCurrentDensityField(B_T_axis, R_axis, minor_radius_a, B_p_a)
+
+        elif find_B_method in ["omfit", "torbeam"]:
+            (   q0, q1, q2,
+                B0, B1, B2,
+                psi,
+            ) = get_profile_data(
+                find_B_method = find_B_method.lower(),
+                geometry = geometry,
+                magnetic_data_path = magnetic_data_path,
+                input_filename_suffix = input_filename_suffix,
+            )
+
+            if geometry == "cylindrical":
+                (   field,
+                    duration_field_interpolation,
+                ) = timer(InterpolatedField_Cylindrical)(
+                    R_coord = q0,
+                    Z_coord = q2,
+                    B_R = B0,
+                    B_T = B1,
+                    B_Z = B2,
+                    psi = psi,
+                    interp_order = interp_order_int,
+                    interp_smoothing = interp_smoothing,
+                )
+            else: # geometry == "cartesian":
+                (   field,
+                    duration_field_interpolation,
+                ) = timer(InterpolatedField_Cartesian)(
+                    X_coord = q0,
+                    Y_coord = q1,
+                    Z_coord = q2,
+                    B_X = B0,
+                    B_Y = B1,
+                    B_Z = B2,
+                    psi = psi,
+                    interp_order = interp_order_str,
+                )
+
+            log.info(f"Interpolating B and poloidal flux profiles took {duration_field_interpolation} s")
+
+        else: raise ValueError(f"`find_B_method` = '{find_B_method}' is not supported")
+
+        return field
+
+    else: raise ValueError(f"`find_B_method` = '{find_B_method}' is not supported")
