@@ -327,14 +327,20 @@ def basic_analysis(
         sin_theta_m_trial = (
             b_hat_cart[:, 0] * K_X + b_hat_cart[:, 1] * K_Y + b_hat_cart[:, 2] * K_Z
         ) / K_magnitude_trial
-        return find_H_Cardano_formula(
-            launch_angular_freq=omega_launch,
-            K_magnitude=K_magnitude_trial,
-            epsilon_para=epsilon.e_bb,
-            epsilon_perp=epsilon.e_11,
-            epsilon_g=epsilon.e_12,
-            theta_m=np.arcsin(sin_theta_m_trial),
-        )[mode_index_Cardano]
+        # The Cardano formula works in complex arithmetic, but its roots are
+        # eigenvalues of a Hermitian matrix: any imaginary part is rounding.
+        # Without np.real it made g_magnitude_Cardano, loc_r and loc_all
+        # complex-typed
+        return np.real(
+            find_H_Cardano_formula(
+                launch_angular_freq=omega_launch,
+                K_magnitude=K_magnitude_trial,
+                epsilon_para=epsilon.e_bb,
+                epsilon_perp=epsilon.e_11,
+                epsilon_g=epsilon.e_12,
+                theta_m=np.arcsin(sin_theta_m_trial),
+            )[mode_index_Cardano]
+        )
 
     def _grad_H_Cardano(direction: str, spacing: float) -> ArrayLike:
         return derivative(
