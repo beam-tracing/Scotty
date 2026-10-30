@@ -3,7 +3,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 from scotty.checks import VALID_SOLVER_STATUS
 from scotty.geometry import MagneticField_Cartesian
-from scotty.hamiltonian import Hamiltonian, hessians
+from scotty.hamiltonian import FIRST_ORDER_KEYS, Hamiltonian, hessians
 from scotty.logger import timer
 from scotty.typing import FloatArray, ComplexFloatArray
 from typing import Tuple
@@ -104,8 +104,11 @@ def d_beam_parameters_d_tau(
         dH=dH, cartesian=isinstance(hamiltonian.field, MagneticField_Cartesian)
     )
 
-    d = np.array(list(dH.values())[:6])
-    dq_dtau, dK_dtau = d[3:], -d[:3]
+    q_keys, K_keys = FIRST_ORDER_KEYS[
+        "cartesian" if isinstance(hamiltonian.field, MagneticField_Cartesian) else "cylindrical"
+    ]
+    dq_dtau = np.array([dH[key] for key in K_keys])
+    dK_dtau = -np.array([dH[key] for key in q_keys])
 
     dPsi_dtau = (
         -np.matmul(np.matmul(Psi, gradK_gradK_H), Psi)

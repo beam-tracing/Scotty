@@ -69,6 +69,17 @@ class DielectricTensor:
 ##################################################
 
 
+FIRST_ORDER_KEYS = {
+    "cylindrical": (("dH_dR", "dH_dzeta", "dH_dZ"), ("dH_dKR", "dH_dKzeta", "dH_dKZ")),
+    "cartesian": (("dH_dX", "dH_dY", "dH_dZ"), ("dH_dKX", "dH_dKY", "dH_dKZ")),
+}
+"""Names of the first-order derivatives returned by `Hamiltonian.derivatives`,
+as ``(spatial, wavevector)`` in the order of the coordinates. The ray equations
+are dq/dtau = dH/dK and dK/dtau = -dH/dq component by component, so anything
+that builds those from the dictionary must use these names, not positions.
+"""
+
+
 class Hamiltonian:
     r"""Functor to evaluate derivatives of the Hamiltonian, H, at a given set
     of points.

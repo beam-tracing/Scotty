@@ -6,7 +6,7 @@ from scipy.optimize import minimize_scalar
 from scotty.checks import VALID_SOLVER_STATUS
 from scotty.fun_general import find_normalised_gyro_ang_freq, find_K_magnitude
 from scotty.geometry import MagneticField_Cartesian, MagneticField_Cylindrical
-from scotty.hamiltonian import Hamiltonian
+from scotty.hamiltonian import FIRST_ORDER_KEYS, Hamiltonian
 from scotty.logger import timer
 from scotty.typing import FloatArray
 
@@ -250,16 +250,12 @@ def d_ray_parameters_d_tau(
     # tau is unused here, but solve_ivp is strict about the function signatures and requires something like
     # f(t, y, y0), so we put the tau here so that it stops complaining
     dH = hamiltonian.derivatives(ray_parameters[:3], ray_parameters[-3:])
-    # d_ray_parameters_d_tau = np.zeros_like(ray_parameters, dtype=np.float64)
-    d_ray_parameters_d_tau = np.zeros(6, dtype=np.float64)
-
-    for i, v in enumerate(dH.values()):
-        # i < 3:  wavevector derivatives
-        # i == 4: dH/dK_zeta = 0
-        # i >= 3: spatial derivatives
-        d_ray_parameters_d_tau[(i + 3) % 6] = -v if i < 3 else v
-
-    return d_ray_parameters_d_tau
+    q_keys, K_keys = FIRST_ORDER_KEYS[
+        "cartesian" if isinstance(hamiltonian.field, MagneticField_Cartesian) else "cylindrical"
+    ]
+    # dq/dtau = dH/dK, dK/dtau = -dH/dq, picked by name so that the order of
+    # the derivative dictionary cannot change the equations of motion
+    return np.array([dH[key] for key in K_keys] + [-dH[key] for key in q_keys])
 
 
 def ray_tracing(
