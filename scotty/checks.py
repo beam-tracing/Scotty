@@ -355,11 +355,11 @@ class Parameters:
         )
         if poloidal_flux_zero_density < poloidal_flux_enter:
             raise ValueError(
-                f"`poloidal_flux_zero_density` must be less than or equals to `poloidal_flux_enter`, but got `poloidal_flux_zero_density` = {poloidal_flux_zero_density} and `poloidal_flux_enter` = {poloidal_flux_enter}"
+                f"`poloidal_flux_zero_density` must be greater than or equal to `poloidal_flux_enter`, but got `poloidal_flux_zero_density` = {poloidal_flux_zero_density} and `poloidal_flux_enter` = {poloidal_flux_enter}"
             )
         if poloidal_flux_zero_temperature < poloidal_flux_enter:
             raise ValueError(
-                f"`poloidal_flux_zero_density` must be less than or equals to `poloidal_flux_enter`, but got `poloidal_flux_zero_density` = {poloidal_flux_zero_density} and `poloidal_flux_enter` = {poloidal_flux_enter}"
+                f"`poloidal_flux_zero_temperature` must be greater than or equal to `poloidal_flux_enter`, but got `poloidal_flux_zero_temperature` = {poloidal_flux_zero_temperature} and `poloidal_flux_enter` = {poloidal_flux_enter}"
             )
         if (
             poloidal_flux_zero_density != poloidal_flux_zero_temperature
