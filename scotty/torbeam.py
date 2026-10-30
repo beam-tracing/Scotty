@@ -249,6 +249,42 @@ def n_e_fun(nedata_psi, core_ne):
     return nedata_ne
 
 
+def write_torbeam_file(
+    major_radius: float,
+    minor_radius: float,
+    buffer_factor: float,
+    x_grid_length: int,
+    z_grid_length: int,
+    B_toroidal_max: float,
+    B_poloidal_max: float,
+    torbeam_directory_path: pathlib.Path,
+):
+    """Write a TORBEAM magnetic geometry file based on the analytical
+    circular flux surface equilibrium (`CircularFluxSurfaceField`)"""
+
+    # Imported here: geometry imports Torbeam from this module
+    from scotty.geometry import CircularFluxSurfaceField
+
+    field = CircularFluxSurfaceField(
+        B_toroidal_max,
+        major_radius,
+        minor_radius,
+        B_poloidal_max,
+        x_grid_length,
+        z_grid_length,
+        buffer_factor,
+    )
+    x_meshgrid, z_meshgrid = np.meshgrid(field.R_coord, field.Z_coord, indexing="ij")
+    B_t = field.B_T(x_meshgrid, 0.0, z_meshgrid)
+    B_r = field.B_R(x_meshgrid, 0.0, z_meshgrid)
+    B_z = field.B_Z(x_meshgrid, 0.0, z_meshgrid)
+    psi = field.polflux(x_meshgrid, 0.0, z_meshgrid)
+
+    Torbeam(field.R_coord, field.Z_coord, B_r, B_t, B_z, psi).write(
+        torbeam_directory_path / "topfile"
+    )
+
+
 def main(
     poloidal_launch_angle: float = 0.0,
     toroidal_launch_angle: float = 0.0,
