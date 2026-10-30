@@ -32,6 +32,9 @@ log = logging.getLogger(__name__)
 # beam frame (x, y, g)
 FIELD_ALIGNED_COMPONENTS = ["u1", "u2", "b"]
 
+# Transverse directions of the beam frame (x, y, g), for Psi_w
+BEAM_TRANSVERSE_COMPONENTS = ["x", "y"]
+
 
 def basic_analysis(
     inputs: xr.Dataset,
@@ -519,7 +522,10 @@ def basic_analysis(
                 "Psi_yy": (["tau"], Psi_yy_output_beamframe_cartesian),
                 "Psi_yg": (["tau"], Psi_yg_output_beamframe_cartesian),
                 "Psi_gg": (["tau"], Psi_gg_output_beamframe_cartesian),
-                # "Psi_w": (["tau", #, #], Psi_w_output_beamframe_cartesian), # TODO commented out because "col/row_cart" is 3d but Psi_w is 2d
+                "Psi_w": (
+                    ["tau", "row_beam", "col_beam"],
+                    Psi_w_output_beamframe_cartesian,
+                ),
                 "curvature_1": (["tau"], curv1),
                 "curvature_2": (["tau"], curv2),
                 "width_1": (["tau"], width1),
@@ -536,6 +542,8 @@ def basic_analysis(
         "col_cart": CARTESIAN_VECTOR_COMPONENTS,
         "solution": SOLUTION_COMPONENTS,
         "col_field": FIELD_ALIGNED_COMPONENTS,
+        "row_beam": BEAM_TRANSVERSE_COMPONENTS,
+        "col_beam": BEAM_TRANSVERSE_COMPONENTS,
     }
 
     return analysis_dict, analysis_coords
