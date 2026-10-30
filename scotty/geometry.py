@@ -3,7 +3,7 @@ import json
 from multiprocessing.managers import ValueProxy
 import numpy as np
 import pathlib
-from h5netcdf.legacyapi import Dataset
+import h5py
 from scipy.interpolate import (
     RectBivariateSpline,
     RegularGridInterpolator,
@@ -491,23 +491,25 @@ class EFITField(InterpolatedField_Cylindrical):
         interp_order: int,
         interp_smoothing: int,
     ):
-        with Dataset(filename) as dataset:
-            efitpp_times = dataset.variables["time"][:]
+        # Read with h5py: h5netcdf's legacy API (1.8.x) builds variable paths
+        # from the group's short name, so it cannot open variables two groups
+        # deep, such as output/profiles2D/poloidalFlux
+        with h5py.File(filename, "r") as efitpp:
+            efitpp_times = efitpp["time"][:]
             time_idx = find_nearest(efitpp_times, equil_time)
             log.info(f"EFIT++ time {efitpp_times[time_idx]}")
 
-            output_group = dataset.groups["output"]
-            profiles2D = output_group.groups["profiles2D"]
+            profiles2D = efitpp["output/profiles2D"]
             # unnormalised, as a function of R and Z
-            unnorm_psi_2D = profiles2D.variables["poloidalFlux"][time_idx][:][:]
-            data_R_coord = profiles2D.variables["r"][time_idx][:]
-            data_Z_coord = profiles2D.variables["z"][time_idx][:]
+            unnorm_psi_2D = profiles2D["poloidalFlux"][time_idx]
+            data_R_coord = profiles2D["r"][time_idx]
+            data_Z_coord = profiles2D["z"][time_idx]
 
-            fluxFunctionProfiles = output_group.groups["fluxFunctionProfiles"]
-            norm_psi_1D = fluxFunctionProfiles.variables["normalizedPoloidalFlux"][:]
+            fluxFunctionProfiles = efitpp["output/fluxFunctionProfiles"]
+            norm_psi_1D = fluxFunctionProfiles["normalizedPoloidalFlux"][:]
             # poloidalFlux as a function of normalised poloidal flux
-            unorm_psi_1D = fluxFunctionProfiles.variables["poloidalFlux"][time_idx][:]
-            rBphi = fluxFunctionProfiles.variables["rBphi"][time_idx][:]
+            unorm_psi_1D = fluxFunctionProfiles["poloidalFlux"][time_idx]
+            rBphi = fluxFunctionProfiles["rBphi"][time_idx]
 
         # linear fit
         polflux_const_m, polflux_const_c = np.polyfit(unorm_psi_1D, norm_psi_1D, 1)
