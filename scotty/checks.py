@@ -431,7 +431,8 @@ class Parameters:
         # TODO -- do we do it like this?
         # either all of them are defined, or none of them are
         # should also insert type hinting and checks
-        _sum = bool(B_T_axis) + bool(B_p_a) + bool(R_axis) + bool(minor_radius_a)
+        # `is not None`, not truthiness: B_p_a = 0 (no poloidal field) is valid
+        _sum = sum(x is not None for x in (B_T_axis, B_p_a, R_axis, minor_radius_a))
         if _sum not in [0, 4]:
             raise ValueError(f"""
     For circular flux surfaces, all variables must be specified or None, but got:
