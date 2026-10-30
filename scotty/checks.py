@@ -1,6 +1,7 @@
 import logging
 from multiprocessing.managers import ValueProxy
 from pathlib import Path
+from scotty.compat import V3_ONLY_ARGUMENTS
 from scotty.fun_general import (
     find_K_labframe_cart_to_cyl,
     find_K_labframe_cyl_to_cart,
@@ -498,6 +499,12 @@ class Parameters:
     There are unsued keyword arguments that do not correspond to any function:
          {"keyword":<{_indent}} value \n{_printmsg}
     """)
+            v3_names = sorted(set(extras_copy) & set(V3_ONLY_ARGUMENTS))
+            if v3_names:
+                log.warning(
+                    f"{', '.join(v3_names)}: Scotty v3 arguments. To run a v3 script, "
+                    "pass its arguments through `scotty.compat.from_v3_kwargs`"
+                )
 
     ##################################################
     #

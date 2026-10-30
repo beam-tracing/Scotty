@@ -104,6 +104,13 @@ def beam_me_up(
     xr.DataTree, Tuple[xr.DataTree, MagneticField_Cylindrical | MagneticField_Cartesian]
 ]:
 
+    """Trace a beam and compute its DBS localisation.
+
+    Scripts written for Scotty v3 use arguments that v4 renamed or removed
+    (e.g. ``Psi_BC_flag``, ``vacuumLaunch_flag``), and miss the required
+    ``geometry``, ``launch_flag`` and ``boundary_flag``. Convert them with
+    ``beam_me_up(**scotty.compat.from_v3_kwargs(kwargs))``.
+    """
     # INSERT DOC STRING HERE
 
     ##################################################
