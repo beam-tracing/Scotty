@@ -50,7 +50,11 @@ def test_search_reaches_the_whole_domain(field, q_launch_cylindrical):
         field.R_coord, np.linspace(-np.pi, np.pi, 37), field.Z_coord, indexing="ij"
     )
     points = np.stack([R * np.cos(zeta), R * np.sin(zeta), Z], axis=-1)
-    assert np.max(np.linalg.norm(points - q_launch, axis=-1)) <= distance
+    # At zeta = pi the farthest grid point is diametrically opposite the launch
+    # point, so its distance equals the bound exactly and rounding decides `<=`
+    # (one ulp over on Linux, equal on Windows): allow for rounding
+    farthest = np.max(np.linalg.norm(points - q_launch, axis=-1))
+    assert farthest <= distance * (1 + 1e-12)
 
 
 @pytest.mark.parametrize("scale", [1.0, 1.37, 2.0])
