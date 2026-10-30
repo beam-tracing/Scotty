@@ -197,11 +197,17 @@ def find_auto_delta_signs(
     deltas = np.asarray(deltas, dtype=float)
 
     def _check_delta_and_log(derivative, delta_name, delta_value):
-        if derivative(*q_initial, delta_value) > 0:
-            log.debug(
-                f"Switching `{delta_name}` from `{delta_value}` to `{-delta_value}`"
-            )
-            delta_value = -delta_value
+        # Point the step down the poloidal flux gradient, i.e. into the plasma,
+        # whatever the sign the user gave: the step's sign alone must not decide
+        # it, or an inward (negative) step would be flipped outward
+        gradient = derivative(*q_initial, delta_value)
+        if gradient != 0:
+            new_value = -np.sign(gradient) * abs(delta_value)
+            if new_value != delta_value:
+                log.debug(
+                    f"Switching `{delta_name}` from `{delta_value}` to `{new_value}`"
+                )
+            delta_value = new_value
         return delta_value
 
     if isinstance(field, MagneticField_Cylindrical):
