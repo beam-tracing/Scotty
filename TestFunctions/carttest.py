@@ -19,7 +19,6 @@ from scotty.geometry import (
     CircularCrossSectionField,
     ConstantCurrentDensityField,
     InterpolatedField,
-    CurvySlabField,
     EFITField,
 )
 from scotty.torbeam import Torbeam
@@ -74,14 +73,6 @@ def create_magnetic_geometry(
             raise ValueError(missing_arg("B_p_a"))
 
         return ConstantCurrentDensityField(B_T_axis, R_axis, minor_radius_a, B_p_a)
-
-    if find_B_method == "curvy_slab":
-        print("Analytical curvy slab geometry")
-        if B_T_axis is None:
-            raise ValueError(missing_arg("B_T_axis"))
-        if R_axis is None:
-            raise ValueError(missing_arg("R_axis"))
-        return CurvySlabField(B_T_axis, R_axis)
 
     if find_B_method == "unit-tests":
         print("Analytical circular cross-section geometry")
