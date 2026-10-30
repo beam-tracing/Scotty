@@ -512,6 +512,10 @@ class EFITField(InterpolatedField_Cylindrical):
             rBphi = fluxFunctionProfiles["rBphi"][time_idx]
 
         # linear fit
+        # psi_norm = m psi + c, so psi is -c/m on axis and (1 - c)/m at the
+        # boundary: EFITField needs psi_boundary - psi_axis = dpsi/dpsi_norm =
+        # 1/m (passing m made B_p too large by a factor (psi_b - psi_a)^-2,
+        # ~170 for MAST 29908)
         polflux_const_m, polflux_const_c = np.polyfit(unorm_psi_1D, norm_psi_1D, 1)
         norm_psi_2D = unnorm_psi_2D * polflux_const_m + polflux_const_c
 
@@ -521,8 +525,8 @@ class EFITField(InterpolatedField_Cylindrical):
             rBphi=rBphi,
             psi_norm_2D=norm_psi_2D,
             psi_norm_1D=norm_psi_1D,
-            psi_unnorm_axis=0.0,
-            psi_unnorm_boundary=polflux_const_m,
+            psi_unnorm_axis=-polflux_const_c / polflux_const_m,
+            psi_unnorm_boundary=(1 - polflux_const_c) / polflux_const_m,
             delta_R=delta_R,
             delta_Z=delta_Z,
             interp_order=interp_order,

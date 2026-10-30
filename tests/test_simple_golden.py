@@ -1059,8 +1059,9 @@ def EFITpp_file(path: pathlib.Path):
     minor_radius = kwargs_dict["minor_radius_a"]
     B_p_a = kwargs_dict["B_p_a"]
 
-    # from_EFITpp normalises by a linear fit, psi_norm = m * psi_unnorm (+ 0),
-    # and takes m as psi_boundary - psi_axis; m = -B_p_a matches UDA_saved
+    # A physically consistent file: the unnormalised flux is psi_unnorm =
+    # (psi_boundary - psi_axis) psi_norm, with psi_boundary - psi_axis = -B_p_a
+    # as in UDA_saved, so from_EFITpp's linear fit gives dpsi_norm/dpsi = 1/slope
     slope = -B_p_a
     R_midplane = np.linspace(R_axis, R_axis + minor_radius)
     psi_norm_1D = np.linspace(0, 1, len(R_midplane))
@@ -1072,12 +1073,12 @@ def EFITpp_file(path: pathlib.Path):
     with h5py.File(path / "efitOut.nc", "w") as efitpp:
         efitpp["time"] = time
         profiles2D = efitpp.create_group("output/profiles2D")
-        profiles2D["poloidalFlux"] = add_timeslices(psi / slope)
+        profiles2D["poloidalFlux"] = add_timeslices(psi * slope)
         profiles2D["r"] = add_timeslices(field.R_coord)
         profiles2D["z"] = add_timeslices(field.Z_coord)
         flux = efitpp.create_group("output/fluxFunctionProfiles")
         flux["normalizedPoloidalFlux"] = psi_norm_1D
-        flux["poloidalFlux"] = add_timeslices(psi_norm_1D / slope)
+        flux["poloidalFlux"] = add_timeslices(psi_norm_1D * slope)
         flux["rBphi"] = add_timeslices(rBphi)
 
     kwargs_dict["find_B_method"] = "EFITpp"
