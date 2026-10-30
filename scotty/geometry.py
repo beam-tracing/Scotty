@@ -1,3 +1,6 @@
+# Copyright 2023 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
 from abc import ABC, abstractmethod
 import json
 from multiprocessing.managers import ValueProxy
@@ -514,8 +517,7 @@ class EFITField(InterpolatedField_Cylindrical):
         # linear fit
         # psi_norm = m psi + c, so psi is -c/m on axis and (1 - c)/m at the
         # boundary: EFITField needs psi_boundary - psi_axis = dpsi/dpsi_norm =
-        # 1/m (passing m made B_p too large by a factor (psi_b - psi_a)^-2,
-        # ~170 for MAST 29908)
+        # 1/m (passing m made B_p wrong by a factor m^2)
         polflux_const_m, polflux_const_c = np.polyfit(unorm_psi_1D, norm_psi_1D, 1)
         norm_psi_2D = unnorm_psi_2D * polflux_const_m + polflux_const_c
 
