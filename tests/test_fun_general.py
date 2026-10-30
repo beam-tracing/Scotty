@@ -252,7 +252,11 @@ def test_find_Psi_3D_plasma_discontinuous():
     dpR, dpZ = dpolflux_dR, dpolflux_dZ
     eta = (
         -0.5
-        * (d2polflux_dR2 * dpZ**2 - 2 * d2polflux_dRdZ * dpR * dpZ + d2polflux_dZ2 * dpR**2)
+        * (
+            d2polflux_dR2 * dpZ**2
+            - 2 * d2polflux_dRdZ * dpR * dpZ
+            + d2polflux_dZ2 * dpR**2
+        )
         / (dpR**2 + dpZ**2)
     )
     Pv, Pp = Psi_vacuum_3D, Psi_3D_plasma  # (R, zeta, Z)

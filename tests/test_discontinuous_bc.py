@@ -6,6 +6,7 @@ The flux surfaces are tilted ellipses, so psi_RZ != 0 where the beam enters
 everywhere and cannot test the cross term of eta (Hall-Chen, Parra &
 Hillesheim 2022, eq. C.6, which prints the wrong sign for it). The density
 jumps at the boundary, so K jumps along grad psi and eta matters."""
+
 import numpy as np
 import pytest
 from scipy.optimize import brentq
@@ -66,11 +67,14 @@ def boundary(tmp_path_factory):
         field=field,
         q=q,
         dK=inputs["K_initial"].values - K_v,
-        dPsi=inputs["Psi_3D_lab_initial"].values - dt["analysis"]["Psi_3D_lab_entry"].values,
+        dPsi=inputs["Psi_3D_lab_initial"].values
+        - dt["analysis"]["Psi_3D_lab_entry"].values,
     )
 
 
-@pytest.mark.parametrize("toroidal_per_poloidal", [0.0, 0.3], ids=["poloidal", "poloidal-and-toroidal"])
+@pytest.mark.parametrize(
+    "toroidal_per_poloidal", [0.0, 0.3], ids=["poloidal", "poloidal-and-toroidal"]
+)
 def test_phase_continuous_to_second_order(boundary, toroidal_per_poloidal):
     R, zeta, Z = boundary["q"]
     f = lambda r, z: float(boundary["field"].poloidal_flux(r, z))
@@ -78,7 +82,9 @@ def test_phase_continuous_to_second_order(boundary, toroidal_per_poloidal):
     psi_R = (f(R + h, Z) - f(R - h, Z)) / (2 * h)
     psi_Z = (f(R, Z + h) - f(R, Z - h)) / (2 * h)
     normal = np.array([psi_R, psi_Z]) / np.hypot(psi_R, psi_Z)
-    psi_RZ = (f(R + h, Z + h) - f(R + h, Z - h) - f(R - h, Z + h) + f(R - h, Z - h)) / (4 * h**2)
+    psi_RZ = (f(R + h, Z + h) - f(R + h, Z - h) - f(R - h, Z + h) + f(R - h, Z - h)) / (
+        4 * h**2
+    )
     assert abs(psi_RZ * psi_R * psi_Z) > 1, "the entry point must test the cross term"
     assert np.linalg.norm(boundary["dK"]) > 10, "K must jump for eta to matter"
 
@@ -87,9 +93,13 @@ def test_phase_continuous_to_second_order(boundary, toroidal_per_poloidal):
     for xi in xis:
         # a point exactly on the boundary surface, a poloidal distance ~xi |grad psi| away
         first_order = np.array([R - psi_Z * xi, Z + psi_R * xi])
-        s = brentq(lambda s: f(*(first_order + s * normal)) - f(R, Z), -0.1 * xi, 0.1 * xi)
+        s = brentq(
+            lambda s: f(*(first_order + s * normal)) - f(R, Z), -0.1 * xi, 0.1 * xi
+        )
         dR, dZ = first_order + s * normal - np.array([R, Z])
         dq = np.array([dR, toroidal_per_poloidal * xi, dZ])
         mismatch.append(abs(boundary["dK"] @ dq + 0.5 * dq @ boundary["dPsi"] @ dq))
     slope = np.polyfit(np.log(xis), np.log(mismatch), 1)[0]
-    assert slope > 2.8, f"phase mismatch ~ xi^{slope:.2f}; continuity to second order needs xi^3"
+    assert (
+        slope > 2.8
+    ), f"phase mismatch ~ xi^{slope:.2f}; continuity to second order needs xi^3"
