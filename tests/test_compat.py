@@ -170,3 +170,21 @@ def test_output_file_conversion(v4_output, tmp_path):
     with xr.open_datatree(tmp_path / "as_v4.h5", engine="h5netcdf") as dt:
         assert detect_version(dt) == "v4"
         assert dt.attrs["scotty_compat_converted_from"] == "v3"
+
+
+def test_quick_cutoff_reproduces_v3_quick_run(tmp_path):
+    """v3's quick_run returned (R, Z, |K|, poloidal flux, theta_m) at the
+    minimum of |K|; the v3 values here are from v3 (b766f33) on the same case"""
+    from scotty.compat import quick_cutoff
+
+    kwargs = get_parameters_for_Scotty("DBS_synthetic")
+    kwargs.update(find_B_method="unit-tests", interp_smoothing=0, figure_flag=False, quick_run=True)
+    for name in ("geometry", "launch_flag", "boundary_flag"):
+        kwargs.pop(name)
+    kwargs.update(Psi_BC_flag="continuous", vacuumLaunch_flag=True)
+    dt = beam_me_up(**from_v3_kwargs(kwargs), output_path=tmp_path)
+
+    q_R, q_Z, K_norm, polflux, theta_m = quick_cutoff(dt)
+    v3 = (1.6940035472950905, -0.18096914886063376, 561.5146915492645, 0.5306117571348025, 0.13255153229421354)
+    assert_allclose([q_R, q_Z, K_norm, polflux, theta_m], v3, rtol=2e-4)
+    assert quick_cutoff(dt).theta_m == theta_m   # attribute access, as for v3's K_cutoff_data

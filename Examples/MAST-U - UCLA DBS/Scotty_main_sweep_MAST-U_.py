@@ -10,7 +10,7 @@ For shot 29908, the EFIT++ times are efit_times = np.linspace(0.155,0.25,20)
 I want efit_times[np.arange(0,10)*2 + 1]. 160ms, 170ms, ..., 250ms
 """
 from scotty.beam_me_up import beam_me_up
-from scotty.compat import from_v3_kwargs
+from scotty.compat import from_v3_kwargs, quick_cutoff
 import numpy as np
 
 from scotty.init_bruv import get_parameters_for_Scotty
@@ -132,9 +132,9 @@ for ii, equil_time in enumerate(equil_times):
                 counter = counter + 1
 
                 print("simulation ", counter, "of", total_simulations)
-                [q_R, q_Z, K_mag, polflux, theta_m] = beam_me_up(
+                [q_R, q_Z, K_mag, polflux, theta_m] = quick_cutoff(beam_me_up(
                     **from_v3_kwargs({**args_dict, **kwargs_dict})
-                )
+                ))
 
                 q_R_all[ii, jj, kk, ll] = q_R
                 q_Z_all[ii, jj, kk, ll] = q_Z

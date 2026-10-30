@@ -20,7 +20,9 @@ What it converts:
   Cartesian ``plasmaLaunch_K_cartesian``, and
   ``plasmaLaunch_Psi_3D_lab_Cartesian`` to
   ``plasmaLaunch_Psi_3D_lab_cartesian``;
-- ``quick_run`` to ``ray_tracing_flag``;
+- ``quick_run`` to ``ray_tracing_flag``; ``quick_cutoff(dt)`` then gives the
+  numbers v3's ``quick_run`` returned (R, Z, |K|, poloidal flux and θ_m at the
+  minimum of |K|);
 - ``output_path`` given as a string, to a ``pathlib.Path``;
 - defaults that changed between v3 and v4, restored when the v3 script left
   them unset: ``interp_smoothing`` (0), ``find_B_method`` ("torbeam"),
@@ -51,7 +53,7 @@ others are dropped, and their names are recorded in the root attribute
 import logging
 import pathlib
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import xarray as xr
@@ -168,6 +170,35 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
             _warn(f"set `{name}` = {kw[name]} (v3's default, at least `poloidal_flux_enter`)")
 
     return kw
+
+
+class CutoffData(NamedTuple):
+    """v3's ``quick_run`` result (``K_cutoff_data``), as an iterable tuple"""
+
+    q_R: float
+    q_Z: float
+    K_norm_min: float
+    poloidal_flux: float
+    theta_m: float
+
+
+def quick_cutoff(dt: xr.DataTree) -> CutoffData:
+    """The quantities v3's ``quick_run`` returned, at the minimum of |K|, from
+    a v4 run (typically one with ``ray_tracing_flag=True``, which is what
+    ``from_v3_kwargs`` turns ``quick_run`` into)::
+
+        q_R, q_Z, K_norm, polflux, theta_m = quick_cutoff(beam_me_up(**from_v3_kwargs(kwargs)))
+    """
+    so, an = dt["solver_output"].ds, dt["analysis"].ds
+    K = np.asarray(so["K_output_magnitude"])
+    i = int(np.argmin(K))
+    return CutoffData(
+        float(so["q_R_output"][i]),
+        float(so["q_Z_output"][i]),
+        float(K[i]),
+        float(an["polflux"][i]),
+        float(an["theta_m"][i]),
+    )
 
 
 ##################################################
