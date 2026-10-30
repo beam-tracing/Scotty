@@ -818,7 +818,7 @@ def dbs_analysis(
             {
                 **{f"{k}": (["tau"], v) for k, v in loc_all.items()},
                 **{
-                    f"{k}": ([], trapezoid(v, beam_path_length))
+                    f"int_{k}_dL": ([], trapezoid(v, beam_path_length))
                     for k, v in loc_all.items()
                 },
             }
