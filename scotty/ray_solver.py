@@ -1,3 +1,6 @@
+# Copyright 2023, Valerian Hall-Chen and Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
 import logging
 import numpy as np
 from scipy.integrate import solve_ivp
