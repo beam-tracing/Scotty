@@ -1,8 +1,4 @@
-from scotty.beam_me_up import (
-    beam_me_up,
-    create_magnetic_geometry,
-    profile_fit
-)
+from scotty.beam_me_up import beam_me_up, create_magnetic_geometry, profile_fit
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.torbeam import Torbeam
 from scotty.geometry import CircularCrossSectionField, MagneticField_Cylindrical
@@ -1302,7 +1298,9 @@ def test_create_magnetic_geometry(tmp_path, generator):
     kwargs_dict = generator(tmp_path)
 
     field = cast(MagneticField_Cylindrical, create_magnetic_geometry(**kwargs_dict))
-    field_golden = cast(MagneticField_Cylindrical, create_magnetic_geometry(**simple(tmp_path)))
+    field_golden = cast(
+        MagneticField_Cylindrical, create_magnetic_geometry(**simple(tmp_path))
+    )
 
     R_axis = kwargs_dict["R_axis"]
     minor_radius = kwargs_dict["minor_radius_a"]
@@ -1312,8 +1310,12 @@ def test_create_magnetic_geometry(tmp_path, generator):
     assert_allclose(
         field.B_R(R_axis, 0, Z), field_golden.B_R(R_axis, 0, Z), rtol=1e-3, atol=1e-3
     )
-    assert_allclose(field.B_T(R, 0, 0.0), field_golden.B_T(R, 0, 0.0), rtol=1e-3, atol=1e-3)
-    assert_allclose(field.B_Z(R, 0, 0.0), field_golden.B_Z(R, 0, 0.0), rtol=1e-3, atol=1e-3)
+    assert_allclose(
+        field.B_T(R, 0, 0.0), field_golden.B_T(R, 0, 0.0), rtol=1e-3, atol=1e-3
+    )
+    assert_allclose(
+        field.B_Z(R, 0, 0.0), field_golden.B_Z(R, 0, 0.0), rtol=1e-3, atol=1e-3
+    )
     assert_allclose(
         field.polflux(R, 0, 0.0),
         field_golden.polflux(R, 0, 0.0),
@@ -1325,7 +1327,9 @@ def test_create_magnetic_geometry(tmp_path, generator):
 def test_EFIT_geometry(tmp_path):
     kwargs_dict = UDA_saved(tmp_path)
     field = cast(MagneticField_Cylindrical, create_magnetic_geometry(**kwargs_dict))
-    field_golden = cast(MagneticField_Cylindrical, create_magnetic_geometry(**simple(tmp_path)))
+    field_golden = cast(
+        MagneticField_Cylindrical, create_magnetic_geometry(**simple(tmp_path))
+    )
 
     R_axis = kwargs_dict["R_axis"]
     minor_radius_a = kwargs_dict["minor_radius_a"]
@@ -1420,17 +1424,17 @@ def test_launch_golden_answer(tmp_path, generator):
         mode_flag_initial,
         mode_index,
     ) = find_plasma_entry_parameters(
-        ray_tracing_flag = False,
-        launch_flag = "vacuum",
-        boundary_flag = args["Psi_BC_flag"],
-        mode_flag_launch = args["mode_flag"],
-        poloidal_launch_angle_deg_Torbeam = args["poloidal_launch_angle_Torbeam"],
-        toroidal_launch_angle_deg_Torbeam = args["toroidal_launch_angle_Torbeam"],
-        q_launch = args["launch_position"],
-        q_initial = q_initial,
-        launch_beam_width = args["launch_beam_width"],
-        launch_beam_curvature = args["launch_beam_curvature"],
-        field = field,
+        ray_tracing_flag=False,
+        launch_flag="vacuum",
+        boundary_flag=args["Psi_BC_flag"],
+        mode_flag_launch=args["mode_flag"],
+        poloidal_launch_angle_deg_Torbeam=args["poloidal_launch_angle_Torbeam"],
+        toroidal_launch_angle_deg_Torbeam=args["toroidal_launch_angle_Torbeam"],
+        q_launch=args["launch_position"],
+        q_initial=q_initial,
+        launch_beam_width=args["launch_beam_width"],
+        launch_beam_curvature=args["launch_beam_curvature"],
+        field=field,
     )
 
     expected_q_initial = np.array([1.99382564, -0.0, -0.07804514])
@@ -1474,16 +1478,18 @@ def test_launch_golden_answer(tmp_path, generator):
         ]
     )
 
-    tol = 1e-3    
+    tol = 1e-3
     assert_allclose(q_initial, expected_q_initial, tol, tol)
     assert_allclose(K_launch, expected_K_launch, tol, tol)
     assert_allclose(K_initial, expected_K_initial, tol, tol)
-    assert_allclose(Psi_3D_launch_labframe, expected_Psi_3D, tol, tol) # type: ignore
-    assert_allclose(Psi_3D_launch_labframe, expected_Psi_3D_lab_launch, tol, tol) # type: ignore
-    assert_allclose(Psi_3D_entry_labframe, expected_Psi_3D_lab_entry, tol, tol) # type: ignore
+    assert_allclose(Psi_3D_launch_labframe, expected_Psi_3D, tol, tol)  # type: ignore
+    assert_allclose(Psi_3D_launch_labframe, expected_Psi_3D_lab_launch, tol, tol)  # type: ignore
+    assert_allclose(Psi_3D_entry_labframe, expected_Psi_3D_lab_entry, tol, tol)  # type: ignore
     # assert_allclose(Psi_3D_lab_entry_cartesian, expected_Psi_3D_lab_entry_cartesian, tol, tol) # TODO fix this
-    assert_allclose(Psi_3D_initial_labframe, expected_Psi_3D_lab_initial, tol, atol=0.4) # Larger atol due to some small values
-    assert_allclose(distance_from_launch_to_entry, expected_distance_from_launch_to_entry, tol, tol) # type: ignore
+    assert_allclose(
+        Psi_3D_initial_labframe, expected_Psi_3D_lab_initial, tol, atol=0.4
+    )  # Larger atol due to some small values
+    assert_allclose(distance_from_launch_to_entry, expected_distance_from_launch_to_entry, tol, tol)  # type: ignore
 
 
 def launch_parameters(start_point, end_point_poloidal_coords):
