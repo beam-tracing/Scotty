@@ -582,6 +582,13 @@ def find_Psi_3D_plasma(
         # terms cancel out nicely. We set these to `0` just to
         # (double) enforce the fact that the terms should cancel out
 
+        # Each eta is the second-order displacement along grad(psi) that keeps
+        # a point on the flux surface for a first-order step along the
+        # tangent t used in the matching row of the interface matrix:
+        #   eta = -(1/2) t.(grad grad psi).t / (grad psi . displacement direction).
+        # The cross terms therefore carry the signs of t's components, e.g.
+        # -2 psi_XY psi_X psi_Y for t = (-psi_Y, psi_X, 0). (Hall-Chen, Parra &
+        # Hillesheim 2022, eq. (C.6), prints +2: an erratum.)
         delta_K = K_vacuum - K_plasma
         if boundary_flag == "continuous":
             eta_XY = eta_XZ = eta_XYZ = 0
@@ -590,7 +597,7 @@ def find_Psi_3D_plasma(
                 -0.5
                 * (
                     d2p_dX2 * dp_dY**2
-                    + 2 * d2p_dXdY * dp_dX * dp_dY
+                    - 2 * d2p_dXdY * dp_dX * dp_dY
                     + d2p_dY2 * dp_dX**2
                 )
                 / (dp_dX**2 + dp_dY**2)
@@ -599,7 +606,7 @@ def find_Psi_3D_plasma(
                 -0.5
                 * (
                     d2p_dX2 * dp_dZ**2
-                    + 2 * d2p_dXdZ * dp_dX * dp_dZ
+                    - 2 * d2p_dXdZ * dp_dX * dp_dZ
                     + d2p_dZ2 * dp_dX**2
                 )
                 / (dp_dX**2 + dp_dZ**2)
@@ -611,8 +618,8 @@ def find_Psi_3D_plasma(
                     + d2p_dY2 * dp_dZ**2
                     + d2p_dZ2 * (dp_dX + dp_dY) ** 2
                     + 2 * d2p_dXdY * dp_dZ**2
-                    + 2 * d2p_dXdZ * dp_dZ * (dp_dX + dp_dY)
-                    + 2 * d2p_dYdZ * dp_dZ * (dp_dX + dp_dY)
+                    - 2 * d2p_dXdZ * dp_dZ * (dp_dX + dp_dY)
+                    - 2 * d2p_dYdZ * dp_dZ * (dp_dX + dp_dY)
                 )
                 / (dp_dX**2 + dp_dY**2 + dp_dZ**2)
             )
