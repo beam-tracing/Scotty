@@ -150,6 +150,82 @@ def test_Psi_cylindrical():
     npt.assert_allclose(Psi_cyld, expected + 0j)
 
 
+def _quadratic_phase_case(seed):
+    """Exact test field s(x) = k.x + x.A.x / 2 with complex symmetric A: the
+    Cartesian Psi is A everywhere and K_cart = k + A x. The cylindrical Psi
+    (dimensionless K_zeta = ds/dzeta) is the Hessian of
+    s(R cos zeta, R sin zeta, Z), found here by central differences, so the
+    coordinate-curvature terms (K_zeta / R in Psi_Rzeta, -R K_R in
+    Psi_zetazeta) are tested rather than assumed."""
+    rng = np.random.default_rng(seed)
+    A = rng.normal(size=(3, 3)) + 1j * rng.normal(size=(3, 3))
+    A = 50 * (A + A.T)
+    k = 500 * rng.normal(size=3)
+    q_cyl = np.array(
+        [rng.uniform(0.5, 2.5), rng.uniform(-np.pi, np.pi), rng.uniform(-1, 1)]
+    )
+    q_cart = find_q_labframe_cyl_to_cart(q_cyl)
+
+    def s(q):
+        x = np.array([q[0] * np.cos(q[1]), q[0] * np.sin(q[1]), q[2]])
+        return k @ x + 0.5 * x @ A @ x
+
+    h = 1e-4
+    Psi_cyl = np.empty((3, 3), dtype=complex)
+    for i in range(3):
+        for j in range(3):
+            ei, ej = h * np.eye(3)[i], h * np.eye(3)[j]
+            Psi_cyl[i, j] = (
+                s(q_cyl + ei + ej)
+                - s(q_cyl + ei - ej)
+                - s(q_cyl - ei + ej)
+                + s(q_cyl - ei - ej)
+            ) / (4 * h**2)
+
+    K_cart = k + A @ q_cart
+    K_cyl = np.array(
+        [
+            K_cart[0] * np.cos(q_cyl[1]) + K_cart[1] * np.sin(q_cyl[1]),
+            q_cyl[0]
+            * (-K_cart[0] * np.sin(q_cyl[1]) + K_cart[1] * np.cos(q_cyl[1])),
+            K_cart[2],
+        ]
+    )
+    return A, Psi_cyl, K_cart, q_cart, K_cyl, q_cyl
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_Psi_conversion_exact_field(seed):
+    A, Psi_cyl, K_cart, q_cart, K_cyl, q_cyl = _quadratic_phase_case(seed)
+    npt.assert_allclose(
+        find_Psi_3D_labframe_cart_to_cyl(A, K_cart, q_cart),
+        Psi_cyl,
+        atol=1e-6 * np.max(np.abs(Psi_cyl)),
+    )
+    npt.assert_allclose(
+        find_Psi_3D_labframe_cyl_to_cart(Psi_cyl, K_cyl, q_cyl),
+        A,
+        atol=1e-6 * np.max(np.abs(A)),
+    )
+
+
+def test_Psi_conversion_exact_field_stacked():
+    cases = [_quadratic_phase_case(seed) for seed in range(4)]
+    A, Psi_cyl, K_cart, q_cart, K_cyl, q_cyl = (
+        np.array([case[i] for case in cases]) for i in range(6)
+    )
+    npt.assert_allclose(
+        find_Psi_3D_labframe_cart_to_cyl(A, K_cart.T, q_cart.T),
+        Psi_cyl,
+        atol=1e-6 * np.max(np.abs(Psi_cyl)),
+    )
+    npt.assert_allclose(
+        find_Psi_3D_labframe_cyl_to_cart(Psi_cyl, K_cyl.T, q_cyl.T),
+        A,
+        atol=1e-6 * np.max(np.abs(A)),
+    )
+
+
 def test_make_array_3x3():
     A = np.array([[1, 2], [3, 4]])
     B = make_array_3x3(A)
