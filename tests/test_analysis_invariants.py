@@ -71,18 +71,38 @@ def test_eigenvalue_of_D_consistent_with_Booker(steered_run):
     assert np.max(np.abs(H_Cardano)) < 2 * np.max(np.abs(H_Booker)) + 1e-6
 
 
-def test_dispersion_relation_satisfied_on_ray(steered_run, request):
-    """The ray is traced on H = 0, so the Booker H must stay near zero"""
-    if "X-tor10" in request.node.callspec.id:
-        request.applymarker(
-            pytest.mark.xfail(
-                strict=True,
-                reason="X-mode at 10 deg: |H_Booker| reaches ~4e-3 in the last few "
-                "points at the default rtol 1e-3 (5e-7 at rtol 1e-5): solver step "
-                "error on K ~ 1000 m^-1, not a Hamiltonian error. A tolerance-aware "
-                "check should replace this xfail",
-            )
-        )
+def test_dispersion_relation_satisfied_on_ray(steered_run):
+    """The ray is traced on H = 0, so the Booker H must stay near zero, to within
+    the solver's step error. At the default rtol 1e-3, a steered X-mode ray drifts
+    to |H| ~ 4e-3 in its last few points (step error on K ~ 1000 m^-1), so the
+    bound scales with rtol rather than being fixed"""
+    rtol = float(steered_run["inputs"]["rtol"])
     H_Booker = np.real(steered_run["analysis"]["H_Booker"].values)
 
-    assert np.max(np.abs(H_Booker)) < 1e-3
+    assert np.max(np.abs(H_Booker)) < 10 * rtol
+
+
+def test_dispersion_drift_is_step_error(tmp_path):
+    """The drift off H = 0 of the steered X-mode ray is solver step error, not an
+    error in H: tightening the tolerance from 1e-3 to 1e-5 shrinks it by far more
+    than 100 (measured: 4e-3 to 5e-7)"""
+
+    def max_drift(rtol, atol, folder):
+        kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
+        kwargs_dict.update(
+            toroidal_launch_angle_Torbeam=10.0,
+            mode_flag=-1,
+            figure_flag=False,
+            output_path=tmp_path / folder,
+            rtol=rtol,
+            atol=atol,
+        )
+        (tmp_path / folder).mkdir()
+        output = beam_me_up(**kwargs_dict)
+        return np.max(np.abs(np.real(output["analysis"]["H_Booker"].values)))
+
+    loose = max_drift(1e-3, 1e-6, "loose")
+    tight = max_drift(1e-5, 1e-8, "tight")
+
+    assert tight < 1e-5
+    assert tight < loose / 100
