@@ -449,29 +449,29 @@ class ConstantCurrentDensityField(MagneticField_Cylindrical):
         grid_width = grid_buffer_factor * minor_radius_a
         self.R_coord = np.linspace(R_axis - grid_width, R_axis + grid_width, R_points)
         self.Z_coord = np.linspace(-grid_width, grid_width, Z_points)
-        self.poloidalFlux_grid = self.poloidal_flux(
+        self.poloidalFlux_grid = self.polflux(
             *np.meshgrid(self.R_coord, self.Z_coord, indexing="ij")
         )
 
-    def rho(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asarray(q_R, dtype=np.float64), np.asarray(q_Z, dtype=np.float64)
-        return np.sqrt((q_R - self.R_axis) ** 2 + q_Z**2)
+    def rho(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return np.sqrt((R - self.R_axis) ** 2 + Z**2)
 
-    def B_R(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asarray(q_R, dtype=np.float64), np.asarray(q_Z, dtype=np.float64)
-        return self.B_p_a * q_Z / self.rho(q_R, q_Z)
+    def B_R(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return self.B_p_a * Z / self.rho(R, _, Z)
 
-    def B_T(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asarray(q_R, dtype=np.float64), np.asarray(q_Z, dtype=np.float64)
-        return self.B_T_axis * (self.R_axis / q_R)
+    def B_T(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return self.B_T_axis * (self.R_axis / R)
 
-    def B_Z(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asarray(q_R, dtype=np.float64), np.asarray(q_Z, dtype=np.float64)
-        return -self.B_p_a * (q_R - self.R_axis) / self.rho(q_R, q_Z)
+    def B_Z(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return -self.B_p_a * (R - self.R_axis) / self.rho(R, _, Z)
 
-    def polflux(self, q_R: ArrayLike, q_Z: ArrayLike) -> FloatArray:
-        q_R, q_Z = np.asarray(q_R, dtype=np.float64), np.asarray(q_Z, dtype=np.float64)
-        return self.rho(q_R, q_Z) / self.minor_radius_a
+    def polflux(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return self.rho(R, _, Z) / self.minor_radius_a
 
 
 ##################################################
