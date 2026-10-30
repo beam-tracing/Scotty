@@ -15,8 +15,6 @@ import xarray as xr
 # Print more of arrays in failed tests
 np.set_printoptions(linewidth=120, threshold=100)
 
-# Known v4 failure, tracked in the README ("Known issues in v4"). Non-strict,
-# so a test that starts passing is reported as XPASS
 
 # Test_fund: test to see whether the beam will be absorbed when its frequency is equal
 # to the fundamental electron cyclotron frequency.
