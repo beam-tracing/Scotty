@@ -84,11 +84,36 @@ class Torbeam:
     def from_file(cls, filename: PathLike) -> Torbeam:
         """Read TORBEAM geometry file"""
 
+        # Section headers, in file order after the radial grid: older
+        # topfiles (and `write`) use the first set, newer ones the second
+        header_styles = {
+            "X-coordinates": ("Z-coordinates", "B_R", "B_t", "B_Z", "psi"),
+            "Radial grid coordinates": (
+                "Vertical grid coordinates",
+                "B_r",
+                "B_t",
+                "B_z",
+                "psi",
+            ),
+        }
+
         with open(filename) as f:
-            while "Radial grid coordinates" not in f.readline():
-                pass  # Start reading only from X-coords onwards
-            R_grid = read_floats_into_list_until("Vertical grid coordinates", f)
-            Z_grid = read_floats_into_list_until("B_r", f)
+            # Start reading only from R-coords onwards
+            while True:
+                line = f.readline()
+                if not line:
+                    raise ValueError(
+                        f"No radial grid header found in TORBEAM file '{filename}'"
+                    )
+                start = next((key for key in header_styles if key in line), None)
+                if start is not None:
+                    break
+            Z_header, B_R_header, B_T_header, B_Z_header, psi_header = header_styles[
+                start
+            ]
+
+            R_grid = read_floats_into_list_until(Z_header, f)
+            Z_grid = read_floats_into_list_until(B_R_header, f)
             R_points = len(R_grid)
             Z_points = len(Z_grid)
 
@@ -97,9 +122,9 @@ class Torbeam:
             def from_fortran(array):
                 return array.reshape((Z_points, R_points)).transpose()
 
-            B_R = from_fortran(read_floats_into_list_until("B_t", f))
-            B_T = from_fortran(read_floats_into_list_until("B_z", f))
-            B_Z = from_fortran(read_floats_into_list_until("psi", f))
+            B_R = from_fortran(read_floats_into_list_until(B_T_header, f))
+            B_T = from_fortran(read_floats_into_list_until(B_Z_header, f))
+            B_Z = from_fortran(read_floats_into_list_until(psi_header, f))
             poloidal_flux = from_fortran(
                 read_floats_into_list_until("you fall asleep", f)
             )

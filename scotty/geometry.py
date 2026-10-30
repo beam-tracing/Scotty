@@ -449,9 +449,8 @@ class ConstantCurrentDensityField(MagneticField_Cylindrical):
         grid_width = grid_buffer_factor * minor_radius_a
         self.R_coord = np.linspace(R_axis - grid_width, R_axis + grid_width, R_points)
         self.Z_coord = np.linspace(-grid_width, grid_width, Z_points)
-        self.poloidalFlux_grid = self.polflux(
-            *np.meshgrid(self.R_coord, self.Z_coord, indexing="ij")
-        )
+        R_meshgrid, Z_meshgrid = np.meshgrid(self.R_coord, self.Z_coord, indexing="ij")
+        self.poloidalFlux_grid = self.polflux(R_meshgrid, 0.0, Z_meshgrid)
 
     def rho(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
         R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
@@ -512,9 +511,8 @@ class CircularCrossSectionField(MagneticField_Cylindrical):
         grid_width = grid_buffer_factor * minor_radius_a
         self.R_coord = np.linspace(R_axis - grid_width, R_axis + grid_width, R_points)
         self.Z_coord = np.linspace(-grid_width, grid_width, Z_points)
-        self.poloidalFlux_grid = self.polflux(
-            *np.meshgrid(self.R_coord, self.Z_coord, indexing="ij")
-        )
+        R_meshgrid, Z_meshgrid = np.meshgrid(self.R_coord, self.Z_coord, indexing="ij")
+        self.poloidalFlux_grid = self.polflux(R_meshgrid, 0.0, Z_meshgrid)
 
     def rho(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
         R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
