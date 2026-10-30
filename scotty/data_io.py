@@ -146,7 +146,7 @@ def solver_output_to_dicts(params: Parameters) -> Tuple[dict, dict]:
         ),
         # initial stuff
         "q_initial_cartesian": (["col_cart"], params.q_initial_cartesian),
-        "q_initial_cylindrical": (["col_cyld"], params.q_launch_cylindrical),
+        "q_initial_cylindrical": (["col_cyld"], params.q_initial_cylindrical),
         "K_initial_cartesian": (["col_cart"], params.K_initial_cartesian),
         "K_initial_cylindrical": (["col_cyld"], params.K_initial_cylindrical),
         **(
