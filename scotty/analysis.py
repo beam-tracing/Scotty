@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 from scipy import constants as const
+from scipy.integrate import trapezoid
 from scotty.checks import VALID_FIELDS, check_H_output, check_Psi_output
 from scotty.data_io import CARTESIAN_VECTOR_COMPONENTS, SOLUTION_COMPONENTS
 from scotty.derivatives import derivative
@@ -681,7 +682,7 @@ def dbs_analysis(
     dbs_analysis_dict.update(
         {
             "loc_p": (["tau"], loc_p),
-            "int_loc_p_dL": ([], np.trapz(loc_p, beam_path_length)),
+            "int_loc_p_dL": ([], trapezoid(loc_p, beam_path_length)),
         }
     )
 
@@ -695,7 +696,7 @@ def dbs_analysis(
     dbs_analysis_dict.update(
         {
             "loc_r": (["tau"], loc_r),
-            "int_loc_r_dL": ([], np.trapz(loc_r, beam_path_length)),
+            "int_loc_r_dL": ([], trapezoid(loc_r, beam_path_length)),
         }
     )
 
@@ -718,7 +719,7 @@ def dbs_analysis(
                 "det_Im_Psi_w": (["tau"], det_Im_Psi_w),
                 "beam_waist": beam_waist,
                 "loc_b": (["tau"], loc_b),
-                "int_loc_b_dL": ([], np.trapz(loc_b, beam_path_length)),
+                "int_loc_b_dL": ([], trapezoid(loc_b, beam_path_length)),
             }
         )
 
@@ -746,7 +747,7 @@ def dbs_analysis(
             {
                 "delta_theta_m": (["tau"], delta_theta_m),
                 "loc_m": (["tau"], loc_m),
-                "int_loc_m_dL": ([], np.trapz(loc_m, beam_path_length)),
+                "int_loc_m_dL": ([], trapezoid(loc_m, beam_path_length)),
             }
         )
 
@@ -770,7 +771,7 @@ def dbs_analysis(
             "spectrum_power_laws": spectrum_power_laws,
             **{f"{k}": (["tau"], v) for k, v in loc_s.items()},
             **{
-                f"int_{k}_dL": ([], np.trapz(v, beam_path_length))
+                f"int_{k}_dL": ([], trapezoid(v, beam_path_length))
                 for k, v in loc_s.items()
             },
         }
@@ -792,7 +793,7 @@ def dbs_analysis(
             {
                 **{f"{k}": (["tau"], v) for k, v in loc_all.items()},
                 **{
-                    f"{k}": ([], np.trapz(v, beam_path_length))
+                    f"{k}": ([], trapezoid(v, beam_path_length))
                     for k, v in loc_all.items()
                 },
             }

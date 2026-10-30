@@ -173,30 +173,46 @@ class MagneticField_Cylindrical(ABC):
     def polflux(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike:
         raise NotImplementedError
 
+    # By default, the poloidal flux derivatives are taken by finite
+    # differences, as in v3. Child classes can override these with exact ones
+
+    def _polflux_RZ(self, R: ArrayLike, Z: ArrayLike) -> ArrayLike:
+        # Axisymmetric, so `derivative` only needs R and Z
+        return self.polflux(R, 0.0, Z)
+
     def d_polflux_dR(
         self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float
     ) -> ArrayLike:
-        raise NotImplementedError
+        return derivative(self._polflux_RZ, "R", {"R": R, "Z": Z}, {"R": delta_R})
 
     def d_polflux_dZ(
         self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_Z: float
     ) -> ArrayLike:
-        raise NotImplementedError
+        return derivative(self._polflux_RZ, "Z", {"R": R, "Z": Z}, {"Z": delta_Z})
 
     def d2_polflux_dR2(
         self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float
     ) -> ArrayLike:
-        raise NotImplementedError
+        return derivative(
+            self._polflux_RZ, ("R", "R"), {"R": R, "Z": Z}, {"R": delta_R}
+        )
 
     def d2_polflux_dZ2(
         self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_Z: float
     ) -> ArrayLike:
-        raise NotImplementedError
+        return derivative(
+            self._polflux_RZ, ("Z", "Z"), {"R": R, "Z": Z}, {"Z": delta_Z}
+        )
 
     def d2_polflux_dRdZ(
         self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float, delta_Z: float
     ) -> ArrayLike:
-        raise NotImplementedError
+        return derivative(
+            self._polflux_RZ,
+            ("R", "Z"),
+            {"R": R, "Z": Z},
+            {"R": delta_R, "Z": delta_Z},
+        )
 
     def _calculate_incyl_outcyl(
         self,
@@ -957,8 +973,7 @@ def create_magnetic_geometry(
 
         find_B_method = find_B_method.lower()
 
-        if find_B_method == "analytical":
-            log.debug("Using analytical constant current density geometry")
+        if find_B_method in ["analytical", "unit-tests"]:
             B_T_axis = kwargs.get("B_T_axis")
             R_axis = kwargs.get("R_axis")
             minor_radius_a = kwargs.get("minor_radius_a")
@@ -971,7 +986,16 @@ def create_magnetic_geometry(
                 raise ValueError(missing_arg("minor_radius_a"))
             if B_p_a is None:
                 raise ValueError(missing_arg("B_p_a"))
-            field = ConstantCurrentDensityField(B_T_axis, R_axis, minor_radius_a, B_p_a)
+            if find_B_method == "analytical":
+                log.debug("Using analytical constant current density geometry")
+                field = ConstantCurrentDensityField(
+                    B_T_axis, R_axis, minor_radius_a, B_p_a
+                )
+            else:
+                log.debug("Using analytical circular cross-section geometry")
+                field = CircularCrossSectionField(
+                    B_T_axis, R_axis, minor_radius_a, B_p_a
+                )
 
         elif find_B_method in ["omfit", "torbeam"]:
             (
@@ -1022,6 +1046,8 @@ def create_magnetic_geometry(
                 f"Interpolating B and poloidal flux profiles took {duration_field_interpolation} s"
             )
 
+        # TODO: port the remaining v3 sources ("test", "test_notime",
+        # "UDA_saved", "EFITpp", "curvy_slab") to v4
         else:
             raise ValueError(f"`find_B_method` = '{find_B_method}' is not supported")
 

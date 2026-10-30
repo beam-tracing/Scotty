@@ -347,6 +347,9 @@ def find_Psi_3D_labframe_cyl_to_cart(
     q_R, q_zeta, q_Z = q_lab_cyl
     q_X, q_Y, _ = find_q_labframe_cyl_to_cart(q_lab_cyl)
     K_R, K_zeta, K_Z = K_lab_cyl
+    # Treat a single point as N = 1, so the rotation matrix below is always
+    # built as (N,3,3) rather than a transposed (3,3)
+    q_R, q_zeta, K_R, K_zeta = np.atleast_1d(q_R, q_zeta, K_R, K_zeta)
 
     if Psi_3D_labframe_cylindrical.ndim == 2:  # A single matrix of Psi
         Psi = np.array([Psi_3D_labframe_cylindrical])
@@ -396,9 +399,9 @@ def find_Psi_3D_labframe_cyl_to_cart(
         0,
     )  # moveaxis to for broadcasting as (N,3,3)
 
-    rotation_matrix_xi_inverse = np.moveaxis(
-        np.swapaxes(rotation_matrix_xi, 0, 1), -1, 0
-    )  # same moveaxis as above
+    # Rotation matrices are orthogonal, so the inverse is the transpose of
+    # each (3,3) matrix
+    rotation_matrix_xi_inverse = np.swapaxes(rotation_matrix_xi, -1, -2)
 
     Psi_cart = np.matmul(
         np.matmul(rotation_matrix_xi, Psi_temp), rotation_matrix_xi_inverse

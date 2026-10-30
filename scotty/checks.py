@@ -421,6 +421,8 @@ class Parameters:
             )
 
     def _unpack_kwargs_for_circular_flux_surfaces(self, **extras):
+        # Pop from the caller's kwargs so they are not reported as unused
+        extras = extras["extras"]
         B_T_axis = extras.pop("B_T_axis", None)
         B_p_a = extras.pop("B_p_a", None)
         R_axis = extras.pop("R_axis", None)
@@ -449,6 +451,7 @@ class Parameters:
         self.minor_radius_a = minor_radius_a
 
     def _unpack_kwargs_for_plasma_launch(self, **extras):
+        extras = extras["extras"]
         K_plasmaLaunch_cartesian = extras.pop("plasmaLaunch_K_cartesian", np.zeros(3))
         Psi_3D_plasmaLaunch_labframe_cartesian = extras.pop(
             "plasmaLaunch_Psi_3D_lab_cartesian", np.zeros([3, 3])

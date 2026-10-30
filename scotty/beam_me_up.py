@@ -235,6 +235,20 @@ def beam_me_up(
     )
     temperature_fit = None
 
+    # Analytical field parameters can be passed directly to beam_me_up (as in
+    # v3) or nested in `create_magnetic_geometry`; the nested ones take priority
+    field_kwargs = {
+        key: value
+        for key, value in {
+            "B_T_axis": params.B_T_axis,
+            "R_axis": params.R_axis,
+            "minor_radius_a": params.minor_radius_a,
+            "B_p_a": params.B_p_a,
+        }.items()
+        if value is not None
+    }
+    field_kwargs.update(kwargs.get("create_magnetic_geometry", {}))
+
     # If the user has already pre-loaded a field, use it
     # Otherwise, create a new one from the specified data pathway
     field = create_magnetic_geometry(
@@ -247,7 +261,7 @@ def beam_me_up(
         input_filename_suffix=params.input_filename_suffix,
         shot=params.shot,
         equil_time=params.equil_time,
-        **kwargs.get("create_magnetic_geometry", {}),
+        **field_kwargs,
     )
 
     log.info(f"""\n
