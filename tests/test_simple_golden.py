@@ -48,11 +48,6 @@ XFAIL_LAUNCH_INTERFACE = pytest.mark.xfail(
     "find_plasma_entry_parameters now needs the Hamiltonians",
     strict=False,
 )
-XFAIL_OMFIT = pytest.mark.xfail(
-    reason="TODO v4: get_profile_data returns no field for find_B_method="
-    "'omfit' in cylindrical geometry",
-    strict=False,
-)
 
 
 def synthetic_parameters() -> dict:
@@ -1360,7 +1355,7 @@ def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
     [
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
-        pytest.param(omfit_json, id="omfit-file", marks=XFAIL_OMFIT),
+        pytest.param(omfit_json, id="omfit-file"),
         pytest.param(npz_file, id="test-file", marks=TODO_V4),
         pytest.param(npz_notime_file, id="test_notime-file", marks=TODO_V4),
         pytest.param(UDA_saved, id="UDA-saved-file", marks=TODO_V4),
