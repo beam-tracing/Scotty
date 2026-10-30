@@ -23,17 +23,8 @@ from typing import cast
 # Print more of arrays in failed tests
 np.set_printoptions(linewidth=120, threshold=100)
 
-# Magnetic field sources from v3 that have not been ported to v4 yet
-
 # Known v4 failures, tracked in the README ("Known issues in v4"). These are
 # non-strict, so a test that starts passing is reported as XPASS
-XFAIL_CUTOFF_PSI_REL_X = pytest.mark.xfail(
-    reason="v4 places the inserted cut-off point at tau = 168.79 against v3's 168.94 "
-    "(minimize_scalar on |K| vs v3's fine-grid argmin); Psi is steep there, so Psi at "
-    "the cut-off index differs by 1.4-3%. The ray agrees at matched tau. The expected "
-    "cut-off Psi for this case was never updated in v3 either ('Not yet modified')",
-    strict=False,
-)
 XFAIL_LAUNCH_INTERFACE = pytest.mark.xfail(
     reason="TODO v4: profile_fit no longer accepts ProfileFit objects, and "
     "find_plasma_entry_parameters now needs the Hamiltonians",
@@ -671,25 +662,45 @@ PSI_START_EXPECTED_REL_NEG1 = np.array(
         ],
     ]
 )
-PSI_CUTOFF_EXPECTED_REL_NEG1 = np.array(  # Not yet modified
-    [
-        [
-            -6.16175436e04 + 1.03713923e04j,
-            8.12739539e02 + 2.10348335e02j,
-            1.16247793e04 - 4.06046898e03j,
-        ],
-        [
-            8.12739539e02 + 2.10348335e02j,
-            3.49517564e03 + 1.84058019e03j,
-            -8.99870324e01 + 3.81172348e01j,
-        ],
-        [
-            1.16247793e04 - 4.06046898e03j,
-            -8.99870324e01 + 3.81172348e01j,
-            3.94919303e02 + 1.59793834e03j,
-        ],
-    ]
-)
+# The cut-off point is inserted where |K| is smallest, and v3 and v4 find that
+# minimum differently (v3: argmin on a fine grid; v4: minimize_scalar), 0.08%
+# apart in tau. Psi is steep there (dPsi_RR/dtau ~ 5600), so Psi at the
+# cut-off is compared with v3's Psi at v4's cut-off tau, interpolated from
+# this table. Table: v3 (shared/scotty b766f33) on this case with len_tau =
+# 8001, cubic spline of each component in tau; it reproduces the fine grid to
+# 1e-8 between 168.4 and 169.3. (v3's own expected cut-off values for this
+# case were never updated.) Bakso, 2026-10-30.
+TAU_CUTOFF_EXPECTED_REL_NEG1 = 168.9315  # v3, len_tau = 8001
+PSI_CUTOFF_TABLE_TAU_REL_NEG1 = np.array([168.4, 168.55, 168.7, 168.85, 169.0, 169.15, 169.3])
+_PSI_CUTOFF_TABLE_REL_NEG1 = {  # (row, col): values at the table's tau
+    (0, 0): [-58691.792 + 9372.449j, -59480.108 + 9633.949j, -60288.878 + 9906.377j, -61118.989 + 10190.545j,
+             -61971.372 + 10487.324j, -62846.999 + 10797.638j, -63746.886 + 11122.467j],
+    (0, 1): [775.221 + 208.754j, 785.311 + 209.275j, 795.68 + 209.763j, 806.341 + 210.212j,
+             817.308 + 210.617j, 828.597 + 210.971j, 840.223 + 211.267j],
+    (0, 2): [11100.88 - 3773.969j, 11242.312 - 3849.666j, 11387.233 - 3928.111j, 11535.784 - 4009.486j,
+             11688.111 - 4093.987j, 11844.367 - 4181.821j, 12004.71 - 4273.206j],
+    (1, 1): [3499.505 + 1846.476j, 3498.304 + 1844.833j, 3497.101 + 1843.192j, 3495.895 + 1841.551j,
+             3494.685 + 1839.911j, 3493.471 + 1838.273j, 3492.253 + 1836.635j],
+    (1, 2): [-82.989 + 37.178j, -84.872 + 37.412j, -86.807 + 37.661j, -88.796 + 37.927j,
+             -90.842 + 38.212j, -92.946 + 38.517j, -95.113 + 38.844j],
+    (2, 2): [479.653 + 1528.647j, 456.767 + 1547.014j, 433.313 + 1566.016j, 409.269 + 1585.693j,
+             384.616 + 1606.086j, 359.33 + 1627.24j, 333.39 + 1649.201j],
+}
+
+
+def psi_cutoff_expected_rel_neg1(tau_cutoff: float) -> np.ndarray:
+    """v3's Psi (lab frame, cylindrical) at the given cut-off tau"""
+    from scipy.interpolate import CubicSpline
+
+    Psi = np.zeros((3, 3), dtype=complex)
+    for (a, b), values in _PSI_CUTOFF_TABLE_REL_NEG1.items():
+        values = np.array(values)
+        Psi[a, b] = Psi[b, a] = CubicSpline(PSI_CUTOFF_TABLE_TAU_REL_NEG1, values.real)(tau_cutoff) + 1j * CubicSpline(
+            PSI_CUTOFF_TABLE_TAU_REL_NEG1, values.imag
+        )(tau_cutoff)
+    return Psi
+
+
 PSI_FINAL_EXPECTED_REL_NEG1 = np.array(
     [
         [
@@ -1280,7 +1291,6 @@ def test_relativistic_O_mode(tmp_path, generator_rel):
         # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
-@XFAIL_CUTOFF_PSI_REL_X
 def test_relativistic_X_mode(tmp_path, generator_relneg):
     """Golden answer test to check relativistic corrections.Mode flag = -1"""
     Te_fit = QuadraticFit(1.0, 10.0)
@@ -1303,11 +1313,14 @@ def test_relativistic_X_mode(tmp_path, generator_relneg):
     )
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_REL_NEG1
 
+    # The cut-off tau on its own, then Psi there against v3's Psi at the same tau
+    tau_cutoff = float(output["solver_output/tau"][CUTOFF_INDEX_REL_NEG1])
+    assert_allclose(tau_cutoff, TAU_CUTOFF_EXPECTED_REL_NEG1, rtol=2e-3)
     check_Psi(
         output["solver_output/Psi_3D_output_labframe_cylindrical"],
         PSI_START_EXPECTED_REL_NEG1,
         CUTOFF_INDEX_REL_NEG1,
-        PSI_CUTOFF_EXPECTED_REL_NEG1,
+        psi_cutoff_expected_rel_neg1(tau_cutoff),
         PSI_FINAL_EXPECTED_REL_NEG1,
     )
 
