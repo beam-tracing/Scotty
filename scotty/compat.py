@@ -45,9 +45,7 @@ Cartesian coordinates, and new dimension names. ``to_v4_output`` and
 
 Only quantities with a counterpart in the other version are converted. The
 others are dropped, and their names are recorded in the root attribute
-``scotty_compat_not_converted``, so nothing disappears silently. Note that
-v3's ``initial_position`` is the first point of the ray (at plasma entry),
-while v4's ``q_initial_cylindrical`` is the launch position.
+``scotty_compat_not_converted``, so nothing disappears silently.
 """
 
 import logging
@@ -238,6 +236,7 @@ RULES: List[Rule] = [
     Rule(("inputs", "quick_run"), ("inputs", "ray_tracing_flag")),
     Rule(("inputs", "interp_order"), ("inputs", "magnetic_data_interp_order")),
     Rule(("inputs", "K_initial"), ("solver_output", "K_initial_cylindrical"), ("col",), ("col_cyld",)),
+    Rule(("inputs", "initial_position"), ("solver_output", "q_initial_cylindrical"), ("col",), ("col_cyld",)),
     Rule(("inputs", "Psi_3D_lab_initial"), ("solver_output", "Psi_3D_initial_labframe_cylindrical"),
          CYL_MAT, V4_CYL_MAT),
     # the ray and beam
@@ -332,26 +331,17 @@ def _convert(dt: xr.DataTree, source: str) -> xr.DataTree:
         if ("inputs", name) not in used and name not in other_inputs and name in _SAME_NAME_INPUTS:
             groups.setdefault("inputs", {})[name] = da.copy()
             used.add(("inputs", name))
-    # The initial position: v3 stores the first point of the ray (at plasma
-    # entry), v4 the launch position (while its K_initial is at entry)
+    # The launch position is a data variable in v3's inputs, a coordinate in v4's
     if target == "v4":
         groups.setdefault("inputs", {})["geometry"] = xr.DataArray(np.asarray("cylindrical"))
         if "launch_position" in dt["inputs"].ds:
             launch = dt["inputs"].ds["launch_position"].values
-            groups.setdefault("solver_output", {})["q_initial_cylindrical"] = xr.DataArray(launch, dims=("col_cyld",))
-            # a coordinate of v4's inputs
             groups["inputs"]["launch_position"] = xr.DataArray(launch, dims=("launch_position",))
             used.add(("inputs", "launch_position"))
-        used.add(("inputs", "initial_position"))
-    else:
-        so = dt["solver_output"].ds
-        first = np.array([so[f"q_{c}_output"].values[0] for c in ("R", "zeta", "Z")])
-        groups.setdefault("inputs", {})["initial_position"] = xr.DataArray(first, dims=("col",))
-        if "launch_position" in dt["inputs"].ds.coords:
-            groups["inputs"]["launch_position"] = xr.DataArray(
-                dt["inputs"].ds.coords["launch_position"].values, dims=("col",)
-            )
-        used.add(("solver_output", "q_initial_cylindrical"))
+    elif "launch_position" in dt["inputs"].ds.coords:
+        groups.setdefault("inputs", {})["launch_position"] = xr.DataArray(
+            dt["inputs"].ds.coords["launch_position"].values, dims=("col",)
+        )
 
     # Coordinates along the ray
     tau = ctx["tau"]
