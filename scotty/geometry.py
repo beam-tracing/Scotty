@@ -407,7 +407,7 @@ class InterpolatedField_Cylindrical(MagneticField_Cylindrical):
         return self._d2psi_dRdZ(R, _, Z, delta_R, delta_Z)
 
 
-class ConstantCurrentDensityField(MagneticField):
+class ConstantCurrentDensityField(MagneticField_Cylindrical):
     """Circular cross-section magnetic geometry with constant current density
 
     TODO
