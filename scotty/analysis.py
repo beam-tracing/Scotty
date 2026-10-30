@@ -716,6 +716,8 @@ def dbs_analysis(
 
     g_mag_Cardano = np.array(analysis["g_magnitude_Cardano"][()])
     loc_r = (2 * const.c / w_launch) ** 2 / g_mag_Cardano**2
+    # needed by loc_b and loc_s; loc_s is also computed for ray tracing only
+    launch_wavenumber = hamiltonian.wavenumber
 
     dbs_analysis_dict.update(
         {
@@ -729,7 +731,6 @@ def dbs_analysis(
         log.debug(f"Finding the beam piece (loc_b)")
         ##################################################
 
-        launch_wavenumber = hamiltonian.wavenumber
         launch_beam_width = float(inputs["launch_beam_width"][()])
         launch_beam_curv = float(inputs["launch_beam_curvature"][()])
         det_Im_Psi_w = np.imag(Psi_xx) * np.imag(Psi_yy) - np.imag(Psi_xy) ** 2
