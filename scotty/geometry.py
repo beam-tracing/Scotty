@@ -58,6 +58,9 @@ def get_profile_data(
     ##############################################
     # TORBEAM
     ##############################################
+    # TODO: this should be `elif`. As an `if`, find_B_method = "omfit" loads
+    # the data above, then falls through to the `else` below and raises
+    # "not supported"; see "Known issues in v4" in README
     if find_B_method == "torbeam":
         log.info(f"Using TORBEAM input files for B and poloidal flux")
         topfile_path = magnetic_data_path / f"topfile{input_filename_suffix}"

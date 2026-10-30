@@ -79,6 +79,9 @@ def find_plasma_entry_position(
     # centre column', then parametrise the path into sections of
     # 0.01m each, and find how many are needed. We also insist that
     # there are at least 100 steps
+    # TODO: `max_dist = max(q_launch_cartesian)` assumes an outboard launch
+    # heading inwards. For inboard launches (e.g. R = 0.1 m) the search is
+    # far too short to reach the plasma; see "Known issues in v4" in README
 
     num_tau = int(max(max_dist / 0.01, 100))
     tau_arr = np.linspace(0, max_dist, num_tau)
