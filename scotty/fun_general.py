@@ -972,11 +972,15 @@ def find_Psi_3D_plasma_discontinuous(
 ):
     ## For discontinuous ne
 
+    # Second-order displacement along grad(psi) that keeps a step along the
+    # flux surface, (dR, dZ) = (-dpsi/dZ, dpsi/dR) xi, on the surface: the
+    # cross term is negative because dR dZ = -dpsi/dR dpsi/dZ xi^2. (Hall-Chen,
+    # Parra & Hillesheim 2022, eq. (C.6), prints +2: an erratum.)
     eta = (
         -0.5
         * (
             d2polflux_dR2 * dpolflux_dZ**2
-            + 2 * d2polflux_dRdZ * dpolflux_dR * dpolflux_dZ
+            - 2 * d2polflux_dRdZ * dpolflux_dR * dpolflux_dZ
             + d2polflux_dZ2 * dpolflux_dR**2
         )
         / (dpolflux_dR**2 + dpolflux_dZ**2)
@@ -1022,13 +1026,14 @@ def find_Psi_3D_plasma_discontinuous(
         interface_matrix_inverse,
         [
             Psi_v_zeta_zeta,
+            # The eta term belongs to the poloidal (RR, RZ, ZZ) condition, where
+            # the second-order displacement along grad(psi) enters through K
             Psi_v_R_R * dpolflux_dZ**2
             - 2 * Psi_v_R_Z * dpolflux_dR * dpolflux_dZ
-            + Psi_v_Z_Z * dpolflux_dR**2,
-            -Psi_v_R_zeta * dpolflux_dZ
-            + Psi_v_zeta_Z * dpolflux_dR
+            + Psi_v_Z_Z * dpolflux_dR**2
             + 2 * (K_v_R - K_p_R) * dpolflux_dR * eta
             + 2 * (K_v_Z - K_p_Z) * dpolflux_dZ * eta,
+            -Psi_v_R_zeta * dpolflux_dZ + Psi_v_zeta_Z * dpolflux_dR,
             -dH_dR,
             -dH_dZ,
             0,

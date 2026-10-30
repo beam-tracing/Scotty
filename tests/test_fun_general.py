@@ -245,27 +245,26 @@ def test_find_Psi_3D_plasma_discontinuous():
         d2polflux_dRdZ,  # Continuous
     )
 
-    expected_Psi_3D_plasma = np.array(
-        [
-            [
-                -1035.11039468 + 51.2582456j,
-                -458.03354529 - 237.47347794j,
-                10.33282589 - 145.99156328j,
-            ],
-            [
-                -458.03354529 - 237.47347794j,
-                3901.7586168 + 2724.12830862j,
-                543.49055857 - 18.07489168j,
-            ],
-            [
-                10.33282589 - 145.99156328j,
-                543.49055857 - 18.07489168j,
-                629.44689491 + 712.76503166j,
-            ],
-        ]
+    # The matching conditions (Hall-Chen, Parra & Hillesheim 2022, App. C,
+    # with the second-order displacement eta on the poloidal condition and the
+    # sign of its cross term corrected), checked directly rather than against
+    # stored values
+    dpR, dpZ = dpolflux_dR, dpolflux_dZ
+    eta = (
+        -0.5
+        * (d2polflux_dR2 * dpZ**2 - 2 * d2polflux_dRdZ * dpR * dpZ + d2polflux_dZ2 * dpR**2)
+        / (dpR**2 + dpZ**2)
     )
-
-    npt.assert_allclose(Psi_3D_plasma, expected_Psi_3D_plasma)
+    Pv, Pp = Psi_vacuum_3D, Psi_3D_plasma  # (R, zeta, Z)
+    poloidal = lambda P: P[0, 0] * dpZ**2 - 2 * P[0, 2] * dpR * dpZ + P[2, 2] * dpR**2
+    mixed = lambda P: -P[0, 1] * dpZ + P[1, 2] * dpR
+    dK_dot_gradpsi = (K_v_R - K_p_R) * dpR + (K_v_Z - K_p_Z) * dpZ
+    npt.assert_allclose(Pp[1, 1], Pv[1, 1])
+    npt.assert_allclose(poloidal(Pp), poloidal(Pv) + 2 * eta * dK_dot_gradpsi)
+    npt.assert_allclose(mixed(Pp), mixed(Pv))
+    g_K = np.array([dH_dKR, dH_dKzeta, dH_dKZ])
+    npt.assert_allclose(Pp @ g_K, -np.array([dH_dR, 0.0, dH_dZ]), atol=1e-12)
+    npt.assert_allclose(Pp, Pp.T)
 
 
 @pytest.mark.parametrize(
