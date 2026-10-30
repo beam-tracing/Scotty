@@ -51,3 +51,32 @@ def test_search_reaches_the_whole_domain(field, q_launch_cylindrical):
     )
     points = np.stack([R * np.cos(zeta), R * np.sin(zeta), Z], axis=-1)
     assert np.max(np.linalg.norm(points - q_launch, axis=-1)) <= distance
+
+
+@pytest.mark.parametrize("scale", [1.0, 1.37, 2.0])
+def test_entry_does_not_depend_on_the_search_grid(field, monkeypatch, scale):
+    """The entry point is refined on the flux itself, so lengthening the
+    search (which changes the sampling grid) must not move it. It must lie
+    inside the plasma, by no more than rounding: this is where the density
+    is still zero and the vacuum K satisfies H = 0"""
+    from scotty import launch
+
+    kwargs = dict(
+        poloidal_launch_angle_deg_Torbeam=-1.0,
+        toroidal_launch_angle_deg_Torbeam=10.0,
+        q_launch=np.array([2.3, 0.0, -0.1]),
+        launch_flag="vacuum",
+        field=field,
+        poloidal_flux_enter=1.0,
+    )
+    reference = launch.find_plasma_entry_position(**kwargs)
+    original = launch.max_search_distance
+    monkeypatch.setattr(
+        launch, "max_search_distance", lambda f, q: scale * original(f, q)
+    )
+    entry = launch.find_plasma_entry_position(**kwargs)
+    np.testing.assert_allclose(entry, reference, rtol=0, atol=1e-9)
+    R, zeta, Z = entry
+    flux = field.polflux(R, zeta, Z)
+    assert flux <= 1.0
+    assert flux > 1.0 - 1e-9

@@ -179,31 +179,51 @@ def find_plasma_entry_position(
             f"distance in poloidal flux to boundary = {minimum.fun}"
         )  # type: ignore
 
-    # The spline roots are a pretty good guess for the boundary
-    # location, which we now try to refine
+    # The entry is the first crossing along the line, i.e. the smallest spline
+    # root. Refine it on the actual flux, bracketed by the neighbouring
+    # samples, so that the result does not depend on the sampling grid
 
-    root = spline_roots[(np.abs(spline_roots - poloidal_flux_enter)).argmin()]
-    boundary = root_scalar(
-        _poloidal_flux_difference_along_ray_line_wrapper, x0=root, x1=root + 1e-3
-    )
+    root = np.min(spline_roots)
+    i = int(np.clip(np.searchsorted(tau_arr_refined, root), 1, num_tau - 1))
+    bracket = (tau_arr_refined[i - 1], tau_arr_refined[i])
+    f_bracket = [_poloidal_flux_difference_along_ray_line_wrapper(t) for t in bracket]
+    if np.all(np.isfinite(f_bracket)) and f_bracket[0] * f_bracket[1] < 0:
+        boundary = root_scalar(
+            _poloidal_flux_difference_along_ray_line_wrapper,
+            bracket=bracket,
+            method="brentq",
+            xtol=1e-12,
+        )
+    else:  # the spline's root lies between two samples on the same side
+        boundary = root_scalar(
+            _poloidal_flux_difference_along_ray_line_wrapper,
+            x0=root,
+            x1=root + 1e-3,
+        )
     if not boundary.converged:
         raise RuntimeError(
             f"Unable to find plasma boundary. Root finding failed with `{boundary.flag}`"
         )
-    else:
-        boundary_tau = boundary.root
+    boundary_tau = boundary.root
 
-    # The root might be just outside the plasma due to floating point
-    # errors. If so, take a small step of size `boundary_adjust` to
-    # ensure the ray is definitely inside
+    # Rounding can leave the root just outside the plasma. Step in by the
+    # smallest amount that lands inside (doubling from 1e-12 m, at most
+    # `boundary_adjust`), so the beam starts where the density is still
+    # zero to rounding and the vacuum K satisfies H = 0
 
+    step = 0.0
     q_initial_cartesian = _ray_line_wrapper(boundary_tau)
-    if field.polflux_cartesian(*q_initial_cartesian) > poloidal_flux_enter:
-        q_initial_cartesian = _ray_line_wrapper(boundary_tau + boundary_adjust)
+    while field.polflux_cartesian(*q_initial_cartesian) > poloidal_flux_enter:
+        step = 1e-12 if step == 0.0 else 2 * step
+        if step > boundary_adjust:
+            raise RuntimeError(
+                f"Plasma entry point still outside the plasma after stepping "
+                f"`boundary_adjust` = {boundary_adjust} m along the launch line"
+            )
+        q_initial_cartesian = _ray_line_wrapper(boundary_tau + step)
+    if step > 0:
         log.debug(
-            f"""
-        Poloidal flux at plasma entry position is greater than `poloidal_flux_enter.`
-        Adjusting by a small tau = {boundary_adjust} to obtain adjusted entry point [X,Y,Z] = {arr2str(q_initial_cartesian)}"""
+            f"Stepped {step:.1e} m into the plasma to the entry point [X,Y,Z] = {arr2str(q_initial_cartesian)}"
         )
 
     # Final conversions back to the proper geometry
