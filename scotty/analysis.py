@@ -432,6 +432,7 @@ def basic_analysis(
             )
             grad_grad_H_cart, gradK_grad_H_cart, gradK_gradK_H_cart = convert_hessians(
                 q_start=q_vec_cyld.T,
+                K_start=K_vec_cart.T,
                 dH=dH,
                 grad_grad_H_start=grad_grad_H_cyld,
                 gradK_grad_H_start=gradK_grad_H_cyld,
