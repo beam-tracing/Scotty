@@ -17,12 +17,6 @@ np.set_printoptions(linewidth=120, threshold=100)
 
 # Known v4 failure, tracked in the README ("Known issues in v4"). Non-strict,
 # so a test that starts passing is reported as XPASS
-XFAIL_INBOARD_LAUNCH = pytest.mark.xfail(
-    reason="TODO v4: find_plasma_entry_position only searches up to "
-    "max(q_launch_cartesian) along the ray, too short for inboard launches",
-    strict=False,
-)
-
 
 # Test_fund: test to see whether the beam will be absorbed when its frequency is equal
 # to the fundamental electron cyclotron frequency.
@@ -225,7 +219,6 @@ def test_fund_5(tmp_path):
     )
 
 
-@XFAIL_INBOARD_LAUNCH
 def test_fund_6(tmp_path):
     kwargs_dict = {
         "geometry": "cylindrical",
@@ -388,7 +381,6 @@ def test_sec_harm_3(tmp_path):
     )
 
 
-@XFAIL_INBOARD_LAUNCH
 def test_sec_harm_4(tmp_path):
     kwargs_dict = {
         "geometry": "cylindrical",
@@ -428,7 +420,6 @@ def test_sec_harm_4(tmp_path):
     )
 
 
-@XFAIL_INBOARD_LAUNCH
 def test_sec_harm_5(tmp_path):
     kwargs_dict = {
         "geometry": "cylindrical",
