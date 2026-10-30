@@ -1,10 +1,19 @@
 import pathlib
 
 import numpy as np
+import pytest
+import xarray as xr
 from numpy.testing import assert_allclose
 
 from scotty.beam_me_up import beam_me_up
-from scotty.compat import V3_ONLY_ARGUMENTS, from_v3_kwargs
+from scotty.compat import (
+    V3_ONLY_ARGUMENTS,
+    convert_output_file,
+    detect_version,
+    from_v3_kwargs,
+    to_v3_output,
+    to_v4_output,
+)
 from scotty.fun_general import find_K_labframe_cart_to_cyl, find_q_labframe_cyl_to_cart
 from scotty.init_bruv import get_parameters_for_Scotty
 
@@ -90,3 +99,74 @@ def test_v3_arguments_point_to_the_converter(caplog):
     params._unpack_unused_kwargs(extras={"Psi_BC_flag": "continuous", "vacuumLaunch_flag": True})
     assert "scotty.compat.from_v3_kwargs" in caplog.text
     assert "Psi_BC_flag" in caplog.text and "vacuumLaunch_flag" in caplog.text
+
+
+# Output files. The v4 output comes from the analytic DBS_synthetic preset; v3
+# files are not available here, so the v3 layout is checked through names
+# and round trips (comparisons with real v3 output are done outside the suite)
+@pytest.fixture(scope="module")
+def v4_output(tmp_path_factory):
+    kwargs = get_parameters_for_Scotty("DBS_synthetic")
+    kwargs.update(len_tau=52, interp_smoothing=0, detailed_analysis_flag=True)
+    path = tmp_path_factory.mktemp("v4")
+    beam_me_up(**kwargs, output_path=path)
+    return next(path.glob("*.h5"))
+
+
+def _same(a, b):
+    a, b = np.asarray(a), np.asarray(b)
+    if a.dtype.kind in "USO" or b.dtype.kind in "USO":
+        return np.array_equal(a.astype(str), b.astype(str))
+    return a.shape == b.shape and np.allclose(a, b, rtol=1e-12, atol=1e-12, equal_nan=True)
+
+
+def test_output_v4_to_v3_layout(v4_output):
+    v4 = xr.open_datatree(v4_output, engine="h5netcdf").load()
+    v3 = to_v3_output(v4)
+    assert detect_version(v4) == "v4" and detect_version(v3) == "v3"
+    assert set(v3.children) == {"inputs", "solver_output", "analysis"}
+    for name in ("q_R", "q_Z", "q_zeta", "K_R", "K_Z", "Psi_3D"):
+        assert name in v3["solver_output"].ds
+    for name in ("poloidal_flux", "loc_b", "loc_m", "theta_m", "delta_theta_m", "b_hat", "K_zeta_initial"):
+        assert name in v3["analysis"].ds
+    assert bool(v3["inputs"].ds["vacuumLaunch_flag"].values)
+    assert_allclose(v3["solver_output"].ds["q_R"], v4["solver_output"].ds["q_R_output"])
+    assert_allclose(v3["analysis"].ds["loc_b"], v4["dbs_analysis"].ds["loc_b"])
+    # v3's initial position is the first point of the ray
+    so = v4["solver_output"].ds
+    assert_allclose(v3["inputs"].ds["initial_position"],
+                    [so["q_R_output"][0], so["q_zeta_output"][0], so["q_Z_output"][0]])
+    assert "dbs_analysis/beam_waist" in v3.attrs["scotty_compat_not_converted"]
+
+
+def test_output_cylindrical_vectors(v4_output):
+    v4 = xr.open_datatree(v4_output, engine="h5netcdf").load()
+    v3 = to_v3_output(v4)
+    zeta = v4["solver_output"].ds["q_zeta_output"].values
+    b_cyl = v3["analysis"].ds["b_hat"].values
+    b_cart = v4["analysis"].ds["b_hat_cartesian"].values
+    # unit vector, and b_X = b_R cos(zeta) - b_zeta sin(zeta)
+    assert_allclose(np.linalg.norm(b_cyl, axis=1), 1.0)
+    assert_allclose(b_cyl[:, 0] * np.cos(zeta) - b_cyl[:, 1] * np.sin(zeta), b_cart[:, 0], atol=1e-12)
+
+
+def test_output_round_trips(v4_output):
+    v4 = xr.open_datatree(v4_output, engine="h5netcdf").load()
+    v3 = to_v3_output(v4)
+    back4 = to_v4_output(v3)
+    for group in back4.children:
+        for name in back4[group].ds.data_vars:
+            if name in v4[group].ds:
+                assert _same(back4[group].ds[name].values, v4[group].ds[name].values), f"{group}/{name}"
+    back3 = to_v3_output(back4)
+    for group in back3.children:
+        for name in back3[group].ds.data_vars:
+            assert _same(back3[group].ds[name].values, v3[group].ds[name].values), f"{group}/{name}"
+
+
+def test_output_file_conversion(v4_output, tmp_path):
+    assert convert_output_file(v4_output, tmp_path / "as_v3.h5") == "v3"
+    assert convert_output_file(tmp_path / "as_v3.h5", tmp_path / "as_v4.h5") == "v4"
+    with xr.open_datatree(tmp_path / "as_v4.h5", engine="h5netcdf") as dt:
+        assert detect_version(dt) == "v4"
+        assert dt.attrs["scotty_compat_converted_from"] == "v3"
