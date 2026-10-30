@@ -968,7 +968,6 @@ def UDA_saved(path: pathlib.Path):
     return kwargs_dict
 
 
-
 def EFITpp_file(path: pathlib.Path):
     """find_B_method = "EFITpp": a synthetic efitOut.nc with EFIT++'s layout"""
     import h5py
@@ -1007,6 +1006,7 @@ def EFITpp_file(path: pathlib.Path):
     kwargs_dict["delta_R"] = -0.0001
     kwargs_dict["delta_Z"] = 0.0001
     return kwargs_dict
+
 
 def UDA_saved_MAST_U(path: pathlib.Path):
     """find_B_method = "UDA_saved" with shot = None"""
@@ -1668,3 +1668,13 @@ def test_quick_run(tmp_path, generator):
     assert np.isclose(cutoff.K_norm_min, K_norm_expected)
     assert np.isclose(cutoff.poloidal_flux, poloidal_flux_cutoff_expected)
     assert np.isclose(cutoff.theta_m, theta_m_cutoff_expected)
+
+    # The *_ray.py Examples unpack the result as a list
+    [q_R, q_Z, K_norm_min, poloidal_flux, theta_m] = cutoff
+    assert (q_R, q_Z, K_norm_min, poloidal_flux, theta_m) == (
+        cutoff.q_R,
+        cutoff.q_Z,
+        cutoff.K_norm_min,
+        cutoff.poloidal_flux,
+        cutoff.theta_m,
+    )

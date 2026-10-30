@@ -8,7 +8,7 @@ plasma, which then sets the integration limits for the beam solver.
 # Copyright 2023, Valerian Hall-Chen and Scotty contributors
 # SPDX-License-Identifier: GPL-3.0
 
-from dataclasses import dataclass
+from dataclasses import astuple, dataclass
 from time import time
 from typing import Any, Callable, Dict, Protocol, Tuple, Union, cast, Optional
 from scotty.profile_fit import ProfileFitLike
@@ -422,6 +422,11 @@ class K_cutoff_data:
     K_norm_min: float
     poloidal_flux: float
     theta_m: float
+
+    def __iter__(self):
+        # So that quick_run results unpack as (q_R, q_Z, K_norm_min,
+        # poloidal_flux, theta_m), as the *_ray.py Examples expect
+        return iter(astuple(self))
 
 
 def quick_K_cutoff(
