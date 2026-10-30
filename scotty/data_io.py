@@ -62,11 +62,13 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "ne_data_path": str(params.ne_data_path),
         "ne_data_interp_order": params.interp_order_ne_data,  # int
         # "density_fit_parameters": params.density_fit_parameters, # TODO: netCDF cannot serialise (int, WindowsPath)
-        "density_fit_method": params.density_fit_method,
+        # As strings, since the methods can be ProfileFit objects, which
+        # netCDF cannot serialise (as for `find_B_method` above)
+        "density_fit_method": str(params.density_fit_method),
         "Te_data_path": str(params.Te_data_path),
         "Te_data_interp_order": params.interp_order_Te_data,
         # "temperature_fit_parameters": params.temperature_fit_parameters, # TODO: netCDF cannot serialise (int, WindowsPath)
-        "temperature_fit_method": params.temperature_fit_method,
+        "temperature_fit_method": str(params.temperature_fit_method),
         "interp_smoothing": params.interp_smoothing,
         "shot": params.shot,
         "equil_time": params.equil_time,

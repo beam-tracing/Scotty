@@ -125,7 +125,7 @@ def find_plasma_entry_position(
 
     if len(spline_roots) == 0:
         minimum = minimize_scalar(_poloidal_flux_difference_along_ray_line_wrapper)
-        q_closest_approach_cartesian = _ray_line_wrapper(minimum)
+        q_closest_approach_cartesian = _ray_line_wrapper(minimum.x)
         q_closest_approach_cylindrical = find_q_labframe_cart_to_cyl(
             q_closest_approach_cartesian
         )
