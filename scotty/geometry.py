@@ -474,6 +474,79 @@ class ConstantCurrentDensityField(MagneticField_Cylindrical):
         return self.rho(R, _, Z) / self.minor_radius_a
 
 
+class CircularCrossSectionField(MagneticField_Cylindrical):
+    """Simple circular cross-section magnetic geometry
+
+    Parameters
+    ----------
+    B_T_axis : float
+        Toroidal magnetic field at the magnetic axis (Tesla)
+    R_axis : float
+        Major radius of the magnetic axis (metres)
+    minor_radius_a : float
+        Minor radius of the last closed flux surface (metres)
+    B_p_a : float
+        Poloidal magnetic field at ``minor_radius_a`` (Tesla)
+    R_points : int
+    Z_points : int
+        Number of points for sample ``(R, Z)`` grid
+    grid_buffer_factor : float
+        Multiplicative factor to increase size of sample grid by
+    """
+
+    def __init__(
+        self,
+        B_T_axis: float,
+        R_axis: float,
+        minor_radius_a: float,
+        B_p_a: float,
+        R_points: int = 101,
+        Z_points: int = 101,
+        grid_buffer_factor: float = 1.0,
+    ):
+        self.B_T_axis = B_T_axis
+        self.R_axis = R_axis
+        self.minor_radius_a = minor_radius_a
+        self.B_p_a = B_p_a
+
+        grid_width = grid_buffer_factor * minor_radius_a
+        self.R_coord = np.linspace(R_axis - grid_width, R_axis + grid_width, R_points)
+        self.Z_coord = np.linspace(-grid_width, grid_width, Z_points)
+        self.poloidalFlux_grid = self.polflux(
+            *np.meshgrid(self.R_coord, self.Z_coord, indexing="ij")
+        )
+
+    def rho(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return np.sqrt((R - self.R_axis) ** 2 + Z**2)
+
+    def B_R(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return np.where(
+            abs(Z) < 1e-12,
+            0.0,
+            self.B_p_a * Z / (R * self.minor_radius_a * self.rho(R, _, Z)),
+        )
+
+    def B_T(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return self.B_T_axis * (self.R_axis / R)
+
+    def B_Z(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return np.where(
+            abs(R - self.R_axis) < 1e-12,
+            0.0,
+            -self.B_p_a
+            * (R - self.R_axis)
+            / (R * self.minor_radius_a * self.rho(R, _, Z)),
+        )
+
+    def polflux(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
+        return self.rho(R, _, Z) / self.minor_radius_a
+
+
 ##################################################
 #
 # FIELD CLASSES, CARTESIAN
