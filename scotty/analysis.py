@@ -24,6 +24,10 @@ import xarray as xr
 
 log = logging.getLogger(__name__)
 
+# Components of e_hat and the eigenvectors of D, which are in D's own basis
+# (e_1, e_2, b), not Cartesian
+D_BASIS_COMPONENTS = ["1", "2", "b"]
+
 
 def basic_analysis(
     inputs: xr.Dataset,
@@ -414,11 +418,11 @@ def basic_analysis(
             "H_eigval2": (["tau"], H_eigvals[:, 1]),
             "H_eigval3": (["tau"], H_eigvals[:, 2]),
             "H_eigval_solution": (["tau"], H_solution),
-            "e_eigvecs": (["tau", "col_cart", "solution"], e_eigvecs),
-            "e_eigvec1": (["tau", "col_cart"], e_eigvecs[:, :, 0]),
-            "e_eigvec2": (["tau", "col_cart"], e_eigvecs[:, :, 1]),
-            "e_eigvec3": (["tau", "col_cart"], e_eigvecs[:, :, 2]),
-            "e_hat": (["tau", "col_cart"], e_hat),
+            "e_eigvecs": (["tau", "col_D", "solution"], e_eigvecs),
+            "e_eigvec1": (["tau", "col_D"], e_eigvecs[:, :, 0]),
+            "e_eigvec2": (["tau", "col_D"], e_eigvecs[:, :, 1]),
+            "e_eigvec3": (["tau", "col_D"], e_eigvecs[:, :, 2]),
+            "e_hat": (["tau", "col_D"], e_hat),
         }
     )
 
@@ -527,6 +531,7 @@ def basic_analysis(
         "row_cart": CARTESIAN_VECTOR_COMPONENTS,
         "col_cart": CARTESIAN_VECTOR_COMPONENTS,
         "solution": SOLUTION_COMPONENTS,
+        "col_D": D_BASIS_COMPONENTS,
     }
 
     return analysis_dict, analysis_coords
