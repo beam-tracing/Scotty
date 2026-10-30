@@ -52,7 +52,7 @@ import numpy as np
 import freeqdsk._fileutils as fortran
 
 from scotty.fun_general import read_floats_into_list_until
-from scotty.geometry import ConstantCurrentDensityField
+from scotty.geometry import CircularFluxSurfaceField
 from scotty.typing import PathLike
 
 
@@ -237,10 +237,10 @@ def write_torbeam_file(
     B_poloidal_max: float,
     torbeam_directory_path: pathlib.Path,
 ):
-    """Write a TORBEAM magnetic geometry file based on a constant
-    current density equilibrium"""
+    """Write a TORBEAM magnetic geometry file based on the analytical
+    circular flux surface equilibrium (`CircularFluxSurfaceField`)"""
 
-    field = ConstantCurrentDensityField(
+    field = CircularFluxSurfaceField(
         B_toroidal_max,
         major_radius,
         minor_radius,
