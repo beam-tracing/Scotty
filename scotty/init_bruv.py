@@ -32,7 +32,6 @@ from scotty.fun_general import (
 from scotty.profile_fit import QuadraticFit, TanhFit, PolynomialFit, ProfileFit
 from typing import Callable, Dict, NamedTuple, Optional, Any, Literal
 
-
 log = logging.getLogger()
 
 ##################################################
@@ -160,7 +159,7 @@ def launch_beam_DBS_NSTX_MAST_horn_and_lens(launch_freq_GHz):
         horn_to_lens = 0.139  # V Band
         lens_to_mirror = 0.644  # lens to steering mirror
 
-    else: # launch_freq_GHz < 52.5:
+    else:  # launch_freq_GHz < 52.5:
         name = "MAST_Q_band"
         horn_to_lens = 0.270  # Q Band
         lens_to_mirror = 0.6425  # lens to steering mirror
@@ -303,7 +302,9 @@ def launch_beam_DBS_UCLA_DIII_D_240_thin_lens(launch_freq_GHz):
 
 
 def launch_beam_DBS_UCLA_MAST_U_thin_lens(launch_freq_GHz):
-    log.warning("DBS_UCLA_MAST-U lens known to change output beam properties depending on its y position. Ignoring this effect")
+    log.warning(
+        "DBS_UCLA_MAST-U lens known to change output beam properties depending on its y position. Ignoring this effect"
+    )
 
     myLens = make_my_lens("DBS_UCLA_MAST-U")
     wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
@@ -475,7 +476,14 @@ DENSITY_FIT_PARAMETERS = {
 
 
 def get_parameters_for_Scotty(
-    diagnostic: Literal["DBS_NSTX_MAST", "DBS_SWIP_MAST-U", "DBS_UCLA_MAST-U", "CPS_UCLA_MAST-U", "hiK_Strath_MAST", "DBS_synthetic"],
+    diagnostic: Literal[
+        "DBS_NSTX_MAST",
+        "DBS_SWIP_MAST-U",
+        "DBS_UCLA_MAST-U",
+        "CPS_UCLA_MAST-U",
+        "hiK_Strath_MAST",
+        "DBS_synthetic",
+    ],
     launch_freq_GHz: Optional[float] = None,
     mirror_rotation: Optional[float] = None,
     mirror_tilt: Optional[float] = None,
@@ -547,13 +555,20 @@ def get_parameters_for_Scotty(
     )
 
     # Assign keys that we already have
-    if find_B_method is not None: parameters["find_B_method"] = find_B_method
-    if equil_time is not None: parameters["equil_time"] = equil_time
-    if shot is not None: parameters["shot"] = shot
+    if find_B_method is not None:
+        parameters["find_B_method"] = find_B_method
+    if equil_time is not None:
+        parameters["equil_time"] = equil_time
+    if shot is not None:
+        parameters["shot"] = shot
 
     # Default settings for each diagnostic
-    try: default_parameters = DEFAULT_DIAGNOSTIC_PARAMETERS[diagnostic]
-    except KeyError: raise ValueError(f"Unknown diagnostic '{diagnostic}', available kinds are: {DEFAULT_DIAGNOSTIC_PARAMETERS.keys()}")
+    try:
+        default_parameters = DEFAULT_DIAGNOSTIC_PARAMETERS[diagnostic]
+    except KeyError:
+        raise ValueError(
+            f"Unknown diagnostic '{diagnostic}', available kinds are: {DEFAULT_DIAGNOSTIC_PARAMETERS.keys()}"
+        )
 
     parameters.update(default_parameters(launch_freq_GHz))
 
@@ -777,5 +792,3 @@ def user_settings(diagnostic, user, shot):
             topfile_path = prefix / "VHChen2021/Data - Equilibrium/DIII-D/"
 
     return ne_path, topfile_path, inbeam_path, efitpp_path, UDA_saved_path
-
-
