@@ -389,9 +389,17 @@ def basic_analysis(
         theta_m=theta_m,
     )
 
-    mode_idx = int(solver_output["mode_index"][()])
-    H_solution = H_eigvals[:, mode_idx]
-    e_hat = e_eigvecs[:, :, mode_idx]
+    # eigh returns its eigenvalues in ascending order, not in the Cardano
+    # order that `mode_index` refers to, so at each point take the
+    # eigenvector whose eigenvalue matches the Cardano solution the beam
+    # follows
+    mode_idx = np.argmin(
+        np.abs(H_eigvals - np.asarray(H_Cardano_solution)[:, np.newaxis]), axis=1
+    )
+    H_solution = np.take_along_axis(H_eigvals, mode_idx[:, np.newaxis], axis=1)[:, 0]
+    e_hat = np.take_along_axis(e_eigvecs, mode_idx[:, np.newaxis, np.newaxis], axis=2)[
+        :, :, 0
+    ]
 
     analysis_dict.update(
         {
