@@ -277,7 +277,7 @@ def basic_analysis(
             "y_hat_cartesian": (["tau", "col_cart"], y_hat_cart),
             "x_hat_cartesian": (["tau", "col_cart"], x_hat_cart),
             "d_xhat_d_tau": (["tau", "col_cart"], d_xhat_d_tau),
-            "d_xhat_d_tau": (["tau"], d_xhat_d_tau_dot_yhat),
+            "d_xhat_d_tau_dot_yhat": (["tau"], d_xhat_d_tau_dot_yhat),
             "d_ghat_d_tau": (["tau", "col_cart"], d_ghat_d_tau),
             "ray_curvature_kappa": (["tau", "col_cart"], ray_curvature_kappa),
             "ray_curvature_kappa_magnitude": (
