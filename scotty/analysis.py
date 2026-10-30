@@ -155,7 +155,9 @@ def basic_analysis(
         B_Y = field.B_Y(*q_vec_T)
         B_Z = field.B_Z(*q_vec_T)
         B_mag = field.magnitude(*q_vec_T)
-        b_hat_cart = field.unitvector_cartesian(*q_vec_T)
+        # unitvector_cartesian takes Cartesian (X, Y, Z), not the
+        # cylindrical (R, zeta, Z) in q_vec_T
+        b_hat_cart = field.unitvector_cartesian(*q_vec_cart.T)
         dbhat_dX = derivative(
             field.unitvector_cartesian,
             dims="X",
