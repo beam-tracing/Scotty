@@ -2,6 +2,66 @@
 # Copyright 2018 - 2023, Valerian Hall-Chen and the Scotty contributors
 # SPDX-License-Identifier: GPL-3.0
 
+"""
+The entry point of Scotty: `beam_me_up` traces the ray, propagates the beam
+and analyses the result, saving everything to one output file.
+
+Notes
+~~~~~
+
+- ``geometry`` is ``"cylindrical"`` (axisymmetric fields; :math:`K_\\zeta` is
+  conserved, and :math:`K^2 = K_R^2 + (K_\\zeta / R)^2 + K_Z^2`) or
+  ``"cartesian"`` (general 3D fields).
+- ``launch_flag="vacuum"`` launches the beam in vacuum, propagates it to the
+  plasma and applies the boundary condition there (``boundary_flag``:
+  ``"continuous"``, ``"discontinuous"`` or ``None``). ``launch_flag="plasma"``
+  starts the beam inside the plasma, with its :math:`K` and :math:`\\Psi`
+  given directly.
+- Positions along the way: *launch* is where the beam starts in vacuum,
+  *entry* is where it reaches the plasma boundary, and *initial* is the first
+  point in the plasma, where the solver starts (e.g. ``q_launch``,
+  ``Psi_3D_entry_labframe``, ``q_initial``).
+- ``ray_tracing_flag=True`` traces only the ray, with no beam.
+- Scripts written for Scotty v3 can be converted with `scotty.compat`.
+
+Output
+~~~~~~
+
+An `xarray.DataTree` with the groups ``inputs``, ``solver_output``,
+``analysis`` and ``dbs_analysis``, saved as ``scotty_output<suffix>.h5``.
+
+Coordinates
+~~~~~~~~~~~
+
+- ``X, Y, Z`` - Lab Cartesian coordinates
+- ``R, zeta, Z`` - Lab cylindrical coordinates
+- ``x, y, g`` - Beam coordinates
+- ``u1, u2, b`` - Field-aligned coordinates
+
+Abbreviations
+~~~~~~~~~~~~~
+
+- ``bs`` - backscattered
+- ``loc`` - localisation (``loc_b``, ``loc_p``, ``loc_r``, ``loc_m``)
+- ``ne`` - equilibrium electron density
+- ``dt`` - datatree (stores data)
+
+Angles
+~~~~~~
+
+- ``theta`` - angle between g and u1, small when mismatch is small
+- ``theta_m`` - mismatch angle, angle between u1 and K
+
+Units
+~~~~~
+
+- SI units
+- Distance in m
+- Angles in rad
+- Temperature in keV
+- Electron cyclotron frequency positive
+"""
+
 import datetime
 import logging
 import numpy as np
