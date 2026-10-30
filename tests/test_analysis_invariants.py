@@ -42,6 +42,23 @@ def test_b_hat_matches_field_components(steered_run):
     )
 
 
+def test_polarisation_matches_mode(steered_run, request):
+    """At the cut-off, O-mode is polarised mostly along b and X-mode mostly
+    across it. e_hat is an eigenvector of D, so it is in the (e_1, e_2, b)
+    basis of eqs. 36-41 (despite its "col_cart" label) and the b-component
+    is its third entry. Fails if e_hat is taken from the wrong eigenvector
+    (the eigh ordering is not the Cardano ordering)"""
+    analysis = steered_run["analysis"]
+    i = int(analysis["cutoff_index"])
+    e_hat = analysis["e_hat"].values[i]
+    e_b = np.abs(e_hat[2]) / np.linalg.norm(e_hat)
+
+    if "X-" in request.node.callspec.id:
+        assert e_b < 0.2
+    else:
+        assert e_b > 0.7
+
+
 def test_eigenvalue_of_D_consistent_with_Booker(steered_run):
     """The Booker H and the eigenvalue of D (Cardano) vanish on the same
     surface, so on the ray the Cardano H can be no larger than the solver's
