@@ -24,9 +24,12 @@ import xarray as xr
 
 log = logging.getLogger(__name__)
 
-# Components of e_hat and the eigenvectors of D, which are in D's own basis
-# (e_1, e_2, b), not Cartesian
-D_BASIS_COMPONENTS = ["1", "2", "b"]
+# e_hat and the eigenvectors of D are in the orthonormal basis (u1, u2, b) in
+# which D is written, eqs. (34)-(41) of Hall-Chen, Parra & Hillesheim (2022):
+# u1 and u2 are perpendicular to b_hat, u1 lies in the plane of b_hat and K,
+# and u2 is perpendicular to that plane. This is neither the Cartesian lab
+# frame (col_cart) nor the beam frame (x, y, g)
+U_BASIS_COMPONENTS = ["u1", "u2", "b"]
 
 
 def basic_analysis(
@@ -418,11 +421,11 @@ def basic_analysis(
             "H_eigval2": (["tau"], H_eigvals[:, 1]),
             "H_eigval3": (["tau"], H_eigvals[:, 2]),
             "H_eigval_solution": (["tau"], H_solution),
-            "e_eigvecs": (["tau", "col_D", "solution"], e_eigvecs),
-            "e_eigvec1": (["tau", "col_D"], e_eigvecs[:, :, 0]),
-            "e_eigvec2": (["tau", "col_D"], e_eigvecs[:, :, 1]),
-            "e_eigvec3": (["tau", "col_D"], e_eigvecs[:, :, 2]),
-            "e_hat": (["tau", "col_D"], e_hat),
+            "e_eigvecs": (["tau", "col_u", "solution"], e_eigvecs),
+            "e_eigvec1": (["tau", "col_u"], e_eigvecs[:, :, 0]),
+            "e_eigvec2": (["tau", "col_u"], e_eigvecs[:, :, 1]),
+            "e_eigvec3": (["tau", "col_u"], e_eigvecs[:, :, 2]),
+            "e_hat": (["tau", "col_u"], e_hat),
         }
     )
 
@@ -531,7 +534,7 @@ def basic_analysis(
         "row_cart": CARTESIAN_VECTOR_COMPONENTS,
         "col_cart": CARTESIAN_VECTOR_COMPONENTS,
         "solution": SOLUTION_COMPONENTS,
-        "col_D": D_BASIS_COMPONENTS,
+        "col_u": U_BASIS_COMPONENTS,
     }
 
     return analysis_dict, analysis_coords
