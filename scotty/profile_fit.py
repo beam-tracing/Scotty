@@ -2,13 +2,14 @@
 # SPDX-License-Identifier: GPL-3.0
 
 from __future__ import annotations
+import logging
+import numpy as np
+from scipy.interpolate import UnivariateSpline
+from scotty.typing import PathLike, ArrayLike
 from typing import Callable, Optional, List, Dict, Union, Sequence
 from warnings import warn
 
-from scotty.typing import PathLike, ArrayLike
-
-import numpy as np
-from scipy.interpolate import UnivariateSpline
+log = logging.getLogger(__name__)
 
 ProfileFitLike = Callable[[ArrayLike], ArrayLike]
 """A callable that can parameterise density/temperature in 1D"""
@@ -35,8 +36,8 @@ class ProfileFit:
     def __call__(self, poloidal_flux: ArrayLike) -> ArrayLike:
         """Returns the interpolated profile at ``poloidal_flux`` points."""
 
-        poloidal_flux = np.asarray(poloidal_flux)
-        profile = np.asarray(self._fit_impl(poloidal_flux))
+        poloidal_flux = np.asarray(poloidal_flux, dtype=float)
+        profile = np.asarray(self._fit_impl(poloidal_flux), dtype=float)
         # Mask density inside plasma
         is_inside = poloidal_flux <= self.poloidal_flux_zero_profile
         return is_inside * profile
@@ -75,7 +76,7 @@ class LinearFit(ProfileFit):
                 )
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
-        poloidal_flux = np.asarray(poloidal_flux)
+        poloidal_flux = np.asarray(poloidal_flux, dtype=float)
         return self.ne_0 - (
             (self.ne_0 / self.poloidal_flux_zero_profile) * poloidal_flux
         )
@@ -132,7 +133,7 @@ class QuadraticFit(ProfileFit):
                 )
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
-        poloidal_flux = np.asarray(poloidal_flux)
+        poloidal_flux = np.asarray(poloidal_flux, dtype=float)
         return self.ne_0 - (
             (self.ne_0 / self.poloidal_flux_zero_profile) * poloidal_flux**2
         )
@@ -187,7 +188,7 @@ class TanhFit(ProfileFit):
                 )
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
-        poloidal_flux = np.asarray(poloidal_flux)
+        poloidal_flux = np.asarray(poloidal_flux, dtype=float)
         return self.ne_0 * np.tanh(
             self.ne_1 * (poloidal_flux - self.poloidal_flux_zero_profile)
         )
@@ -218,7 +219,7 @@ class PolynomialFit(ProfileFit):
         self.coefficients = coefficients
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
-        poloidal_flux = np.asarray(poloidal_flux)
+        poloidal_flux = np.asarray(poloidal_flux, dtype=float)
         return np.polyval(self.coefficients, poloidal_flux)
 
     def __repr__(self):
@@ -281,7 +282,7 @@ class StefanikovaFit(ProfileFit):
         return (self.b_height - self.b_SOL) / 2 * (mth + 1) + self.b_SOL
 
     def _fit_impl(self, poloidal_flux: ArrayLike) -> ArrayLike:
-        poloidal_flux = np.asarray(poloidal_flux)
+        poloidal_flux = np.asarray(poloidal_flux, dtype=float)
         fp = self._f_ped(poloidal_flux)
         return (
             fp
@@ -392,7 +393,7 @@ def _guess_profile_fit_method(
     parameters: Sequence, filename: Optional[PathLike]
 ) -> str:
     if filename is not None:
-        print("ne(psi): loading from input file")
+        log.info(f"Loading ne(psi) from input file")
         return "smoothing-spline-file"
 
     FIT_LENGTH_MAPPINGS = {
@@ -404,7 +405,7 @@ def _guess_profile_fit_method(
 
     try:
         name, fit_method = FIT_LENGTH_MAPPINGS[len(parameters)]
-        print(f"ne(psi): Using {name}")
+        log.info(f"Using {name} for ne(psi)e")
         return fit_method
     except KeyError:
         raise ValueError(

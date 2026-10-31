@@ -1,3 +1,5 @@
+import numpy as np
+import pytest
 from scotty.profile_fit import (
     QuadraticFit,
     TanhFit,
@@ -6,10 +8,6 @@ from scotty.profile_fit import (
     SmoothingSplineFit,
     profile_fit,
 )
-
-import numpy as np
-
-import pytest
 
 # Parameters for profile fits
 CENTRAL_DENSITY = 2.0

@@ -10,6 +10,7 @@ For shot 29908, the EFIT++ times are efit_times = np.linspace(0.155,0.25,20)
 I want efit_times[np.arange(0,10)*2 + 1]. 160ms, 170ms, ..., 250ms
 """
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs, quick_cutoff
 import numpy as np
 
 from scotty.init_bruv import get_parameters_for_Scotty
@@ -85,7 +86,7 @@ for ii, equil_time in enumerate(equil_times):
                 kwargs_dict["density_fit_parameters"] = None
                 kwargs_dict[
                     "ne_data_path"
-                ] = "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST\\"
+                ] = "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST\\"
                 # kwargs_dict['magnetic_data_path'] = 'C:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\'
                 kwargs_dict["input_filename_suffix"] = (
                     "_shotgroup2_avr_" + f"{equil_time*1000:.0f}" + "ms"
@@ -120,9 +121,9 @@ for ii, equil_time in enumerate(equil_times):
                 counter = counter + 1
                 print("simulation ", counter, "of", total_simulations)
 
-                [q_R, q_Z, K_mag, polflux, theta_m] = beam_me_up(
-                    **kwargs_dict
-                )
+                [q_R, q_Z, K_mag, polflux, theta_m] = quick_cutoff(beam_me_up(
+                    **from_v3_kwargs(kwargs_dict)
+                ))
 
                 q_R_all[ii, jj, kk, ll] = q_R
                 q_Z_all[ii, jj, kk, ll] = q_Z

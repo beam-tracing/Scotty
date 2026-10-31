@@ -33,11 +33,11 @@ def cache(func):
         )
 
         try:
-            result = wrapper_cache.cache[cache_key]
+            result = wrapper_cache.cache[cache_key]  # type: ignore
             hits += 1
         except KeyError:
             result = func(*args, **kwargs)
-            wrapper_cache.cache[cache_key] = result
+            wrapper_cache.cache[cache_key] = result  # type: ignore
             misses += 1
 
         return result
@@ -47,8 +47,8 @@ def cache(func):
         nonlocal hits, misses
         return {"hits": hits, "misses": misses}
 
-    wrapper_cache.cache = {}
-    wrapper_cache.cache_info = cache_info
+    wrapper_cache.cache = {}  # type: ignore
+    wrapper_cache.cache_info = cache_info  # type: ignore
     return wrapper_cache
 
 
@@ -115,7 +115,7 @@ def derivative(
     spacings: Union[float, Dict[str, float]] = 1e-8,
     stencil: Optional[str] = None,
     use_cache: bool = True,
-) -> FloatArray:
+) -> ArrayLike:
     """Partial derivative of a function along one or more of its arguments.
 
     Currently this can take partial derivatives in one or two arguments, given
@@ -235,4 +235,9 @@ def derivative(
             full_result = np.zeros_like(result)
         full_result += result
 
-    return cast(FloatArray, full_result) / np.prod(dim_spacings)
+    # If float, return float
+    # If FloatArray, return FloatArray
+    final_result = cast(FloatArray, full_result) / np.prod(dim_spacings)
+    return final_result.squeeze()
+    # if isinstance(final_result, np.ndarray) and final_result.shape == (1,): return np.float64(final_result)
+    # else: return final_result

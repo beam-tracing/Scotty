@@ -17,8 +17,8 @@ import pytest
 from scipy.optimize import brentq
 
 from scotty.beam_me_up import beam_me_up
-from scotty.fun_general import find_K_lab, find_K_lab_Cartesian
-from scotty.geometry import InterpolatedField
+from scotty.fun_general import find_K_labframe_cart_to_cyl, find_q_labframe_cyl_to_cart
+from scotty.geometry import InterpolatedField_Cylindrical
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.profile_fit import QuadraticFit
 
@@ -41,7 +41,9 @@ def tilted_ellipse_field(tilt):
     psi_R = 2 * u * np.cos(tilt) / A**2 - 2 * v * np.sin(tilt) / B**2
     psi_Z = 2 * u * np.sin(tilt) / A**2 + 2 * v * np.cos(tilt) / B**2
     c = 0.05
-    return InterpolatedField(R, Z, -c * psi_Z / RR, R0 / RR, c * psi_R / RR, psi, 5, 0)
+    return InterpolatedField_Cylindrical(
+        R, Z, -c * psi_Z / RR, R0 / RR, c * psi_R / RR, psi, 5, 0
+    )
 
 
 @pytest.fixture(scope="module", params=list(CASES))
@@ -51,37 +53,32 @@ def boundary(request, tmp_path_factory):
     kwargs = get_parameters_for_Scotty("DBS_synthetic")
     for name in ("B_T_axis", "B_p_a", "R_axis", "minor_radius_a"):
         kwargs.pop(name, None)
-    launch_position = np.array(launch)
     kwargs.update(
         find_B_method=field,
         len_tau=52,
         interp_smoothing=0,
-        Psi_BC_flag="discontinuous",
+        boundary_flag="discontinuous",
         # zero at psi = 1.3, but cut to zero at the boundary psi = 1: a jump
         density_fit_method=QuadraticFit(1.3, 4.0),
         poloidal_flux_enter=1.0,
         poloidal_flux_zero_density=1.0,
-        launch_position=launch_position,
+        poloidal_flux_zero_temperature=1.0,
+        launch_position=np.array(launch),
         poloidal_launch_angle_Torbeam=poloidal_angle,
-        delta_R=-1e-5,
-        delta_Z=-1e-5,
-        figure_flag=False,
-        output_path=str(tmp_path_factory.mktemp("bc")) + "/",
+        output_path=tmp_path_factory.mktemp("bc"),
     )
-    dt = beam_me_up(**kwargs)
-    inputs = dt["inputs"]
-    q = inputs["initial_position"].values
-    # in vacuum K is constant in Cartesian; launch_K is cylindrical at the launch position
-    K_launch_cart = find_K_lab_Cartesian(inputs["launch_K"].values, launch_position)
-    q_cart = np.array([q[0] * np.cos(q[1]), q[0] * np.sin(q[1]), q[2]])
-    K_v = find_K_lab(K_launch_cart, q_cart)
+    so = beam_me_up(**kwargs)["solver_output"]
+    q = so["q_initial_cylindrical"].values
+    K_v = find_K_labframe_cart_to_cyl(
+        so["K_launch_cartesian"].values, find_q_labframe_cyl_to_cart(q)
+    )
     return dict(
         case=request.param,
         field=field,
         q=q,
-        dK=inputs["K_initial"].values - K_v,
-        dPsi=inputs["Psi_3D_lab_initial"].values
-        - dt["analysis"]["Psi_3D_lab_entry"].values,
+        dK=so["K_initial_cylindrical"].values - K_v,
+        dPsi=so["Psi_3D_initial_labframe_cylindrical"].values
+        - so["Psi_3D_entry_labframe_cylindrical"].values,
     )
 
 
@@ -90,7 +87,7 @@ def boundary(request, tmp_path_factory):
 )
 def test_phase_continuous_to_second_order(boundary, toroidal_per_poloidal):
     R, zeta, Z = boundary["q"]
-    f = lambda r, z: float(boundary["field"].poloidal_flux(r, z))
+    f = lambda r, z: float(boundary["field"].polflux(r, 0.0, z))
     h = 1e-5
     psi_R = (f(R + h, Z) - f(R - h, Z)) / (2 * h)
     psi_Z = (f(R, Z + h) - f(R, Z - h)) / (2 * h)

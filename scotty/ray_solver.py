@@ -1,29 +1,26 @@
-"""Functions for evolving a single ray
-
-Used by the main code to find the point where the beam leaves the
-plasma, which then sets the integration limits for the beam solver.
-
-"""
-
 # Copyright 2023, Valerian Hall-Chen and Scotty contributors
 # SPDX-License-Identifier: GPL-3.0
 
-from dataclasses import astuple, dataclass
-from time import time
-from typing import Any, Callable, Dict, Protocol, Tuple, Union, cast, Optional
-from scotty.profile_fit import ProfileFitLike
-
+import logging
 import numpy as np
 from scipy.integrate import solve_ivp
-
+from scipy.integrate._ivp.ivp import OdeSolution
+from scipy.optimize import minimize_scalar
+from scotty.checks import VALID_SOLVER_STATUS
 from scotty.fun_general import (
-    K_magnitude,
-    find_normalised_gyro_freq,
-    find_normalised_plasma_freq,
+    find_K_magnitude,
+    find_normalised_gyro_ang_freq,
+    find_normalised_plasma_ang_freq,
 )
-from scotty.geometry import MagneticField
-from scotty.hamiltonian import Hamiltonian
-from scotty.typing import ArrayLike, FloatArray
+from scotty.geometry import MagneticField_Cartesian, MagneticField_Cylindrical
+from scotty.hamiltonian import FIRST_ORDER_KEYS, Hamiltonian
+from scotty.logger import timer
+from scotty.typing import FloatArray
+
+# from sklearn.utils import Bunch
+from typing import Any, Callable, Dict, Literal, Protocol, Union, Tuple, cast
+
+log = logging.getLogger(__name__)
 
 
 class _Event(Protocol):
@@ -37,16 +34,16 @@ class _Event(Protocol):
 
 
 def _event(terminal: bool, direction: float):
-    """Decorator to add the attributes required for `scipy.integrate.solve_ivp` while
-    keepying mypy happy
-
+    """Decorator to add the attributes required for
+    `scipy.integrate.solve_ivp while keeping the `mypy` type checker
+    happy
     """
 
     def decorator_event(func: Any) -> _Event:
-        # Stop the solver when the beam leaves the plasma
-        func.terminal = terminal
-        # positive value, when function result goes from negative to positive
-        func.direction = direction
+        func.terminal = terminal  # Terminate solver when beam leaves plasma
+        func.direction = (
+            direction  # +ve value when function result goes from -ve to +ve
+        )
         return func
 
     return decorator_event
@@ -55,230 +52,129 @@ def _event(terminal: bool, direction: float):
 def make_solver_events(
     poloidal_flux_enter: float,
     launch_angular_frequency: float,
-    field: MagneticField,
-    mode_flag: int,
-    resonance_flag: bool,
-    find_density: ProfileFitLike,
-    find_temperature_1D: Optional[ProfileFitLike] = None,
+    field: Union[MagneticField_Cartesian, MagneticField_Cylindrical],
+    resonance_flag: bool = True,
 ) -> Dict[str, Callable]:
-    """Define event handlers for the ray solver
 
-    Only works correctly for the 2D case
+    cart = True if isinstance(field, MagneticField_Cartesian) else False
 
-    Parameters
-    ----------
-    poloidal_flux_enter : float
-        Poloidal flux label of plasma surface
-    launch_angular_frequency : float
-        Beam frequency
-    field : MagneticField
-        Magnetic field object
-    mode_flag: int
-        Beam polarisation
-    find_density: ProfileFitLike
-        Electron density array
-    find_temperature_1D: Optional[ProfileFitLike]
-        Temperature array
-
-    Returns
-    -------
-    Dict[str, Callable]
-        Dictionary of event handlers with names
-
-    """
-
+    # Triggers when the beam leaves the same poloidal flux value it
+    # entered the plasma at
+    #   -ve -> +ve when leaving the plasma
     @_event(terminal=True, direction=1.0)
-    def event_leave_plasma(
-        tau, ray_parameters_2D, K_zeta: float, hamiltonian: Hamiltonian
-    ):
-        q_R, q_Z, _, _ = ray_parameters_2D
-        poloidal_flux = field.poloidal_flux(q_R, q_Z)
+    def event_leave_plasma(tau, ray_parameters, hamiltonian):
+        q0, q1, q2, _, _, _ = ray_parameters
+        polflux = field.polflux(q0, q1, q2)
+        return polflux - poloidal_flux_enter
 
-        # Leave at the same poloidal flux of entry
-        # goes from negative to positive when leaving the plasma
-        return poloidal_flux - poloidal_flux_enter
-
+    # Triggers when the beam leaves the LCFS
+    #   -ve -> +ve when leaving LCFS
     @_event(terminal=False, direction=1.0)
-    def event_leave_LCFS(
-        tau, ray_parameters_2D, K_zeta: float, hamiltonian: Hamiltonian
-    ):
-        q_R, q_Z, _, _ = ray_parameters_2D
-        poloidal_flux = field.poloidal_flux(q_R, q_Z)
-        poloidal_flux_LCFS = 1.0
-        # goes from negative to positive when leaving the LCFS
-        return poloidal_flux - poloidal_flux_LCFS
+    def event_leave_LCFS(tau, ray_parameters, hamiltonian):
+        q0, q1, q2, _, _, _ = ray_parameters
+        polflux = field.polflux(q0, q1, q2)
+        polflux_LCFS = 1.0
+        return polflux - polflux_LCFS
 
-    # Capture bounding box of magnetic field
-    data_R_coord_min = field.R_coord.min()
-    data_R_coord_max = field.R_coord.max()
-    data_Z_coord_min = field.Z_coord.min()
-    data_Z_coord_max = field.Z_coord.max()
+    # Capture the bounding box of the magnetic field to check if
+    # the beam has left the plasma
+    def _minmax(arr) -> Tuple[float, float]:
+        return min(arr), max(arr)
 
+    q0_min, q0_max = _minmax(field.X_coord if cart else field.R_coord)  # type: ignore
+    q1_min, q1_max = _minmax(field.Y_coord if cart else [-np.inf, np.inf])  # type: ignore
+    q2_min, q2_max = _minmax(field.Z_coord)
+
+    # Triggers when the beam leaves the magnetic field region
+    #   +ve -> -ve when leaving the simulation region
     @_event(terminal=True, direction=-1.0)
-    def event_leave_simulation(
-        tau, ray_parameters_2D, K_zeta: float, hamiltonian: Hamiltonian
-    ):
-        q_R, q_Z, _, _ = ray_parameters_2D
-
+    def event_leave_simulation(tau, ray_parameters, hamiltonian):
+        q0, q1, q2, _, _, _ = ray_parameters
         is_inside = (
-            (q_R > data_R_coord_min)
-            and (q_R < data_R_coord_max)
-            and (q_Z > data_Z_coord_min)
-            and (q_Z < data_Z_coord_max)
+            (q0_min < q0 < q0_max) and (q1_min < q1 < q1_max) and (q2_min < q2 < q2_max)
         )
-
-        # goes from positive (True) to negative(False) when leaving the simulation region
         return +1 if is_inside else -1
 
+    # Triggers when the beam frequency crosses a resonance: the fundamental
+    # or the second harmonic of the electron cyclotron frequency, and, for
+    # X-mode, the upper hybrid frequency (beam-tracing/Scotty#151). With a
+    # temperature profile, the cyclotron and plasma frequencies include the
+    # relativistic mass correction. The event is the product of the
+    # differences, so it changes sign at any of the resonances; with
+    # `resonance_flag = False` its absolute value is returned, so it never
+    # changes sign and the ray is not stopped.
+    # ***Two resonances crossed within one solver step would cancel in the
+    #    product and go unseen
     @_event(terminal=True, direction=0.0)
-    def event_cross_resonance(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
-        # This event triggers when the beam's frequency is equal
-        # to the fundamental electron cyclotron frequency
-
-        # Used to include a delta_gyro_freq where the event triggers when
-        # beam frequency is close to the electron frequency, but this is removed because it works unreliably.
-
-        q_R, q_Z, _, _ = ray_parameters_2D
-
-        B_R = field.B_R(q_R, q_Z)
-        B_T = field.B_T(q_R, q_Z)
-        B_Z = field.B_Z(q_R, q_Z)
-        poloidal_flux = field.poloidal_flux(q_R, q_Z)
-
-        # find the temperature at a given poloidal flux
-        # this temperature will be used to compute relativistic corrections
-        if find_temperature_1D:
-            temperature = find_temperature_1D(poloidal_flux)
-        else:
-            temperature = None
-
-        # Magnitude of B field
-        B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
-
-        # Find the ratio of beam freq to electron cyclotron freq
-        # temperature is passed as an argument
-        # if None, no relativistic corrections are applied
-
-        gyro_freq = find_normalised_gyro_freq(
-            B_Total, launch_angular_frequency, temperature
+    def event_cross_resonance(tau, ray_parameters, hamiltonian: Hamiltonian):
+        q0, q1, q2, _, _, _ = ray_parameters
+        B_magnitude = field.magnitude(q0, q1, q2)
+        polflux = field.polflux(q0, q1, q2)
+        temperature = (
+            hamiltonian.temperature(polflux) if hamiltonian.temperature else None
         )
 
-        # Find the difference. If the sign changes, it means you have crossed the resonance frequency
-        difference_fundamental = gyro_freq - 1
-        difference_second_harmonic = gyro_freq - 0.5
+        # Ratio of the electron cyclotron frequency to the beam frequency
+        gyro_freq = find_normalised_gyro_ang_freq(
+            launch_angular_frequency, B_magnitude, temperature
+        )
+        difference = (gyro_freq - 1) * (gyro_freq - 0.5)
 
-        # UHR only applies for X-mode, so check mode_flag first
-
-        if mode_flag == -1:
-            electron_density = find_density(poloidal_flux)
-            plasma_freq = find_normalised_plasma_freq(
-                electron_density, launch_angular_frequency, temperature
+        if hamiltonian.mode_flag == -1:
+            plasma_freq = find_normalised_plasma_ang_freq(
+                launch_angular_frequency, hamiltonian.density(polflux), temperature
             )
-            UHR_normalised = np.sqrt(gyro_freq**2 + plasma_freq**2)
-            difference_UHR = UHR_normalised - 1
-            if resonance_flag == False:
-                # to prevent event from getting detected, force product to be positive so that there
-                # is no sign change.
-                return np.abs(
-                    difference_fundamental * difference_second_harmonic * difference_UHR
-                )
-            else:
-                return (
-                    difference_fundamental * difference_second_harmonic * difference_UHR
-                )
+            UH_freq = np.sqrt(gyro_freq**2 + plasma_freq**2)
+            difference = difference * (UH_freq - 1)
 
-        else:
-            if resonance_flag == False:
-                # to prevent event from getting detected, force product to be positive so that there
-                # is no sign change.
-                return np.abs(difference_fundamental * difference_second_harmonic)
-            else:
-                return difference_fundamental * difference_second_harmonic
+        return difference if resonance_flag else np.abs(difference)
 
-    """
-    # Old function for second harmonic
-    
-    @_event(terminal=True, direction=0.0)
-    def event_cross_resonance2(
-        tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian
-    ):
-        # This event triggers when the beam's frequency is equal
-        # to the second harmonic of the electron cyclotron frequency
-        # Not implemented for relativistic temperatures
-
-        # Used to include a delta_gyro_freq where the event triggers when
-        # beam frequency is close to the second harmonic electron frequency, but this is removed because it works unreliably.
-
-        q_R, q_Z, _, _ = ray_parameters_2D
-
-        B_R = field.B_R(q_R, q_Z)
-        B_T = field.B_T(q_R, q_Z)
-        B_Z = field.B_Z(q_R, q_Z)
-
-        # Magnitude of B field
-        B_Total = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
-
-        gyro_freq = find_normalised_gyro_freq(B_Total, launch_angular_frequency)
-
-        # Find the difference, if the sign changes, it means you have crossed the resonance frequency.
-        # We want 0.5. This is because second harmonic is 2*\omega_c = \omega
-        # normalised gyrofreq = \omega_c/\omega = 0.5
-
-        difference = gyro_freq - 0.5
-        return difference
-    """
-
+    # Triggers when the cut-off location is reached (i.e. when the
+    # wavenumber K is minimised)
     @_event(terminal=False, direction=1.0)
-    def event_reach_K_min(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
-        # To find tau of the cut-off, that is the location where the
-        # wavenumber K is minimised
-        # This function finds the turning points
+    def event_reach_K_min(tau, ray_parameters, hamiltonian: Hamiltonian):
+        q0, q1, q2, K0, K1, K2 = ray_parameters
+        q = np.array([q0, q1, q2])
+        K = np.array([K0, K1, K2])
+        K_magnitude = find_K_magnitude(cart, K0, K1, K2, q0)
+        dH = list(hamiltonian.derivatives(q, K).values())
+        spatial_dH = np.array([deriv for deriv in dH[:3]])
 
-        q_R = ray_parameters_2D[0]
-        q_Z = ray_parameters_2D[1]
-        K_R = ray_parameters_2D[2]
-        K_Z = ray_parameters_2D[3]
-        K_magnitude = np.sqrt(K_R**2 + K_Z**2 + K_zeta**2 / q_R**2)
-
-        dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z)
-
-        d_K_d_tau = -(1 / K_magnitude) * (
-            dH["dH_dR"] * K_R + dH["dH_dZ"] * K_Z + dH["dH_dKR"] * q_R
-        )
+        dK_d_tau = -1 * np.sum(spatial_dH * q) / K_magnitude
 
         # This event does not work properly when the ray reaches resonance
         # The following if statement introduces a trick to avoid this problem
         # When ray reaches resonance, dK_dtau goes to infinity. Just set to 0
         # to tell scotty that we are heading to infinity if we get a NaN.
-        ##
+        #
         # Note to developers:
         # Cannot set condition where K_magnitude > some value. K_magnitude
         # does not actually blow up. Only dK_dtau blows up
         # Matthew Liang, Peter Hill, and Valerian Hall-Chen (01 August 2024)
-        if np.isnan(d_K_d_tau) == True:
-            d_K_d_tau = 0
+        if np.isnan(dK_d_tau) == True:
+            dK_d_tau = 0
 
-        return d_K_d_tau
+        return dK_d_tau
 
-    # note: event_cross_resonance2 is outdated. It used to
-    # compute the second harmonic, but now all resonances are packaged
-    # under one single event
     return {
         "leave_plasma": event_leave_plasma,
         "leave_LCFS": event_leave_LCFS,
         "leave_simulation": event_leave_simulation,
         "cross_resonance": event_cross_resonance,
-        # "cross_resonance2": event_cross_resonance2,
         "reach_K_min": event_reach_K_min,
     }
 
 
-def handle_leaving_plasma_events(
-    tau_events: Dict[str, FloatArray], ray_parameters_2D_events: FloatArray
+def handle_terminating_event(
+    tau_events: Dict[str, FloatArray],
+    ray_parameters_events: FloatArray,
 ) -> float:
     """Handle events detected by `scipy.integrate.solve_ivp`. This
     only handles events due to the ray leaving the plasma or
     simulation:
+
+    TODO # TO REMOVE does it actually *only* handle ray leaving plasma or sim?
+    doesnt seem like it
 
     - ``"leave_plasma"``: the ray has left the plasma
     - ``"leave_LCFS"``: the ray has left the last-closed flux
@@ -292,15 +188,12 @@ def handle_leaving_plasma_events(
     ----------
     tau_events : Dict[str, FloatArray]
         A mapping between event names and the solver ``t_events``
-    K_R_LCFS : float
-        The radial wavevector in the case where the beam has crossed
-        the LCFS
+    ray_parameters_events :
 
     Returns
     -------
     FloatArray
         The value of ``tau`` when the detected event first occurred
-
     """
 
     def detected(event):
@@ -309,369 +202,202 @@ def handle_leaving_plasma_events(
 
     # Event names here must match those in the `solver_ray_events`
     # dict defined outside this function
-    if detected("leave_plasma") and not detected("leave_LCFS"):
-        return tau_events["leave_plasma"][0]
+    # if detected("leave_plasma") and not detected("leave_LCFS"):
+    #     log.info(f"Ray has left plasma")
+    #     return tau_events["leave_plasma"][0]
 
     if detected("cross_resonance"):
+        log.info(f"Ray has crossed resonance")
         return tau_events["cross_resonance"][0]
-    """
-    # Old function for second harmonic
-    if detected("cross_resonance2"):
-        return tau_events["cross_resonance2"][0]
-    """
-    if not detected("leave_plasma") and detected("leave_LCFS"):
-        return tau_events["leave_LCFS"][0]
 
     if detected("leave_plasma") and detected("leave_LCFS"):
-        # If both event_leave_plasma and event_leave_LCFS occur
-        K_R_LCFS = ray_parameters_2D_events[0][2]
-        if K_R_LCFS < 0:
-            # Beam has gone through the plasma, terminate at LCFS
-            return tau_events["leave_LCFS"][0]
-
-        # Beam deflection sufficiently large, terminate at entry poloidal flux
+        log.info(f"Ray has left plasma")
         return tau_events["leave_plasma"][0]
 
-    # If one ends up here, things aren't going well. I can think of
-    # two possible reasons:
-    # - The launch conditions are really weird (hasn't happened yet,
-    #   in my experience)
-    # - The max_step setting of the solver is too large, such that the
-    #   ray leaves the LCFS and enters a region where `poloidal_flux <
-    #   1` in a single step. The solver thus doesn't log the event
-    #   when it really should
+    if not detected("leave_plasma") and detected("leave_LCFS"):
+        log.info(f"Ray has left LCFS")
+        return tau_events["leave_LCFS"][0]
 
-    print("Warning: Ray has left the simulation region without leaving the LCFS.")
+    if detected("leave_plasma") and not detected("leave_LCFS"):
+        log.info(f"Ray has left plasma")
+        return tau_events["leave_plasma"][0]
+
+    # if detected("leave_plasma") and detected("leave_LCFS"):
+    #     K0_at_LCFS = ray_parameters_events[0][2]
+    #     if K0_at_LCFS < 0:
+    #         log.info(f"Ray has gone through the plasma and LCFS, and exited from the outboard side. Terminating the propagation at the LCFS")
+    #         return tau_events["leave_LCFS"][0]
+
+    #     log.info(f"Ray deflection is sufficiently large, so the ray has gone through the plasma and LCFS, but did not exit from the outboard side. Terminating at entry poloidal flux")
+    #     return tau_events["leave_plasma"][0]
+
+    log.warning(f"""Ray has left the simulation region without leaving the LCFS
+
+    If one ends up here, things aren't going well. I can think of two possible reasons:
+    1) The launch conditions are really weird (hasn't happened yet, in my experience)
+    2) The max_step setting of the solver is too large, such that the ray leaves the
+        LCFS and enters a region where `poloidal_flux < 1` in a single step. The solver
+        thus doesn't log the event when it really should
+    """)
     return tau_events["leave_simulation"][0]
 
 
-def handle_no_resonance(
-    solver_ray_output,
-    tau_leave: float,
-    tau_points: FloatArray,
-    K_zeta: float,
-    solver_arguments,
-    event_leave_plasma: Callable,
+def d_ray_parameters_d_tau(
+    tau: FloatArray, ray_parameters: FloatArray, hamiltonian: Hamiltonian
 ) -> FloatArray:
-    """Add an additional tau point at the cut-off (minimum K) if the
-    beam does NOT reach a resonance
-
-    Propagates another ray to find the cut-off location
-
-    TODO
-    ----
-    Check if using ``dense_output`` in the initial ray solver can get
-    the same information better/faster
-
-    """
-    ray_parameters_2D = solver_ray_output.y
-    tau_ray = solver_ray_output.t
-
-    max_tau_idx = int(np.argmax(tau_ray[tau_ray <= tau_leave]))
-
-    K_magnitude_ray = K_magnitude(
-        K_R=ray_parameters_2D[2, :max_tau_idx],
-        K_zeta=K_zeta,
-        K_Z=ray_parameters_2D[3, :max_tau_idx],
-        q_R=ray_parameters_2D[0, :max_tau_idx],
-    )
-
-    index_cutoff_estimate = int(np.argmin(K_magnitude_ray))
-    start = max(0, index_cutoff_estimate - 1)
-    stop = min(len(tau_ray) - 1, index_cutoff_estimate + 1)
-
-    ray_parameters_2D_initial_fine = ray_parameters_2D[:, start]
-    tau_start_fine = tau_ray[start]
-    tau_end_fine = tau_ray[stop]
-    tau_points_fine = np.linspace(tau_start_fine, tau_end_fine, 1001)
-
-    solver_start_time = time()
-
-    solver_ray_output_fine = solve_ivp(
-        ray_evolution_2D_fun,
-        [tau_start_fine, tau_end_fine],
-        ray_parameters_2D_initial_fine,
-        method="RK45",
-        t_eval=tau_points_fine,
-        dense_output=False,
-        events=event_leave_plasma,
-        vectorized=False,
-        args=solver_arguments,
-    )
-
-    solver_end_time = time()
-    print("Time taken (cut-off finder)", solver_end_time - solver_start_time, "s")
-
-    K_magnitude_ray_fine = K_magnitude(
-        K_R=solver_ray_output_fine.y[2, :],
-        K_zeta=K_zeta,
-        K_Z=solver_ray_output_fine.y[3, :],
-        q_R=solver_ray_output_fine.y[0, :],
-    )
-    index_cutoff_fine = np.argmin(K_magnitude_ray_fine)
-    tau_cutoff_fine = float(solver_ray_output_fine.t[index_cutoff_fine])
-    return np.sort(np.append(tau_points, tau_cutoff_fine))
+    # tau is unused here, but solve_ivp is strict about the function signatures and requires something like
+    # f(t, y, y0), so we put the tau here so that it stops complaining
+    dH = hamiltonian.derivatives(ray_parameters[:3], ray_parameters[-3:])
+    q_keys, K_keys = FIRST_ORDER_KEYS[
+        (
+            "cartesian"
+            if isinstance(hamiltonian.field, MagneticField_Cartesian)
+            else "cylindrical"
+        )
+    ]
+    # dq/dtau = dH/dK, dK/dtau = -dH/dq, picked by name so that the order of
+    # the derivative dictionary cannot change the equations of motion
+    return np.array([dH[key] for key in K_keys] + [-dH[key] for key in q_keys])
 
 
-@dataclass
-class K_cutoff_data:
-    """Properties of :math:`K`-cutoff"""
-
-    q_R: float
-    q_Z: float
-    K_norm_min: float
-    poloidal_flux: float
-    theta_m: float
-
-    def __iter__(self):
-        # So that quick_run results unpack as (q_R, q_Z, K_norm_min,
-        # poloidal_flux, theta_m), as the *_ray.py Examples expect
-        return iter(astuple(self))
-
-
-def quick_K_cutoff(
-    ray_parameters_turning_pt: FloatArray, K_zeta: float, field: MagneticField
-) -> K_cutoff_data:
-    r"""Calculate some quantities at the minimum :math:`|K|` along the ray
-
-    Parameters
-    ----------
-    ray_parameters_turning_pt : FloatArray
-        State vector from ray evolution
-    K_zeta : float
-        :math:`K_\zeta` for the ray
-    field : MagneticField
-        Object describing the magnetic field
-
-    Returns
-    -------
-    q_R, q_Z, K_norm, poloidal_flux, theta_m
-        Ray coordinates, :math:`|K|`, magnetic flux, and mismatch
-        angle
-
-    """
-
-    K_turning_pt = np.array(
-        [
-            K_magnitude(K_R, K_zeta, K_Z, q_R)
-            for (q_R, _, K_R, K_Z) in ray_parameters_turning_pt
-        ]
-    )
-    K_min_idx = np.argmin(K_turning_pt)
-    q_R, q_Z, K_R, K_Z = ray_parameters_turning_pt[K_min_idx]
-
-    B_R = field.B_R(q_R, q_Z)
-    B_T = field.B_T(q_R, q_Z)
-    B_Z = field.B_Z(q_R, q_Z)
-    B = np.array([B_R, B_T, B_Z])
-
-    K = np.array([K_R, K_zeta / q_R, K_Z])
-    K_norm_min = K_turning_pt[K_min_idx]
-
-    sin_theta_m = np.dot(B, K) / (K_norm_min * np.linalg.norm(B))
-    # Assumes the mismatch angle is never smaller than -90deg or bigger than 90deg
-    theta_m = np.sign(sin_theta_m) * np.arcsin(abs(sin_theta_m))
-
-    poloidal_flux = field.poloidal_flux(q_R, q_Z)
-
-    return K_cutoff_data(q_R, q_Z, K_norm_min, cast(float, poloidal_flux), theta_m)
-
-
-def ray_evolution_2D_fun(tau, ray_parameters_2D, K_zeta, hamiltonian: Hamiltonian):
-    """
-    Parameters
-    ----------
-    tau : float
-        Parameter along the ray.
-    ray_parameters_2D : complex128
-        q_R, q_Z, K_R, K_Z
-    hamiltonian:
-        Hamiltonian object
-
-    Returns
-    -------
-    d_beam_parameters_d_tau
-        d (beam_parameters) / d tau
-
-    Notes
-    -------
-
-    """
-
-    # Clean input up. Not necessary, but aids readability
-    q_R = ray_parameters_2D[0]
-    q_Z = ray_parameters_2D[1]
-    K_R = ray_parameters_2D[2]
-    K_Z = ray_parameters_2D[3]
-
-    # Find derivatives of H
-    dH = hamiltonian.derivatives(q_R, q_Z, K_R, K_zeta, K_Z)
-
-    d_ray_parameters_2D_d_tau = np.zeros_like(ray_parameters_2D)
-
-    # d (q_R) / d tau
-    d_ray_parameters_2D_d_tau[0] = dH["dH_dKR"]
-    # d (q_Z) / d tau
-    d_ray_parameters_2D_d_tau[1] = dH["dH_dKZ"]
-    # d (K_R) / d tau
-    d_ray_parameters_2D_d_tau[2] = -dH["dH_dR"]
-    # d (K_Z) / d tau
-    d_ray_parameters_2D_d_tau[3] = -dH["dH_dZ"]
-
-    return d_ray_parameters_2D_d_tau
-
-
-def propagate_ray(
-    poloidal_flux_enter: float,
-    launch_angular_frequency: float,
-    field: MagneticField,
-    initial_position: FloatArray,
+def ray_tracing(
+    q_initial: FloatArray,
     K_initial: FloatArray,
+    poloidal_flux_enter: float,
     hamiltonian: Hamiltonian,
+    ray_tracing_flag: bool,
     rtol: float,
     atol: float,
-    quick_run: bool,
-    mode_flag: int,
     len_tau: int,
-    resonance_flag: bool,
-    find_density: ProfileFitLike,
-    find_temperature_1D: Optional[ProfileFitLike] = None,
     tau_max: float = 1e5,
-    verbose: bool = True,
-) -> Union[Tuple[float, FloatArray], K_cutoff_data]:
-    """Propagate a ray. Quickly finds tau at which the ray leaves the
-    plasma, as well as estimates location of cut-off.
+    resonance_flag: bool = True,
+) -> Tuple[VALID_SOLVER_STATUS, int, float, FloatArray, Union[float, FloatArray]]:
+    """Propagates a ray, given an initial position `q` and wavevector `K`, using
+    `scipy.integrate.solve_ivp` until any of these terminating conditions are
+    encountered:
+        (i) ray leaves the plasma (at the same `poloidal_flux_enter`);
+        (ii) ray leaves the simulation region (i.e. exits the bounds of the magnetic profile); or
+        (iii) ray reaches a resonance layer (i.e. when the beam frequency is equal to the
+              fundamental or second harmonic of the electron gyrotron frequency).
 
-    Parameters
-    ----------
-    poloidal_flux_enter : float
-        Flux label where ray enters plasma
-    launch_angular_frequency : float
-        Angular frequency of beam
-    field : MagneticField
-        Object describing magnetic field
-    initial_position : FloatArray
-        Initial position in ``q`` coordinates
-    K_initial : FloatArray
-        Initial wavevector
-    hamiltonian : Hamiltonian
-        Object to compute Hamiltonian
-    rtol : float
-        Relative tolerance
-    atol : float
-        Absolute tolerance
-    quick_run : bool
-        If true, use minimum of :math:`|K|` to estimate cut-off location
-    len_tau : int
-        Number of points for tau
-    tau_max : float
-        Maximum value of tau before the solver stops
-    resonance_flag: bool
-        If true, terminate beam when it hits resonance
-    verbose : bool
-        If true, print some timing information
+    In addition to the conditions above, the solver will also return the instances when
+    any of the following non-terminating conditions occur:
+        (a) ray leaves the LCFS (i.e. when the ray reaches `poloidal_flux` == 1.0); or
+        (b) dK/dtau = 0 (i.e. a cut-off is reached).
 
-    Returns
-    -------
-    Union[Tuple[float, FloatArray], K_cutoff_data]
-        Returns either: value of tau where ray left plasma, along with
-        an array of tau points for the beam solver to output results
-        at; or, a `K_cutoff_data` with information about the estimated
-        location of the cut-off
+    If `ray_tracing_flag == True`, then this returns a 2-tuple where the first item is an
+    array of equally-spaced `tau` points, and the second is an array of shape `(6, len(tau_points))`
+    corresponding to `q0`, `q1`, `q2`, `K0`, `K1`, `K2` in the same order as the first.
 
+    If `ray_tracing_flag == False`, it returns a 2-tuple with the same first item, but the second
+    item is the `tau` value when the ray encounters a terminating condition.
     """
 
-    # `solve_ivp` only takes a list of event handlers, which means we
-    # need to match indices with the returned events. To make that a
-    # bit easier, we make a dict here and pass `solve_ivp` the
-    # values. We can then pass the keys to our event handler along
-    # with the returned events, and use these names instead of list
-    # indices
+    log.trace(f"Packing ray parameters: q = {q_initial}, K = {K_initial}")
+    ray_parameters_initial = [*q_initial, *K_initial]
 
-    # added arguments (mode_flag, find_density, find_temperature_1D)
-    # to account for relativistic corrections + UHR
-
+    # Creating arguments and events to be passed to solver
     solver_ray_events = make_solver_events(
         poloidal_flux_enter,
-        launch_angular_frequency,
-        field,
-        mode_flag,
+        hamiltonian.angular_frequency,
+        hamiltonian.field,
         resonance_flag,
-        find_density,
-        find_temperature_1D,
     )
+    solver_arguments = (hamiltonian,)
 
-    K_R_initial, K_zeta_initial, K_Z_initial = K_initial
+    # Propagating q, K by solving the ray-tracing equatoins
+    log.info(f"Starting the ray solver")
 
-    # Ray evolves q_R, q_Z, K_R, K_Z
-    ray_parameters_2D_initial = [
-        initial_position[0],
-        initial_position[2],
-        K_R_initial,
-        K_Z_initial,
-    ]
-
-    # Additional arguments for solver
-    solver_arguments = (K_zeta_initial, hamiltonian)
-
-    solver_start_time = time()
-    solver_ray_output = solve_ivp(
-        ray_evolution_2D_fun,
-        [0, tau_max],
-        ray_parameters_2D_initial,
+    solver_ray_output, duration_ray_tracing = timer(solve_ivp)(
+        fun=d_ray_parameters_d_tau,
+        t_span=[0, tau_max],
+        y0=ray_parameters_initial,
         method="RK45",
         t_eval=None,
-        dense_output=False,
+        dense_output=True,
         events=solver_ray_events.values(),
         vectorized=False,
         args=solver_arguments,
         rtol=rtol,
         atol=atol,
-        max_step=50,
+        max_step=500,
     )
-    solver_end_time = time()
-    if verbose:
-        print("Time taken (ray solver)", solver_end_time - solver_start_time, "s")
+
+    log.info(f"""\n
+        Ray solver status: {solver_ray_output.status}
+        Ray solver took {duration_ray_tracing} s
+        Number of ray evolution evaluations: {solver_ray_output.nfev}
+        Time per ray evolution evaluation: {duration_ray_tracing / solver_ray_output.nfev}
+    """)
 
     if solver_ray_output.status == 0:
         raise RuntimeError(
-            "Ray has not left plasma/simulation region. "
-            "Increase tau_max or choose different initial conditions."
+            "Ray has not left plasma/simulation region; increase `tau_max` or choose different initial conditions"
         )
-    if solver_ray_output.status == -1:
+    elif solver_ray_output.status == -1:
         raise RuntimeError(
-            "Integration step failed. Check density interpolation is not negative"
+            "Integration step failed. Check that (i) ray does not leave interpolation region; and (ii) density interpolation is not negative"
         )
 
     # tau_events is a list with the same order as the values of
     # solver_ray_events, so we can use the names from that dict
     # instead of raw indices
+
+    soln_interp = cast(OdeSolution, solver_ray_output.sol)
     tau_events = dict(zip(solver_ray_events.keys(), solver_ray_output.t_events))
-    ray_parameters_2D_events = dict(
+    ray_parameters_events = dict(
         zip(solver_ray_events.keys(), solver_ray_output.y_events)
     )
-    tau_leave = handle_leaving_plasma_events(
-        tau_events, ray_parameters_2D_events["leave_LCFS"]
+    tau_terminating_event = handle_terminating_event(
+        tau_events=tau_events, ray_parameters_events=ray_parameters_events["leave_LCFS"]
+    )
+    tau_arr_resampled = np.linspace(
+        start=0, stop=tau_terminating_event, num=len_tau - 1, endpoint=False
     )
 
-    if quick_run:
-        return quick_K_cutoff(
-            ray_parameters_2D_events["reach_K_min"], K_zeta_initial, field
-        )
-
-    # The beam solver outputs data at these values of tau
-    # Don't include `tau_leave` itself so that last point is inside
-    # the plasma
-    tau_points = np.linspace(0, tau_leave, len_tau - 1, endpoint=False)
-
+    # Find the cut-off (i.e. `tau` where K_magnitude is minimised) if no resonance is reached
     if len(tau_events["cross_resonance"]) == 0:
-        tau_points = handle_no_resonance(
-            solver_ray_output,
-            tau_leave,
-            tau_points,
-            K_zeta_initial,
-            solver_arguments,
-            solver_ray_events["leave_plasma"],
+
+        def K_magnitude(tau):
+            q0, _, _, K0, K1, K2 = soln_interp(tau)
+            return (
+                np.sqrt(K0**2 + K1**2 + K2**2)
+                if isinstance(hamiltonian.field, MagneticField_Cartesian)
+                else np.sqrt(K0**2 + (K1 / q0) ** 2 + K2**2)
+            )
+
+        tau_cutoff = minimize_scalar(
+            fun=K_magnitude, bounds=[0, tau_arr_resampled[-1]], options={"xatol": atol}
+        )
+        tau_arr_resampled = np.sort(
+            np.append(
+                np.linspace(
+                    start=0, stop=tau_terminating_event, num=len_tau - 1, endpoint=False
+                ),
+                tau_cutoff.x,
+            )
         )
 
-    return tau_leave, tau_points
+    else:
+        tau_arr_resampled = np.linspace(
+            start=0, stop=tau_terminating_event, num=len_tau - 1, endpoint=False
+        )
+
+    # For ray-tracing runs, return `tau` and `result` (containing `q`, `K`)
+    # Otherwise return `tau_terminating_event` and `tau_arr_resampled` (since the beam solver calculates everything again)
+    if ray_tracing_flag:
+        return (
+            solver_ray_output.status,
+            solver_ray_output.nfev,
+            duration_ray_tracing,
+            tau_arr_resampled,
+            soln_interp(tau_arr_resampled),
+        )
+    else:
+        return (
+            solver_ray_output.status,
+            solver_ray_output.nfev,
+            duration_ray_tracing,
+            tau_arr_resampled,
+            tau_terminating_event,
+        )

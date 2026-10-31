@@ -24,9 +24,11 @@ Consider a ray entering and leaving an optical system. It is distance
 at a distance :math:`r'`, and an angle :math:`\theta'`
 """
 
-from .fun_general import freq_GHz_to_wavenumber
+# TODO: go through this file; everything copied from v3
+
 
 import numpy as np
+from scotty.fun_general import freq_GHz_to_wavenumber
 from typing import Optional, Dict
 
 

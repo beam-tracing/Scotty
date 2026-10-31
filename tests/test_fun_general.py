@@ -1,24 +1,24 @@
-from scotty.fun_general import (
-    freq_GHz_to_wavenumber,
-    find_nearest,
-    read_floats_into_list_until,
-    find_Psi_3D_lab,
-    find_Psi_3D_lab_Cartesian,
-    make_array_3x3,
-    K_magnitude,
-    dot,
-    find_Psi_3D_plasma_discontinuous,
-    cartesian_to_cylindrical,
-    cylindrical_to_cartesian,
-)
-
 import io
-from textwrap import dedent
-
-from scipy.constants import c as speed_of_light
 import numpy as np
 import numpy.testing as npt
 import pytest
+from scipy.constants import c as speed_of_light
+from scotty.fun_general import (
+    dot,
+    find_K_labframe_cyl_to_cart,
+    freq_GHz_to_wavenumber,
+    find_K_magnitude,
+    find_nearest,
+    find_Psi_3D_labframe_cart_to_cyl,
+    find_Psi_3D_labframe_cyl_to_cart,
+    find_q_labframe_cart_to_cyl,
+    find_q_labframe_cyl_to_cart,
+    make_array_3x3,
+    read_floats_into_list_until,
+)
+from scotty.typing import ComplexFloatArray
+from textwrap import dedent
+from typing import cast
 
 
 def test_freq_GHz_to_wavenumber():
@@ -26,7 +26,7 @@ def test_freq_GHz_to_wavenumber():
 
 
 def test_find_nearest():
-    data = [1, 3, 5, 7, 9]
+    data = np.array([1, 3, 5, 7, 9])
     assert find_nearest(data, 5.5) == 2
     assert find_nearest(data, 6.5) == 3
     assert find_nearest(data, 0.5) == 0
@@ -68,18 +68,20 @@ def test_read_floats_into_list():
     npt.assert_allclose(B_r, expected_B_r)
 
 
-def random_symmetric_matrix():
+def random_symmetric_matrix() -> ComplexFloatArray:
     array = np.random.random((3, 3))
     array[0, 1] = array[1, 0]
     array[0, 2] = array[2, 0]
     array[1, 2] = array[2, 1]
-    return array
+    return cast(ComplexFloatArray, array)
 
 
 def test_find_Psi_3D_lab_symmetry():
     Psi_lab_Cartesian = random_symmetric_matrix()
 
-    Psi_lab_cylindrical = find_Psi_3D_lab(Psi_lab_Cartesian, 2, np.pi, 42, 64)
+    Psi_lab_cylindrical = find_Psi_3D_labframe_cart_to_cyl(
+        Psi_lab_Cartesian, np.array([42, 64, 0]), np.array([2, np.pi, 0.123])
+    )
 
     # result should be symmetric
     assert Psi_lab_cylindrical[0, 1] == Psi_lab_cylindrical[1, 0]
@@ -91,16 +93,26 @@ def test_find_Psi_3D_lab_symmetry():
 
 
 def test_convert_Psi_roundtrip():
-    Psi_original = random_symmetric_matrix()
-    q_R = 2
-    q_zeta = np.pi
-    K_R = 42
-    K_zeta = 64
-    Psi_cylindrical = find_Psi_3D_lab(Psi_original, q_R, q_zeta, K_R, K_zeta)
-    Psi_cartesian = find_Psi_3D_lab_Cartesian(Psi_cylindrical, q_R, q_zeta, K_R, K_zeta)
+    q_cyld = np.array([2, np.pi, 0.123])
+    q_cart = find_q_labframe_cyl_to_cart(q_cyld)
+    K_cyld = np.array([42, 64, 0])
+    K_cart = find_K_labframe_cyl_to_cart(K_cyld, q_cyld)
+    Psi_original_cyld = random_symmetric_matrix()
 
-    npt.assert_allclose(Psi_cartesian.real, Psi_original)
-    npt.assert_allclose(Psi_cartesian.imag, np.zeros_like(Psi_original))
+    Psi_cart = find_Psi_3D_labframe_cyl_to_cart(
+        Psi_original_cyld,
+        K_cyld,
+        q_cyld,
+    )
+
+    Psi_cyld = find_Psi_3D_labframe_cart_to_cyl(
+        Psi_cart,
+        K_cart,
+        q_cart,
+    )
+
+    npt.assert_allclose(Psi_cyld.real, Psi_original_cyld)
+    npt.assert_allclose(Psi_cyld.imag, np.zeros_like(Psi_original_cyld))
 
 
 def test_Psi_cylindrical():
@@ -118,8 +130,16 @@ def test_Psi_cylindrical():
         ]
     )
 
-    R = 2
-    Psi_lab_cylindrical = find_Psi_3D_lab(Psi_lab_Cartesian, R, np.pi, 0, 0)
+    q_cyld = np.array([2, np.pi, 0.123])
+    q_cart = find_q_labframe_cyl_to_cart(q_cyld)
+    K_cyld = K_cart = np.array([0, 0, 0])
+    Psi_cyld = find_Psi_3D_labframe_cart_to_cyl(
+        Psi_lab_Cartesian,
+        K_cart,
+        q_cart,
+    )
+
+    R = q_cyld[0]
     expected = np.array(
         [
             [xx, xy * R, -xz],
@@ -127,7 +147,82 @@ def test_Psi_cylindrical():
             [-xz, -yz * R, zz],
         ]
     )
-    npt.assert_allclose(Psi_lab_cylindrical, expected + 0j)
+    npt.assert_allclose(Psi_cyld, expected + 0j)
+
+
+def _quadratic_phase_case(seed):
+    """Exact test field s(x) = k.x + x.A.x / 2 with complex symmetric A: the
+    Cartesian Psi is A everywhere and K_cart = k + A x. The cylindrical Psi
+    (dimensionless K_zeta = ds/dzeta) is the Hessian of
+    s(R cos zeta, R sin zeta, Z), found here by central differences, so the
+    coordinate-curvature terms (K_zeta / R in Psi_Rzeta, -R K_R in
+    Psi_zetazeta) are tested rather than assumed."""
+    rng = np.random.default_rng(seed)
+    A = rng.normal(size=(3, 3)) + 1j * rng.normal(size=(3, 3))
+    A = 50 * (A + A.T)
+    k = 500 * rng.normal(size=3)
+    q_cyl = np.array(
+        [rng.uniform(0.5, 2.5), rng.uniform(-np.pi, np.pi), rng.uniform(-1, 1)]
+    )
+    q_cart = find_q_labframe_cyl_to_cart(q_cyl)
+
+    def s(q):
+        x = np.array([q[0] * np.cos(q[1]), q[0] * np.sin(q[1]), q[2]])
+        return k @ x + 0.5 * x @ A @ x
+
+    h = 1e-4
+    Psi_cyl = np.empty((3, 3), dtype=complex)
+    for i in range(3):
+        for j in range(3):
+            ei, ej = h * np.eye(3)[i], h * np.eye(3)[j]
+            Psi_cyl[i, j] = (
+                s(q_cyl + ei + ej)
+                - s(q_cyl + ei - ej)
+                - s(q_cyl - ei + ej)
+                + s(q_cyl - ei - ej)
+            ) / (4 * h**2)
+
+    K_cart = k + A @ q_cart
+    K_cyl = np.array(
+        [
+            K_cart[0] * np.cos(q_cyl[1]) + K_cart[1] * np.sin(q_cyl[1]),
+            q_cyl[0] * (-K_cart[0] * np.sin(q_cyl[1]) + K_cart[1] * np.cos(q_cyl[1])),
+            K_cart[2],
+        ]
+    )
+    return A, Psi_cyl, K_cart, q_cart, K_cyl, q_cyl
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_Psi_conversion_exact_field(seed):
+    A, Psi_cyl, K_cart, q_cart, K_cyl, q_cyl = _quadratic_phase_case(seed)
+    npt.assert_allclose(
+        find_Psi_3D_labframe_cart_to_cyl(A, K_cart, q_cart),
+        Psi_cyl,
+        atol=1e-6 * np.max(np.abs(Psi_cyl)),
+    )
+    npt.assert_allclose(
+        find_Psi_3D_labframe_cyl_to_cart(Psi_cyl, K_cyl, q_cyl),
+        A,
+        atol=1e-6 * np.max(np.abs(A)),
+    )
+
+
+def test_Psi_conversion_exact_field_stacked():
+    cases = [_quadratic_phase_case(seed) for seed in range(4)]
+    A, Psi_cyl, K_cart, q_cart, K_cyl, q_cyl = (
+        np.array([case[i] for case in cases]) for i in range(6)
+    )
+    npt.assert_allclose(
+        find_Psi_3D_labframe_cart_to_cyl(A, K_cart.T, q_cart.T),
+        Psi_cyl,
+        atol=1e-6 * np.max(np.abs(Psi_cyl)),
+    )
+    npt.assert_allclose(
+        find_Psi_3D_labframe_cyl_to_cart(Psi_cyl, K_cyl.T, q_cyl.T),
+        A,
+        atol=1e-6 * np.max(np.abs(A)),
+    )
 
 
 def test_make_array_3x3():
@@ -181,94 +276,7 @@ def test_K_magnitude():
     K_Z = 11
     q_R = 2
     expected_K = 15
-    assert K_magnitude(K_R, K_zeta, K_Z, q_R) == expected_K
-
-
-def test_find_Psi_3D_plasma_discontinuous():
-    ## Values from a test case that I used
-    ## TODO: Integrate this test with a circular-flux-surface case which has discontinuous ne
-    ## Find values from a simple slab case and test them
-
-    Psi_vacuum_3D = np.array(
-        [
-            [
-                22.96480274 + 25.35603703j,
-                -288.34856095 - 200.18496508j,
-                -76.01536319 - 83.93054303j,
-            ],
-            [
-                -288.34856095 - 200.18496508j,
-                3901.7586168 + 2724.12830862j,
-                -22.50617362 - 24.84965268j,
-            ],
-            [
-                -76.01536319 - 83.93054303j,
-                -22.50617362 - 24.84965268j,
-                625.89678142 + 691.06894368j,
-            ],
-        ]
-    )
-    K_v_R = -720.1663330442489
-    K_v_zeta = -213.22253614625006
-    K_v_Z = -89.39673984646942
-    K_p_R = -572.3610161829057
-    K_p_zeta = -213.22253614625006
-    K_p_Z = -116.25073909098793
-    dH_dKR = -0.0021297263342362482
-    dH_dKzeta = -0.00018858310699032543
-    dH_dKZ = -0.00044100184796613817
-    dH_dR = -2.2863224601654686
-    dH_dZ = 0.40208647341111176
-    dpolflux_dR = 1.9677859515843108
-    dpolflux_dZ = -0.3575170608158262
-    d2polflux_dR2 = 0.12782996883231587
-    d2polflux_dZ2 = 3.8721770234673154
-    d2polflux_dRdZ = 0.7035172444602721
-
-    Psi_3D_plasma = find_Psi_3D_plasma_discontinuous(
-        Psi_vacuum_3D,
-        K_v_R,
-        K_v_zeta,
-        K_v_Z,
-        K_p_R,
-        K_p_zeta,
-        K_p_Z,
-        dH_dKR,  # In the plasma
-        dH_dKzeta,  # In the plasma
-        dH_dKZ,  # In the plasma
-        dH_dR,  # In the plasma
-        dH_dZ,  # In the plasma
-        dpolflux_dR,  # Continuous
-        dpolflux_dZ,  # Continuous
-        d2polflux_dR2,  # Continuous
-        d2polflux_dZ2,  # Continuous
-        d2polflux_dRdZ,  # Continuous
-    )
-
-    # The matching conditions (Hall-Chen, Parra & Hillesheim 2022, App. C,
-    # with the second-order displacement eta on the poloidal condition and the
-    # sign of its cross term corrected), checked directly rather than against
-    # stored values
-    dpR, dpZ = dpolflux_dR, dpolflux_dZ
-    eta = (
-        -0.5
-        * (
-            d2polflux_dR2 * dpZ**2
-            - 2 * d2polflux_dRdZ * dpR * dpZ
-            + d2polflux_dZ2 * dpR**2
-        )
-        / (dpR**2 + dpZ**2)
-    )
-    Pv, Pp = Psi_vacuum_3D, Psi_3D_plasma  # (R, zeta, Z)
-    poloidal = lambda P: P[0, 0] * dpZ**2 - 2 * P[0, 2] * dpR * dpZ + P[2, 2] * dpR**2
-    mixed = lambda P: -P[0, 1] * dpZ + P[1, 2] * dpR
-    dK_dot_gradpsi = (K_v_R - K_p_R) * dpR + (K_v_Z - K_p_Z) * dpZ
-    npt.assert_allclose(Pp[1, 1], Pv[1, 1])
-    npt.assert_allclose(poloidal(Pp), poloidal(Pv) + 2 * eta * dK_dot_gradpsi)
-    npt.assert_allclose(mixed(Pp), mixed(Pv))
-    g_K = np.array([dH_dKR, dH_dKzeta, dH_dKZ])
-    npt.assert_allclose(Pp @ g_K, -np.array([dH_dR, 0.0, dH_dZ]), atol=1e-12)
-    npt.assert_allclose(Pp, Pp.T)
+    assert find_K_magnitude(False, K_R, K_zeta, K_Z, q_R) == expected_K
 
 
 @pytest.mark.parametrize(
@@ -281,7 +289,7 @@ def test_find_Psi_3D_plasma_discontinuous():
     ),
 )
 def test_cartesian_to_cylindrical(cartesian, expected_cylindrical):
-    cylindrical = cartesian_to_cylindrical(*cartesian)
+    cylindrical = find_q_labframe_cart_to_cyl(np.array(cartesian))
     npt.assert_allclose(cylindrical, expected_cylindrical)
 
 
@@ -295,5 +303,5 @@ def test_cartesian_to_cylindrical(cartesian, expected_cylindrical):
     ),
 )
 def test_cylindrical_to_cylindrical(cylindrical, expected_cartesian):
-    cartesian = cylindrical_to_cartesian(*cylindrical)
+    cartesian = find_q_labframe_cyl_to_cart(np.array(cylindrical))
     npt.assert_allclose(cartesian, expected_cartesian, atol=1e-15)

@@ -46,13 +46,10 @@ Version history
 
 from __future__ import annotations
 import argparse
-import pathlib
-
-import numpy as np
 import freeqdsk._fileutils as fortran
-
+import numpy as np
+import pathlib
 from scotty.fun_general import read_floats_into_list_until
-from scotty.geometry import CircularFluxSurfaceField
 from scotty.typing import PathLike
 
 
@@ -265,6 +262,9 @@ def write_torbeam_file(
     """Write a TORBEAM magnetic geometry file based on the analytical
     circular flux surface equilibrium (`CircularFluxSurfaceField`)"""
 
+    # Imported here: geometry imports Torbeam from this module
+    from scotty.geometry import CircularFluxSurfaceField
+
     field = CircularFluxSurfaceField(
         B_toroidal_max,
         major_radius,
@@ -275,10 +275,10 @@ def write_torbeam_file(
         buffer_factor,
     )
     x_meshgrid, z_meshgrid = np.meshgrid(field.R_coord, field.Z_coord, indexing="ij")
-    B_t = field.B_T(x_meshgrid, z_meshgrid)
-    B_r = field.B_R(x_meshgrid, z_meshgrid)
-    B_z = field.B_Z(x_meshgrid, z_meshgrid)
-    psi = field.poloidal_flux(x_meshgrid, z_meshgrid)
+    B_t = field.B_T(x_meshgrid, 0.0, z_meshgrid)
+    B_r = field.B_R(x_meshgrid, 0.0, z_meshgrid)
+    B_z = field.B_Z(x_meshgrid, 0.0, z_meshgrid)
+    psi = field.polflux(x_meshgrid, 0.0, z_meshgrid)
 
     Torbeam(field.R_coord, field.Z_coord, B_r, B_t, B_z, psi).write(
         torbeam_directory_path / "topfile"

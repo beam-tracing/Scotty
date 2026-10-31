@@ -7,6 +7,7 @@ Valerian Hongjie Hall-Chen
 
 """
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs
 import numpy as np
 
 ## high density
@@ -91,4 +92,4 @@ kwargs_dict = dict(
 # )
 
 
-beam_me_up(**kwargs_dict)
+beam_me_up(**from_v3_kwargs(kwargs_dict))

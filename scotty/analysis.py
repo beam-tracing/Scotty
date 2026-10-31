@@ -1,1043 +1,880 @@
-"""
-This file analyses solver_output (q, K, Psi_3D) from a beam tracing solver.
-
-To do:
-- Separate functions into those which analyse beam tracing only from those which are DBS specific. Maybe different files? (analysis_beam.py, analysis_DBS.py, analysis_highk.py)
-- Write docstrings for functions in this file
-- Change everything to Cartesian coordinates before passing into the functions in this file. Especially since within the scotty framework we expect to have both Cartesian and Cylindrical solvers
-"""
-
-from pathlib import Path
-from typing import Dict, Optional, Union
-
+import logging
 import numpy as np
-from scipy import constants
-import xarray as xr
-
-from scotty.check_output import check_output
-from scotty.profile_fit import ProfileFitLike
+from scipy import constants as const
+from scipy.integrate import trapezoid
+from scotty.checks import VALID_FIELDS, check_H_output, check_Psi_output
+from scotty.data_io import CARTESIAN_VECTOR_COMPONENTS, SOLUTION_COMPONENTS
 from scotty.derivatives import derivative
 from scotty.fun_general import (
-    K_magnitude,
-    dot,
-    find_nearest,
-    find_normalised_gyro_freq,
-    find_normalised_plasma_freq,
-    make_unit_vector_from_cross_product,
-    find_Psi_3D_lab_Cartesian,
-    find_H_Cardano,
-    angular_frequency_to_wavenumber,
-    find_waist,
-    find_D,
-    find_x0,
+    find_H_Cardano_eigh,
+    find_H_Cardano_formula,
+    find_beam_widths_and_curvs,
+    find_g_cartesian,
+    find_normalised_angular_freqs,
     find_electron_mass,
-    cylindrical_to_cartesian,
+    make_unit_vector_from_cross_product,
+    dot,
+    find_waist,
 )
-from scotty.geometry import MagneticField
-from scotty.hamiltonian import DielectricTensor, Hamiltonian, hessians
-from scotty.typing import ArrayLike, FloatArray, PathLike
+from scotty.hamiltonian import DielectricTensor, Hamiltonian, convert_hessians, hessians
+from scotty.profile_fit import ProfileFitLike
+from scotty.typing import ArrayLike
+from typing import Optional, Tuple
+import xarray as xr
 
-CYLINDRICAL_VECTOR_COMPONENTS = ["R", "zeta", "Z"]
-CARTESIAN_VECTOR_COMPONENTS = ["X", "Y", "Z"]
-SOLUTION_COMPONENTS = ["solution_1", "solution_2", "solution_3"]
+log = logging.getLogger(__name__)
 
+# e_hat and the eigenvectors of D are in the field-aligned frame (u1, u2, b) in
+# which D is written, eqs. (34)-(41) of Hall-Chen, Parra & Hillesheim (2022):
+# u1 is the unit vector perpendicular to b_hat in the plane of g and b_hat
+# (which also contains K), and u2 = b_hat x g / |b_hat x g| is perpendicular
+# to that plane. This is neither the Cartesian lab frame (col_cart) nor the
+# beam frame (x, y, g)
+FIELD_ALIGNED_COMPONENTS = ["u1", "u2", "b"]
 
-def set_vector_components_long_name(df: Union[xr.Dataset, xr.DataArray]) -> None:
-    if "col" in df.coords:
-        df.col.attrs["long_name"] = "Vector/matrix column component"
-    if "row" in df.coords:
-        df.row.attrs["long_name"] = "Matrix row component"
-    if "col_cart" in df.coords:
-        df.col_cart.attrs["long_name"] = "Vector/matrix column component"
-    if "row_cart" in df.coords:
-        df.row_cart.attrs["long_name"] = "Matrix row component"
-    if "solution" in df.coords:
-        df.solution.attrs["long_name"] = "Solution/root number"
+# Transverse directions of the beam frame (x, y, g), for Psi_w
+BEAM_TRANSVERSE_COMPONENTS = ["x", "y"]
 
 
-def save_npz(filename: Path, df: xr.Dataset) -> None:
-    """Save xarray dataset to numpy .npz file"""
-    np.savez(
-        filename,
-        **{str(k): v for k, v in df.items()},
-        **{str(k): v.data for k, v in df.coords.items()},
-    )
-
-
-def immediate_analysis(
-    solver_output: xr.Dataset,
-    field: MagneticField,
-    find_density_1D: ProfileFitLike,
-    find_temperature_1D: Optional[ProfileFitLike],
-    hamiltonian: Hamiltonian,
-    K_zeta_initial: float,
-    launch_angular_frequency: float,
-    mode_flag: int,
-    delta_R: float,
-    delta_Z: float,
-    delta_K_R: float,
-    delta_K_zeta: float,
-    delta_K_Z: float,
-    Psi_3D_lab_launch: FloatArray,
-    Psi_3D_lab_entry: FloatArray,
-    distance_from_launch_to_entry: float,
-    vacuumLaunch_flag: bool,
-    output_path: Path,
-    output_filename_suffix: str,
-    dH: Dict[str, ArrayLike],
-):
-    q_R = solver_output.q_R
-    q_Z = solver_output.q_Z
-    tau = solver_output.tau
-    K_R = solver_output.K_R
-    K_Z = solver_output.K_Z
-
-    numberOfDataPoints = len(tau)
-
-    poloidal_flux = field.poloidal_flux(q_R, q_Z)
-
-    dH_dR = dH["dH_dR"]
-    dH_dZ = dH["dH_dZ"]
-    dH_dKR = dH["dH_dKR"]
-    dH_dKzeta = dH["dH_dKzeta"]
-    dH_dKZ = dH["dH_dKZ"]
-
-    g_magnitude = (q_R**2 * dH_dKzeta**2 + dH_dKR**2 + dH_dKZ**2) ** 0.5
-    g_hat = (np.block([[dH_dKR], [q_R * dH_dKzeta], [dH_dKZ]]) / g_magnitude.data).T
-
-    # Calculates b_hat and grad_b_hat
-    B_R = field.B_R(q_R, q_Z)
-    B_T = field.B_T(q_R, q_Z)
-    B_Z = field.B_Z(q_R, q_Z)
-    B_magnitude = field.magnitude(q_R, q_Z)
-    b_hat = field.unit(q_R, q_Z)
-
-    dbhat_dR = derivative(
-        field.unit, dims="q_R", args={"q_R": q_R, "q_Z": q_Z}, spacings=delta_R
-    )
-    dbhat_dZ = derivative(
-        field.unit, dims="q_Z", args={"q_R": q_R, "q_Z": q_Z}, spacings=delta_Z
-    )
-
-    # Transpose dbhat_dR so that it has the right shape
-    grad_bhat = np.zeros([numberOfDataPoints, 3, 3])
-    grad_bhat[:, 0, :] = dbhat_dR
-    grad_bhat[:, 2, :] = dbhat_dZ
-    grad_bhat[:, 1, 0] = -B_T / (B_magnitude * q_R)
-    grad_bhat[:, 1, 1] = B_R / (B_magnitude * q_R)
-
-    # x_hat and y_hat
-    y_hat = make_unit_vector_from_cross_product(b_hat, g_hat)
-    x_hat = make_unit_vector_from_cross_product(y_hat, g_hat)
-
-    # -------------------
-    # Not useful for physics or data analysis
-    # But good for checking whether things are working properly
-    # -------------------
-    #
-    # There are two definitions of H used in Scotty
-    # H_Booker: H is the determinant of the dispersion tensor D. Booker quartic
-    # H_Cardano: H is the zero eigenvalue of the dispersion tensor D. Can be calculated with Cardano's formula.
-
-    H_Booker = hamiltonian(q_R.data, q_Z.data, K_R.data, K_zeta_initial, K_Z.data)
-    # Create and immediately evaluate a Hamiltonian with the opposite mode
-    # That is, the opposite of the discriminant in the Booker quartic
-    H_Booker_other = Hamiltonian(
-        field,
-        launch_angular_frequency,
-        -mode_flag,
-        find_density_1D,
-        delta_R,
-        delta_Z,
-        delta_K_R,
-        delta_K_zeta,
-        delta_K_Z,
-    )(q_R.data, q_Z.data, K_R.data, K_zeta_initial, K_Z.data)
-
-    electron_density = np.asarray(find_density_1D(poloidal_flux))
-    temperature = find_temperature_1D(poloidal_flux) if find_temperature_1D else None
-
-    epsilon = DielectricTensor(
-        electron_density, launch_angular_frequency, B_magnitude, temperature
-    )
-
-    # Plasma and cyclotron frequencies
-    normalised_plasma_freqs = find_normalised_plasma_freq(
-        electron_density, launch_angular_frequency, temperature
-    )
-    normalised_gyro_freqs = find_normalised_gyro_freq(
-        B_magnitude, launch_angular_frequency, temperature
-    )
-
-    # -------------------
-    # Sanity check. Makes sure that calculated quantities are reasonable
-    # -------------------
-    check_output(H_Booker)
-    print("The final value of H_Booker is", H_Booker[-1])
-    ##
-
-    df = xr.Dataset(
-        {
-            "B_R": (["tau"], B_R),
-            "B_T": (["tau"], B_T),
-            "B_Z": (["tau"], B_Z),
-            "B_magnitude": (["tau"], B_magnitude),
-            "K_R": K_R,
-            "K_Z": K_Z,
-            "K_zeta_initial": K_zeta_initial,
-            "Psi_3D_lab_launch": (["row", "col"], Psi_3D_lab_launch),
-            "Psi_3D": solver_output.Psi_3D,
-            "b_hat": (["tau", "col"], b_hat),
-            "dH_dKR": (["tau"], dH_dKR),
-            "dH_dKZ": (["tau"], dH_dKZ),
-            "dH_dKzeta": (["tau"], dH_dKzeta),
-            "dH_dR": (["tau"], dH_dR),
-            "dH_dZ": (["tau"], dH_dZ),
-            "dpolflux_dR": (
-                ["tau"],
-                field.d_poloidal_flux_dR(q_R, q_Z, delta_R),
-            ),
-            "dpolflux_dZ": (
-                ["tau"],
-                field.d_poloidal_flux_dZ(q_R, q_Z, delta_Z),
-            ),
-            "epsilon_para": (["tau"], epsilon.e_bb),
-            "epsilon_perp": (["tau"], epsilon.e_11),
-            "epsilon_g": (["tau"], epsilon.e_12),
-            "electron_density": (["tau"], electron_density),
-            "g_hat": (["tau", "col"], g_hat),
-            "g_magnitude": g_magnitude,
-            "grad_bhat": (["tau", "row", "col"], grad_bhat),
-            "H_Booker": (["tau"], H_Booker),
-            "H_Booker_other": (["tau"], H_Booker_other),
-            "normalised_plasma_freqs": (["tau"], normalised_plasma_freqs),
-            "normalised_gyro_freqs": (["tau"], normalised_gyro_freqs),
-            "x_hat": (["tau", "col"], x_hat),
-            "y_hat": (["tau", "col"], y_hat),
-            "poloidal_flux": (["tau"], poloidal_flux),
-            "beam": (["tau", "col"], np.vstack([q_R, solver_output.q_zeta, q_Z]).T),
-        },
-        coords={
-            "tau": tau,
-            "row": CYLINDRICAL_VECTOR_COMPONENTS,
-            "col": CYLINDRICAL_VECTOR_COMPONENTS,
-            "solution": SOLUTION_COMPONENTS,
-            "q_R": q_R,
-            "q_Z": q_Z,
-            "q_zeta": solver_output.q_zeta,
-        },
-    )
-    df.tau.attrs["long_name"] = "Parameterised distance along beam"
-    set_vector_components_long_name(df)
-
-    if temperature is not None:
-        df.update({"temperature": (["tau"], temperature)})
-
-    if vacuumLaunch_flag:
-        vacuum_only = {
-            "Psi_3D_lab_entry": (["row", "col"], Psi_3D_lab_entry),
-            "distance_from_launch_to_entry": distance_from_launch_to_entry,
-        }
-        df.update(vacuum_only)
-
-    return df
-
-
-def further_analysis(
+def basic_analysis(
     inputs: xr.Dataset,
-    df: xr.Dataset,
-    Psi_3D_lab_entry_cartersian: FloatArray,
-    output_path: Path,
-    output_filename_suffix: str,
-    field: MagneticField,
-    detailed_analysis_flag: bool,
-    dH: Dict[str, ArrayLike],
-):
-    # Calculates various useful stuff
-    q_X, q_Y, _ = cylindrical_to_cartesian(df.q_R, df.q_zeta, df.q_Z)
-    point_spacing = np.sqrt(
-        np.diff(q_X) ** 2 + np.diff(q_Y) ** 2 + np.diff(df.q_Z) ** 2
+    solver_output: xr.Dataset,
+    hamiltonian: Hamiltonian,
+    hamiltonian_other: Hamiltonian,
+    field: VALID_FIELDS,
+    density_fit: ProfileFitLike,
+    temperature_fit: Optional[ProfileFitLike],
+) -> Tuple[dict, dict]:
+    r"""Unless stated otherwise, all calculations are done in
+    cartesian coordinates"""
+
+    log.info(f"""\n
+    ##################################################
+    #
+    # BASIC ANALYSIS ROUTINE
+    #
+    ##################################################
+    """)
+
+    log.debug(f"Performing analysis on ray-tracing results")
+
+    cart = bool(inputs["geometry"] == "cartesian")
+    btf = not bool(inputs["ray_tracing_flag"])
+    tau = np.array(solver_output["tau"][()])
+    len_tau = len(tau)
+    analysis_dict = {}
+
+    ##################################################
+    log.debug("Position and wavevector stuff")
+    ##################################################
+
+    q_vec_cart = np.array(solver_output["q_output_cartesian"][()])  # (N,3)
+    q_vec_cyld = np.array(solver_output["q_output_cylindrical"][()])  # (N,3)
+    K_vec_cart = np.array(solver_output["K_output_cartesian"][()])  # (N,3)
+    K_vec_cyld = np.array(solver_output["K_output_cylindrical"][()])  # (N,3)
+    K_mag = np.array(solver_output["K_output_magnitude"][()])  # (N,)
+
+    coidx = np.argmin(K_mag)
+    q_X, q_Y, q_Z = q_vec_cart.T
+    dL_along_beam_path = np.sqrt(
+        np.diff(q_X) ** 2 + np.diff(q_Y) ** 2 + np.diff(q_Z) ** 2
     )
-    distance_along_line = np.append(0, np.cumsum(point_spacing))
+    beam_path_length = np.append(0, np.cumsum(dL_along_beam_path))
+    beam_path_length_wrt_cutoff = beam_path_length - beam_path_length[coidx]
 
-    # Calculates the index of the minimum magnitude of K
-    # That is, finds when the beam hits the cut-off
-    K_magnitude_array = np.asarray(
-        K_magnitude(df.K_R, df.K_zeta_initial, df.K_Z, df.q_R)
-    )
-
-    # Index of the cutoff, at the minimum value of K, use this with other arrays
-    cutoff_index = find_nearest(np.abs(K_magnitude_array), 0)
-
-    # Calcuating the angles theta and theta_m
-    # B \cdot K / (abs (B) abs(K))
-    sin_theta_m_analysis = (
-        df.b_hat.sel(col="R") * df.K_R
-        + df.b_hat.sel(col="zeta") * df.K_zeta_initial / df.q_R
-        + df.b_hat.sel(col="Z") * df.K_Z
-    ) / K_magnitude_array
-
-    # Assumes the mismatch angle is never smaller than -90deg or bigger than 90deg
-    theta_m = np.sign(sin_theta_m_analysis) * np.arcsin(abs(sin_theta_m_analysis))
-
-    kperp1_hat = make_unit_vector_from_cross_product(df.y_hat, df.b_hat)
-    # The negative sign is there by definition
-    sin_theta_analysis = -dot(df.x_hat, kperp1_hat)
-    # The negative sign is there by definition. Alternative way to get sin_theta
-    # Assumes theta is never smaller than -90deg or bigger than 90deg
-    theta = np.sign(sin_theta_analysis) * np.arcsin(abs(sin_theta_analysis))
-
-    cos_theta_analysis = np.cos(theta)
-    # -----
-
-    # Calcuating the corrections to make M from Psi
-    # Includes terms small in mismatch
-
-    # The dominant value of kperp1 that is backscattered at every point
-    k_perp_1_bs = -2 * K_magnitude_array * np.cos(theta_m + theta) / cos_theta_analysis
-
-    normal_vectors = np.vstack(
-        (df.dpolflux_dR, np.zeros_like(df.dpolflux_dR), df.dpolflux_dZ)
-    ).T
-    normal_magnitudes = np.linalg.norm(normal_vectors, axis=-1)
-    normal_hat = normal_vectors / normal_magnitudes[:, np.newaxis]
-    binormal_hat = make_unit_vector_from_cross_product(
-        df.b_hat, normal_hat
-    )  # by definition, binormal vector = tangent vector cross normal vector. Follows the same sign convention as Pyrokinetics [Patel, Bhavin, et al. "Pyrokinetics-A Python library to standardise gyrokinetic analysis." Journal of open source software (2024)]
-
-    k_perp_1_bs_normal = k_perp_1_bs * dot(
-        kperp1_hat, normal_hat
-    )  # TODO: Check that this works properly
-    k_perp_1_bs_binormal = k_perp_1_bs * dot(
-        kperp1_hat, binormal_hat
-    )  # TODO: Check that this works properly
-
-    # Converting x_hat, y_hat, and Psi_3D to Cartesians so we can contract them with each other
-    cos_q_zeta = np.cos(df.q_zeta)
-    sin_q_zeta = np.sin(df.q_zeta)
-
-    def to_Cartesian(array):
-        cart = np.empty([len(df.tau), 3])
-        cart[:, 0] = array[:, 0] * cos_q_zeta - array[:, 1] * sin_q_zeta
-        cart[:, 1] = array[:, 0] * sin_q_zeta + array[:, 1] * cos_q_zeta
-        cart[:, 2] = array[:, 2]
-        return cart
-
-    y_hat_Cartesian = to_Cartesian(df.y_hat)
-    x_hat_Cartesian = to_Cartesian(df.x_hat)
-    g_hat_Cartesian = to_Cartesian(df.g_hat)
-
-    Psi_3D_Cartesian = find_Psi_3D_lab_Cartesian(
-        df.Psi_3D, df.q_R, df.q_zeta, df.K_R, df.K_zeta_initial
-    )
-    Psi_xx = dot(x_hat_Cartesian, dot(Psi_3D_Cartesian, x_hat_Cartesian))
-    Psi_xy = dot(x_hat_Cartesian, dot(Psi_3D_Cartesian, y_hat_Cartesian))
-    Psi_yy = dot(y_hat_Cartesian, dot(Psi_3D_Cartesian, y_hat_Cartesian))
-    Psi_xg = dot(x_hat_Cartesian, dot(Psi_3D_Cartesian, g_hat_Cartesian))
-    Psi_yg = dot(y_hat_Cartesian, dot(Psi_3D_Cartesian, g_hat_Cartesian))
-    Psi_gg = dot(g_hat_Cartesian, dot(Psi_3D_Cartesian, g_hat_Cartesian))
-
-    Psi_xx_entry = np.dot(
-        x_hat_Cartesian[0, :],
-        np.dot(Psi_3D_lab_entry_cartersian, x_hat_Cartesian[0, :]),
-    )
-    Psi_xy_entry = np.dot(
-        x_hat_Cartesian[0, :],
-        np.dot(Psi_3D_lab_entry_cartersian, y_hat_Cartesian[0, :]),
-    )
-    Psi_yy_entry = np.dot(
-        y_hat_Cartesian[0, :],
-        np.dot(Psi_3D_lab_entry_cartersian, y_hat_Cartesian[0, :]),
+    analysis_dict.update(
+        {
+            "beam_path_length": (["tau"], beam_path_length),
+            "beam_path_length_wrt_cutoff": (["tau"], beam_path_length_wrt_cutoff),
+            "cutoff_index": ([], coidx),
+        }
     )
 
-    numberOfDataPoints = len(df.tau)
-    # Calculating intermediate terms that are needed for the corrections in M
-    xhat_dot_grad_bhat = dot(df.x_hat, df.grad_bhat)
-    yhat_dot_grad_bhat = dot(df.y_hat, df.grad_bhat)
+    ##################################################
+    log.debug("Booker Hamiltonian stuff")
+    ##################################################
 
-    # See notes 07 June 2021
-    grad_g_hat = df.g_hat.differentiate("tau")
-    ray_curvature_kappa = (
-        np.block(
-            [
-                [grad_g_hat.sel(col="R") - df.g_hat.sel(col="zeta") * df.dH_dKzeta],
-                [grad_g_hat.sel(col="zeta") + df.g_hat.sel(col="R") * df.dH_dKzeta],
-                [grad_g_hat.sel(col="Z")],
-            ]
+    if cart:
+        q_vec, K_vec = q_vec_cart, K_vec_cart  # (N,3) each
+    else:
+        q_vec, K_vec = q_vec_cyld, K_vec_cyld  # (N,3) each
+    q_vec_T, K_vec_T = q_vec.T, K_vec.T
+    H_Booker = hamiltonian(*q_vec_T, *K_vec_T)
+    check_H_output(H_Booker)
+
+    dH = hamiltonian.derivatives(q_vec_T, K_vec_T, second_order=btf)
+
+    analysis_dict.update(
+        {
+            "H_Booker": (["tau"], H_Booker),  # (N,) # type: ignore
+            "H_Booker_other": (
+                ["tau"],
+                hamiltonian_other(*q_vec_T, *K_vec_T),
+            ),  # (N,) # type: ignore
+        }
+    )
+
+    ##################################################
+    log.debug("Magnetic field and poloidal flux stuff")
+    ##################################################
+
+    if cart:
+        # field.all?
+        B_X = field.B_X(*q_vec_T)  # (N,)
+        B_Y = field.B_Y(*q_vec_T)  # (N,)
+        B_Z = field.B_Z(*q_vec_T)  # (N,)
+        B_mag = field.magnitude(*q_vec_T)  # (N,)
+        b_hat_cart = field.unitvector(*q_vec_T)  # (N,3)
+        dbhat_dX = derivative(
+            field.unitvector_cartesian,
+            dims="X",
+            args={"X": q_vec_T[0], "Y": q_vec_T[1], "Z": q_vec_T[2]},
+            spacings=hamiltonian.delta_X,
+        )  # (N,3)
+        dbhat_dY = derivative(
+            field.unitvector_cartesian,
+            dims="Y",
+            args={"X": q_vec_T[0], "Y": q_vec_T[1], "Z": q_vec_T[2]},
+            spacings=hamiltonian.delta_Y,
+        )  # (N,3)
+        dbhat_dZ = derivative(
+            field.unitvector_cartesian,
+            dims="Z",
+            args={"X": q_vec_T[0], "Y": q_vec_T[1], "Z": q_vec_T[2]},
+            spacings=hamiltonian.delta_Z,
+        )  # (N,3)
+        grad_bhat_cart = np.stack((dbhat_dX, dbhat_dY, dbhat_dZ), axis=1)  # (N,3,3)
+
+        polflux = field.polflux(*q_vec_T)  # (N,)
+        dp_dX = field.d_polflux_dX(*q_vec_T, hamiltonian.delta_X)  # (N,) # type: ignore
+        dp_dY = field.d_polflux_dY(*q_vec_T, hamiltonian.delta_Y)  # (N,) # type: ignore
+        dp_dZ = field.d_polflux_dZ(*q_vec_T, hamiltonian.delta_Z)  # (N,) # type: ignore
+    else:
+        # B_R = field.B_R(*q_vec_T)
+        # B_T = field.B_T(*q_vec_T)
+        # B_Z = field.B_Z(*q_vec_T)
+        # B_mag = field.magnitude(*q_vec_T)
+        # b_hat = field.unitvector(*q_vec_T)
+        # dbhat_dR = derivative(field.unitvector, dims="R", args={"R": q_vec_T[0], "_": q_vec_T[1], "Z": q_vec_T[2]}, spacings=hamiltonian.delta_R)
+        # dbhat_dZ = derivative(field.unitvector, dims="Z", args={"R": q_vec_T[0], "_": q_vec_T[1], "Z": q_vec_T[2]}, spacings=hamiltonian.delta_Z)
+        # grad_bhat = np.zeros([len_tau, 3, 3])
+        # grad_bhat[:,0,:] = dbhat_dR
+        # grad_bhat[:,2,:] = dbhat_dZ
+        # grad_bhat[:,1,0] = -B_T / (B_mag * q_vec_T[0])
+        # grad_bhat[:,1,1] = B_R / (B_mag * q_vec_T[0])
+        B_X = field.B_X(*q_vec_T)
+        B_Y = field.B_Y(*q_vec_T)
+        B_Z = field.B_Z(*q_vec_T)
+        B_mag = field.magnitude(*q_vec_T)
+        # unitvector_cartesian takes Cartesian (X, Y, Z), not the
+        # cylindrical (R, zeta, Z) in q_vec_T
+        b_hat_cart = field.unitvector_cartesian(*q_vec_cart.T)
+        dbhat_dX = derivative(
+            field.unitvector_cartesian,
+            dims="X",
+            args={"X": q_vec_cart.T[0], "Y": q_vec_cart.T[1], "Z": q_vec_cart.T[2]},
+            spacings=hamiltonian.delta_R,
         )
-        / df.g_magnitude.data
-    ).T
+        dbhat_dY = derivative(
+            field.unitvector_cartesian,
+            dims="Y",
+            args={"X": q_vec_cart.T[0], "Y": q_vec_cart.T[1], "Z": q_vec_cart.T[2]},
+            spacings=hamiltonian.delta_R,
+        )
+        dbhat_dZ = derivative(
+            field.unitvector_cartesian,
+            dims="Z",
+            args={"X": q_vec_cart.T[0], "Y": q_vec_cart.T[1], "Z": q_vec_cart.T[2]},
+            spacings=hamiltonian.delta_Z,
+        )
+        grad_bhat_cart = np.stack((dbhat_dX, dbhat_dY, dbhat_dZ), axis=1)
 
-    grad_x_hat = df.x_hat.differentiate("tau")
-    d_xhat_d_tau = np.block(
-        [
-            [grad_x_hat.sel(col="R") - df.x_hat.sel(col="zeta") * df.dH_dKzeta],
-            [grad_x_hat.sel(col="zeta") + df.x_hat.sel(col="R") * df.dH_dKzeta],
-            [grad_x_hat.sel(col="Z")],
-        ]
-    ).T
+        polflux = field.polflux(*q_vec_T)
+        dp_dX = field.d_polflux_dX(*q_vec_T, hamiltonian.delta_R)  # type: ignore
+        dp_dY = field.d_polflux_dY(*q_vec_T, hamiltonian.delta_R)  # type: ignore
+        dp_dZ = field.d_polflux_dZ(*q_vec_T, hamiltonian.delta_Z)  # type: ignore
 
-    xhat_dot_grad_bhat_dot_xhat = dot(xhat_dot_grad_bhat, df.x_hat)
-    xhat_dot_grad_bhat_dot_yhat = dot(xhat_dot_grad_bhat, df.y_hat)
-    xhat_dot_grad_bhat_dot_ghat = dot(xhat_dot_grad_bhat, df.g_hat)
-    yhat_dot_grad_bhat_dot_xhat = dot(yhat_dot_grad_bhat, df.x_hat)
-    yhat_dot_grad_bhat_dot_yhat = dot(yhat_dot_grad_bhat, df.y_hat)
-    yhat_dot_grad_bhat_dot_ghat = dot(yhat_dot_grad_bhat, df.g_hat)
-    kappa_dot_xhat = dot(ray_curvature_kappa, df.x_hat)
-    kappa_dot_yhat = dot(ray_curvature_kappa, df.y_hat)
-    # This should be 0. Good to check.
-    kappa_dot_ghat = dot(ray_curvature_kappa, df.g_hat)
-    d_xhat_d_tau_dot_yhat = dot(d_xhat_d_tau, df.y_hat)
-
-    # Calculates the components of M_w, only taking into consideration
-    # correction terms that are not small in mismatch
-    M_xx = Psi_xx + (k_perp_1_bs / 2) * xhat_dot_grad_bhat_dot_ghat
-    M_xy = Psi_xy + (k_perp_1_bs / 2) * yhat_dot_grad_bhat_dot_ghat
-    M_yy = Psi_yy
-    # -----
-
-    # Calculates the localisation, wavenumber resolution, and mismatch attenuation pieces
-    det_M_w_analysis = M_xx * M_yy - M_xy**2
-    M_w_inv_xx = M_yy / det_M_w_analysis
-    M_w_inv_xy = -M_xy / det_M_w_analysis
-    M_w_inv_yy = M_xx / det_M_w_analysis
-
-    delta_k_perp_2 = 2 * np.sqrt(-1 / np.imag(M_w_inv_yy))
-    delta_theta_m = np.sqrt(
-        np.imag(M_w_inv_yy)
-        / ((np.imag(M_w_inv_xy)) ** 2 - np.imag(M_w_inv_xx) * np.imag(M_w_inv_yy))
-    ) / (K_magnitude_array)
-    loc_m = np.exp(-2 * (theta_m / delta_theta_m) ** 2)
-
-    print("polflux: ", df.poloidal_flux[cutoff_index].data)
-
-    print("theta_m: ", theta_m[cutoff_index].data)
-    print("delta_theta_m: ", delta_theta_m[cutoff_index].data)
-    print(
-        "mismatch attenuation: ",
-        (np.exp(-2 * (theta_m[cutoff_index] / delta_theta_m[cutoff_index]) ** 2)).data,
+    analysis_dict.update(
+        {
+            "B_X": (["tau"], B_X),
+            "B_Y": (["tau"], B_Y),
+            "B_Z": (["tau"], B_Z),
+            "B_magnitude": (["tau"], B_mag),
+            "b_hat_cartesian": (["tau", "col_cart"], b_hat_cart),
+            "dbhat_dX": (["tau", "row_cart"], dbhat_dX),
+            "dbhat_dY": (["tau", "row_cart"], dbhat_dY),
+            "dbhat_dZ": (["tau", "row_cart"], dbhat_dZ),
+            "grad_bhat_cartesian": (["tau", "row_cart", "col_cart"], grad_bhat_cart),
+            "polflux": (["tau"], polflux),
+            "dpolflux_dX": (["tau"], dp_dX),
+            "dpolflux_dY": (["tau"], dp_dY),
+            "dpolflux_dZ": (["tau"], dp_dZ),
+        }
     )
 
-    # This part is used to make some nice plots when post-processing
-    R_midplane_points = np.linspace(field.R_coord[0], field.R_coord[-1], 1000)
-    # poloidal flux at R and z=0
-    poloidal_flux_on_midplane = field.poloidal_flux(R_midplane_points, 0)
+    ##################################################
+    log.debug("Plasma properties along path")
+    ##################################################
 
-    # Calculates localisation (start)
-    # Ray piece of localisation as a function of distance along ray
-
-    H_1_Cardano, H_2_Cardano, H_3_Cardano = find_H_Cardano(
-        K_magnitude_array,
-        inputs.launch_angular_frequency.data,
-        df.epsilon_para.data,
-        df.epsilon_perp.data,
-        df.epsilon_g.data,
-        theta_m.data,
+    n_e = density_fit(polflux)  # (N,)
+    T_e = temperature_fit(polflux) if temperature_fit else None
+    omega_launch = float(inputs["launch_angular_frequency"][()])
+    epsilon = DielectricTensor(
+        launch_angular_freq=omega_launch,
+        B_magnitude=B_mag,
+        electron_density=n_e,
+        temperature=T_e,
     )
 
-    def H_cardano(K_R, K_zeta, K_Z):
-        # In my experience, the H_3_Cardano expression corresponds to
-        # the O mode, and the H_2_Cardano expression corresponds to
-        # the X-mode.
+    (
+        norm_omega_pe,
+        norm_omega_ce,
+        norm_omega_LH,
+        norm_omega_RH,
+        norm_omega_UH,
+    ) = find_normalised_angular_freqs(
+        launch_angular_freq=omega_launch,
+        B_total=B_mag,
+        electron_density=n_e,
+        temperature=T_e,
+    )
 
-        # ALERT: This may not always be the case! Check the output
-        # figure to make sure that the appropriate solution is indeed
-        # 0 along the ray
+    analysis_dict.update(
+        {
+            "electron_density": (["tau"], n_e),
+            **({"electron_temperature": (["tau"], T_e)} if T_e is not None else {}),
+            "epsilon_bb": (["tau"], epsilon.e_bb),
+            "epsilon_para": (["tau"], epsilon.e_bb),
+            "epsilon_11": (["tau"], epsilon.e_11),
+            "epsilon_perp": (["tau"], epsilon.e_11),
+            "epsilon_12": (["tau"], epsilon.e_12),
+            "epsilon_g": (["tau"], epsilon.e_12),
+            "normalised_omega_pe": (["tau"], norm_omega_pe),
+            "normalised_omega_ce": (["tau"], norm_omega_ce),
+            "normalised_omega_LH": (["tau"], norm_omega_LH),
+            "normalised_omega_RH": (["tau"], norm_omega_RH),
+            "normalised_omega_UH": (["tau"], norm_omega_UH),
+        }
+    )
 
+    ##################################################
+    log.debug("Ray properties along path")
+    ##################################################
+
+    sin_theta_m = np.sum(b_hat_cart * K_vec_cart / K_mag[:, np.newaxis], axis=1)
+    theta_m = np.sign(sin_theta_m) * np.arcsin(np.abs(sin_theta_m))
+
+    g_vec_cart, g_mag, g_hat_cart = find_g_cartesian(cart, *q_vec_T, dH)  # type: ignore
+    y_hat_cart = make_unit_vector_from_cross_product(b_hat_cart, g_hat_cart)
+    x_hat_cart = make_unit_vector_from_cross_product(y_hat_cart, g_hat_cart)
+    d_xhat_d_tau = np.gradient(x_hat_cart, tau, axis=0)
+    d_xhat_d_tau_dot_yhat = dot(d_xhat_d_tau, y_hat_cart)
+
+    d_ghat_d_tau = np.gradient(g_hat_cart, tau, axis=0)
+    ray_curvature_kappa = d_ghat_d_tau / g_mag[:, None]
+    kappa_dot_xhat = dot(ray_curvature_kappa, x_hat_cart)
+    kappa_dot_yhat = dot(ray_curvature_kappa, y_hat_cart)
+    kappa_dot_ghat = dot(
+        ray_curvature_kappa, g_hat_cart
+    )  # this should be zero; good to check
+
+    analysis_dict.update(
+        {
+            "sin_theta_m": (["tau"], sin_theta_m),
+            "theta_m": (["tau"], theta_m),
+            "g_vector_cartesian": (["tau", "col_cart"], g_vec_cart),
+            "g_magnitude": (["tau"], g_mag),
+            "g_hat_cartesian": (["tau", "col_cart"], g_hat_cart),
+            "y_hat_cartesian": (["tau", "col_cart"], y_hat_cart),
+            "x_hat_cartesian": (["tau", "col_cart"], x_hat_cart),
+            "d_xhat_d_tau": (["tau", "col_cart"], d_xhat_d_tau),
+            "d_xhat_d_tau_dot_yhat": (["tau"], d_xhat_d_tau_dot_yhat),
+            "d_ghat_d_tau": (["tau", "col_cart"], d_ghat_d_tau),
+            "ray_curvature_kappa": (["tau", "col_cart"], ray_curvature_kappa),
+            "ray_curvature_kappa_magnitude": (
+                ["tau"],
+                np.linalg.norm(ray_curvature_kappa, axis=1),
+            ),
+            "kappa_dot_xhat": (["tau"], kappa_dot_xhat),
+            "kappa_dot_yhat": (["tau"], kappa_dot_yhat),
+            "kappa_dot_ghat": (["tau"], kappa_dot_ghat),
+        }
+    )
+
+    ##################################################
+    log.debug("H_Cardano dispersion relation (analytic)")
+    ##################################################
+
+    H_Cardano_1, H_Cardano_2, H_Cardano_3 = find_H_Cardano_formula(
+        launch_angular_freq=omega_launch,
+        K_magnitude=K_mag,
+        epsilon_para=epsilon.e_bb,
+        epsilon_perp=epsilon.e_11,
+        epsilon_g=epsilon.e_12,
+        theta_m=theta_m,
+    )
+
+    abs_H_Cardano_all = np.abs(np.stack([H_Cardano_1, H_Cardano_2, H_Cardano_3]))[
+        :, len_tau // 10 : -len_tau // 10
+    ]
+    min_H_Cardano_all = np.argmin(abs_H_Cardano_all, axis=0)
+    if np.all(min_H_Cardano_all == 0):
+        mode_index_Cardano, H_Cardano_solution = 0, H_Cardano_1
+    elif np.all(min_H_Cardano_all == 1):
+        mode_index_Cardano, H_Cardano_solution = 1, H_Cardano_2
+    elif np.all(min_H_Cardano_all == 2):
+        mode_index_Cardano, H_Cardano_solution = 2, H_Cardano_3
+    else:
+        raise ValueError(f"Unable to select correct mode index for H_Cardano")
+
+    check_H_output(H_Cardano_solution)
+
+    def _H_Cardano(K_X: ArrayLike, K_Y: ArrayLike, K_Z: ArrayLike) -> ArrayLike:
         # theta_m depends on the direction of K, so it must be recomputed
         # from the K being evaluated here. Holding it at its value on the
         # ray would only differentiate H through |K|, making grad_K H
         # parallel to K instead of to the group velocity
-        K_magnitude_trial = K_magnitude(K_R, K_zeta, K_Z, df.q_R)
+        K_magnitude_trial = np.sqrt(K_X**2 + K_Y**2 + K_Z**2)
         sin_theta_m_trial = (
-            df.b_hat.sel(col="R") * K_R
-            + df.b_hat.sel(col="zeta") * K_zeta / df.q_R
-            + df.b_hat.sel(col="Z") * K_Z
+            b_hat_cart[:, 0] * K_X + b_hat_cart[:, 1] * K_Y + b_hat_cart[:, 2] * K_Z
         ) / K_magnitude_trial
-        result = find_H_Cardano(
-            K_magnitude_trial,
-            inputs.launch_angular_frequency,
-            df.epsilon_para,
-            df.epsilon_perp,
-            df.epsilon_g,
-            np.arcsin(sin_theta_m_trial),
+        # The Cardano formula works in complex arithmetic, but its roots are
+        # eigenvalues of a Hermitian matrix: any imaginary part is rounding.
+        # Without np.real it made g_magnitude_Cardano, loc_r and loc_all
+        # complex-typed
+        return np.real(
+            find_H_Cardano_formula(
+                launch_angular_freq=omega_launch,
+                K_magnitude=K_magnitude_trial,
+                epsilon_para=epsilon.e_bb,
+                epsilon_perp=epsilon.e_11,
+                epsilon_g=epsilon.e_12,
+                theta_m=np.arcsin(sin_theta_m_trial),
+            )[mode_index_Cardano]
         )
-        if inputs.mode_flag == 1:
-            return result[2]
-        return result[1]
 
-    def grad_H_Cardano(direction: str, spacing: float):
+    def _grad_H_Cardano(direction: str, spacing: float) -> ArrayLike:
         return derivative(
-            H_cardano,
-            direction,
-            args={"K_R": df.K_R, "K_zeta": df.K_zeta_initial, "K_Z": df.K_Z},
+            func=_H_Cardano,
+            dims=direction,
+            args={
+                "K_X": K_vec_cart.T[0],
+                "K_Y": K_vec_cart.T[1],
+                "K_Z": K_vec_cart.T[2],
+            },
             spacings=spacing,
         )
 
-    g_R_Cardano = grad_H_Cardano("K_R", inputs.delta_K_R)
-    # K_zeta is the toroidal mode number, so the physical toroidal component
-    # of g is q_R dH/dK_zeta, as for g_magnitude in immediate_analysis
-    g_zeta_Cardano = df.q_R * grad_H_Cardano("K_zeta", inputs.delta_K_zeta)
-    g_Z_Cardano = grad_H_Cardano("K_Z", inputs.delta_K_Z)
-    # This has maximum imaginary component of like 1e-16 -- should just be real?
-    g_magnitude_Cardano = np.sqrt(g_R_Cardano**2 + g_zeta_Cardano**2 + g_Z_Cardano**2)
-    # On the ray, this is parallel (or antiparallel) to g_hat from the Booker
-    # dispersion relation, since both dispersion relations vanish there
+    g_X_Cardano = _grad_H_Cardano(
+        "K_X", float(inputs["delta_K_X" if cart else "delta_K_R"][()])
+    )
+    g_Y_Cardano = _grad_H_Cardano(
+        "K_Y", float(inputs["delta_K_Y" if cart else "delta_K_zeta"][()])
+    )
+    g_Z_Cardano = _grad_H_Cardano("K_Z", float(inputs["delta_K_Z"][()]))
+    g_magnitude_Cardano = np.sqrt(g_X_Cardano**2 + g_Y_Cardano**2 + g_Z_Cardano**2)
     g_hat_Cardano = (
-        np.stack([g_R_Cardano, g_zeta_Cardano, g_Z_Cardano], axis=-1)
-        / np.asarray(g_magnitude_Cardano)[:, np.newaxis]
+        np.stack([g_X_Cardano, g_Y_Cardano, g_Z_Cardano], axis=-1)
+        / g_magnitude_Cardano[:, np.newaxis]
     )
 
-    ##
-    # From here on, we use the shorthand
-    # loc: localisation
-    # l_lc: distance from cutoff (l - l_c). Distance along the ray
-    # cum: cumulative. As such, cum_loc is the cumulative integral of the localisation
-    # p: polarisation
-    # r: ray
-    # b: beam
-    # s: spectrum
-    # Otherwise, variable names get really unwieldly
-    ##
-
-    # localisation_ray = g_magnitude_Cardano[0]**2/g_magnitude_Cardano**2
-    # The first point of the beam may be very slightly in the plasma, so I have used the vacuum expression for the group velocity instead
-    loc_r = (
-        2 * constants.c / inputs.launch_angular_frequency
-    ) ** 2 / g_magnitude_Cardano**2
-
-    # Spectrum piece of localisation as a function of distance along ray
-    spectrum_power_law_coefficient = 13 / 3  # Turbulence cascade
-    wavenumber_K0 = angular_frequency_to_wavenumber(
-        inputs.launch_angular_frequency.data
-    )
-    loc_s = (k_perp_1_bs / (-2 * wavenumber_K0)) ** (-spectrum_power_law_coefficient)
-
-    # Beam piece of localisation as a function of distance along ray
-    # Determinant of the imaginary part of Psi_w
-    det_imag_Psi_w_analysis = np.imag(Psi_xx) * np.imag(Psi_yy) - np.imag(Psi_xy) ** 2
-
-    # Assumes circular beam at launch
-    beam_waist_y = find_waist(
-        inputs.launch_beam_width.data, wavenumber_K0, inputs.launch_beam_curvature.data
-    )
-
-    loc_b = (
-        (beam_waist_y / np.sqrt(2))
-        * det_imag_Psi_w_analysis
-        / (np.abs(det_M_w_analysis) * np.sqrt(-np.imag(M_w_inv_yy)))
-    )
-    # --
-
-    # Polarisation piece of localisation as a function of distance along ray
-    H_eigvals, e_eigvecs = dispersion_eigenvalues(
-        K_magnitude_array,
-        inputs.launch_angular_frequency.data,
-        df,
-        numberOfDataPoints,
-        theta_m,
-    )
-    # In my experience, H_eigvals[:,1] corresponds to the O mode, and H_eigvals[:,0] corresponds to the X-mode
-    # ALERT: This may not always be the case! Check the output figure to make sure that the appropriate solution is indeed 0 along the ray
-    # e_hat has components e_1,e_2,e_b
-    mode_index = 1 if inputs.mode_flag == 1 else 0
-    e_hat = e_eigvecs[:, :, mode_index]
-
-    # equilibrium dielectric tensor - identity matrix. \bm{\epsilon}_{eq} - \bm{1}
-    zero = np.zeros(len(df.tau))
-    # fmt: off
-    epsilon_minus_identity = np.block(
-        [
-            [[df.epsilon_perp],    [1j * df.epsilon_g], [zero]],
-            [[-1j * df.epsilon_g], [df.epsilon_perp],   [zero]],
-            [[zero],               [zero],              [df.epsilon_para]],
-        ]
-    ).T - np.eye(3)
-    # fmt: on
-
-    # Avoids dividing a small number by another small number, leading to a big number because of numerical errors or something
-    loc_p_unnormalised = np.divide(
-        np.abs(
-            dot(
-                np.conjugate(e_hat),
-                dot(epsilon_minus_identity, e_hat),
-            )
-        )
-        ** 2,
-        (df.electron_density * 1e19) ** 2,
-        out=np.zeros_like(df.electron_density),
-        where=(df.electron_density > 1e-6).data,
-    )
-    loc_p = (
-        inputs.launch_angular_frequency**2
-        * constants.epsilon_0
-        * find_electron_mass(df.get("temperature"))
-        / constants.e**2
-    ) ** 2 * loc_p_unnormalised
-    # Note that loc_p is called varepsilon in my paper
-
-    # --
-
-    # TODO: Come back and see if the naming of variables makes sense and is consistent
-    # Distance from cutoff
-    l_lc = distance_along_line - distance_along_line[cutoff_index]
-
-    # Combining the various localisation pieces to get some overall localisation
-    loc_b_r_s = loc_b * loc_r * loc_s
-    loc_b_r = loc_b * loc_r
-
-    grad_grad_H, gradK_grad_H, gradK_gradK_H = hessians(dH)
-
-    further_df = {
-        "Psi_xx": (["tau"], Psi_xx),
-        "Psi_xy": (["tau"], Psi_xy),
-        "Psi_yy": (["tau"], Psi_yy),
-        "Psi_xg": (["tau"], Psi_xg),
-        "Psi_yg": (["tau"], Psi_yg),
-        "Psi_gg": (["tau"], Psi_gg),
-        "Psi_xx_entry": Psi_xx_entry,
-        "Psi_xy_entry": Psi_xy_entry,
-        "Psi_yy_entry": Psi_yy_entry,
-        "Psi_3D_Cartesian": (["tau", "row_cart", "col_cart"], Psi_3D_Cartesian),
-        "x_hat_Cartesian": (["tau", "col_cart"], x_hat_Cartesian),
-        "y_hat_Cartesian": (["tau", "col_cart"], y_hat_Cartesian),
-        "g_hat_Cartesian": (["tau", "col_cart"], g_hat_Cartesian),
-        "M_xx": M_xx,
-        "M_xy": M_xy,
-        "M_yy": M_yy,
-        "M_w_inv_xx": M_w_inv_xx,
-        "M_w_inv_xy": M_w_inv_xy,
-        "M_w_inv_yy": M_w_inv_yy,
-        "xhat_dot_grad_bhat_dot_xhat": (["tau"], xhat_dot_grad_bhat_dot_xhat),
-        "xhat_dot_grad_bhat_dot_yhat": (["tau"], xhat_dot_grad_bhat_dot_yhat),
-        "xhat_dot_grad_bhat_dot_ghat": (["tau"], xhat_dot_grad_bhat_dot_ghat),
-        "yhat_dot_grad_bhat_dot_xhat": (["tau"], yhat_dot_grad_bhat_dot_xhat),
-        "yhat_dot_grad_bhat_dot_yhat": (["tau"], yhat_dot_grad_bhat_dot_yhat),
-        "yhat_dot_grad_bhat_dot_ghat": (["tau"], yhat_dot_grad_bhat_dot_ghat),
-        "grad_grad_H": (["tau", "row", "col"], grad_grad_H),
-        "gradK_grad_H": (["tau", "row", "col"], gradK_grad_H),
-        "gradK_gradK_H": (["tau", "row", "col"], gradK_gradK_H),
-        "d_theta_d_tau": (["tau"], np.gradient(theta, df.tau)),
-        "d_xhat_d_tau_dot_yhat": (["tau"], d_xhat_d_tau_dot_yhat),
-        "kappa_dot_xhat": (["tau"], kappa_dot_xhat),
-        "kappa_dot_yhat": (["tau"], kappa_dot_yhat),
-        "kappa_dot_ghat": (["tau"], kappa_dot_ghat),
-        "kappa_magnitude": (["tau"], np.linalg.norm(ray_curvature_kappa, axis=-1)),
-        "delta_k_perp_2": delta_k_perp_2,
-        "delta_theta_m": delta_theta_m,
-        "theta_m": theta_m,
-        "k_perp_1_bs": k_perp_1_bs,
-        "k_perp_1_bs_normal": k_perp_1_bs_normal,
-        "k_perp_1_bs_binormal": k_perp_1_bs_binormal,
-        "K_magnitude": (["tau"], K_magnitude_array),
-        "cutoff_index": cutoff_index,
-        "x_hat": df.x_hat,
-        "y_hat": df.y_hat,
-        "b_hat": df.b_hat,
-        "g_hat": df.g_hat,
-        "e_hat": (["tau", "col"], e_hat),
-        "H_eigvals": (["tau", "solution"], H_eigvals),
-        "e_eigvecs": (["tau", "col", "solution"], e_eigvecs),
-        "H_Cardano": (
-            ["tau", "solution"],
-            np.vstack([H_1_Cardano, H_2_Cardano, H_3_Cardano]).T,
-        ),
-        # "H_1_Cardano": (["tau"], H_1_Cardano),
-        # "H_2_Cardano": (["tau"], H_2_Cardano),
-        # "H_3_Cardano": (["tau"], H_3_Cardano),
-        "kperp1_hat": (["tau", "col"], kperp1_hat),
-        "theta": (["tau"], theta),
-        "g_magnitude_Cardano": g_magnitude_Cardano,
-        "g_hat_Cardano": (["tau", "col"], np.real(g_hat_Cardano)),
-        "poloidal_flux_on_midplane": (["R_midplane"], poloidal_flux_on_midplane),
-        "loc_b": loc_b,
-        "loc_p": loc_p,
-        "loc_r": loc_r,
-        "loc_s": loc_s,
-        "loc_m": loc_m,
-        "loc_b_r_s": loc_b_r_s,
-        "loc_b_r": loc_b_r,
-        "beam_cartesian": (["tau", "col_cart"], np.vstack([q_X, q_Y, df.q_Z.data]).T),
-    }
-
-    RZ_point_spacing = np.sqrt((np.diff(df.q_Z)) ** 2 + (np.diff(df.q_R)) ** 2)
-    RZ_distance_along_line = np.append(0, np.cumsum(RZ_point_spacing))
-
-    df = df.assign_coords(
+    analysis_dict.update(
         {
-            "R_midplane": R_midplane_points,
-            "l_lc": (
-                ["tau"],
-                l_lc,
-                {"long_name": "Distance from cutoff", "units": "m"},
+            # all three roots on one array, as master (v3.2) stores them
+            "H_Cardano": (
+                ["tau", "solution"],
+                np.vstack([H_Cardano_1, H_Cardano_2, H_Cardano_3]).T,
             ),
-            "RZ_distance_along_line": (["tau"], RZ_distance_along_line, {"units": "m"}),
-            "distance_along_line": (["tau"], distance_along_line, {"units": "m"}),
-            "row_cart": CARTESIAN_VECTOR_COMPONENTS,
-            "col_cart": CARTESIAN_VECTOR_COMPONENTS,
-            "q_X": q_X,
-            "q_Y": q_Y,
+            "H_Cardano_1": (["tau"], H_Cardano_1),
+            "H_Cardano_2": (["tau"], H_Cardano_2),
+            "H_Cardano_3": (["tau"], H_Cardano_3),
+            "mode_index_Cardano": ([], mode_index_Cardano),
+            "H_Cardano_solution": (["tau"], H_Cardano_solution),
+            "g_X_Cardano": (["tau"], g_X_Cardano),
+            "g_Y_Cardano": (["tau"], g_Y_Cardano),
+            "g_Z_Cardano": (["tau"], g_Z_Cardano),
+            "g_magnitude_Cardano": (["tau"], g_magnitude_Cardano),
+            "g_hat_Cardano": (["tau", "col_cart"], g_hat_Cardano),
         }
     )
-    set_vector_components_long_name(df)
-    df.update(further_df)
 
-    if detailed_analysis_flag and (cutoff_index + 1 != len(df.tau)):
-        df.update(localisation_analysis(df, cutoff_index, wavenumber_K0))
+    ##################################################
+    log.debug("H_eigval dispersion relation and polarisation vector")
+    ##################################################
 
-    return df
-
-
-def dispersion_eigenvalues(
-    K_magnitude_array: FloatArray,
-    launch_angular_frequency: float,
-    df: xr.Dataset,
-    numberOfDataPoints: int,
-    theta_m: float,
-):
-    """
-    Polarisation e
-    eigenvector corresponding to eigenvalue = 0 (H=0)
-
-    Returns
-    -------
-    eigenvalues, eigenvectors
-
-    """
-
-    # First, find the components of the tensor D
-    # Refer to 21st Dec 2020 notes for more
-    # Note that e \cdot e* = 1
-    D_11, D_22, D_bb, D_12, D_1b = find_D(
-        K_magnitude_array,
-        launch_angular_frequency,
-        df.epsilon_para,
-        df.epsilon_perp,
-        df.epsilon_g,
-        theta_m,
+    H_eigvals, e_eigvecs = find_H_Cardano_eigh(
+        launch_angular_freq=omega_launch,
+        K_magnitude=K_mag,
+        epsilon_para=epsilon.e_bb,
+        epsilon_perp=epsilon.e_11,
+        epsilon_g=epsilon.e_12,
+        theta_m=theta_m,
     )
 
-    # Dispersion tensor
-    D_tensor = np.zeros([numberOfDataPoints, 3, 3], dtype="complex128")
-    D_tensor[:, 0, 0] = D_11
-    D_tensor[:, 1, 1] = D_22
-    D_tensor[:, 2, 2] = D_bb
-    D_tensor[:, 0, 1] = -1j * D_12
-    D_tensor[:, 1, 0] = 1j * D_12
-    D_tensor[:, 0, 2] = D_1b
-    D_tensor[:, 2, 0] = D_1b
+    # eigh returns its eigenvalues in ascending order, not in the Cardano
+    # order that `mode_index` refers to, so at each point take the
+    # eigenvector whose eigenvalue matches the Cardano solution the beam
+    # follows
+    mode_idx = np.argmin(
+        np.abs(H_eigvals - np.asarray(H_Cardano_solution)[:, np.newaxis]), axis=1
+    )
+    H_solution = np.take_along_axis(H_eigvals, mode_idx[:, np.newaxis], axis=1)[:, 0]
+    e_hat = np.take_along_axis(e_eigvecs, mode_idx[:, np.newaxis, np.newaxis], axis=2)[
+        :, :, 0
+    ]
 
-    return np.linalg.eigh(D_tensor)
-
-
-def find_e2_width(
-    l_lc: xr.DataArray, array: xr.DataArray, k_perp: xr.DataArray, cutoff_index: int
-):
-    r"""Estimate inter-:math:`e^2` range (analogous to interquartile range) in
-    :math:`l - l_c` and :math:`k_\perp`
-
-    Returns
-    -------
-    max_over_e2: float
-        :math:`1/e^2` value of ``array``
-    delta_l: FloatArray
-        inter-:math:`e^2` range in :math:`l - l_c` of ``array``
-    delta_kperp1: FloatArray
-        inter-:math:`e^2` range in :math:`k_\perp` of ``array``
-
-    """
-
-    max_over_e2 = (array.max() / (np.e**2)).data
-    delta_l_1 = find_x0(l_lc[:cutoff_index], array[:cutoff_index], max_over_e2)
-    delta_l_2 = find_x0(l_lc[cutoff_index:], array[cutoff_index:], max_over_e2)
-
-    # Estimates the inter-e2 range (analogous to interquartile range) in kperp1,
-    # from l-lc. Bear in mind that since abs(kperp1) is minimised at cutoff, one
-    # really has to use that in addition to these.
-    delta_kperp1_1 = find_x0(k_perp[:cutoff_index], l_lc[:cutoff_index], delta_l_1)
-    delta_kperp1_2 = find_x0(k_perp[cutoff_index:], l_lc[cutoff_index:], delta_l_2)
-    return (
-        max_over_e2,
-        np.array((delta_l_1, delta_l_2)),
-        np.array((delta_kperp1_1, delta_kperp1_2)),
+    analysis_dict.update(
+        {
+            "H_eigvals": (["tau", "solution"], H_eigvals),
+            "H_eigval1": (["tau"], H_eigvals[:, 0]),
+            "H_eigval2": (["tau"], H_eigvals[:, 1]),
+            "H_eigval3": (["tau"], H_eigvals[:, 2]),
+            "H_eigval_solution": (["tau"], H_solution),
+            "e_eigvecs": (["tau", "col_field", "solution"], e_eigvecs),
+            "e_eigvec1": (["tau", "col_field"], e_eigvecs[:, :, 0]),
+            "e_eigvec2": (["tau", "col_field"], e_eigvecs[:, :, 1]),
+            "e_eigvec3": (["tau", "col_field"], e_eigvecs[:, :, 2]),
+            "e_hat": (["tau", "col_field"], e_hat),
+        }
     )
 
+    if btf:
+        ##################################################
+        log.debug("Performing analysis on beam-tracing results")
+        log.debug("Hessians and second derivatives")
+        ##################################################
 
-def cumulative_integrate(array: xr.DataArray) -> xr.DataArray:
-    """Cumulative integral of ``array`` along ``distance_along_line``, shifted
-    by half the maximum"""
-    cumint = array.cumulative_integrate("distance_along_line")
-    return cumint - cumint.max() / 2
-
-
-def max_l_lc(
-    distance_along_line: xr.DataArray, array: xr.DataArray, cutoff_index: int
-) -> xr.DataArray:
-    max_index = array.argmax("tau")
-    return distance_along_line[max_index] - distance_along_line[cutoff_index]
-
-
-def mean_l_lc(
-    distance_along_line: xr.DataArray, array: xr.DataArray, cutoff_index: int
-) -> xr.DataArray:
-    return (
-        (array * distance_along_line).integrate("distance_along_line")
-        / array.integrate("distance_along_line")
-    ) - distance_along_line[cutoff_index]
-
-
-def mean_kperp(k_perp: xr.DataArray, array: xr.DataArray) -> xr.DataArray:
-    """Mean kperp1 for backscattering"""
-    return np.trapezoid(array * k_perp, k_perp) / np.trapezoid(array, k_perp)
-
-
-def localisation_analysis(df: xr.Dataset, cutoff_index: int, wavenumber_K0: float):
-    """
-    Now to do some more-complex analysis of the localisation / instrumentation function / filter function.
-    This part of the code fails in some situations, hence I'm making
-    it possible to skip this section
-    """
-    # Finds the 1/e2 values (localisation)
-    loc_b_r_s_max_over_e2, loc_b_r_s_delta_l, loc_b_r_s_delta_kperp1 = find_e2_width(
-        df.l_lc, df.loc_b_r_s, df.k_perp_1_bs, cutoff_index
-    )
-    loc_b_r_max_over_e2, loc_b_r_delta_l, loc_b_r_delta_kperp1 = find_e2_width(
-        df.l_lc, df.loc_b_r, df.k_perp_1_bs, cutoff_index
-    )
-
-    # Calculate the cumulative integral of the localisation pieces
-    cum_loc_b_r_s = cumulative_integrate(df.loc_b_r_s)
-    cum_loc_b_r = cumulative_integrate(df.loc_b_r)
-
-    (
-        cum_loc_b_r_s_max_over_e2,
-        cum_loc_b_r_s_delta_l,
-        cum_loc_b_r_s_delta_kperp1,
-    ) = find_e2_width(df.l_lc, cum_loc_b_r_s, df.k_perp_1_bs, cutoff_index)
-
-    (
-        cum_loc_b_r_max_over_e2,
-        cum_loc_b_r_delta_l,
-        cum_loc_b_r_delta_kperp1,
-    ) = find_e2_width(df.l_lc, cum_loc_b_r, df.k_perp_1_bs, cutoff_index)
-
-    # Gives the mode l-lc for backscattering
-    loc_b_r_s_max_l_lc = max_l_lc(df.distance_along_line, df.loc_b_r_s, cutoff_index)
-    loc_b_r_max_l_lc = max_l_lc(df.distance_along_line, df.loc_b_r, cutoff_index)
-
-    # Gives the mean l-lc for backscattering
-    cum_loc_b_r_s_mean_l_lc = mean_l_lc(
-        df.distance_along_line, df.loc_b_r_s, cutoff_index
-    )
-    cum_loc_b_r_mean_l_lc = mean_l_lc(df.distance_along_line, df.loc_b_r, cutoff_index)
-
-    # Gives the median l-lc for backscattering
-    cum_loc_b_r_s_delta_l_0 = find_x0(df.l_lc, cum_loc_b_r_s, 0)
-    cum_loc_b_r_delta_l_0 = find_x0(df.l_lc, cum_loc_b_r, 0)
-
-    # Due to the divergency of the ray piece, the mode kperp1 for backscattering is exactly that at the cut-off
-
-    cum_loc_b_r_s_mean_kperp1 = mean_kperp(df.k_perp_1_bs, df.loc_b_r_s)
-    cum_loc_b_r_mean_kperp1 = mean_kperp(df.k_perp_1_bs, df.loc_b_r)
-
-    # Gives the median kperp1 for backscattering
-    cum_loc_b_r_s_delta_kperp1_0 = find_x0(df.k_perp_1_bs, cum_loc_b_r_s, 0)
-
-    # Some of these will get added as "dimension coordinates", arrays with
-    # coordinates that have the same name, because we've not specified
-    # dimensions, which is perhaps not desired. What might be better would be to
-    # use e.g. loc_b_r_delta_l as the coordinate for loc_b_r_max_over_e2
-    return {
-        "loc_b_r_s_max_over_e2": loc_b_r_s_max_over_e2,
-        "loc_b_r_max_over_e2": loc_b_r_max_over_e2,
-        # The 1/e2 distances,  (l - l_c)
-        "loc_b_r_s_delta_l": loc_b_r_s_delta_l,
-        "loc_b_r_delta_l": loc_b_r_delta_l,
-        # The 1/e2 distances, kperp1, estimated from (l - l_c)
-        "loc_b_r_s_delta_kperp1": loc_b_r_s_delta_kperp1,
-        "loc_b_r_delta_kperp1": loc_b_r_delta_kperp1,
-        "cum_loc_b_r_s": cum_loc_b_r_s,
-        "cum_loc_b_r": cum_loc_b_r,
-        "cum_loc_b_r_s_max_over_e2": cum_loc_b_r_s_max_over_e2,
-        "cum_loc_b_r_max_over_e2": cum_loc_b_r_max_over_e2,
-        "cum_loc_b_r_s_delta_l": cum_loc_b_r_s_delta_l,
-        "cum_loc_b_r_delta_l": cum_loc_b_r_delta_l,
-        "cum_loc_b_r_s_delta_kperp1": cum_loc_b_r_s_delta_kperp1,
-        "cum_loc_b_r_delta_kperp1": cum_loc_b_r_delta_kperp1,
-        "loc_b_r_s_max_l_lc": loc_b_r_s_max_l_lc,
-        "loc_b_r_max_l_lc": loc_b_r_max_l_lc,
-        "cum_loc_b_r_s_mean_l_lc": cum_loc_b_r_s_mean_l_lc,
-        "cum_loc_b_r_mean_l_lc": cum_loc_b_r_mean_l_lc,  # mean l-lc
-        "cum_loc_b_r_s_delta_l_0": cum_loc_b_r_s_delta_l_0,
-        "cum_loc_b_r_delta_l_0": cum_loc_b_r_delta_l_0,  # median l-lc
-        "cum_loc_b_r_s_mean_kperp1": cum_loc_b_r_s_mean_kperp1,
-        "cum_loc_b_r_mean_kperp1": cum_loc_b_r_mean_kperp1,  # mean kperp1
-        "cum_loc_b_r_s_delta_kperp1_0": cum_loc_b_r_s_delta_kperp1_0,
-    }
-
-
-def open_data_input_npz(filename: PathLike) -> xr.Dataset:
-    """Read a ``data_input.npz`` file created with a previous version of Scotty, v2.4.3 or earlier, returning an xarray dataset"""
-    with np.load(filename) as f:
-        df = xr.Dataset(
-            {
-                "launch_freq_GHz": f["launch_freq_GHz"],
-                "launch_position": (["col"], f["launch_position"]),
-                "mode_flag": f["mode_flag"],
-                "poloidalFlux_grid": (["R", "Z"], f["poloidalFlux_grid"]),
-            },
-            coords={
-                "R": f["data_R_coord"],
-                "Z": f["data_Z_coord"],
-                "row": CYLINDRICAL_VECTOR_COMPONENTS,
-                "col": CYLINDRICAL_VECTOR_COMPONENTS,
-            },
-        )
-
-    set_vector_components_long_name(df)
-    return df
-
-
-def open_data_output_npz(filename: PathLike) -> xr.Dataset:
-    """Read a ``data_output.npz`` file created with a previous version of Scotty, v2.4.3 or earlier, returning an xarray dataset"""
-
-    with np.load(filename, allow_pickle=True) as f:
-        df = xr.Dataset(
-            {
-                "B_R": (["tau"], f["B_R_output"]),
-                "B_T": (["tau"], f["B_T_output"]),
-                "B_Z": (["tau"], f["B_Z_output"]),
-                "B_magnitude": (["tau"], f["B_magnitude"]),
-                "K_R": (["tau"], f["K_R_array"]),
-                "K_Z": (["tau"], f["K_Z_array"]),
-                "Psi_3D_lab_launch": (["row", "col"], f["Psi_3D_lab_launch"]),
-                "Psi_3D": (["tau", "row", "col"], f["Psi_3D_output"]),
-                "b_hat": (["tau", "col"], f["b_hat_output"]),
-                "dH_dKR": (["tau"], f["dH_dKR_output"]),
-                "dH_dKZ": (["tau"], f["dH_dKZ_output"]),
-                "dH_dKzeta": (["tau"], f["dH_dKzeta_output"]),
-                "dH_dR": (["tau"], f["dH_dR_output"]),
-                "dH_dZ": (["tau"], f["dH_dZ_output"]),
-                "g_hat": (["tau", "col"], f["g_hat_output"]),
-                "g_magnitude": (["tau"], f["g_magnitude_output"]),
-                "grad_bhat": (["tau", "row", "col"], f["grad_bhat_output"]),
-                "x_hat": (["tau", "col"], f["x_hat_output"]),
-                "y_hat": (["tau", "col"], f["y_hat_output"]),
-                "poloidal_flux": (["tau"], f["poloidal_flux_output"]),
-            },
-            coords={
-                "tau": f["tau_array"],
-                "row": CYLINDRICAL_VECTOR_COMPONENTS,
-                "col": CYLINDRICAL_VECTOR_COMPONENTS,
-                "q_R": f["q_R_array"],
-                "q_Z": f["q_Z_array"],
-                "q_zeta": f["q_zeta_array"],
-            },
-        )
-        if "temperature" in f:
-            df.update({"temperature": (["tau"], f["temperature"])})
-
-        if "Psi_3D_lab_entry" in f:
-            df.update(
-                {
-                    "Psi_3D_lab_entry": (["row", "col"], f["Psi_3D_lab_entry"]),
-                    "distance_from_launch_to_entry": f["distance_from_launch_to_entry"],
-                    "dpolflux_dR_debugging": (["tau"], f["dpolflux_dR_debugging"]),
-                    "dpolflux_dZ_debugging": (["tau"], f["dpolflux_dZ_debugging"]),
-                    "epsilon_para": (["tau"], f["epsilon_para_output"]),
-                    "epsilon_perp": (["tau"], f["epsilon_perp_output"]),
-                    "epsilon_g": (["tau"], f["epsilon_g_output"]),
-                    "electron_density": (["tau"], f["electron_density_output"]),
-                    "normalised_plasma_freqs": (["tau"], f["normalised_plasma_freqs"]),
-                    "normalised_gyro_freqs": (["tau"], f["normalised_gyro_freqs"]),
-                    "H": (["tau"], f["H_output"]),
-                    "H_other": (["tau"], f["H_other"]),
-                }
+        if cart:
+            grad_grad_H_cart, gradK_grad_H_cart, gradK_gradK_H_cart = hessians(
+                dH, cartesian=cart
+            )
+        else:
+            grad_grad_H_cyld, gradK_grad_H_cyld, gradK_gradK_H_cyld = hessians(
+                dH, cartesian=cart
+            )
+            grad_grad_H_cart, gradK_grad_H_cart, gradK_gradK_H_cart = convert_hessians(
+                q_start=q_vec_cyld.T,
+                K_start=K_vec_cart.T,
+                dH=dH,
+                grad_grad_H_start=grad_grad_H_cyld,
+                gradK_grad_H_start=gradK_grad_H_cyld,
+                gradK_gradK_H_start=gradK_gradK_H_cyld,
+                start="cylindrical",
+                end="cartesian",
             )
 
-    df.tau.attrs["long_name"] = "Parameterised distance along beam"
-    set_vector_components_long_name(df)
+        ##################################################
+        log.debug("Beam matrix (Psi_w) components in the {y, g, x} basis")
+        ##################################################
 
-    return df
-
-
-def open_analysis_npz(outputs: xr.Dataset, filename: PathLike) -> xr.Dataset:
-    """Read a ``analysis_output.npz`` file created with a previous version of Scotty, v2.4.3 or earlier, returning an xarray dataset"""
-    with np.load(filename, allow_pickle=True) as f:
-        df = xr.Dataset(
-            {
-                "Psi_3D_Cartesian": (["tau", "row", "col"], f["Psi_3D_Cartesian"]),
-                "Psi_xx": (["tau"], f["Psi_xx_output"]),
-                "Psi_xy": (["tau"], f["Psi_xy_output"]),
-                "Psi_yy": (["tau"], f["Psi_yy_output"]),
-                "M_xx": (["tau"], f["M_xx_output"]),
-                "M_xy": (["tau"], f["M_xy_output"]),
-                "xhat_dot_grad_bhat_dot_xhat": (
-                    ["tau"],
-                    f["xhat_dot_grad_bhat_dot_xhat_output"],
-                ),
-                "xhat_dot_grad_bhat_dot_ghat": (
-                    ["tau"],
-                    f["xhat_dot_grad_bhat_dot_ghat_output"],
-                ),
-                "yhat_dot_grad_bhat_dot_ghat": (
-                    ["tau"],
-                    f["yhat_dot_grad_bhat_dot_ghat_output"],
-                ),
-                "d_theta_d_tau": (["tau"], f["d_theta_d_tau"]),
-                "d_xhat_d_tau_dot_yhat": (["tau"], f["d_xhat_d_tau_dot_yhat_output"]),
-                "kappa_dot_xhat": (["tau"], f["kappa_dot_xhat_output"]),
-                "kappa_dot_yhat": (["tau"], f["kappa_dot_yhat_output"]),
-                "distance_along_line": (["tau"], f["distance_along_line"]),
-                "cutoff_index": f["cutoff_index"],
-                "poloidal_flux_on_midplane": (
-                    ["R_midplane"],
-                    f["poloidal_flux_on_midplane"],
-                ),
-                "theta": (["tau"], f["theta_output"]),
-                "theta_m": (["tau"], f["theta_m_output"]),
-                "delta_theta_m": (["tau"], f["delta_theta_m"]),
-                "K_magnitude": (["tau"], f["K_magnitude_array"]),
-                "k_perp_1_bs": (["tau"], f["k_perp_1_bs"]),
-                "loc_b_r_s": (["tau"], f["loc_b_r_s"]),
-                "loc_b_r": (["tau"], f["loc_b_r"]),
-            },
-            coords={
-                "R_midplane": f["R_midplane_points"],
-                "tau": outputs.tau,
-                "row": outputs.row,
-                "col": outputs.col,
-                "q_R": outputs.q_R,
-                "q_Z": outputs.q_Z,
-                "q_zeta": outputs.q_zeta,
-            },
+        Psi_3D_output_labframe_cartesian = np.array(
+            solver_output["Psi_3D_output_labframe_cartesian"][()]
+        )  # (N, 3, 3)
+        Psi_xx_output_beamframe_cartesian = dot(
+            x_hat_cart, dot(Psi_3D_output_labframe_cartesian, x_hat_cart)
+        )
+        Psi_xy_output_beamframe_cartesian = dot(
+            x_hat_cart, dot(Psi_3D_output_labframe_cartesian, y_hat_cart)
+        )
+        Psi_xg_output_beamframe_cartesian = dot(
+            x_hat_cart, dot(Psi_3D_output_labframe_cartesian, g_hat_cart)
+        )
+        Psi_yy_output_beamframe_cartesian = dot(
+            y_hat_cart, dot(Psi_3D_output_labframe_cartesian, y_hat_cart)
+        )
+        Psi_yg_output_beamframe_cartesian = dot(
+            y_hat_cart, dot(Psi_3D_output_labframe_cartesian, g_hat_cart)
+        )
+        Psi_gg_output_beamframe_cartesian = dot(
+            g_hat_cart, dot(Psi_3D_output_labframe_cartesian, g_hat_cart)
         )
 
-        if "l_lc" in f:
-            l_lc = f["l_lc"]
-        else:
-            l_lc = df.distance_along_line - df.distance_along_line[df.cutoff_index]
+        check_Psi_output(
+            Psi_xg_output_beamframe_cartesian,
+            Psi_yg_output_beamframe_cartesian,
+            Psi_gg_output_beamframe_cartesian,
+        )
 
-        return df.assign_coords(
+        Psi_w_output_beamframe_cartesian = np.zeros(
+            (len_tau, 2, 2), dtype=np.complex128
+        )  # (N, 2, 2)
+        Psi_w_output_beamframe_cartesian[:, 0, 0] = Psi_xx_output_beamframe_cartesian
+        Psi_w_output_beamframe_cartesian[:, 0, 1] = Psi_w_output_beamframe_cartesian[
+            :, 1, 0
+        ] = Psi_xy_output_beamframe_cartesian
+        Psi_w_output_beamframe_cartesian[:, 1, 1] = Psi_yy_output_beamframe_cartesian
+        curv1, curv2, width1, width2 = find_beam_widths_and_curvs(
+            Psi_w_output_beamframe_cartesian, K_vec_cart, g_vec_cart
+        )
+
+        analysis_dict.update(
             {
-                "l_lc": (
-                    ["tau"],
-                    l_lc.data,
-                    {"long_name": "Distance from cutoff", "units": "m"},
-                )
+                "grad_grad_H_cartesian": (
+                    ["tau", "row_cart", "col_cart"],
+                    grad_grad_H_cart,
+                ),
+                "gradK_grad_H_cartesian": (
+                    ["tau", "row_cart", "col_cart"],
+                    gradK_grad_H_cart,
+                ),
+                "gradK_gradK_H_cartesian": (
+                    ["tau", "row_cart", "col_cart"],
+                    gradK_gradK_H_cart,
+                ),
+                "Psi_xx": (["tau"], Psi_xx_output_beamframe_cartesian),
+                "Psi_xy": (["tau"], Psi_xy_output_beamframe_cartesian),
+                "Psi_xg": (["tau"], Psi_xg_output_beamframe_cartesian),
+                "Psi_yy": (["tau"], Psi_yy_output_beamframe_cartesian),
+                "Psi_yg": (["tau"], Psi_yg_output_beamframe_cartesian),
+                "Psi_gg": (["tau"], Psi_gg_output_beamframe_cartesian),
+                "Psi_w": (
+                    ["tau", "row_beam", "col_beam"],
+                    Psi_w_output_beamframe_cartesian,
+                ),
+                "curvature_1": (["tau"], curv1),
+                "curvature_2": (["tau"], curv2),
+                "width_1": (["tau"], width1),
+                "width_2": (["tau"], width2),
             }
         )
 
+    else:
+        log.debug("No beam-tracing results; skipping beam-tracing analysis")
 
-def beam_width(
-    g_hat: xr.DataArray, orthogonal_dir: FloatArray, Psi_3D: xr.DataArray
-) -> xr.DataArray:
-    W_vec = np.cross(g_hat, orthogonal_dir)
-    W_vec_magnitude = np.linalg.norm(W_vec, axis=1)
+    analysis_coords = {
+        "tau": np.array(solver_output["tau"][()]),
+        "row_cart": CARTESIAN_VECTOR_COMPONENTS,
+        "col_cart": CARTESIAN_VECTOR_COMPONENTS,
+        "solution": SOLUTION_COMPONENTS,
+        "col_field": FIELD_ALIGNED_COMPONENTS,
+        "row_beam": BEAM_TRANSVERSE_COMPONENTS,
+        "col_beam": BEAM_TRANSVERSE_COMPONENTS,
+    }
 
-    # Unit vector
-    W_uvec = W_vec / W_vec_magnitude[:, np.newaxis]
-    width = np.sqrt(2 / dot(W_uvec, dot(Psi_3D, W_uvec)).imag)
-    width = xr.DataArray(W_uvec * width[:, np.newaxis], coords=g_hat.coords)
-    set_vector_components_long_name(width)
-    return width
+    return analysis_dict, analysis_coords
+
+
+def dbs_analysis(
+    inputs: xr.Dataset,
+    solver_output: xr.Dataset,
+    analysis: xr.Dataset,
+    hamiltonian: Hamiltonian,
+    hamiltonian_other: Hamiltonian,
+    field: VALID_FIELDS,
+    density_fit: ProfileFitLike,
+    temperature_fit: Optional[ProfileFitLike],
+) -> Tuple[dict, dict]:
+
+    log.info(f"""\n
+    ##################################################
+    #
+    # DOPPLER BACKSCATTERING ANALYSIS ROUTINE
+    #
+    ##################################################
+    """)
+
+    log.debug(f"Performing analysis on ray-tracing results")
+
+    cart = bool(inputs["geometry"] == "cartesian")
+    btf = not bool(inputs["ray_tracing_flag"])
+    tau = np.array(solver_output["tau"][()])
+    len_tau = len(tau)
+    beam_path_length = np.array(analysis["beam_path_length"][()])
+    dbs_analysis_dict = {}
+
+    ##################################################
+    log.debug("Find cos(theta) and d(theta)/d(tau)")
+    ##################################################
+
+    y_hat_cart = np.array(analysis["y_hat_cartesian"][()])  # (N,3)
+    g_hat_cart = np.array(analysis["g_hat_cartesian"][()])  # (N,3)
+    x_hat_cart = np.array(analysis["x_hat_cartesian"][()])  # (N,3)
+    b_hat_cart = np.array(analysis["b_hat_cartesian"][()])  # (N,3)
+    k_perp1_hat = make_unit_vector_from_cross_product(y_hat_cart, b_hat_cart)
+    sin_theta = -dot(x_hat_cart, k_perp1_hat)
+    theta = np.sign(sin_theta) * np.arcsin(np.abs(sin_theta))
+    cos_theta = np.cos(theta)
+
+    dbs_analysis_dict.update(
+        {
+            "k_perp1_hat": (["tau", "col_cart"], k_perp1_hat),
+            "sin_theta": (["tau"], sin_theta),
+            "cos_theta": (["tau"], cos_theta),
+            "theta": (["tau"], theta),  # in radians
+            "d_theta_d_tau": (["tau"], np.gradient(theta, tau)),
+        }
+    )
+
+    ##################################################
+    log.debug("Find k_perp_bs components")
+    ##################################################
+
+    theta_m = np.array(analysis["theta_m"][()])  # (N,)
+    dpolflux_dX = np.array(analysis["dpolflux_dX"][()])  # (N,)
+    dpolflux_dY = np.array(analysis["dpolflux_dY"][()])  # (N,)
+    dpolflux_dZ = np.array(analysis["dpolflux_dZ"][()])  # (N,)
+    K_mag = np.array(solver_output["K_output_magnitude"][()])  # (N,)
+    normal_vec = np.stack((dpolflux_dX, dpolflux_dY, dpolflux_dZ), axis=1)  # (N,3)
+    normal_mag = np.linalg.norm(normal_vec, axis=1)  # (N,)
+    normal_hat = normal_vec / normal_mag[:, np.newaxis]  # (N,3)
+    binormal_hat = make_unit_vector_from_cross_product(b_hat_cart, normal_hat)  # (N,3)
+    k_perp1_bs = -2 * K_mag * np.cos(theta + theta_m) / cos_theta  # (N,)
+    # normal_hat and binormal_hat span the plane perpendicular to b_hat, which
+    # contains k_perp1_hat, so these add in quadrature to k_perp1_bs; tested in
+    # tests/test_analysis_outputs.py
+    k_perp1_bs_normal = k_perp1_bs * dot(k_perp1_hat, normal_hat)
+    k_perp1_bs_binormal = k_perp1_bs * dot(k_perp1_hat, binormal_hat)
+
+    dbs_analysis_dict.update(
+        {
+            "normal_hat": (["tau", "col_cart"], normal_hat),
+            "binormal_hat": (["tau", "col_cart"], binormal_hat),
+            "k_perp1_bs": (["tau"], k_perp1_bs),
+            "k_perp1_bs_normal": (["tau"], k_perp1_bs_normal),
+            "k_perp1_bs_binormal": (["tau"], k_perp1_bs_binormal),
+        }
+    )
+
+    ##################################################
+    log.debug("Find grad_bhat stuff")
+    ##################################################
+
+    grad_bhat = np.array(analysis["grad_bhat_cartesian"][()])  # (N,3,3)
+    xhat_dot_grad_bhat_dot_xhat = dot(x_hat_cart, dot(grad_bhat, x_hat_cart))
+    xhat_dot_grad_bhat_dot_yhat = dot(x_hat_cart, dot(grad_bhat, y_hat_cart))
+    xhat_dot_grad_bhat_dot_ghat = dot(x_hat_cart, dot(grad_bhat, g_hat_cart))
+    yhat_dot_grad_bhat_dot_xhat = dot(y_hat_cart, dot(grad_bhat, x_hat_cart))
+    yhat_dot_grad_bhat_dot_yhat = dot(y_hat_cart, dot(grad_bhat, y_hat_cart))
+    yhat_dot_grad_bhat_dot_ghat = dot(y_hat_cart, dot(grad_bhat, g_hat_cart))
+
+    dbs_analysis_dict.update(
+        {
+            "xhat_dot_grad_bhat_dot_xhat": (["tau"], xhat_dot_grad_bhat_dot_xhat),
+            "xhat_dot_grad_bhat_dot_yhat": (["tau"], xhat_dot_grad_bhat_dot_yhat),
+            "xhat_dot_grad_bhat_dot_ghat": (["tau"], xhat_dot_grad_bhat_dot_ghat),
+            "yhat_dot_grad_bhat_dot_xhat": (["tau"], yhat_dot_grad_bhat_dot_xhat),
+            "yhat_dot_grad_bhat_dot_yhat": (["tau"], yhat_dot_grad_bhat_dot_yhat),
+            "yhat_dot_grad_bhat_dot_ghat": (["tau"], yhat_dot_grad_bhat_dot_ghat),
+        }
+    )
+
+    if btf:
+        ##################################################
+        log.debug("Find wavenumber resolution and mismatch attenuation")
+        ##################################################
+
+        Psi_xx = np.array(analysis["Psi_xx"][()])
+        Psi_xy = np.array(analysis["Psi_xy"][()])
+        Psi_yy = np.array(analysis["Psi_yy"][()])
+        M_xx = Psi_xx + (k_perp1_bs / 2) * xhat_dot_grad_bhat_dot_ghat
+        M_xy = Psi_xy + (k_perp1_bs / 2) * yhat_dot_grad_bhat_dot_ghat
+        M_yy = Psi_yy
+        det_M_w = M_xx * M_yy - M_xy**2
+        M_w_inv_xx = M_yy / det_M_w
+        M_w_inv_xy = -M_xy / det_M_w
+        M_w_inv_yy = M_xx / det_M_w
+        delta_k_perp2 = 2 * np.sqrt(-1 / np.imag(M_w_inv_yy))
+
+        dbs_analysis_dict.update(
+            {
+                "M_xx": (["tau"], M_xx),
+                "M_xy": (["tau"], M_xy),
+                "M_yy": (["tau"], M_yy),
+                "det_M_w": (["tau"], det_M_w),
+                "M_w_inv_xx": (["tau"], M_w_inv_xx),
+                "M_w_inv_xy": (["tau"], M_w_inv_xy),
+                "M_w_inv_yy": (["tau"], M_w_inv_yy),
+                "delta_k_perp2": (["tau"], delta_k_perp2),
+            }
+        )
+
+    else:
+        log.debug(
+            "No beam-tracing results; skipping wavenumber resolution and mismatch attenuation"
+        )
+
+    ##################################################
+    log.debug(f"Finding the polarisation piece (loc_p)")
+    ##################################################
+
+    zero = np.zeros(len_tau, dtype=np.float64)
+    epsilon_para = np.array(analysis["epsilon_para"][()])
+    epsilon_perp = np.array(analysis["epsilon_perp"][()])
+    epsilon_g = np.array(analysis["epsilon_g"][()])
+    e_hat = np.array(analysis["e_hat"][()])
+    e_hat_conj = np.conjugate(e_hat)
+    n_e = np.array(analysis["electron_density"][()])
+    w_launch = hamiltonian.angular_frequency
+    temperature = analysis.get("electron_temperature")
+    if temperature is not None:
+        # a plain array, like the inputs above, so that loc_p is not a DataArray
+        temperature = np.array(temperature[()])
+
+    # equilibrium dielectric tensor - identity matrix, i.e.
+    # \bm{\epsilon}_{eq} - \bm{1}
+    epsilon_minus_identity = np.block(
+        [
+            [[epsilon_perp], [1j * epsilon_g], [zero]],
+            [[-1j * epsilon_g], [epsilon_perp], [zero]],
+            [[zero], [zero], [epsilon_para]],
+        ]
+    ).T - np.eye(3)
+
+    # Avoids dividing a small number by another small number,
+    # leading to a big number because of numerical errors or something
+    loc_p_unnormalised = np.divide(
+        np.abs(dot(e_hat_conj, dot(epsilon_minus_identity, e_hat))) ** 2,
+        (n_e * 1e19) ** 2,
+        out=np.zeros_like(n_e),
+        where=(n_e > 1e-6),
+    )
+
+    loc_p = (
+        w_launch**2 * const.epsilon_0 * find_electron_mass(temperature) / const.e**2
+    ) ** 2 * loc_p_unnormalised
+
+    dbs_analysis_dict.update(
+        {
+            "loc_p": (["tau"], loc_p),
+            "int_loc_p_dL": ([], trapezoid(loc_p, beam_path_length)),
+        }
+    )
+
+    ##################################################
+    log.debug(f"Finding the ray piece (loc_r)")
+    ##################################################
+
+    g_mag_Cardano = np.array(analysis["g_magnitude_Cardano"][()])
+    loc_r = (2 * const.c / w_launch) ** 2 / g_mag_Cardano**2
+    # needed by loc_b and loc_s; loc_s is also computed for ray tracing only
+    launch_wavenumber = hamiltonian.wavenumber
+
+    dbs_analysis_dict.update(
+        {
+            "loc_r": (["tau"], loc_r),
+            "int_loc_r_dL": ([], trapezoid(loc_r, beam_path_length)),
+        }
+    )
+
+    if btf:
+        ##################################################
+        log.debug(f"Finding the beam piece (loc_b)")
+        ##################################################
+
+        launch_beam_width = float(inputs["launch_beam_width"][()])
+        launch_beam_curv = float(inputs["launch_beam_curvature"][()])
+        det_Im_Psi_w = np.imag(Psi_xx) * np.imag(Psi_yy) - np.imag(Psi_xy) ** 2
+        beam_waist = find_waist(launch_beam_width, launch_wavenumber, launch_beam_curv)
+        loc_b = (beam_waist * det_Im_Psi_w) / (
+            np.sqrt(2) * np.abs(det_M_w) * np.sqrt(-np.imag(M_w_inv_yy))
+        )
+
+        dbs_analysis_dict.update(
+            {
+                "det_Im_Psi_w": (["tau"], det_Im_Psi_w),
+                "beam_waist": beam_waist,
+                "loc_b": (["tau"], loc_b),
+                "int_loc_b_dL": ([], trapezoid(loc_b, beam_path_length)),
+            }
+        )
+
+    else:
+        log.debug("No beam-tracing results; skipping beam piece (loc_b)")
+
+    if btf:
+        ##################################################
+        log.debug(f"Finding the mismatch piece (loc_m)")
+        ##################################################
+
+        delta_theta_m = (
+            np.sqrt(
+                np.imag(M_w_inv_yy)
+                / (
+                    (np.imag(M_w_inv_xy)) ** 2
+                    - np.imag(M_w_inv_xx) * np.imag(M_w_inv_yy)
+                )
+            )
+            / K_mag
+        )
+        loc_m = np.exp(-2 * (theta_m / delta_theta_m) ** 2)
+
+        dbs_analysis_dict.update(
+            {
+                "delta_theta_m": (["tau"], delta_theta_m),
+                "loc_m": (["tau"], loc_m),
+                "int_loc_m_dL": ([], trapezoid(loc_m, beam_path_length)),
+            }
+        )
+
+    else:
+        log.debug("No beam-tracing results; skipping beam piece (loc_b)")
+
+    ##################################################
+    log.debug(f"Finding the spectrum piece (loc_s)")
+    ##################################################
+
+    spectrum_power_laws = ["-10/3", "-13/3"]
+    loc_s = {
+        f"loc_s_{power}": np.array(
+            (k_perp1_bs / (-2 * launch_wavenumber)) ** eval(power)
+        )
+        for power in spectrum_power_laws
+    }
+
+    dbs_analysis_dict.update(
+        {
+            "spectrum_power_laws": spectrum_power_laws,
+            **{f"{k}": (["tau"], v) for k, v in loc_s.items()},
+            **{
+                f"int_{k}_dL": ([], trapezoid(v, beam_path_length))
+                for k, v in loc_s.items()
+            },
+        }
+    )
+
+    if btf:
+        ##################################################
+        log.debug(
+            f"Finding total localisation (loc_p * loc_r * loc_b * loc_m * loc_s) and backscattered power (p_r)"
+        )
+        ##################################################
+
+        loc_all = {
+            f"loc_all_{power}": loc_p * loc_r * loc_b * loc_m * loc_s[f"loc_s_{power}"]
+            for power in spectrum_power_laws
+        }
+
+        dbs_analysis_dict.update(
+            {
+                **{f"{k}": (["tau"], v) for k, v in loc_all.items()},
+                **{
+                    f"int_{k}_dL": ([], trapezoid(v, beam_path_length))
+                    for k, v in loc_all.items()
+                },
+            }
+        )
+
+    else:
+        log.debug(
+            "No beam-tracing results; skipping total localisation (loc_p * loc_r * loc_b * loc_m * loc_s) and backscattered power (p_r)"
+        )
+
+    dbs_analysis_coords = {
+        "tau": np.array(solver_output["tau"][()]),
+        "beam_path_length": (["tau"], beam_path_length),
+        "beam_path_length_wrt_cutoff": (
+            ["tau"],
+            np.array(analysis["beam_path_length_wrt_cutoff"][()]),
+        ),
+        "row_cart": CARTESIAN_VECTOR_COMPONENTS,
+        "col_cart": CARTESIAN_VECTOR_COMPONENTS,
+    }
+
+    # netCDF complains if keys contian '/' so
+    # iterate along the keys and replace those with '_'
+    def _replace_slash_with_underscore(d: dict) -> dict:
+        return {k.replace("/", "_"): v for k, v in d.items()}
+
+    dbs_analysis_dict_clean = _replace_slash_with_underscore(dbs_analysis_dict)
+
+    return dbs_analysis_dict_clean, dbs_analysis_coords

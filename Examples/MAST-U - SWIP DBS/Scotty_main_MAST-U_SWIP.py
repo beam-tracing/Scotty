@@ -7,6 +7,7 @@ Valerian Hongjie Hall-Chen
 
 """
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs
 from scotty.init_bruv import get_parameters_for_Scotty
 
 
@@ -31,7 +32,7 @@ kwargs_dict['toroidal_launch_angle_Torbeam'] = toroidal_launch_angle_Torbeam
 kwargs_dict['poloidal_flux_enter'] = 1.22
 # kwargs_dict['output_path'] = os.path.dirname(os.path.abspath(__file__)) + '\\Output\\'
 kwargs_dict['density_fit_parameters'] = None
-kwargs_dict['ne_data_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST-U\\'
+kwargs_dict['ne_data_path'] = 'D:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST-U\\'
 kwargs_dict['input_filename_suffix'] = '_45304_780ms'
 
 kwargs_dict['figure_flag'] = False
@@ -43,4 +44,4 @@ kwargs_dict['delta_K_zeta'] = 0.1
 kwargs_dict['delta_K_Z'] = 0.1
 
 
-beam_me_up(**kwargs_dict)
+beam_me_up(**from_v3_kwargs(kwargs_dict))

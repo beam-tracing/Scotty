@@ -7,6 +7,7 @@ Valerian Hongjie Hall-Chen
 
 """
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs
 import numpy as np
 import os
 from scotty.init_bruv import get_parameters_for_Scotty
@@ -89,5 +90,5 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
             if os.path.exists(an_output):
                 continue
             else:
-                beam_me_up(**kwargs_dict)
-            # beam_me_up(**kwargs_dict)
+                beam_me_up(**from_v3_kwargs(kwargs_dict))
+            # beam_me_up(**from_v3_kwargs(kwargs_dict))

@@ -7,6 +7,7 @@ Valerian Hongjie Hall-Chen
 
 """
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs
 import os
 
 from scotty.init_bruv import get_parameters_for_Scotty
@@ -41,4 +42,4 @@ kwargs_dict["delta_K_zeta"] = 0.1
 kwargs_dict["delta_K_Z"] = 0.1
 
 
-beam_me_up(**kwargs_dict)
+beam_me_up(**from_v3_kwargs(kwargs_dict))

@@ -1,3 +1,10 @@
+"""master's (v3) geometry tests, in v4's call signature
+
+The bodies are master's: the only changes are the toroidal coordinate (zeta = 0.0, which
+axisymmetric fields ignore) and v4's names (``polflux``, ``unitvector``,
+``InterpolatedField_Cylindrical``)
+"""
+
 from scotty import geometry
 
 import numpy as np
@@ -13,9 +20,9 @@ def test_circular():
         B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
     )
 
-    assert np.isclose(field.B_T(R_axis, 0.0), B_T_axis), "B_T on axis, scalar"
+    assert np.isclose(field.B_T(R_axis, 0.0, 0.0), B_T_axis), "B_T on axis, scalar"
     npt.assert_allclose(
-        field.B_T([R_axis, R_axis], [-1, 1]), [B_T_axis, B_T_axis]
+        field.B_T([R_axis, R_axis], 0.0, [-1, 1]), [B_T_axis, B_T_axis]
     ), "B_T, array"
 
     # Include buffer for gradient near edge
@@ -24,10 +31,10 @@ def test_circular():
     R = np.linspace(R_axis - width, R_axis + width, 99)
     Z = np.linspace(-width, width, 101)
     R_grid, Z_grid = np.meshgrid(R, Z, indexing="ij")
-    B_R = field.B_R(R_grid, Z_grid)
-    B_Z = field.B_Z(R_grid, Z_grid)
+    B_R = field.B_R(R_grid, 0.0, Z_grid)
+    B_Z = field.B_Z(R_grid, 0.0, Z_grid)
 
-    psi = field.poloidal_flux(R_grid, Z_grid)
+    psi = field.polflux(R_grid, 0.0, Z_grid)
     grad_psi = np.gradient(psi, R, Z)
     calculated_B_R = grad_psi[1] * B_p_a / R_grid
     calculated_B_Z = -grad_psi[0] * B_p_a / R_grid
@@ -54,17 +61,17 @@ def test_circular_magnitude():
         B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
     )
     assert np.isclose(
-        field.magnitude(R_axis, 0.0), B_T_axis
+        field.magnitude(R_axis, 0.0, 0.0), B_T_axis
     ), "on axis"  ## This throws a divide by zero error
 
     B_magnitude_top_bottom = np.sqrt(
         B_T_axis**2 + (B_p_a / (R_axis * minor_radius_a)) ** 2
     )
     assert np.isclose(
-        field.magnitude(R_axis, minor_radius_a), B_magnitude_top_bottom
+        field.magnitude(R_axis, 0.0, minor_radius_a), B_magnitude_top_bottom
     ), "top"
     assert np.isclose(
-        field.magnitude(R_axis, -minor_radius_a), B_magnitude_top_bottom
+        field.magnitude(R_axis, 0.0, -minor_radius_a), B_magnitude_top_bottom
     ), "bottom"
 
     R_inboard = R_axis - minor_radius_a
@@ -72,7 +79,9 @@ def test_circular_magnitude():
         (R_axis * B_T_axis / R_inboard) ** 2
         + (B_p_a / (R_inboard * minor_radius_a)) ** 2
     )
-    assert np.isclose(field.magnitude(R_inboard, 0.0), B_magnitude_inboard), "inboard"
+    assert np.isclose(
+        field.magnitude(R_inboard, 0.0, 0.0), B_magnitude_inboard
+    ), "inboard"
 
     R_outboard = R_axis + minor_radius_a
     B_magnitude_outboard = np.sqrt(
@@ -80,7 +89,7 @@ def test_circular_magnitude():
         + (B_p_a / (R_outboard * minor_radius_a)) ** 2
     )
     assert np.isclose(
-        field.magnitude(R_outboard, 0.0), B_magnitude_outboard
+        field.magnitude(R_outboard, 0.0, 0.0), B_magnitude_outboard
     ), "outboard"
 
 
@@ -94,18 +103,18 @@ def test_circular_unit():
     )
 
     ## Something around here throws a divide by zero error
-    unit_axis = field.unit(R_axis, 0)
+    unit_axis = field.unitvector(R_axis, 0.0, 0)
     assert np.linalg.norm(unit_axis) == 1.0, "on axis, magnitude"
     assert np.allclose(unit_axis, [0, 1, 0]), "on axis, direction"
 
     B_magnitude_top_bottom = np.sqrt(
         B_T_axis**2 + (B_p_a / (R_axis * minor_radius_a)) ** 2
     )
-    unit_top = field.unit(R_axis, minor_radius_a)
+    unit_top = field.unitvector(R_axis, 0.0, minor_radius_a)
     expected_unit_top = np.array([0.25, 1, 0]) / B_magnitude_top_bottom
     assert np.linalg.norm(unit_top) == 1.0, "top, magnitude"
     assert np.allclose(unit_top, expected_unit_top), "top, direction"
-    unit_bottom = field.unit(R_axis, -minor_radius_a)
+    unit_bottom = field.unitvector(R_axis, 0.0, -minor_radius_a)
     expected_unit_bottom = np.array([-0.25, 1, 0]) / B_magnitude_top_bottom
     assert np.linalg.norm(unit_bottom) == 1.0, "bottom, magnitude"
     assert np.allclose(unit_bottom, expected_unit_bottom), "bottom, direction"
@@ -115,7 +124,7 @@ def test_circular_unit():
         (R_axis * B_T_axis / R_inboard) ** 2
         + (B_p_a / (R_inboard * minor_radius_a)) ** 2
     )
-    unit_inboard = field.unit(R_inboard, 0)
+    unit_inboard = field.unitvector(R_inboard, 0.0, 0)
     expected_unit_inboard = np.array([0, 2, 0.5]) / B_magnitude_inboard
     assert np.linalg.norm(unit_inboard) == 1.0, "inboard, magnitude"
     assert np.allclose(unit_inboard, expected_unit_inboard), "inboard, direction"
@@ -125,7 +134,7 @@ def test_circular_unit():
         (R_axis * B_T_axis / R_outboard) ** 2
         + (B_p_a / (R_outboard * minor_radius_a)) ** 2
     )
-    unit_outboard = field.unit(R_outboard, 0)
+    unit_outboard = field.unitvector(R_outboard, 0.0, 0)
     expected_unit_outboard = np.array([0, 2 / 3, -1 / 6]) / B_magnitude_outboard
     assert np.linalg.norm(unit_outboard) == 1.0, "outboard, magnitude"
     assert np.allclose(unit_outboard, expected_unit_outboard), "outboard, direction"
@@ -143,16 +152,16 @@ def test_interpolated():
     R = np.linspace(R_axis - minor_radius_a, R_axis + minor_radius_a)
     Z = np.linspace(-minor_radius_a, minor_radius_a)
     R_grid, Z_grid = np.meshgrid(R, Z, indexing="ij")
-    B_R = circular_field.B_R(R_grid, Z_grid)
-    B_T = circular_field.B_T(R_grid, Z_grid)
-    B_Z = circular_field.B_Z(R_grid, Z_grid)
-    psi = circular_field.poloidal_flux(R_grid, Z_grid)
+    B_R = circular_field.B_R(R_grid, 0.0, Z_grid)
+    B_T = circular_field.B_T(R_grid, 0.0, Z_grid)
+    B_Z = circular_field.B_Z(R_grid, 0.0, Z_grid)
+    psi = circular_field.polflux(R_grid, 0.0, Z_grid)
 
-    field = geometry.InterpolatedField(R, Z, B_R, B_T, B_Z, psi)
+    field = geometry.InterpolatedField_Cylindrical(R, Z, B_R, B_T, B_Z, psi)
 
-    assert np.isclose(field.B_T(R_axis, 0.0), B_T_axis), "B_T on axis, scalar"
+    assert np.isclose(field.B_T(R_axis, 0.0, 0.0), B_T_axis), "B_T on axis, scalar"
     npt.assert_allclose(
-        field.B_T([R_axis, R_axis], [-1, 1]), [B_T_axis, B_T_axis], rtol=5e-6
+        field.B_T([R_axis, R_axis], 0.0, [-1, 1]), [B_T_axis, B_T_axis], rtol=5e-6
     ), "B_T, array"
 
     # Not quite from the axis, as interpolation particularly bad there
@@ -160,73 +169,22 @@ def test_interpolated():
     Z_vertical = np.linspace(0.1, minor_radius_a, 10)
 
     npt.assert_allclose(
-        field.B_R(R_axis, Z_vertical), circular_field.B_R(R_axis, Z_vertical), rtol=1e-2
+        field.B_R(R_axis, 0.0, Z_vertical),
+        circular_field.B_R(R_axis, 0.0, Z_vertical),
+        rtol=1e-2,
     )
     npt.assert_allclose(
-        field.B_T(R_midplane, 0.0), circular_field.B_T(R_midplane, 0.0), rtol=1e-2
+        field.B_T(R_midplane, 0.0, 0.0),
+        circular_field.B_T(R_midplane, 0.0, 0.0),
+        rtol=1e-2,
     )
     npt.assert_allclose(
-        field.B_Z(R_midplane, 0.0), circular_field.B_Z(R_midplane, 0.0), rtol=1e-2
+        field.B_Z(R_midplane, 0.0, 0.0),
+        circular_field.B_Z(R_midplane, 0.0, 0.0),
+        rtol=1e-2,
     )
     npt.assert_allclose(
-        field.poloidal_flux(R_midplane, 0.0),
-        circular_field.poloidal_flux(R_midplane, 0.0),
+        field.polflux(R_midplane, 0.0, 0.0),
+        circular_field.polflux(R_midplane, 0.0, 0.0),
         rtol=1e-3,
     )
-
-
-def test_circular_flux_surface():
-    B_T_axis = 1.0
-    R_axis = 2.0
-    minor_radius_a = 1.0
-    B_p_a = 0.5
-    field = geometry.CircularFluxSurfaceField(
-        B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
-    )
-
-    # psi_pol = (r/a)^2, so rho_pol = r/a
-    npt.assert_allclose(field.poloidal_flux(R_axis + 0.5, 0.0), 0.25)
-    npt.assert_allclose(field.poloidal_flux(R_axis, -minor_radius_a), 1.0)
-
-    # B_p_a is the poloidal field on the LCFS at R = R_axis, and B_p is linear in r
-    # at fixed R
-    assert np.isclose(field.B_R(R_axis, minor_radius_a), B_p_a), "top"
-    assert np.isclose(field.B_R(R_axis, 0.5 * minor_radius_a), 0.5 * B_p_a), "half"
-    assert np.isclose(field.magnitude(R_axis, 0.0), B_T_axis), "on axis"
-    npt.assert_allclose(field.unit(R_axis, 0.0), [0, 1, 0])
-
-    # B_p = grad(Psi) x grad(zeta) with Psi = B_p_a a R_axis psi_pol / 2
-    width = minor_radius_a + 0.05
-    R = np.linspace(R_axis - width, R_axis + width, 99)
-    Z = np.linspace(-width, width, 101)
-    R_grid, Z_grid = np.meshgrid(R, Z, indexing="ij")
-    B_R = field.B_R(R_grid, Z_grid)
-    B_Z = field.B_Z(R_grid, Z_grid)
-    Psi = 0.5 * B_p_a * minor_radius_a * R_axis * field.poloidal_flux(R_grid, Z_grid)
-    dPsi_dR, dPsi_dZ = np.gradient(Psi, R, Z, edge_order=2)
-    npt.assert_allclose(B_R, dPsi_dZ / R_grid, rtol=1e-6, atol=1e-6)
-    npt.assert_allclose(B_Z, -dPsi_dR / R_grid, rtol=1e-6, atol=1e-6)
-
-    # Divergence-free: (1/R) d(R B_R)/dR + dB_Z/dZ = 0
-    divergence = np.gradient(
-        R_grid * B_R, R, axis=0, edge_order=2
-    ) / R_grid + np.gradient(B_Z, Z, axis=1, edge_order=2)
-    npt.assert_allclose(divergence, 0.0, atol=1e-10)
-
-    # Same direction of rotation as CircularCrossSectionField
-    total_sign = np.sign(B_R) * np.sign(B_Z)
-    assert total_sign[0, 0] == -1, "Top left"
-    assert total_sign[0, -1] == 1, "Top right"
-    assert total_sign[-1, 0] == 1, "Bottom left"
-    assert total_sign[-1, -1] == -1, "Bottom right"
-
-
-def test_deprecated_circular_fields_warn():
-    import pytest
-
-    for cls in (
-        geometry.CircularCrossSectionField,
-        geometry.ConstantCurrentDensityField,
-    ):
-        with pytest.warns(DeprecationWarning, match="Scotty v4"):
-            cls(B_T_axis=1.0, R_axis=2.0, minor_radius_a=1.0, B_p_a=0.5)

@@ -10,6 +10,7 @@ For shot 29908, the EFIT++ times are efit_times = np.linspace(0.155,0.25,20)
 I want efit_times[np.arange(0,10)*2 + 1]. 160ms, 170ms, ..., 250ms
 """
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs
 import numpy as np
 
 from scotty.init_bruv import get_parameters_for_Scotty
@@ -65,13 +66,13 @@ for ii, equil_time in enumerate(equil_times):
                     kwargs_dict["density_fit_parameters"] = None
                     kwargs_dict[
                         "ne_data_path"
-                    ] = "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST\\"
+                    ] = "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST\\"
                     kwargs_dict["input_filename_suffix"] = (
                         "_CPS_Jon_avr_" + f"{equil_time*1000:.0f}" + "ms"
                     )
                     kwargs_dict[
                         "magnetic_data_path"
-                    ] = "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\MAST\\"
+                    ] = "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST\\"
 
                     kwargs_dict["poloidal_flux_enter"] = 1.03857452**2
                     kwargs_dict["Psi_BC_flag"] = True
@@ -102,9 +103,9 @@ for ii, equil_time in enumerate(equil_times):
                     # if os.path.exists(data_output) and os.path.exists(analysis_output):
                     #     continue
                     # else:
-                    #     beam_me_up(**kwargs_dict)
+                    #     beam_me_up(**from_v3_kwargs(kwargs_dict))
 
-                    beam_me_up(**kwargs_dict)
+                    beam_me_up(**from_v3_kwargs(kwargs_dict))
 
                     # if equil_time == 0.16:
                     #     kwargs_dict['poloidal_flux_enter'] = 1.17280433**2
