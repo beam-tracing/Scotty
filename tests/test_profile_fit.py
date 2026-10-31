@@ -64,6 +64,19 @@ def test_spline_fit_from_file(ne_dat):
     assert np.allclose(density, fit(rho**2))
 
 
+@pytest.mark.parametrize("separator", [" ", "    ", "\t", " \t "])
+def test_spline_fit_from_file_accepts_whitespace_separators(tmp_path, separator):
+    rho = np.linspace(0.0, 1.0, 6)
+    density = np.linspace(4.0, 0.0, 6)
+    rows = [f"{r:.1f}{separator}{ne:.1f}" for r, ne in zip(rho, density)]
+    filename = tmp_path / "ne.dat"
+    filename.write_text("6\n" + "\n".join(rows) + "\n")
+
+    fit = SmoothingSplineFit.from_dat_file(1.0, filename)
+
+    assert np.allclose(density, fit(rho**2))
+
+
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_make_profile_fit(ne_dat):
     fit = profile_fit("quadratic", LCFS, [CENTRAL_DENSITY])
