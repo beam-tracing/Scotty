@@ -459,10 +459,10 @@ def find_plasma_entry_parameters(
 
         K0 = cast(float, K0)  # to stop the typechecker from complaining
 
-        # Find K_launch
-        # In truth, K_launch in cylindrical is the same as in cartesian, but
-        # note that K in Scotty does not represent the true toroidal component
-        # but the toroidal mode number i.e. K_zeta_true = K_launch[1] / q_R
+        # Find K_launch, returned in the field's coordinates like K_initial.
+        # The two only coincide with no toroidal launch angle: in cylindrical,
+        # K_zeta is the toroidal mode number, q_R times the Cartesian K_Y
+        # at the launch position (which is at zeta = 0)
         K_launch_cartesian = -K0 * np.array(
             [
                 np.cos(poloidal_launch_angle) * np.cos(toroidal_launch_angle),
@@ -470,7 +470,11 @@ def find_plasma_entry_parameters(
                 np.sin(poloidal_launch_angle),
             ]
         )
-        K_launch = K_launch_cartesian
+        K_launch = (
+            K_launch_cartesian
+            if cart
+            else find_K_labframe_cart_to_cyl(K_launch_cartesian, q_launch_cartesian)
+        )
 
         if ray_tracing_flag:
             Psi_3D_launch_labframe = None
