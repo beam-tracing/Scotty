@@ -761,10 +761,21 @@ def dbs_analysis(
         log.debug(f"Finding the beam piece (loc_b)")
         ##################################################
 
-        launch_beam_width = float(inputs["launch_beam_width"][()])
-        launch_beam_curv = float(inputs["launch_beam_curvature"][()])
         det_Im_Psi_w = np.imag(Psi_xx) * np.imag(Psi_yy) - np.imag(Psi_xy) ** 2
-        beam_waist = find_waist(launch_beam_width, launch_wavenumber, launch_beam_curv)
+        if str(inputs["launch_flag"].values) == "plasma":
+            # loc_b is normalised by the waist of the beam the antenna
+            # launches; a plasma launch has no antenna beam
+            log.warning(
+                "`launch_flag` = 'plasma': there is no launched beam, so "
+                "`beam_waist`, and with it loc_b and loc_all, are NaN"
+            )
+            beam_waist = np.nan
+        else:
+            launch_beam_width = float(inputs["launch_beam_width"][()])
+            launch_beam_curv = float(inputs["launch_beam_curvature"][()])
+            beam_waist = find_waist(
+                launch_beam_width, launch_wavenumber, launch_beam_curv
+            )
         loc_b = (beam_waist * det_Im_Psi_w) / (
             np.sqrt(2) * np.abs(det_M_w) * np.sqrt(-np.imag(M_w_inv_yy))
         )

@@ -410,13 +410,10 @@ class Parameters:
     def _check_mode_flag_launch_and_launch_flag(
         self, mode_flag_launch: VALID_LAUNCH_MODE_FLAGS, launch_flag: VALID_LAUNCH_FLAGS
     ):
-        if launch_flag == "vacuum":
-            pass
-        elif launch_flag == "plasma" and mode_flag_launch in ["O", "X"]:
-            raise ValueError(
-                f"`mode_flag` (at launch) must be '1' or '-1' if `launch_flag` = 'plasma', but got `mode_flag` = {mode_flag_launch} and `launch_flag` = {launch_flag}"
-            )
-        else:
+        # Any `mode_flag` (checked in `_check_mode_flag`) works with either
+        # launch: for "O" or "X", the mode is found from K where the solvers
+        # start, for a plasma launch as for a vacuum one
+        if launch_flag not in get_args(VALID_LAUNCH_FLAGS):
             raise ValueError(
                 f"`launch_flag` must be one of {get_args(VALID_LAUNCH_FLAGS)}, but got {launch_flag}"
             )

@@ -712,6 +712,80 @@ def find_Psi_3D_plasma(
     return Psi_3D_plasma_labframe
 
 
+def check_density_smooth_at_edge(
+    density_fit,
+    poloidal_flux_zero_density: Optional[float] = None,
+    rtol: float = 1e-3,
+    step: float = 1e-4,
+) -> None:
+    r"""Check that the density profile is continuous and flat at the plasma
+    edge, as `boundary_flag` = None assumes, and raise a `ValueError` if not.
+
+    At the edge, `poloidal_flux_zero_density` (:math:`\psi_e`), the density
+    must go to zero (continuous, since it is zero outside) with zero gradient
+    (differentiable). Both are measured relative to the largest density
+    :math:`n_{max}` inside the plasma: :math:`|n(\psi_e)| \le` `rtol`
+    :math:`n_{max}` and :math:`|dn/d\psi(\psi_e)|\, \psi_e \le` `rtol`
+    :math:`n_{max}`. The gradient is the one-sided, second-order difference
+    from inside the plasma, with spacing `step` :math:`\psi_e`.
+
+    If `poloidal_flux_zero_density` is not given, the profile's own
+    `poloidal_flux_zero_profile` is used.
+    """
+    edge = poloidal_flux_zero_density
+    if edge is None:
+        edge = getattr(density_fit, "poloidal_flux_zero_profile", None)
+    if edge is None:
+        raise ValueError(
+            "`poloidal_flux_zero_density` is needed to check the density at the "
+            "plasma edge for `boundary_flag` = None"
+        )
+
+    n_max = float(np.max(np.abs(density_fit(np.linspace(0.0, edge, 201)))))
+    if n_max == 0:
+        return
+
+    h = step * edge
+    n_edge, n_1, n_2 = (
+        float(n) for n in density_fit(np.array([edge, edge - h, edge - 2 * h]))
+    )
+    gradient = (3 * n_edge - 4 * n_1 + n_2) / (2 * h)
+
+    value_rel = abs(n_edge) / n_max
+    gradient_rel = abs(gradient) * edge / n_max
+
+    log.debug(f"""
+        ##################################################
+        #
+        # Density at the plasma edge, poloidal flux = {edge}:
+        #   - n_e = {n_edge} (e19), {value_rel:.3e} of the maximum {n_max}
+        #   - dn_e/dpsi = {gradient} (e19), {gradient_rel:.3e} of the maximum
+        #   - tolerance = {rtol}
+        #
+        ##################################################
+        """)
+
+    problems = []
+    if value_rel > rtol:
+        problems.append(
+            f"it is not continuous: n_e = {n_edge:.4g} (e19) at the edge, "
+            f"{value_rel:.2e} of its maximum, but it is zero outside"
+        )
+    if gradient_rel > rtol:
+        problems.append(
+            f"it is not flat: dn_e/dpsi = {gradient:.4g} (e19) at the edge, "
+            f"{gradient_rel:.2e} of its maximum per unit flux"
+        )
+    if problems:
+        raise ValueError(
+            f"`boundary_flag` = None assumes the density is continuous and "
+            f"differentiable at the plasma edge (poloidal flux = {edge}), but "
+            + " and ".join(problems)
+            + f" (tolerance {rtol}). Use `boundary_flag` = 'continuous' (or "
+            "'discontinuous') to apply the boundary conditions instead"
+        )
+
+
 def apply_boundary_conditions(
     ray_tracing_flag: bool,
     boundary_flag: VALID_BOUNDARY_FLAGS,

@@ -21,6 +21,12 @@ anything you need to reproduce later, use v3.
   - some arguments and output names have changed. `scotty.compat.from_v3_kwargs`
     translates v3's `beam_me_up` arguments, and `scotty.compat.quick_cutoff`
     replaces v3's `quick_run`;
+  - a plasma launch (`launch_flag="plasma"`, v3's `vacuumLaunch_flag=False`)
+    checks that the launch point is inside the plasma and that K satisfies the
+    dispersion relation, and takes K and Ψ in Cartesian components. With no
+    launched beam, `loc_b` and `loc_all` are NaN;
+  - `boundary_flag=None` (v3's `Psi_BC_flag=None`, its default) checks that the
+    density is zero and flat at the plasma edge, and raises an error otherwise;
   - not yet ported: v3's plotting functions, the localisation widths (`delta_l`,
     `delta_kperp1`), and the `curvy_slab` field;
   - until v4 is tagged, its version number is a development version of 3.x (from

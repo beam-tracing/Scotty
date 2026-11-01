@@ -5,7 +5,10 @@ import logging
 import numpy as np
 from scipy.interpolate import CubicSpline
 from scipy.optimize import minimize_scalar, root_scalar
-from scotty.boundary_conditions import apply_boundary_conditions
+from scotty.boundary_conditions import (
+    apply_boundary_conditions,
+    check_density_smooth_at_edge,
+)
 from scotty.checks import (
     VALID_FIELDS,
     VALID_LAUNCH_FLAGS,
@@ -88,11 +91,19 @@ def find_plasma_entry_position(
     log.info(f"Finding plasma entry position")
 
     # If launch_flag is "plasma", we are already in the plasma
-    # so take this as the entry position
+    # so take this as the entry position, after checking it is inside
     if launch_flag == "plasma":
         log.debug(
             f"`launch_flag` = {launch_flag}, so skipping plasma entry position calculations"
         )
+        polflux_launch = float(field.polflux(*q_launch))
+        if not polflux_launch <= poloidal_flux_enter:
+            raise ValueError(
+                f"`launch_flag` = 'plasma', but `launch_position` = {q_launch} is "
+                f"outside the plasma (poloidal flux {polflux_launch:.6g} > "
+                f"`poloidal_flux_enter` = {poloidal_flux_enter}). Use "
+                "`launch_flag` = 'vacuum' to launch from outside the plasma"
+            )
         return q_launch
 
     # The following calculations will be performed in cartesian and
@@ -354,6 +365,320 @@ def find_mode_index_and_ehat(
     return cast(int, np.squeeze(mode_idx)), np.squeeze(H), np.squeeze(ehat)
 
 
+def _check_dispersion_relation(
+    hamiltonians: List[Hamiltonian],
+    q_initial: FloatArray,
+    K_initial: FloatArray,
+    context: str,
+    tol_H_error: float = 1e-3,
+    tol_H_warning: float = 1e-5,
+) -> None:
+    r"""Check that `K_initial` at `q_initial` satisfies the dispersion relation
+    of at least one of `hamiltonians` (|H| close to 0). Raises above
+    `tol_H_error`, warns above `tol_H_warning`."""
+    H_values = {
+        hamiltonian.mode_flag: float(np.abs(hamiltonian(q_initial, K_initial)))
+        for hamiltonian in hamiltonians
+    }
+    closest_mode_flag = min(H_values, key=H_values.get)
+    H_min = H_values[closest_mode_flag]
+    _values = ", ".join(
+        f"|H| = {H:.3e} for `mode_flag` = {m}" for m, H in H_values.items()
+    )
+
+    if H_min > tol_H_error:
+        raise ValueError(
+            f"{context}: K does not satisfy the dispersion relation ({_values}; "
+            f"closest is `mode_flag` = {closest_mode_flag}, tolerance {tol_H_error}). "
+            f"Check the magnitude and direction of K"
+        )
+    if H_min > tol_H_warning:
+        log.warning(
+            f"{context}: K only approximately satisfies the dispersion relation ({_values})"
+        )
+
+
+def _plasma_terms_at(
+    q_initial: FloatArray,
+    q_initial_cartesian: FloatArray,
+    field: VALID_FIELDS,
+    launch_angular_freq: float,
+    density_fit,
+    temperature_fit,
+) -> Tuple[FloatArray, Tuple[float, float, float]]:
+    r"""Returns `b_hat` and the dielectric terms `(epsilon_para, epsilon_perp,
+    epsilon_g)` at `q_initial`, as used by `_mode_solution`"""
+    polflux = field.polflux(*q_initial)
+    electron_density = density_fit(polflux)
+    electron_temperature = temperature_fit(polflux) if temperature_fit else None
+
+    B_magnitude = field.magnitude(*q_initial)
+    b_hat = field.unitvector(*q_initial)
+    epsilon = DielectricTensor(
+        launch_angular_freq, B_magnitude, electron_density, electron_temperature
+    )
+
+    log.debug(f"""
+        ##################################################
+        #
+        # Calculated values at [X,Y,Z] = {arr2str(q_initial_cartesian)}:
+        #   - poloidal flux = {polflux}
+        #   - n_e = {electron_density} (e19)
+        #   - T_e = {electron_temperature}
+        #   - |B| = {B_magnitude}
+        #   - b_hat = {arr2str(b_hat)}
+        #   - epsilon_11 = {epsilon.e_11}
+        #   - epsilon_12 = {epsilon.e_12}
+        #   - epsilon_bb = {epsilon.e_bb}
+        #
+        ##################################################
+        """)
+
+    epsilon_terms = find_epsilon_terms(
+        launch_angular_freq=launch_angular_freq,
+        B_total=B_magnitude,
+        electron_density=electron_density,
+        temperature=electron_temperature,
+    )
+    return b_hat, epsilon_terms
+
+
+def _mode_solution(
+    hamiltonian: Hamiltonian,
+    K_initial: FloatArray,
+    Psi_3D_initial_labframe: Optional[ComplexFloatArray],
+    q_initial: FloatArray,
+    cart: bool,
+    b_hat: FloatArray,
+    epsilon_terms: Tuple[float, float, float],
+    launch_angular_freq: float,
+    mode_flag_launch: VALID_LAUNCH_MODE_FLAGS,
+    tol_H: float,
+    tol_O_mode_polarisation: float,
+) -> dict:
+    r"""For one Hamiltonian, given K and Psi where the solvers start, find the
+    Cardano root (mode index) that vanishes there, and its polarisation e_hat"""
+    epsilon_para, epsilon_perp, epsilon_g = epsilon_terms
+
+    K_magnitude_initial = find_K_magnitude(cart, *K_initial, q_initial[0])  # type: ignore
+    K_hat_initial = K_initial / (
+        K_magnitude_initial * np.array([1, 1 if cart else q_initial[0], 1])
+    )
+    theta_m = np.arcsin(np.dot(b_hat, K_hat_initial))
+
+    H_Cardanos, e_hats = find_H_Cardano_eigh(
+        launch_angular_freq=launch_angular_freq,
+        K_magnitude=K_magnitude_initial,
+        epsilon_para=epsilon_para,
+        epsilon_perp=epsilon_perp,
+        epsilon_g=epsilon_g,
+        theta_m=theta_m,
+    )
+
+    mode_index, H_Cardano, e_hat = find_mode_index_and_ehat(
+        mode_flag=mode_flag_launch,
+        H_Cardanos=H_Cardanos,
+        ehats=e_hats,
+        tol_H=tol_H,
+        tol_O_mode_polarisation=tol_O_mode_polarisation,
+    )
+
+    log.debug(f"""
+        ##################################################
+        #
+        # Calculated values for Hamiltonian with `{hamiltonian.mode_flag:+d}`:
+        #   - K_initial_{"cartesian" if cart else "cylindrical"} = {arr2str(K_initial)}
+        #
+        #   - Psi_3D_initial_labframe_{"cartesian" if cart else "cylindrical"} =
+        #        [{Psi_3D_initial_labframe if Psi_3D_initial_labframe is None else arr2str(Psi_3D_initial_labframe[0])},
+        #         {Psi_3D_initial_labframe if Psi_3D_initial_labframe is None else arr2str(Psi_3D_initial_labframe[1])},
+        #         {Psi_3D_initial_labframe if Psi_3D_initial_labframe is None else arr2str(Psi_3D_initial_labframe[2])}]
+        #
+        #   - theta_m (in radians) = {theta_m}
+        #   - theta_m (in degrees) = {np.rad2deg(theta_m)}
+        #
+        #   - H[0] = {H_Cardanos[0]}
+        #   - e_hat[0] = {arr2str(e_hats[:, 0])}
+        #
+        #   - H[1] = {H_Cardanos[1]}
+        #   - e_hat[1] = {arr2str(e_hats[:, 1])}
+        #
+        #   - H[2] = {H_Cardanos[2]}
+        #   - e_hat[2] = {arr2str(e_hats[:, 2])}
+        #
+        #   - mode_index = {mode_index}
+        #   - selected H = {H_Cardano}
+        #   - selected e_hat = {arr2str(e_hat)}
+        #
+        ##################################################
+        """)
+
+    return {
+        "K_initial": K_initial,
+        "Psi_3D_initial": Psi_3D_initial_labframe,
+        "H_Cardano_initial": H_Cardano,
+        "e_hat_initial": e_hat,
+        "mode_flag": hamiltonian.mode_flag,
+        "mode_index": mode_index,
+    }
+
+
+def _mode_from_K(
+    hamiltonian_pos1: Optional[Hamiltonian],
+    hamiltonian_neg1: Optional[Hamiltonian],
+    K_initial: FloatArray,
+    Psi_3D_initial_labframe: Optional[ComplexFloatArray],
+    mode_flag_launch: VALID_LAUNCH_MODE_FLAGS,
+    q_initial: FloatArray,
+    tol_H_error: float = 1e-3,
+    **mode_kwargs,
+) -> dict:
+    r"""The mode solution when K is given rather than solved for (a plasma
+    launch, or `boundary_flag` = None): the mode is the Hamiltonian whose
+    dispersion relation K satisfies, and whether it is O or X follows from
+    its polarisation. Raises if `mode_flag_launch` asks for a different mode.
+
+    Where K satisfies both (zero density, e.g. at the plasma edge), K cannot
+    tell the modes apart: a numeric `mode_flag_launch` is then used as given,
+    and "O" or "X" raises."""
+    hamiltonians = {
+        mode_flag: hamiltonian
+        for mode_flag, hamiltonian in ((1, hamiltonian_pos1), (-1, hamiltonian_neg1))
+        if hamiltonian is not None
+    }
+    H_values = {
+        mode_flag: float(np.abs(hamiltonian(q_initial, K_initial)))
+        for mode_flag, hamiltonian in hamiltonians.items()
+    }
+    _values = ", ".join(
+        f"|H| = {H:.3e} for `mode_flag` = {m}" for m, H in H_values.items()
+    )
+    satisfied = [m for m, H in H_values.items() if H <= tol_H_error]
+
+    if len(satisfied) == 2:
+        if mode_flag_launch not in [1, -1]:
+            raise ValueError(
+                f"K satisfies both modes' dispersion relations here ({_values}), "
+                f"as at zero density, so `mode_flag` = {mode_flag_launch!r} cannot "
+                "be told apart from K and its polarisation. Give `mode_flag` = 1 "
+                "or -1, or for a vacuum launch use `boundary_flag` = 'continuous'"
+            )
+        mode_flag_found = mode_flag_launch
+    else:
+        mode_flag_found = min(H_values, key=H_values.get)
+        if mode_flag_launch in [1, -1] and mode_flag_launch != mode_flag_found:
+            raise ValueError(
+                f"`mode_flag` = {mode_flag_launch}, but K satisfies the dispersion "
+                f"relation of `mode_flag` = {mode_flag_found} ({_values})"
+            )
+
+    soln = _mode_solution(
+        hamiltonian=hamiltonians[mode_flag_found],
+        K_initial=K_initial,
+        Psi_3D_initial_labframe=Psi_3D_initial_labframe,
+        q_initial=q_initial,
+        mode_flag_launch=mode_flag_found,
+        **mode_kwargs,
+    )
+
+    tol_O_mode_polarisation = mode_kwargs["tol_O_mode_polarisation"]
+    is_O_mode = abs(soln["e_hat_initial"][-1]) > 1 - tol_O_mode_polarisation
+    mode_name = "O" if is_O_mode else "X"
+    if mode_flag_launch in ["O", "X"] and mode_flag_launch != mode_name:
+        raise ValueError(
+            f"`mode_flag` = {mode_flag_launch!r}, but K is the {mode_name}-mode "
+            f"(`mode_flag` = {mode_flag_found}, from its polarisation |e_b| = "
+            f"{abs(soln['e_hat_initial'][-1]):.3f})"
+        )
+
+    log.debug(
+        f"K satisfies `mode_flag` = {mode_flag_found} ({_values}), the {mode_name}-mode"
+    )
+    return soln
+
+
+def _select_mode(
+    solns: List[dict],
+    mode_flag_launch: VALID_LAUNCH_MODE_FLAGS,
+    tol_H: float,
+    tol_O_mode_polarisation: float,
+) -> dict:
+    r"""Choose the O- or X-mode solution that `mode_flag_launch` asks for.
+    For `mode_flag_launch` = "O" or "X", `solns` holds the `+1` then the `-1`
+    solution; for 1 or -1, only that one"""
+
+    # If the user has specified `mode_flag` = "O" or "X", then we
+    # compare the polarisations to determine which is the correct
+    # mode, and also check with `tol_O_mode_polarisation` to
+    # double confirm. If the user has specified `mode_flag` = `1`
+    # or `-1`, then just check with `tol_O_mode_polarisation`.
+
+    if mode_flag_launch in ["O", "X"]:
+        soln_idx, _, _ = find_mode_index_and_ehat(
+            mode_flag=mode_flag_launch,
+            H_Cardanos=np.array([soln["H_Cardano_initial"] for soln in solns]),
+            ehats=np.array([soln["e_hat_initial"] for soln in solns]).T,
+            tol_H=tol_H,
+            tol_O_mode_polarisation=tol_O_mode_polarisation,
+        )
+
+        O_mode = solns[soln_idx if mode_flag_launch == "O" else not soln_idx]
+        X_mode = solns[not soln_idx if mode_flag_launch == "O" else soln_idx]
+
+    else:  # elif mode_flag_launch in [1, -1]:
+        soln = solns[0]  # since there is only one solution
+        soln_is_O_mode = abs(soln["e_hat_initial"][-1]) > 1 - tol_O_mode_polarisation
+
+        O_mode = soln if soln_is_O_mode else {}
+        X_mode = {} if soln_is_O_mode else soln
+
+    if mode_flag_launch in [1, -1, "O"] and O_mode != {}:
+        sel, toreturn = "O", O_mode
+    elif mode_flag_launch in [1, -1, "X"] and X_mode != {}:
+        sel, toreturn = "X", X_mode
+    else:
+        raise RuntimeError(
+            f"Unable to determine correct mode solution for `mode_flag` = {mode_flag_launch}"
+        )
+
+    log.debug(f"""
+        ##################################################
+        #
+        # Calculated plasma entry parameters for:
+        #   - O-mode {"(selected)" if sel == "O" else ""}:
+        #        - K_cartesian = {O_mode.get("K_initial")}
+        #
+        #        - Psi_3D_cartesian =
+        #              {O_mode.get("Psi_3D_initial")}
+        #
+        #        - H_Cardano = {O_mode.get("H_Cardano")}
+        #
+        #        - e_hat = {O_mode.get("e_hat")}
+        #
+        #        - mode_flag = {O_mode.get("mode_flag")}
+        #
+        #        - mode_index = {O_mode.get("mode_index")}
+        #
+        #   - X-mode {"(selected)" if sel == "X" else ""}:
+        #        - K_cartesian = {X_mode.get("K_initial")}
+        #
+        #        - Psi_3D_cartesian =
+        #              {X_mode.get("Psi_3D_initial")}
+        #
+        #        - H_Cardano = {X_mode.get("H_Cardano")}
+        #
+        #        - e_hat = {X_mode.get("e_hat")}
+        #
+        #        - mode_flag = {X_mode.get("mode_flag")}
+        #
+        #        - mode_index = {X_mode.get("mode_index")}
+        #
+        ##################################################
+        """)
+
+    return toreturn
+
+
 def find_plasma_entry_parameters(
     ray_tracing_flag: bool,
     launch_flag: VALID_LAUNCH_FLAGS,
@@ -368,6 +693,7 @@ def find_plasma_entry_parameters(
     field: VALID_FIELDS,
     K_plasmaLaunch_cartesian: Optional[FloatArray] = None,
     Psi_3D_plasmaLaunch_labframe_cartesian: Optional[FloatArray] = None,
+    poloidal_flux_zero_density: Optional[float] = None,
     hamiltonian_pos1: Optional[Hamiltonian] = None,
     hamiltonian_neg1: Optional[Hamiltonian] = None,
     tol_H: float = 1e-3,
@@ -419,45 +745,86 @@ def find_plasma_entry_parameters(
         float, np.linalg.norm(q_launch_cartesian - q_initial_cartesian)
     )
 
-    # If `launch_flag` = "plasma", that means we start propagation
-    # from inside the plasma, so we can skip the plasma entry calculations
-    # TODO -- TO REMOVE -- this isnt fully implemented, because we dont
-    # select the mode_flag_initial based mode_flag_launch, and we also
-    # dont calculate the corresponding e_hat, mode_index, etc
+    # Launch frequency, wavenumber and profiles, shared by both Hamiltonians
+    if hamiltonian_pos1 is not None:
+        launch_angular_freq = hamiltonian_pos1.angular_frequency
+        K0 = hamiltonian_pos1.wavenumber
+        density_fit = hamiltonian_pos1.density
+        temperature_fit = hamiltonian_pos1.temperature
+
+    elif hamiltonian_neg1 is not None:
+        launch_angular_freq = hamiltonian_neg1.angular_frequency
+        K0 = hamiltonian_neg1.wavenumber
+        density_fit = hamiltonian_neg1.density
+        temperature_fit = hamiltonian_neg1.temperature
+
+    else:
+        raise ValueError(
+            f"At least one of `hamiltonian_pos1` and `hamiltonian_neg1` must be provided to find the plasma entry parameters"
+        )
+
+    K0 = cast(float, K0)  # to stop the typechecker from complaining
+
+    hamiltonians = [h for h in (hamiltonian_pos1, hamiltonian_neg1) if h is not None]
+
+    # If `launch_flag` = "plasma", we start propagation from inside the
+    # plasma, with the user's K and Psi (given in Cartesian coordinates):
+    # there is no vacuum propagation and no boundary condition, and the
+    # launch, entry and initial values are the same
     if launch_flag == "plasma":
         log.debug(
             f"`launch_flag` = {launch_flag}. Launching directly from inside the plasma"
         )
-        raise NotImplementedError(f"Not implemented yet")
+        if K_plasmaLaunch_cartesian is None:
+            raise ValueError(
+                "`plasmaLaunch_K_cartesian` must be given if `launch_flag` = 'plasma'"
+            )
+        K_plasma_cartesian = np.asarray(K_plasmaLaunch_cartesian, dtype=float)
+        K_launch = (
+            K_plasma_cartesian
+            if cart
+            else find_K_labframe_cart_to_cyl(K_plasma_cartesian, q_launch_cartesian)
+        )
+
+        if ray_tracing_flag:
+            Psi_3D_launch_labframe = None
+        else:
+            if Psi_3D_plasmaLaunch_labframe_cartesian is None:
+                raise ValueError(
+                    "`plasmaLaunch_Psi_3D_lab_cartesian` must be given if "
+                    "`launch_flag` = 'plasma'"
+                )
+            Psi_plasma_cartesian = np.asarray(
+                Psi_3D_plasmaLaunch_labframe_cartesian, dtype=complex
+            )
+            Psi_3D_launch_labframe = (
+                Psi_plasma_cartesian
+                if cart
+                else find_Psi_3D_labframe_cart_to_cyl(
+                    Psi_plasma_cartesian, K_plasma_cartesian, q_launch_cartesian
+                )
+            )
+        Psi_3D_entry_labframe = Psi_3D_launch_labframe
+
+        _check_dispersion_relation(
+            hamiltonians,
+            q_initial,
+            K_launch,
+            "Plasma launch (`launch_flag` = 'plasma')",
+        )
+
+        def initial_K_and_Psi(hamiltonian):
+            return K_launch, Psi_3D_launch_labframe
 
     # Otherwise, we start propagation from vacuum, so we need to
-    # calculate the K and Psi, and plus other stuff
-    # This, however, is fully implemented -- TO REMOVE this msg
+    # calculate the K and Psi at launch, propagate them to the plasma
+    # boundary, and apply the boundary conditions there
     else:
         log.debug(
             f"`launch_flag` = {launch_flag}. Launching from outside the plasma boundary"
         )
         poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_deg_Torbeam)
         toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_deg_Torbeam)
-
-        if hamiltonian_pos1 is not None:
-            launch_angular_freq = hamiltonian_pos1.angular_frequency
-            K0 = hamiltonian_pos1.wavenumber
-            density_fit = hamiltonian_pos1.density
-            temperature_fit = hamiltonian_pos1.temperature
-
-        elif hamiltonian_neg1 is not None:
-            launch_angular_freq = hamiltonian_neg1.angular_frequency
-            K0 = hamiltonian_neg1.wavenumber
-            density_fit = hamiltonian_neg1.density
-            temperature_fit = hamiltonian_neg1.temperature
-
-        else:
-            raise ValueError(
-                f"At least one of `hamiltonian_pos1` and `hamiltonian_neg1` must be provided to find the plasma entry parameters"
-            )
-
-        K0 = cast(float, K0)  # to stop the typechecker from complaining
 
         # Find K_launch, returned in the field's coordinates like K_initial.
         # The two only coincide with no toroidal launch angle: in cylindrical,
@@ -565,15 +932,31 @@ def find_plasma_entry_parameters(
 
         # If `boundary_flag` is None, then we assume that the electron density
         # profile is both continuous and differentiable at the plasma boundary,
-        # so we can just take the values at the plasma launch position as the
-        # values to start the solvers at
-        # TODO -- TO REMOVE -- not fully implemented, because we dont select
-        # the mode_flag_initial, the mode_index, and the e_hat_initial
+        # so K and Psi carry straight over from vacuum: K_initial is the vacuum
+        # K (in the field's coordinates at the entry point), and Psi_initial is
+        # Psi_entry. Check that assumption holds for the density profile
         if boundary_flag is None:
             log.debug(
                 f"`boundary_flag` = {boundary_flag}. No boundary conditions applied"
             )
-            raise NotImplementedError(f"Not implemented yet")
+            check_density_smooth_at_edge(density_fit, poloidal_flux_zero_density)
+
+            K_entry = (
+                K_launch_cartesian
+                if cart
+                else find_K_labframe_cart_to_cyl(
+                    K_launch_cartesian, q_initial_cartesian
+                )
+            )
+            _check_dispersion_relation(
+                hamiltonians,
+                q_initial,
+                K_entry,
+                "Vacuum launch with `boundary_flag` = None",
+            )
+
+            def initial_K_and_Psi(hamiltonian):
+                return K_entry, Psi_3D_entry_labframe
 
         # If `boundary_flag` = "continuous" or "discontinuous", then we assume
         # that the electron density is not differentiable at the plasma boundary,
@@ -587,298 +970,98 @@ def find_plasma_entry_parameters(
             log.debug(
                 f"`boundary_flag` = {boundary_flag}. Applying {boundary_flag} boundary conditions to find K and Psi"
             )
-            polflux = field.polflux(*q_initial)
-            electron_density = density_fit(polflux)
-            electron_temperature = temperature_fit(polflux) if temperature_fit else None
 
-            B_magnitude = field.magnitude(*q_initial)
-            b_hat = field.unitvector(*q_initial)
-            epsilon = DielectricTensor(
-                launch_angular_freq, B_magnitude, electron_density, electron_temperature
-            )
-
-            log.debug(f"""
-        ##################################################
-        #
-        # Calculated values at [X,Y,Z] = {arr2str(q_initial_cartesian)}:
-        #   - poloidal flux = {polflux}
-        #   - n_e = {electron_density} (e19)
-        #   - T_e = {electron_temperature}
-        #   - |B| = {B_magnitude}
-        #   - b_hat = {arr2str(b_hat)}
-        #   - epsilon_11 = {epsilon.e_11}
-        #   - epsilon_12 = {epsilon.e_12}
-        #   - epsilon_bb = {epsilon.e_bb}
-        #
-        ##################################################
-        """)
-
-            # If mode_flag is 1 or -1, then we just calculate the
-            # quantities for those. If mode_flag is "O" or "X", then
-            # we calculate the quantities for both 1 and -1. After
-            # obtaining the quantities corresponding to H_booker = 0,
-            # we calculate H_Cardano and find the polarisation vectorl
-            # corresponding to H_booker = H_Cardano = 0 to see if it's
-            # O- or X-mode. We do this, literally, by comparing the
-            # e_hats with the O-mode polarisation vector; specifically,
-            # since the O-mode polarisation vector ~ [0,0,1] (in the u1,
-            # u2, b) basis -- see the paper), we compare the last
-            # component of both vectors. If the last component of
-            # the vector is not close to 1 (i.e. |v[-1] - 1| < tol),
-            # then we say it's X-mode; otherwise, it's O-mode
-
-            # We store the corresponding solutions in these lists
-            solns = []
-
-            # Pre-calculating some quantities
-            epsilon_para, epsilon_perp, epsilon_g = find_epsilon_terms(
-                launch_angular_freq=launch_angular_freq,
-                B_total=B_magnitude,
-                electron_density=electron_density,
-                temperature=electron_temperature,
-            )
-
-            if mode_flag_launch in [1, "O", "X"] and hamiltonian_pos1 is not None:
-                log.debug(
-                    f"`mode_flag_launch` is {mode_flag_launch}. Applying boundary conditions for Hamiltonian with `mode_flag` = 1"
+            def initial_K_and_Psi(hamiltonian):
+                return apply_boundary_conditions(
+                    ray_tracing_flag=ray_tracing_flag,
+                    boundary_flag=boundary_flag,
+                    q_vacuum_entry_cartesian=q_initial_cartesian,
+                    K_vacuum_entry_cartesian=K_launch_cartesian,
+                    Psi_3D_vacuum_entry_labframe=Psi_3D_entry_labframe,
+                    field=field,
+                    hamiltonian=hamiltonian,
                 )
-                K_initial_pos1, Psi_3D_initial_labframe_pos1 = (
-                    apply_boundary_conditions(
-                        ray_tracing_flag=ray_tracing_flag,
-                        boundary_flag=boundary_flag,
-                        q_vacuum_entry_cartesian=q_initial_cartesian,
-                        K_vacuum_entry_cartesian=K_launch_cartesian,
-                        Psi_3D_vacuum_entry_labframe=Psi_3D_entry_labframe,
-                        field=field,
-                        hamiltonian=hamiltonian_pos1,
+
+    # If mode_flag is 1 or -1, then we just calculate the
+    # quantities for those. If mode_flag is "O" or "X", then
+    # we calculate the quantities for both 1 and -1. After
+    # obtaining the quantities corresponding to H_booker = 0,
+    # we calculate H_Cardano and find the polarisation vector
+    # corresponding to H_booker = H_Cardano = 0 to see if it's
+    # O- or X-mode. We do this, literally, by comparing the
+    # e_hats with the O-mode polarisation vector; specifically,
+    # since the O-mode polarisation vector ~ [0,0,1] (in the u1,
+    # u2, b) basis -- see the paper), we compare the last
+    # component of both vectors. If the last component of
+    # the vector is not close to 1 (i.e. |v[-1] - 1| < tol),
+    # then we say it's X-mode; otherwise, it's O-mode
+    b_hat, epsilon_terms = _plasma_terms_at(
+        q_initial,
+        q_initial_cartesian,
+        field,
+        launch_angular_freq,
+        density_fit,
+        temperature_fit,
+    )
+
+    mode_kwargs = dict(
+        q_initial=q_initial,
+        cart=cart,
+        b_hat=b_hat,
+        epsilon_terms=epsilon_terms,
+        launch_angular_freq=launch_angular_freq,
+        tol_H=tol_H,
+        tol_O_mode_polarisation=tol_O_mode_polarisation,
+    )
+
+    # Without boundary conditions (a plasma launch, or `boundary_flag` =
+    # None), K is given rather than solved for each mode, so the mode is the
+    # one whose dispersion relation K satisfies
+    if launch_flag == "plasma" or boundary_flag is None:
+        K_given, Psi_given = initial_K_and_Psi(None)
+        toreturn = _mode_from_K(
+            hamiltonian_pos1=hamiltonian_pos1,
+            hamiltonian_neg1=hamiltonian_neg1,
+            K_initial=K_given,
+            Psi_3D_initial_labframe=Psi_given,
+            mode_flag_launch=mode_flag_launch,
+            **mode_kwargs,
+        )
+
+    # With boundary conditions, each mode has its own K and Psi
+    else:
+        solns = []
+        for mode_flag, hamiltonian in (
+            (1, hamiltonian_pos1),
+            (-1, hamiltonian_neg1),
+        ):
+            if mode_flag_launch in [mode_flag, "O", "X"] and hamiltonian is not None:
+                log.debug(
+                    f"`mode_flag_launch` is {mode_flag_launch}. Finding the initial K and Psi for the Hamiltonian with `mode_flag` = {mode_flag}"
+                )
+                K_initial_mode, Psi_3D_initial_labframe_mode = initial_K_and_Psi(
+                    hamiltonian
+                )
+                solns.append(
+                    _mode_solution(
+                        hamiltonian=hamiltonian,
+                        K_initial=K_initial_mode,
+                        Psi_3D_initial_labframe=Psi_3D_initial_labframe_mode,
+                        mode_flag_launch=mode_flag_launch,
+                        **mode_kwargs,
                     )
                 )
 
-                K_magnitude_initial_pos1 = find_K_magnitude(cart, *K_initial_pos1, q_initial[0])  # type: ignore
-                K_hat_initial_pos1 = K_initial_pos1 / (
-                    K_magnitude_initial_pos1
-                    * np.array([1, 1 if cart else q_initial[0], 1])
-                )
-                theta_m_pos1 = np.arcsin(np.dot(b_hat, K_hat_initial_pos1))
+        toreturn = _select_mode(solns, mode_flag_launch, tol_H, tol_O_mode_polarisation)
 
-                H_Cardanos_pos1, e_hats_pos1 = find_H_Cardano_eigh(
-                    launch_angular_freq=launch_angular_freq,
-                    K_magnitude=K_magnitude_initial_pos1,
-                    epsilon_para=epsilon_para,
-                    epsilon_perp=epsilon_perp,
-                    epsilon_g=epsilon_g,
-                    theta_m=theta_m_pos1,
-                )
-
-                mode_index_pos1, H_Cardano_pos1, e_hat_pos1 = find_mode_index_and_ehat(
-                    mode_flag=mode_flag_launch,
-                    H_Cardanos=H_Cardanos_pos1,
-                    ehats=e_hats_pos1,
-                    tol_H=tol_H,
-                    tol_O_mode_polarisation=tol_O_mode_polarisation,
-                )
-
-                log.debug(f"""
-        ##################################################
-        #
-        # Calculated values for Hamiltonian with `+1`:
-        #   - K_initial_{"cartesian" if cart else "cylindrical"} = {arr2str(K_initial_pos1)}
-        #
-        #   - Psi_3D_initial_labframe_{"cartesian" if cart else "cylindrical"} =
-        #        [{Psi_3D_initial_labframe_pos1 if Psi_3D_initial_labframe_pos1 is None else arr2str(Psi_3D_initial_labframe_pos1[0])},
-        #         {Psi_3D_initial_labframe_pos1 if Psi_3D_initial_labframe_pos1 is None else arr2str(Psi_3D_initial_labframe_pos1[1])},
-        #         {Psi_3D_initial_labframe_pos1 if Psi_3D_initial_labframe_pos1 is None else arr2str(Psi_3D_initial_labframe_pos1[2])}]
-        #
-        #   - theta_m (in radians) = {theta_m_pos1}
-        #   - theta_m (in degrees) = {np.rad2deg(theta_m_pos1)}
-        #
-        #   - H[0] = {H_Cardanos_pos1[0]}
-        #   - e_hat[0] = {arr2str(e_hats_pos1[:, 0])}
-        #
-        #   - H[1] = {H_Cardanos_pos1[1]}
-        #   - e_hat[1] = {arr2str(e_hats_pos1[:, 1])}
-        #
-        #   - H[2] = {H_Cardanos_pos1[2]}
-        #   - e_hat[2] = {arr2str(e_hats_pos1[:, 2])}
-        #
-        #   - mode_index = {mode_index_pos1}
-        #   - selected H = {H_Cardano_pos1}
-        #   - selected e_hat = {arr2str(e_hat_pos1)}
-        #
-        ##################################################
-        """)
-
-                solns.append(
-                    {
-                        "K_initial": K_initial_pos1,
-                        "Psi_3D_initial": Psi_3D_initial_labframe_pos1,
-                        "H_Cardano_initial": H_Cardano_pos1,
-                        "e_hat_initial": e_hat_pos1,
-                        "mode_flag": hamiltonian_pos1.mode_flag,  # sanity check: this should be `1`
-                        "mode_index": mode_index_pos1,
-                    }
-                )
-
-            if mode_flag_launch in [-1, "O", "X"] and hamiltonian_neg1 is not None:
-                log.debug(
-                    f"`mode_flag_launch` is {mode_flag_launch}. Applying boundary conditions for Hamiltonian with `mode_flag` = -1"
-                )
-                K_initial_neg1, Psi_3D_initial_labframe_neg1 = (
-                    apply_boundary_conditions(
-                        ray_tracing_flag=ray_tracing_flag,
-                        boundary_flag=boundary_flag,
-                        q_vacuum_entry_cartesian=q_initial_cartesian,
-                        K_vacuum_entry_cartesian=K_launch_cartesian,
-                        Psi_3D_vacuum_entry_labframe=Psi_3D_entry_labframe,
-                        field=field,
-                        hamiltonian=hamiltonian_neg1,
-                    )
-                )
-
-                K_magnitude_initial_neg1 = find_K_magnitude(cart, *K_initial_neg1, q_initial[0])  # type: ignore
-                K_hat_initial_neg1 = K_initial_neg1 / (
-                    K_magnitude_initial_neg1
-                    * np.array([1, 1 if cart else q_initial[0], 1])
-                )
-                theta_m_neg1 = np.arcsin(np.dot(b_hat, K_hat_initial_neg1))
-
-                H_Cardanos_neg1, e_hats_neg1 = find_H_Cardano_eigh(
-                    launch_angular_freq=launch_angular_freq,
-                    K_magnitude=K_magnitude_initial_neg1,
-                    epsilon_para=epsilon_para,
-                    epsilon_perp=epsilon_perp,
-                    epsilon_g=epsilon_g,
-                    theta_m=theta_m_neg1,
-                )
-
-                mode_index_neg1, H_Cardano_neg1, e_hat_neg1 = find_mode_index_and_ehat(
-                    mode_flag=mode_flag_launch,
-                    H_Cardanos=H_Cardanos_neg1,
-                    ehats=e_hats_neg1,
-                    tol_H=tol_H,
-                    tol_O_mode_polarisation=tol_O_mode_polarisation,
-                )
-
-                log.debug(f"""
-        ##################################################
-        #
-        # Calculated values for Hamiltonian with `-1`:
-        #   - K_initial_{"cartesian" if cart else "cylindrical"} = {arr2str(K_initial_neg1)}
-        #
-        #   - Psi_3D_initial_labframe_{"cartesian" if cart else "cylindrical"} =
-        #        [{Psi_3D_initial_labframe_neg1 if Psi_3D_initial_labframe_neg1 is None else arr2str(Psi_3D_initial_labframe_neg1[0])},
-        #         {Psi_3D_initial_labframe_neg1 if Psi_3D_initial_labframe_neg1 is None else arr2str(Psi_3D_initial_labframe_neg1[1])},
-        #         {Psi_3D_initial_labframe_neg1 if Psi_3D_initial_labframe_neg1 is None else arr2str(Psi_3D_initial_labframe_neg1[2])}]
-        #
-        #   - theta_m (in radians) = {theta_m_neg1}
-        #   - theta_m (in degrees) = {np.rad2deg(theta_m_neg1)}
-        #
-        #   - H[0] = {H_Cardanos_neg1[0]}
-        #   - e_hat[0] = {arr2str(e_hats_neg1[:, 0])}
-        #
-        #   - H[1] = {H_Cardanos_neg1[1]}
-        #   - e_hat[1] = {arr2str(e_hats_neg1[:, 1])}
-        #
-        #   - H[2] = {H_Cardanos_neg1[2]}
-        #   - e_hat[2] = {arr2str(e_hats_neg1[:, 2])}
-        #
-        #   - mode_index = {mode_index_neg1}
-        #   - selected H = {H_Cardano_neg1}
-        #   - selected e_hat = {arr2str(e_hat_neg1)}
-        #
-        ##################################################
-        """)
-
-                solns.append(
-                    {
-                        "K_initial": K_initial_neg1,
-                        "Psi_3D_initial": Psi_3D_initial_labframe_neg1,
-                        "H_Cardano_initial": H_Cardano_neg1,
-                        "e_hat_initial": e_hat_neg1,
-                        "mode_flag": hamiltonian_neg1.mode_flag,  # sanity check: this should be `-1`
-                        "mode_index": mode_index_neg1,
-                    }
-                )
-
-            # If the user has specified `mode_flag` = "O" or "X", then we
-            # compare the polarisations to determine which is the correct
-            # mode, and also check with `tol_O_mode_polarisation` to
-            # double confirm. If the user has specified `mode_flag` = `1`
-            # or `-1`, then just check with `tol_O_mode_polarisation`.
-
-            if mode_flag_launch in ["O", "X"]:
-                soln_idx, _, _ = find_mode_index_and_ehat(
-                    mode_flag=mode_flag_launch,
-                    H_Cardanos=np.array([H_Cardano_pos1, H_Cardano_neg1]),  # type: ignore
-                    ehats=np.array([e_hat_pos1, e_hat_neg1]).T,  # type: ignore
-                    tol_H=tol_H,
-                    tol_O_mode_polarisation=tol_O_mode_polarisation,
-                )
-
-                O_mode = solns[soln_idx if mode_flag_launch == "O" else not soln_idx]
-                X_mode = solns[not soln_idx if mode_flag_launch == "O" else soln_idx]
-
-            else:  # elif mode_flag_launch in [1, -1]:
-                soln = solns[0]  # since there is only one solution
-                soln_is_O_mode = (
-                    abs(soln["e_hat_initial"][-1]) > 1 - tol_O_mode_polarisation
-                )
-
-                O_mode = soln if soln_is_O_mode else {}
-                X_mode = {} if soln_is_O_mode else soln
-
-            if mode_flag_launch in [1, -1, "O"] and O_mode != {}:
-                sel, toreturn = "O", O_mode
-            elif mode_flag_launch in [1, -1, "X"] and X_mode != {}:
-                sel, toreturn = "X", X_mode
-            else:
-                raise RuntimeError(
-                    f"Unable to determine correct mode solution for `mode_flag` = {mode_flag_launch}"
-                )
-
-            log.debug(f"""
-        ##################################################
-        #
-        # Calculated plasma entry parameters for:
-        #   - O-mode {"(selected)" if sel == "O" else ""}:
-        #        - K_cartesian = {O_mode.get("K_initial")}
-        #
-        #        - Psi_3D_cartesian =
-        #              {O_mode.get("Psi_3D_initial")}
-        #
-        #        - H_Cardano = {O_mode.get("H_Cardano")}
-        #
-        #        - e_hat = {O_mode.get("e_hat")}
-        #
-        #        - mode_flag = {O_mode.get("mode_flag")}
-        #
-        #        - mode_index = {O_mode.get("mode_index")}
-        #
-        #   - X-mode {"(selected)" if sel == "X" else ""}:
-        #        - K_cartesian = {X_mode.get("K_initial")}
-        #
-        #        - Psi_3D_cartesian =
-        #              {X_mode.get("Psi_3D_initial")}
-        #
-        #        - H_Cardano = {X_mode.get("H_Cardano")}
-        #
-        #        - e_hat = {X_mode.get("e_hat")}
-        #
-        #        - mode_flag = {X_mode.get("mode_flag")}
-        #
-        #        - mode_index = {X_mode.get("mode_index")}
-        #
-        ##################################################
-        """)
-
-            (
-                K_initial,
-                Psi_3D_initial_labframe,
-                H_Cardano_initial,
-                e_hat_initial,
-                mode_flag_initial,
-                mode_index,
-            ) = toreturn.values()
+    (
+        K_initial,
+        Psi_3D_initial_labframe,
+        H_Cardano_initial,
+        e_hat_initial,
+        mode_flag_initial,
+        mode_index,
+    ) = toreturn.values()
 
     return (
         K_launch,

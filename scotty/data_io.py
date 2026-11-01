@@ -1,4 +1,5 @@
 import logging
+import numpy as np
 from scotty.checks import Parameters, VALID_FIELDS
 from typing import Tuple
 import xarray as xr
@@ -34,7 +35,8 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "benchmarking_flag": params.benchmarking_flag,
         "ray_tracing_flag": params.ray_tracing_flag,
         "launch_flag": params.launch_flag,
-        "boundary_flag": params.boundary_flag,
+        # As a string, since netCDF cannot store `None`
+        "boundary_flag": str(params.boundary_flag),
         "relativistic_flag": params.relativistic_flag,
         "resonance_flag": params.resonance_flag,
         "auto_delta_sign": params.auto_delta_sign,
@@ -81,6 +83,18 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "further_analysis_flag": params.further_analysis_flag,
         "detailed_analysis_flag": params.detailed_analysis_flag,
     }
+    # A plasma launch starts from the user's K and Psi (Cartesian, lab
+    # frame), so keep them to make the run reproducible from its output
+    if params.launch_flag == "plasma":
+        inputs_dict["plasmaLaunch_K_cartesian"] = (
+            ["col_cart"],
+            np.asarray(params.K_plasmaLaunch_cartesian, dtype=float),
+        )
+        if not params.ray_tracing_flag:
+            inputs_dict["plasmaLaunch_Psi_3D_lab_cartesian"] = (
+                ["row_cart", "col_cart"],
+                np.asarray(params.Psi_3D_plasmaLaunch_labframe_cartesian),
+            )
     inputs_coords = {
         **({"X": field.X_coord} if cart else {"R": field.R_coord}),  # type: ignore
         **({"Y": field.Y_coord} if cart else {}),  # type: ignore

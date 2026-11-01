@@ -13,10 +13,23 @@ Notes
   conserved, and :math:`K^2 = K_R^2 + (K_\\zeta / R)^2 + K_Z^2`) or
   ``"cartesian"`` (general 3D fields).
 - ``launch_flag="vacuum"`` launches the beam in vacuum, propagates it to the
-  plasma and applies the boundary condition there (``boundary_flag``:
-  ``"continuous"``, ``"discontinuous"`` or ``None``). ``launch_flag="plasma"``
-  starts the beam inside the plasma, with its :math:`K` and :math:`\\Psi`
-  given directly.
+  plasma and applies the boundary condition there. ``boundary_flag`` is
+  ``"continuous"`` (density continuous at the edge, but not its gradient),
+  ``"discontinuous"`` (density jumps at the edge), or ``None`` (density
+  continuous and flat at the edge, so :math:`K` and :math:`\\Psi` carry
+  straight over from vacuum; this is checked, and an error suggests
+  ``"continuous"`` if the profile is not zero with zero gradient at
+  ``poloidal_flux_zero_density``).
+- ``launch_flag="plasma"`` starts the beam at ``launch_position``, which must
+  be inside the plasma, with ``plasmaLaunch_K_cartesian`` (the wavevector,
+  Cartesian lab-frame components :math:`K_X, K_Y, K_Z` in m⁻¹) and
+  ``plasmaLaunch_Psi_3D_lab_cartesian`` (the 3×3 complex :math:`\\Psi` in the
+  Cartesian lab frame, in m⁻²; not used with ``ray_tracing_flag``). There is
+  no vacuum propagation or boundary condition, so the launch angles,
+  ``launch_beam_width`` and ``launch_beam_curvature`` are ignored, and
+  ``boundary_flag`` has no effect. :math:`K` must satisfy the dispersion
+  relation of the mode asked for (``mode_flag`` 1, -1, ``"O"`` or ``"X"``).
+  With no launched beam, ``beam_waist``, ``loc_b`` and ``loc_all`` are NaN.
 - Positions along the way: *launch* is where the beam starts in vacuum,
   *entry* is where it reaches the plasma boundary, and *initial* is the first
   point in the plasma, where the solver starts (e.g. ``q_launch``,
@@ -348,6 +361,14 @@ def beam_me_up(
     ##################################################
     """)
 
+    if params.launch_flag == "plasma":
+        log.warning(
+            "`launch_flag` = 'plasma': the beam starts at `launch_position` with "
+            "`plasmaLaunch_K_cartesian` and `plasmaLaunch_Psi_3D_lab_cartesian`, so "
+            "the launch angles, `launch_beam_width` and `launch_beam_curvature` are "
+            "not used"
+        )
+
     # Calculating the plasma entry position and auto_delta_sign
     params.q_initial = find_plasma_entry_position(
         poloidal_launch_angle_deg_Torbeam=params.poloidal_launch_angle_deg_Torbeam,
@@ -412,6 +433,7 @@ def beam_me_up(
         field=field,
         K_plasmaLaunch_cartesian=params.K_plasmaLaunch_cartesian,
         Psi_3D_plasmaLaunch_labframe_cartesian=params.Psi_3D_plasmaLaunch_labframe_cartesian,
+        poloidal_flux_zero_density=params.poloidal_flux_zero_density,
         hamiltonian_pos1=hamiltonian_pos1,
         hamiltonian_neg1=hamiltonian_neg1,
         tol_H=1e-2,
