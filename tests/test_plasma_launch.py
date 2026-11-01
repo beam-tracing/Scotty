@@ -102,15 +102,17 @@ def test_plasma_launch_reproduces_the_vacuum_beam(round_trip, name):
 
 
 def test_plasma_launch_keeps_the_mode_and_tau(round_trip):
-    """At the plasma edge the density is zero, where the O- and X-mode
-    polarisations become degenerate, so e_hat is only good to ~1e-5 there"""
+    """At the plasma edge the density is zero, so both runs save the mode's
+    zero-density polarisation as e_hat_initial"""
     vacuum, plasma = round_trip
     so_v, so_p = vacuum["solver_output"], plasma["solver_output"]
 
     assert int(so_p["mode_flag_initial"]) == int(so_v["mode_flag_initial"])
     assert_allclose(so_p["tau"].values, so_v["tau"].values, rtol=1e-6)
     assert_allclose(
-        so_p["e_hat_initial"].values, so_v["e_hat_initial"].values, atol=1e-4
+        np.abs(so_p["e_hat_initial"].values),
+        np.abs(so_v["e_hat_initial"].values),
+        atol=1e-6,
     )
 
 
@@ -151,14 +153,16 @@ def test_plasma_launch_has_no_beam_waist(round_trip):
     assert np.isnan(dbs["loc_b"].values).all()
 
 
-def test_plasma_launch_at_zero_density_needs_a_numeric_mode(tmp_path):
-    """At the edge, K satisfies both modes' dispersion relations, so "O" and
-    "X" cannot be told apart"""
+@pytest.mark.parametrize(("named", "mode_flag"), [("O", 1), ("X", -1)])
+def test_plasma_launch_at_zero_density_with_named_mode(tmp_path, named, mode_flag):
+    """At the edge, K satisfies both modes' dispersion relations, but their
+    zero-density polarisations still tell them apart. For DBS_synthetic the
+    O-mode is mode_flag = 1 (test_vacuum_mode_flag_polarisation)"""
     kwargs = synthetic(tmp_path)
     vacuum = beam_me_up(**kwargs)
+    plasma = beam_me_up(**plasma_launch_from(vacuum, kwargs, mode_flag=named))
 
-    with pytest.raises(ValueError, match="cannot be told apart"):
-        beam_me_up(**plasma_launch_from(vacuum, kwargs, mode_flag="O"))
+    assert int(plasma["solver_output"]["mode_flag_initial"]) == mode_flag
 
 
 ##################################################
@@ -393,14 +397,16 @@ def test_no_boundary_condition_matches_continuous_when_flat(
     assert_allclose(b, a, rtol=1e-4, atol=1e-4 * np.abs(a).max())
 
 
-def test_no_boundary_condition_needs_a_numeric_mode(tmp_path):
-    """The beam enters where the density is zero, so "O" and "X" cannot be
-    told apart without boundary conditions"""
+@pytest.mark.parametrize(("named", "mode_flag"), [("O", 1), ("X", -1)])
+def test_no_boundary_condition_with_named_mode(tmp_path, named, mode_flag):
+    """The beam enters where the density is zero, where the modes are told
+    apart by their zero-density polarisations"""
     kwargs = synthetic(
-        tmp_path, density_fit_method=FLAT_AT_EDGE, boundary_flag=None, mode_flag="O"
+        tmp_path, density_fit_method=FLAT_AT_EDGE, boundary_flag=None, mode_flag=named
     )
-    with pytest.raises(ValueError, match="cannot be told apart"):
-        beam_me_up(**kwargs)
+    dt = beam_me_up(**kwargs)
+
+    assert int(dt["solver_output"]["mode_flag_initial"]) == mode_flag
 
 
 def test_no_boundary_condition_rejects_a_kink(tmp_path):

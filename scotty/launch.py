@@ -3,6 +3,7 @@
 
 import logging
 import numpy as np
+from scipy import constants
 from scipy.interpolate import CubicSpline
 from scipy.optimize import minimize_scalar, root_scalar
 from scotty.boundary_conditions import (
@@ -25,6 +26,8 @@ from scotty.fun_general import (
     poloidal_flux_difference_along_ray_line,
     make_array_3x3,
     find_inverse_2D,
+    find_Booker_discriminant,
+    find_Booker_terms,
     find_epsilon_terms,
     find_H_Cardano_eigh,
 )
@@ -398,6 +401,116 @@ def _check_dispersion_relation(
         )
 
 
+# Density (10^19 m^-3) below which a mode's polarisation is taken as its
+# zero-density limit, since at exactly zero density the O- and X-modes are
+# degenerate (any polarisation transverse to K is allowed)
+POLARISATION_PROBE_DENSITY = 1e-6
+
+
+def _mode_polarisations(
+    launch_angular_freq: float,
+    B_magnitude: float,
+    theta_m: float,
+    electron_density: float,
+    temperature: Optional[float] = None,
+    n_probe: float = POLARISATION_PROBE_DENSITY,
+) -> dict:
+    r"""Polarisation of each Booker root, `mode_flag` = +1 and -1, for a K
+    along `theta_m`. Returns `{mode_flag: e_hat}`, `e_hat` in the (u1, u2, b)
+    basis.
+
+    For each root, N^2 solves its Booker quadratic, and e_hat is the
+    eigenvector of D whose eigenvalue vanishes at that N^2. As n_e -> 0 both
+    roots tend to N = 1, where D is degenerate in the plane transverse to K.
+    Their polarisations still tend to distinct limits, the eigenvectors of
+    the susceptibility projected onto that plane (degenerate perturbation
+    theory), which depend on |B| and theta_m but not n_e. So below `n_probe`
+    the density is replaced by `n_probe`, which gives those limits.
+
+    If either root does not propagate at this density (N^2 <= 0, e.g. past
+    its cut-off), the two are compared in their zero-density limits instead.
+    """
+    K0 = launch_angular_freq / constants.c
+    sin_theta_m_sq = np.sin(theta_m) ** 2
+
+    def polarisations_at(n_e: float) -> Optional[dict]:
+        alpha, beta, _ = find_Booker_terms(
+            launch_angular_freq, B_magnitude, sin_theta_m_sq, n_e, temperature
+        )
+        discriminant = find_Booker_discriminant(
+            launch_angular_freq, B_magnitude, sin_theta_m_sq, n_e, temperature
+        )
+        epsilon_terms = find_epsilon_terms(
+            launch_angular_freq, B_magnitude, n_e, temperature
+        )
+        result = {}
+        for mode_flag in (1, -1):
+            # The root of H_Booker = N^2 + (beta - mode_flag sqrt(disc)) / (2 alpha)
+            N_sq = -(beta - mode_flag * np.sqrt(discriminant)) / (2 * alpha)
+            if not (np.isfinite(N_sq) and N_sq > 0):
+                return None
+            eigvals, eigvecs = find_H_Cardano_eigh(
+                launch_angular_freq, np.sqrt(N_sq) * K0, *epsilon_terms, theta_m
+            )
+            result[mode_flag] = eigvecs[:, int(np.argmin(np.abs(eigvals)))]
+        return result
+
+    polarisations = polarisations_at(max(float(electron_density), n_probe))
+    if polarisations is None:
+        log.debug(
+            f"A root does not propagate at n_e = {electron_density} (e19), so "
+            "the O- and X-mode polarisations are compared at zero density"
+        )
+        polarisations = cast(dict, polarisations_at(n_probe))
+    return polarisations
+
+
+def _O_mode_flag(polarisations: dict, min_difference: float = 0.05) -> int:
+    r"""The `mode_flag` (+1 or -1) of the O-mode: the root more polarised
+    along b (for perpendicular propagation, exactly E parallel to B). Raises
+    if the two are too alike to tell apart, as for K nearly along B, where
+    both are circularly polarised transverse to b."""
+    e_b = {mode_flag: abs(e_hat[-1]) for mode_flag, e_hat in polarisations.items()}
+    if abs(e_b[1] - e_b[-1]) < min_difference:
+        raise ValueError(
+            f"The O- and X-mode polarisations are too alike to tell apart "
+            f"(|e_b| = {e_b[1]:.3f} for `mode_flag` = 1, {e_b[-1]:.3f} for -1), as "
+            "when K is nearly along B. Give `mode_flag` = 1 or -1"
+        )
+    return 1 if e_b[1] > e_b[-1] else -1
+
+
+def _theta_m(q: FloatArray, K: FloatArray, field: VALID_FIELDS, cart: bool) -> float:
+    r"""Angle between K and the plane perpendicular to B: sin(theta_m) =
+    b_hat . K_hat (in cylindrical, K_zeta is the toroidal mode number)"""
+    K_magnitude = find_K_magnitude(cart, *K, q[0])  # type: ignore
+    K_hat = K / (K_magnitude * np.array([1, 1 if cart else q[0], 1]))
+    return float(np.arcsin(np.dot(field.unitvector(*q), K_hat)))
+
+
+def find_O_mode_flag(
+    q: FloatArray,
+    K: FloatArray,
+    field: VALID_FIELDS,
+    launch_angular_freq: float,
+    density_fit,
+    temperature_fit=None,
+) -> int:
+    r"""The `mode_flag` (+1 or -1) whose Booker root is the O-mode for a K
+    along `K` at `q` (in the field's coordinates), judged by polarisation.
+    Works at zero density too, from the polarisations' zero-density limits."""
+    cart = not isinstance(field, MagneticField_Cylindrical)
+    polflux = field.polflux(*q)
+    polarisations = _mode_polarisations(
+        launch_angular_freq,
+        float(field.magnitude(*q)),
+        _theta_m(q, K, field, cart),
+        float(density_fit(polflux)),
+        float(temperature_fit(polflux)) if temperature_fit else None,
+    )
+    return _O_mode_flag(polarisations)
+
+
 def _plasma_terms_at(
     q_initial: FloatArray,
     q_initial_cartesian: FloatArray,
@@ -405,9 +518,10 @@ def _plasma_terms_at(
     launch_angular_freq: float,
     density_fit,
     temperature_fit,
-) -> Tuple[FloatArray, Tuple[float, float, float]]:
-    r"""Returns `b_hat` and the dielectric terms `(epsilon_para, epsilon_perp,
-    epsilon_g)` at `q_initial`, as used by `_mode_solution`"""
+) -> Tuple[FloatArray, Tuple[float, float, float], float, float, Optional[float]]:
+    r"""Returns `b_hat`, the dielectric terms `(epsilon_para, epsilon_perp,
+    epsilon_g)` (as used by `_mode_solution`), |B|, n_e and T_e at
+    `q_initial`"""
     polflux = field.polflux(*q_initial)
     electron_density = density_fit(polflux)
     electron_temperature = temperature_fit(polflux) if temperature_fit else None
@@ -440,7 +554,13 @@ def _plasma_terms_at(
         electron_density=electron_density,
         temperature=electron_temperature,
     )
-    return b_hat, epsilon_terms
+    return (
+        b_hat,
+        epsilon_terms,
+        float(B_magnitude),
+        float(electron_density),
+        None if electron_temperature is None else float(electron_temperature),
+    )
 
 
 def _mode_solution(
@@ -530,17 +650,19 @@ def _mode_from_K(
     Psi_3D_initial_labframe: Optional[ComplexFloatArray],
     mode_flag_launch: VALID_LAUNCH_MODE_FLAGS,
     q_initial: FloatArray,
+    O_mode_flag: int,
     tol_H_error: float = 1e-3,
     **mode_kwargs,
 ) -> dict:
     r"""The mode solution when K is given rather than solved for (a plasma
     launch, or `boundary_flag` = None): the mode is the Hamiltonian whose
-    dispersion relation K satisfies, and whether it is O or X follows from
-    its polarisation. Raises if `mode_flag_launch` asks for a different mode.
+    dispersion relation K satisfies, and `O_mode_flag` (from the two roots'
+    polarisations, see `_O_mode_flag`) says whether it is O or X. Raises if
+    `mode_flag_launch` asks for a different mode.
 
     Where K satisfies both (zero density, e.g. at the plasma edge), K cannot
-    tell the modes apart: a numeric `mode_flag_launch` is then used as given,
-    and "O" or "X" raises."""
+    tell the modes apart, but their polarisations still can: "O" or "X" then
+    picks `O_mode_flag` or the other root, and 1 or -1 is used as given."""
     hamiltonians = {
         mode_flag: hamiltonian
         for mode_flag, hamiltonian in ((1, hamiltonian_pos1), (-1, hamiltonian_neg1))
@@ -556,14 +678,10 @@ def _mode_from_K(
     satisfied = [m for m, H in H_values.items() if H <= tol_H_error]
 
     if len(satisfied) == 2:
-        if mode_flag_launch not in [1, -1]:
-            raise ValueError(
-                f"K satisfies both modes' dispersion relations here ({_values}), "
-                f"as at zero density, so `mode_flag` = {mode_flag_launch!r} cannot "
-                "be told apart from K and its polarisation. Give `mode_flag` = 1 "
-                "or -1, or for a vacuum launch use `boundary_flag` = 'continuous'"
-            )
-        mode_flag_found = mode_flag_launch
+        if mode_flag_launch in [1, -1]:
+            mode_flag_found = mode_flag_launch
+        else:
+            mode_flag_found = O_mode_flag if mode_flag_launch == "O" else -O_mode_flag
     else:
         mode_flag_found = min(H_values, key=H_values.get)
         if mode_flag_launch in [1, -1] and mode_flag_launch != mode_flag_found:
@@ -581,102 +699,18 @@ def _mode_from_K(
         **mode_kwargs,
     )
 
-    tol_O_mode_polarisation = mode_kwargs["tol_O_mode_polarisation"]
-    is_O_mode = abs(soln["e_hat_initial"][-1]) > 1 - tol_O_mode_polarisation
-    mode_name = "O" if is_O_mode else "X"
+    mode_name = "O" if mode_flag_found == O_mode_flag else "X"
     if mode_flag_launch in ["O", "X"] and mode_flag_launch != mode_name:
         raise ValueError(
             f"`mode_flag` = {mode_flag_launch!r}, but K is the {mode_name}-mode "
-            f"(`mode_flag` = {mode_flag_found}, from its polarisation |e_b| = "
-            f"{abs(soln['e_hat_initial'][-1]):.3f})"
+            f"(`mode_flag` = {mode_flag_found}, from the polarisations of the "
+            "two roots)"
         )
 
     log.debug(
         f"K satisfies `mode_flag` = {mode_flag_found} ({_values}), the {mode_name}-mode"
     )
     return soln
-
-
-def _select_mode(
-    solns: List[dict],
-    mode_flag_launch: VALID_LAUNCH_MODE_FLAGS,
-    tol_H: float,
-    tol_O_mode_polarisation: float,
-) -> dict:
-    r"""Choose the O- or X-mode solution that `mode_flag_launch` asks for.
-    For `mode_flag_launch` = "O" or "X", `solns` holds the `+1` then the `-1`
-    solution; for 1 or -1, only that one"""
-
-    # If the user has specified `mode_flag` = "O" or "X", then we
-    # compare the polarisations to determine which is the correct
-    # mode, and also check with `tol_O_mode_polarisation` to
-    # double confirm. If the user has specified `mode_flag` = `1`
-    # or `-1`, then just check with `tol_O_mode_polarisation`.
-
-    if mode_flag_launch in ["O", "X"]:
-        soln_idx, _, _ = find_mode_index_and_ehat(
-            mode_flag=mode_flag_launch,
-            H_Cardanos=np.array([soln["H_Cardano_initial"] for soln in solns]),
-            ehats=np.array([soln["e_hat_initial"] for soln in solns]).T,
-            tol_H=tol_H,
-            tol_O_mode_polarisation=tol_O_mode_polarisation,
-        )
-
-        O_mode = solns[soln_idx if mode_flag_launch == "O" else not soln_idx]
-        X_mode = solns[not soln_idx if mode_flag_launch == "O" else soln_idx]
-
-    else:  # elif mode_flag_launch in [1, -1]:
-        soln = solns[0]  # since there is only one solution
-        soln_is_O_mode = abs(soln["e_hat_initial"][-1]) > 1 - tol_O_mode_polarisation
-
-        O_mode = soln if soln_is_O_mode else {}
-        X_mode = {} if soln_is_O_mode else soln
-
-    if mode_flag_launch in [1, -1, "O"] and O_mode != {}:
-        sel, toreturn = "O", O_mode
-    elif mode_flag_launch in [1, -1, "X"] and X_mode != {}:
-        sel, toreturn = "X", X_mode
-    else:
-        raise RuntimeError(
-            f"Unable to determine correct mode solution for `mode_flag` = {mode_flag_launch}"
-        )
-
-    log.debug(f"""
-        ##################################################
-        #
-        # Calculated plasma entry parameters for:
-        #   - O-mode {"(selected)" if sel == "O" else ""}:
-        #        - K_cartesian = {O_mode.get("K_initial")}
-        #
-        #        - Psi_3D_cartesian =
-        #              {O_mode.get("Psi_3D_initial")}
-        #
-        #        - H_Cardano = {O_mode.get("H_Cardano")}
-        #
-        #        - e_hat = {O_mode.get("e_hat")}
-        #
-        #        - mode_flag = {O_mode.get("mode_flag")}
-        #
-        #        - mode_index = {O_mode.get("mode_index")}
-        #
-        #   - X-mode {"(selected)" if sel == "X" else ""}:
-        #        - K_cartesian = {X_mode.get("K_initial")}
-        #
-        #        - Psi_3D_cartesian =
-        #              {X_mode.get("Psi_3D_initial")}
-        #
-        #        - H_Cardano = {X_mode.get("H_Cardano")}
-        #
-        #        - e_hat = {X_mode.get("e_hat")}
-        #
-        #        - mode_flag = {X_mode.get("mode_flag")}
-        #
-        #        - mode_index = {X_mode.get("mode_index")}
-        #
-        ##################################################
-        """)
-
-    return toreturn
 
 
 def find_plasma_entry_parameters(
@@ -995,13 +1029,15 @@ def find_plasma_entry_parameters(
     # component of both vectors. If the last component of
     # the vector is not close to 1 (i.e. |v[-1] - 1| < tol),
     # then we say it's X-mode; otherwise, it's O-mode
-    b_hat, epsilon_terms = _plasma_terms_at(
-        q_initial,
-        q_initial_cartesian,
-        field,
-        launch_angular_freq,
-        density_fit,
-        temperature_fit,
+    b_hat, epsilon_terms, B_magnitude, electron_density, electron_temperature = (
+        _plasma_terms_at(
+            q_initial,
+            q_initial_cartesian,
+            field,
+            launch_angular_freq,
+            density_fit,
+            temperature_fit,
+        )
     )
 
     mode_kwargs = dict(
@@ -1014,45 +1050,80 @@ def find_plasma_entry_parameters(
         tol_O_mode_polarisation=tol_O_mode_polarisation,
     )
 
+    # Which root (`mode_flag` +1 or -1) is the O-mode, from the two roots'
+    # polarisations along K where the solvers start. This works at zero
+    # density too, where K cannot tell the modes apart, from the
+    # polarisations' zero-density limits. For a vacuum launch, the vacuum K
+    # at the entry is used (the boundary conditions change it little)
+    no_boundary_conditions = launch_flag == "plasma" or boundary_flag is None
+    if no_boundary_conditions:
+        K_given, Psi_given = initial_K_and_Psi(None)
+        K_for_polarisation = K_given
+    else:
+        K_for_polarisation = (
+            K_launch_cartesian
+            if cart
+            else find_K_labframe_cart_to_cyl(K_launch_cartesian, q_initial_cartesian)
+        )
+    polarisations = _mode_polarisations(
+        launch_angular_freq,
+        B_magnitude,
+        _theta_m(q_initial, K_for_polarisation, field, cart),
+        electron_density,
+        electron_temperature,
+    )
+    O_mode_flag = _O_mode_flag(polarisations)
+    log.debug(
+        f"The O-mode is `mode_flag` = {O_mode_flag}, the X-mode `mode_flag` = {-O_mode_flag}"
+    )
+
     # Without boundary conditions (a plasma launch, or `boundary_flag` =
     # None), K is given rather than solved for each mode, so the mode is the
     # one whose dispersion relation K satisfies
-    if launch_flag == "plasma" or boundary_flag is None:
-        K_given, Psi_given = initial_K_and_Psi(None)
+    if no_boundary_conditions:
         toreturn = _mode_from_K(
             hamiltonian_pos1=hamiltonian_pos1,
             hamiltonian_neg1=hamiltonian_neg1,
             K_initial=K_given,
             Psi_3D_initial_labframe=Psi_given,
             mode_flag_launch=mode_flag_launch,
+            O_mode_flag=O_mode_flag,
             **mode_kwargs,
         )
 
-    # With boundary conditions, each mode has its own K and Psi
+    # With boundary conditions, "O" or "X" is first turned into its root, and
+    # the boundary conditions are applied for that root only
     else:
-        solns = []
-        for mode_flag, hamiltonian in (
-            (1, hamiltonian_pos1),
-            (-1, hamiltonian_neg1),
-        ):
-            if mode_flag_launch in [mode_flag, "O", "X"] and hamiltonian is not None:
-                log.debug(
-                    f"`mode_flag_launch` is {mode_flag_launch}. Finding the initial K and Psi for the Hamiltonian with `mode_flag` = {mode_flag}"
-                )
-                K_initial_mode, Psi_3D_initial_labframe_mode = initial_K_and_Psi(
-                    hamiltonian
-                )
-                solns.append(
-                    _mode_solution(
-                        hamiltonian=hamiltonian,
-                        K_initial=K_initial_mode,
-                        Psi_3D_initial_labframe=Psi_3D_initial_labframe_mode,
-                        mode_flag_launch=mode_flag_launch,
-                        **mode_kwargs,
-                    )
-                )
+        if mode_flag_launch in [1, -1]:
+            mode_flag = mode_flag_launch
+        else:
+            mode_flag = O_mode_flag if mode_flag_launch == "O" else -O_mode_flag
+        hamiltonian = hamiltonian_pos1 if mode_flag == 1 else hamiltonian_neg1
+        if hamiltonian is None:
+            raise ValueError(
+                f"`mode_flag` = {mode_flag_launch!r} needs the Hamiltonian with "
+                f"`mode_flag` = {mode_flag}, which was not given"
+            )
+        log.debug(
+            f"`mode_flag_launch` is {mode_flag_launch}. Finding the initial K and Psi for the Hamiltonian with `mode_flag` = {mode_flag}"
+        )
+        K_initial_mode, Psi_3D_initial_labframe_mode = initial_K_and_Psi(hamiltonian)
+        toreturn = _mode_solution(
+            hamiltonian=hamiltonian,
+            K_initial=K_initial_mode,
+            Psi_3D_initial_labframe=Psi_3D_initial_labframe_mode,
+            mode_flag_launch=mode_flag,
+            **mode_kwargs,
+        )
 
-        toreturn = _select_mode(solns, mode_flag_launch, tol_H, tol_O_mode_polarisation)
+    # At (near-)zero density, the eigenvector of D is any transverse vector,
+    # so keep the mode's zero-density polarisation instead
+    if electron_density < POLARISATION_PROBE_DENSITY:
+        toreturn["e_hat_initial"] = polarisations[toreturn["mode_flag"]]
+
+    log.debug(
+        f"Starting the solvers in the {'O' if toreturn['mode_flag'] == O_mode_flag else 'X'}-mode, `mode_flag` = {toreturn['mode_flag']}"
+    )
 
     (
         K_initial,

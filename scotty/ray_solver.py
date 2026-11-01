@@ -54,7 +54,13 @@ def make_solver_events(
     launch_angular_frequency: float,
     field: Union[MagneticField_Cartesian, MagneticField_Cylindrical],
     resonance_flag: bool = True,
+    *,
+    X_mode: bool,
 ) -> Dict[str, Callable]:
+    r"""The ray's solver events. `X_mode` says whether the ray is the X-mode,
+    for the upper-hybrid resonance; which `mode_flag` that is depends on the
+    plasma and K (see `scotty.launch.find_O_mode_flag`), so it is given
+    explicitly rather than assumed from the Hamiltonian's `mode_flag`."""
 
     cart = True if isinstance(field, MagneticField_Cartesian) else False
 
@@ -120,7 +126,9 @@ def make_solver_events(
         )
         difference = (gyro_freq - 1) * (gyro_freq - 0.5)
 
-        if hamiltonian.mode_flag == -1:
+        # The upper hybrid resonance is reached by the X-mode only, whichever
+        # `mode_flag` (or "X") it was launched as
+        if X_mode:
             plasma_freq = find_normalised_plasma_ang_freq(
                 launch_angular_frequency, hamiltonian.density(polflux), temperature
             )
@@ -271,6 +279,8 @@ def ray_tracing(
     len_tau: int,
     tau_max: float = 1e5,
     resonance_flag: bool = True,
+    *,
+    X_mode: bool,
 ) -> Tuple[VALID_SOLVER_STATUS, int, float, FloatArray, Union[float, FloatArray]]:
     """Propagates a ray, given an initial position `q` and wavevector `K`, using
     `scipy.integrate.solve_ivp` until any of these terminating conditions are
@@ -302,6 +312,7 @@ def ray_tracing(
         hamiltonian.angular_frequency,
         hamiltonian.field,
         resonance_flag,
+        X_mode=X_mode,
     )
     solver_arguments = (hamiltonian,)
 

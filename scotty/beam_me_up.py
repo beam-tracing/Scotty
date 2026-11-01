@@ -34,6 +34,15 @@ Notes
   *entry* is where it reaches the plasma boundary, and *initial* is the first
   point in the plasma, where the solver starts (e.g. ``q_launch``,
   ``Psi_3D_entry_labframe``, ``q_initial``).
+- ``mode_flag`` picks a root of the Booker quadratic: 1 or -1 directly, or
+  ``"O"`` / ``"X"``. The O-mode is the root more polarised along
+  :math:`\\hat{b}` (for perpendicular propagation, :math:`E \\parallel B`);
+  which of 1 and -1 that is depends on the plasma and :math:`K`. This also
+  works at zero density (e.g. at the plasma edge), where both roots have
+  :math:`N = 1`, from their polarisations' zero-density limits. It fails
+  only for :math:`K` nearly along :math:`B`, where both modes are circularly
+  polarised; give 1 or -1 there. The upper hybrid resonance stops the X-mode,
+  whichever ``mode_flag`` it was launched with.
 - ``ray_tracing_flag=True`` traces only the ray, with no beam.
 - Scripts written for Scotty v3 can be converted with `scotty.compat`.
 
@@ -98,6 +107,7 @@ from scotty.hamiltonian import initialise_hamiltonians, assign_hamiltonians
 from scotty.launch import (
     find_plasma_entry_position,
     find_auto_delta_signs,
+    find_O_mode_flag,
     find_plasma_entry_parameters,
 )
 from scotty.logger import config_logger, arr2str
@@ -453,6 +463,28 @@ def beam_me_up(
         tol_H=1e-5,
     )
 
+    # Whether the traced root is the X-mode, from the two roots'
+    # polarisations where the solvers start, for the upper hybrid resonance
+    try:
+        X_mode = params.mode_flag_initial != find_O_mode_flag(
+            params.q_initial,
+            params.K_initial,
+            field,
+            params.launch_angular_frequency,
+            density_fit,
+            temperature_fit,
+        )
+    except ValueError as error:
+        # K nearly along B: the roots' polarisations are too alike to label
+        X_mode = params.mode_flag_initial == -1
+        log.warning(
+            f"{error}. For the upper hybrid resonance, taking `mode_flag` = -1 as "
+            f"the X-mode, so this is the {'X' if X_mode else 'O'}-mode"
+        )
+    log.info(
+        f"Tracing the {'X' if X_mode else 'O'}-mode (`mode_flag` = {params.mode_flag_initial})"
+    )
+
     log.info(f"""\n
     ##################################################
     #
@@ -471,6 +503,7 @@ def beam_me_up(
         atol=params.atol,
         len_tau=params.len_tau,
         resonance_flag=params.resonance_flag,
+        X_mode=X_mode,
         # tau_max = 1e5,
     )
 

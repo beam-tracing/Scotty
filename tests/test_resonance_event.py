@@ -34,7 +34,9 @@ def trace_level(tmp_path_factory):
     config_logger("warning", None, tmp_path_factory.mktemp("log"), "")
 
 
-def event(mode_flag, resonance_flag, temperature_fit=None):
+def event(mode_flag, resonance_flag, temperature_fit=None, X_mode=None):
+    """The resonance event for the Hamiltonian with `mode_flag`. Unless given,
+    `X_mode` is True for mode_flag = -1, the X-mode in this geometry"""
     hamiltonian = Hamiltonian(
         launch_angular_freq=OMEGA,
         mode_flag=mode_flag,
@@ -43,7 +45,9 @@ def event(mode_flag, resonance_flag, temperature_fit=None):
         density_fit=DENSITY,
         temperature_fit=temperature_fit,
     )
-    events = make_solver_events(1.0, OMEGA, FIELD, resonance_flag)
+    if X_mode is None:
+        X_mode = mode_flag == -1
+    events = make_solver_events(1.0, OMEGA, FIELD, resonance_flag, X_mode=X_mode)
     cross = events["cross_resonance"]
     return lambda R: cross(0.0, [R, 0.0, Z, 0.0, 0.0, 0.0], hamiltonian)
 
@@ -85,6 +89,21 @@ def test_layers_are_separated():
 def test_event_changes_sign_across_its_layers(mode_flag, R_layer, must_change):
     f = event(mode_flag, resonance_flag=True)
     before, after = f(R_layer - 1e-3), f(R_layer + 1e-3)
+    assert (np.sign(before) != np.sign(after)) == must_change
+
+
+@pytest.mark.parametrize(
+    ("mode_flag", "X_mode", "must_change"),
+    [
+        pytest.param(1, True, True, id="X-mode-as-mode_flag+1"),
+        pytest.param(-1, False, False, id="O-mode-as-mode_flag-1"),
+    ],
+)
+def test_upper_hybrid_follows_the_X_mode_not_mode_flag(mode_flag, X_mode, must_change):
+    """Which mode_flag is the X-mode depends on the plasma and K, so the
+    upper-hybrid layer is detected for the X-mode whatever its mode_flag"""
+    f = event(mode_flag, resonance_flag=True, X_mode=X_mode)
+    before, after = f(UH - 1e-3), f(UH + 1e-3)
     assert (np.sign(before) != np.sign(after)) == must_change
 
 
