@@ -76,7 +76,6 @@ def test_parameters_DBS_NSTX_MAST():
         "geometry": "cylindrical",
         "launch_flag": "vacuum_analytic",
         "Psi_BC_flag": "continuous",
-        "figure_flag": True,
     }
     assert sorted(expected.keys()) == sorted(parameters.keys())
     for key, value in expected.items():
@@ -102,7 +101,6 @@ def test_parameters_DBS_UCLA_DIII_D_240():
         "geometry": "cylindrical",
         "launch_flag": "vacuum_analytic",
         "Psi_BC_flag": "continuous",
-        "figure_flag": True,
     }
     assert sorted(expected.keys()) == sorted(parameters.keys())
     for key, value in expected.items():

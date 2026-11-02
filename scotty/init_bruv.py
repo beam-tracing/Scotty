@@ -49,7 +49,6 @@ def parameters_DBS_NSTX_MAST(launch_freq_GHz: float) -> dict:
         "geometry": "cylindrical",
         "launch_flag": "vacuum_analytic",
         "Psi_BC_flag": "continuous",
-        "figure_flag": True,
     }
 
 
@@ -67,7 +66,6 @@ def parameters_DBS_UCLA_MAST_U(launch_freq_GHz: float) -> dict:
         "geometry": "cylindrical",
         "launch_flag": "vacuum_analytic",
         "Psi_BC_flag": "continuous",
-        "figure_flag": True,
     }
 
 
@@ -87,7 +85,6 @@ def parameters_DBS_SWIP_MAST_U(launch_freq_GHz: float) -> dict:
         "geometry": "cylindrical",
         "launch_flag": "vacuum_analytic",
         "Psi_BC_flag": "continuous",
-        "figure_flag": True,
     }
 
 
@@ -103,7 +100,6 @@ def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
         "geometry": "cylindrical",
         "launch_flag": "vacuum_analytic",
         "Psi_BC_flag": "continuous",
-        "figure_flag": True,
     }
 
 
@@ -125,7 +121,6 @@ def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
         "geometry": "cylindrical",
         "launch_flag": "vacuum_analytic",
         "Psi_BC_flag": "continuous",
-        "figure_flag": False,
         "poloidal_flux_zero_density": poloidal_flux_zero_density,
         "poloidal_flux_enter": 1.0,
         "B_T_axis": 1.0,
