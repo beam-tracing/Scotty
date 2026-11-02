@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# Copyright 2018 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
 """Run Scotty v3 inputs on v4.
 
 ``from_v3_kwargs`` takes the keyword arguments a v3 script passed to
@@ -13,9 +17,21 @@ use it for v3 inputs, not v4 ones.
 
 What it converts:
 
-- the launch flags: ``vacuumLaunch_flag`` to ``launch_flag``, and
-  ``Psi_BC_flag`` to ``boundary_flag``; ``geometry`` is set to
-  ``"cylindrical"``, the only geometry v3 had;
+- the launch flags: ``vacuumLaunch_flag`` and ``vacuum_propagation_flag`` to
+  ``launch_flag``. ``vacuumLaunch_flag=False`` is ``"plasma"``.
+  ``vacuumLaunch_flag=True`` (v3's default) is ``"vacuum_analytic"`` if
+  ``vacuum_propagation_flag`` is True, and ``"vacuum_numerical"`` otherwise
+  (v3's ``beam_me_up`` defaulted to ``vacuum_propagation_flag=False``, so a
+  script that does not set it gets ``"vacuum_numerical"``). v3's docstring
+  describes ``vacuum_propagation_flag`` the wrong way round: its code (and
+  this conversion) propagates analytically through the vacuum when it is
+  True;
+- ``Psi_BC_flag`` is passed through unchanged (v4 uses the same name and the
+  same values; v3's deprecated booleans raise in v4). If it is not given,
+  v3's default ``None`` is set. With ``"vacuum_numerical"`` it is set to
+  ``None``, with a warning: v3 propagated through the vacuum numerically
+  without boundary conditions and ignored the flag, and v4 refuses it there;
+- ``geometry`` is set to ``"cylindrical"``, the only geometry v3 had;
 - a plasma launch: ``plasmaLaunch_K`` (cylindrical, as in v3) to the
   Cartesian ``plasmaLaunch_K_cartesian``, and
   ``plasmaLaunch_Psi_3D_lab_Cartesian`` to
@@ -23,14 +39,15 @@ What it converts:
 - ``quick_run`` to ``ray_tracing_flag``; ``quick_cutoff(dt)`` then gives the
   numbers v3's ``quick_run`` returned (R, Z, |K|, poloidal flux and θ_m at the
   minimum of |K|);
-- ``output_path`` given as a string, to a ``pathlib.Path``;
-- defaults that changed between v3 and v4, restored when the v3 script left
-  them unset: ``interp_smoothing`` (0), ``find_B_method`` ("torbeam"),
-  ``detailed_analysis_flag`` (True), and ``poloidal_flux_zero_density`` and
+- ``output_path`` given as a string, to a ``pathlib.Path`` (v4 accepts
+  either, but v3 used a string as a file-name prefix, which is warned about);
+- defaults that differ between v3 and v4, restored when the v3 script left
+  them unset: ``poloidal_flux_zero_density`` and
   ``poloidal_flux_zero_temperature`` (1.01, raised to
-  ``poloidal_flux_enter`` if that is larger, since v4 requires it).
+  ``poloidal_flux_enter`` if that is larger, since v4 requires it), and the
+  spatial finite-difference steps ``delta_R`` = -1e-4 and ``delta_Z`` = 1e-4
+  (v4's default is 1e-5 for both; v3 had no other spatial step).
 
-``vacuum_propagation_flag`` has no v4 equivalent and is dropped with a warning.
 ``resonance_flag`` is passed through unchanged (v4 has it since #151 was ported).
 
 Output files
@@ -66,19 +83,17 @@ log = logging.getLogger(__name__)
 V3_ONLY_ARGUMENTS = (
     "vacuumLaunch_flag",
     "vacuum_propagation_flag",
-    "Psi_BC_flag",
     "quick_run",
     "plasmaLaunch_K",
     "plasmaLaunch_Psi_3D_lab_Cartesian",
 )
 
-#: Defaults that changed between v3 and v4: name -> v3 default
-V3_DEFAULTS = {
-    "interp_smoothing": 0,
-    "find_B_method": "torbeam",
-    "detailed_analysis_flag": True,
-}
+
 V3_DEFAULT_POLOIDAL_FLUX_ZERO = 1.01
+
+#: v3's beam_me_up defaults for the spatial finite-difference steps
+#: (upstream/master feb9499); v4's are 1e-5
+V3_DEFAULT_SPATIAL_STEPS = {"delta_R": -1e-4, "delta_Z": 1e-4}
 
 
 _warned = set()
@@ -95,31 +110,44 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
     """Return a copy of ``kwargs`` with v3 arguments converted to v4"""
     kw = dict(kwargs)
 
-    # Launch from vacuum or from inside the plasma
-    if "vacuumLaunch_flag" in kw:
-        vacuum_launch = bool(kw.pop("vacuumLaunch_flag"))
-        if "launch_flag" not in kw:
-            kw["launch_flag"] = "vacuum" if vacuum_launch else "plasma"
-            _warn(
-                f"`vacuumLaunch_flag` = {vacuum_launch} -> `launch_flag` = '{kw['launch_flag']}'"
-            )
-    elif "launch_flag" not in kw:
-        kw["launch_flag"] = "vacuum"  # v3's default
-        _warn("set `launch_flag` = 'vacuum' (v3's default `vacuumLaunch_flag` = True)")
+    # Launch from vacuum (propagated analytically or numerically) or from
+    # inside the plasma. v3's defaults: vacuumLaunch_flag = True,
+    # vacuum_propagation_flag = False
+    vacuum_launch_given = "vacuumLaunch_flag" in kw
+    propagation_given = "vacuum_propagation_flag" in kw
+    vacuum_launch = bool(kw.pop("vacuumLaunch_flag", True))
+    vacuum_propagation = bool(kw.pop("vacuum_propagation_flag", False))
+    if "launch_flag" not in kw:
+        if not vacuum_launch:
+            kw["launch_flag"] = "plasma"
+        elif vacuum_propagation:
+            kw["launch_flag"] = "vacuum_analytic"
+        else:
+            kw["launch_flag"] = "vacuum_numerical"
 
-    # Plasma-vacuum boundary conditions; booleans were already deprecated in v3
-    if "Psi_BC_flag" in kw:
-        Psi_BC_flag = kw.pop("Psi_BC_flag")
-        if Psi_BC_flag is True:
-            Psi_BC_flag = "continuous"
-        elif Psi_BC_flag is False:
-            Psi_BC_flag = None
-        if "boundary_flag" not in kw:
-            kw["boundary_flag"] = Psi_BC_flag
-            _warn(f"`Psi_BC_flag` -> `boundary_flag` = {Psi_BC_flag!r}")
-    elif "boundary_flag" not in kw:
-        kw["boundary_flag"] = None  # v3's default
-        _warn("set `boundary_flag` = None (v3's default `Psi_BC_flag` = None)")
+        def given(name: str, value: bool, was_given: bool) -> str:
+            return f"`{name}` = {value}" + ("" if was_given else " (v3's default)")
+
+        source = given("vacuumLaunch_flag", vacuum_launch, vacuum_launch_given)
+        if vacuum_launch:
+            source += ", " + given(
+                "vacuum_propagation_flag", vacuum_propagation, propagation_given
+            )
+        _warn(f"{source} -> `launch_flag` = '{kw['launch_flag']}'")
+
+    # Plasma-vacuum boundary conditions: same name and values in v4
+    if "Psi_BC_flag" not in kw:
+        kw["Psi_BC_flag"] = None  # v3's default
+        _warn("set `Psi_BC_flag` = None (v3's default)")
+    elif kw["launch_flag"] == "vacuum_numerical" and kw["Psi_BC_flag"] is not None:
+        # v3 ignored it when propagating numerically through the vacuum (no
+        # boundary conditions are applied there); v4 refuses it
+        _warn(
+            f"dropped `Psi_BC_flag` = {kw['Psi_BC_flag']!r}: v3 ignored it with "
+            "`launch_flag` = 'vacuum_numerical' (no boundary conditions), so "
+            "`Psi_BC_flag` = None"
+        )
+        kw["Psi_BC_flag"] = None
 
     if "geometry" not in kw:
         kw["geometry"] = "cylindrical"
@@ -148,12 +176,6 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
             kw["ray_tracing_flag"] = quick_run
             _warn(f"`quick_run` -> `ray_tracing_flag` = {quick_run}")
 
-    if "vacuum_propagation_flag" in kw:
-        _warn(
-            f"dropped `vacuum_propagation_flag` = {kw.pop('vacuum_propagation_flag')!r}: "
-            "it has no v4 equivalent"
-        )
-
     # v3 built output file names by string concatenation; v4 joins Paths
     if isinstance(kw.get("output_path"), str):
         output_path = kw["output_path"]
@@ -164,11 +186,6 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
             )
         kw["output_path"] = pathlib.Path(output_path)
 
-    for name, v3_default in V3_DEFAULTS.items():
-        if name not in kw:
-            kw[name] = v3_default
-            _warn(f"set `{name}` = {v3_default!r} (v3's default; v4's differs)")
-
     enter = kw.get("poloidal_flux_enter", 1.0)
     for name in ("poloidal_flux_zero_density", "poloidal_flux_zero_temperature"):
         if name not in kw:
@@ -176,6 +193,11 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
             _warn(
                 f"set `{name}` = {kw[name]} (v3's default, at least `poloidal_flux_enter`)"
             )
+
+    for name, value in V3_DEFAULT_SPATIAL_STEPS.items():
+        if name not in kw:
+            kw[name] = value
+            _warn(f"set `{name}` = {value} (v3's default; v4's is 1e-5)")
 
     return kw
 
@@ -228,6 +250,8 @@ class Rule:
     v4_dims: Optional[Tuple[str, ...]] = None
     to_v4: Transform = _same
     to_v3: Transform = _same
+    # "v3" or "v4": apply only when converting from that version
+    only_from: Optional[str] = None
 
 
 # Lab-frame vectors along the ray, (tau, 3): cylindrical (R, zeta, Z) physical
@@ -247,11 +271,22 @@ def _cart_to_cyl(v: np.ndarray, ctx: Dict[str, np.ndarray]) -> np.ndarray:
 
 
 def _launch_flag_to_v4(a, ctx):
-    return np.asarray("vacuum" if bool(a) else "plasma")
+    # v3's vacuumLaunch_flag, with its vacuum_propagation_flag in the context
+    if not bool(a):
+        return np.asarray("plasma")
+    return np.asarray(
+        "vacuum_analytic" if ctx["vacuum_propagation_flag"] else "vacuum_numerical"
+    )
 
 
 def _launch_flag_to_v3(a, ctx):
-    return np.asarray(str(a) == "vacuum")
+    # Any vacuum launch is v3's vacuumLaunch_flag = True ("vacuum" is how v4
+    # files before 4.0.0.dev0 stored "vacuum_analytic")
+    return np.asarray(str(a) != "plasma")
+
+
+def _vacuum_propagation_flag_to_v3(a, ctx):
+    return np.asarray(str(a) in ("vacuum_analytic", "vacuum"))
 
 
 def _K_zeta_to_v4(a, ctx):
@@ -274,12 +309,22 @@ CART_MAT = ("row_cart", "col_cart")
 
 RULES: List[Rule] = [
     # inputs
-    Rule(("inputs", "Psi_BC_flag"), ("inputs", "boundary_flag"), to_v4=_boundary_to_v4),
+    Rule(("inputs", "Psi_BC_flag"), ("inputs", "Psi_BC_flag"), to_v4=_boundary_to_v4),
+    # v4 files before 4.0.0.dev0 called it `boundary_flag`
+    Rule(("inputs", "Psi_BC_flag"), ("inputs", "boundary_flag"), only_from="v4"),
     Rule(
         ("inputs", "vacuumLaunch_flag"),
         ("inputs", "launch_flag"),
         to_v4=_launch_flag_to_v4,
         to_v3=_launch_flag_to_v3,
+    ),
+    # v4's launch_flag also gives v3's vacuum_propagation_flag; from v3, the
+    # flag is read through the context, by the rule above
+    Rule(
+        ("inputs", "vacuum_propagation_flag"),
+        ("inputs", "launch_flag"),
+        to_v3=_vacuum_propagation_flag_to_v3,
+        only_from="v4",
     ),
     Rule(("inputs", "quick_run"), ("inputs", "ray_tracing_flag")),
     Rule(("inputs", "interp_order"), ("inputs", "magnetic_data_interp_order")),
@@ -407,11 +452,11 @@ for _v3, _v4 in (
     ("k_perp_1_bs_normal", "k_perp1_bs_normal"),
     ("k_perp_1_bs_binormal", "k_perp1_bs_binormal"),
     ("theta", "theta"),
-    ("loc_b", "loc_b"),
-    ("loc_m", "loc_m"),
-    ("loc_p", "loc_p"),
-    ("loc_r", "loc_r"),
-    ("loc_s", "loc_s_-13_3"),
+    ("loc_b", "filter_b"),
+    ("loc_m", "filter_m"),
+    ("loc_p", "filter_p"),
+    ("loc_r", "filter_r"),
+    ("loc_s", "filter_s_-13_3"),
     ("xhat_dot_grad_bhat_dot_xhat", "xhat_dot_grad_bhat_dot_xhat"),
     ("xhat_dot_grad_bhat_dot_yhat", "xhat_dot_grad_bhat_dot_yhat"),
     ("xhat_dot_grad_bhat_dot_ghat", "xhat_dot_grad_bhat_dot_ghat"),
@@ -434,7 +479,16 @@ def detect_version(dt: xr.DataTree) -> str:
 def _context(dt: xr.DataTree, version: str) -> Dict[str, np.ndarray]:
     so = dt["solver_output"].ds
     zeta = so["q_zeta" if version == "v3" else "q_zeta_output"].values
-    return {"zeta": np.asarray(zeta), "tau": np.asarray(so["tau"].values)}
+    context = {"zeta": np.asarray(zeta), "tau": np.asarray(so["tau"].values)}
+    if version == "v3":
+        inputs = dt["inputs"].ds
+        # v3's beam_me_up default, for files that do not store it
+        context["vacuum_propagation_flag"] = bool(
+            inputs["vacuum_propagation_flag"].values
+            if "vacuum_propagation_flag" in inputs
+            else False
+        )
+    return context
 
 
 def _convert(dt: xr.DataTree, source: str) -> xr.DataTree:
@@ -443,6 +497,8 @@ def _convert(dt: xr.DataTree, source: str) -> xr.DataTree:
     groups: Dict[str, Dict[str, xr.DataArray]] = {}
     used = set()
     for rule in RULES:
+        if rule.only_from not in (None, source):
+            continue
         (sg, sn), (tg, tn) = (
             (rule.v3, rule.v4) if source == "v3" else (rule.v4, rule.v3)
         )
@@ -460,8 +516,13 @@ def _convert(dt: xr.DataTree, source: str) -> xr.DataTree:
 
     # Inputs that keep their name
     other_inputs = {
-        r.v4[1] if source == "v3" else r.v3[1] for r in RULES if r.v3[0] == "inputs"
+        r.v4[1] if source == "v3" else r.v3[1]
+        for r in RULES
+        if r.v3[0] == "inputs" and r.only_from in (None, source)
     }
+    # Consumed through the context (to make v4's launch_flag)
+    if source == "v3" and "vacuum_propagation_flag" in dt["inputs"].ds:
+        used.add(("inputs", "vacuum_propagation_flag"))
     for name, da in dt["inputs"].ds.data_vars.items():
         if (
             ("inputs", name) not in used

@@ -48,7 +48,7 @@ def multisweep(pol_launch_angles,tor_launch_angles,launch_freqs_GHz, folder_path
                 
     
     #interpolate mismatch angle and delta_theta
-    loc_m  = np.zeros((len(pol_launch_angles),len(tor_launch_angles),len(launch_freqs_GHz)))
+    filter_m  = np.zeros((len(pol_launch_angles),len(tor_launch_angles),len(launch_freqs_GHz)))
     for k in range(len(pol_launch_angles)):
         interp_mismatch = interpolate.RectBivariateSpline(
             tor_launch_angles,
@@ -75,7 +75,7 @@ def multisweep(pol_launch_angles,tor_launch_angles,launch_freqs_GHz, folder_path
             toroidalzeromismatch.append(interp_zero_mismatch_toroidal.roots()[0])
         
         
-        #now, we can start finding loc_m
+        #now, we can start finding filter_m
         for i in range(len(tor_launch_angles)):
             for j in range(len(launch_freqs_GHz)):
                 outputsuffix = suffix_format.format(
@@ -87,14 +87,14 @@ def multisweep(pol_launch_angles,tor_launch_angles,launch_freqs_GHz, folder_path
                 dt = xr.open_datatree(path, engine="h5netcdf")
                 delta_theta = interp_delta(toroidalzeromismatch[j],launch_freqs_GHz[j])[0][0] #this gives us delta_theta 
                 thetam = float(dt.analysis.theta_m[cutoffindex])
-                loc_m[k,i,j] = exp(-2 * thetam**2/ delta_theta**2 )
+                filter_m[k,i,j] = exp(-2 * thetam**2/ delta_theta**2 )
     
     
     #write data into main file
     outputs = xr.Dataset(
     {
         "mismatch_angle_plot": (["pol_launch_angle", "tor_launch_angle", "frequency"], mismatchplot),
-        "mismatch_atten_plot": (["pol_launch_angle", "tor_launch_angle", "frequency"], loc_m),
+        "mismatch_atten_plot": (["pol_launch_angle", "tor_launch_angle", "frequency"], filter_m),
         "K_cutoff_plot": (["pol_launch_angle", "tor_launch_angle", "frequency"], Kcutoff),
         "rho_cutoff_plot": (["pol_launch_angle", "tor_launch_angle", "frequency"], rhocutoff)
 

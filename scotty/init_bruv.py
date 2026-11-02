@@ -12,9 +12,6 @@ split into a set of dictionaries (`DEFAULT_DIAGNOSTIC_PARAMETERS`,
 
 """
 
-# TODO: go through this file; everything copied from v3
-
-
 from __future__ import annotations
 import logging
 import math
@@ -50,8 +47,8 @@ def parameters_DBS_NSTX_MAST(launch_freq_GHz: float) -> dict:
         "launch_beam_width": launch_beam.width,
         "launch_beam_curvature": launch_beam.curvature,
         "geometry": "cylindrical",
-        "launch_flag": "vacuum",
-        "boundary_flag": "continuous",
+        "launch_flag": "vacuum_analytic",
+        "Psi_BC_flag": "continuous",
         "figure_flag": True,
     }
 
@@ -68,8 +65,8 @@ def parameters_DBS_UCLA_MAST_U(launch_freq_GHz: float) -> dict:
         "launch_beam_width": launch_beam.width,
         "launch_beam_curvature": launch_beam.curvature,
         "geometry": "cylindrical",
-        "launch_flag": "vacuum",
-        "boundary_flag": "continuous",
+        "launch_flag": "vacuum_analytic",
+        "Psi_BC_flag": "continuous",
         "figure_flag": True,
     }
 
@@ -88,8 +85,8 @@ def parameters_DBS_SWIP_MAST_U(launch_freq_GHz: float) -> dict:
         # I'm checking what this actually is from Peng. Currently using the
         # MAST UCLA DBS as a guide
         "geometry": "cylindrical",
-        "launch_flag": "vacuum",
-        "boundary_flag": "continuous",
+        "launch_flag": "vacuum_analytic",
+        "Psi_BC_flag": "continuous",
         "figure_flag": True,
     }
 
@@ -104,8 +101,8 @@ def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
         "launch_beam_width": launch_beam.width,
         "launch_beam_curvature": launch_beam.curvature,
         "geometry": "cylindrical",
-        "launch_flag": "vacuum",
-        "boundary_flag": "continuous",
+        "launch_flag": "vacuum_analytic",
+        "Psi_BC_flag": "continuous",
         "figure_flag": True,
     }
 
@@ -126,8 +123,8 @@ def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
         "density_fit_method": ne_fit,
         "find_B_method": "analytical",
         "geometry": "cylindrical",
-        "launch_flag": "vacuum",
-        "boundary_flag": "continuous",
+        "launch_flag": "vacuum_analytic",
+        "Psi_BC_flag": "continuous",
         "figure_flag": False,
         "poloidal_flux_zero_density": poloidal_flux_zero_density,
         "poloidal_flux_enter": 1.0,
@@ -151,6 +148,9 @@ DEFAULT_DIAGNOSTIC_PARAMETERS: Dict[str, Callable[[float], dict]] = {
 }
 """Functions that return default parameters for the corresponding diagnostic
 """
+
+NOT_IMPLEMENTED_DIAGNOSTICS = ("CPS_UCLA_MAST-U", "hiK_Strath_MAST")
+"""Diagnostics listed in `get_parameters_for_Scotty` without a preset yet"""
 
 
 def launch_beam_DBS_NSTX_MAST_horn_and_lens(launch_freq_GHz):
@@ -538,6 +538,14 @@ def get_parameters_for_Scotty(
         the launch beam width and curvature, and launch position (of the final
         quasioptical element)
     """
+    # TODO: implement the CPS_UCLA_MAST-U and hiK_Strath_MAST presets
+    # (future work; they were never implemented, in v3 either)
+    if diagnostic in NOT_IMPLEMENTED_DIAGNOSTICS:
+        raise NotImplementedError(
+            f"The `{diagnostic}` preset is not implemented yet. Implemented presets: "
+            f"{', '.join(DEFAULT_DIAGNOSTIC_PARAMETERS)}"
+        )
+
     # Initialise dictionaries
     parameters: Dict[str, Any] = {
         "poloidal_launch_angle_Torbeam": None,

@@ -1,5 +1,5 @@
 """Tests of launching from inside the plasma (``launch_flag="plasma"``) and of
-launching from vacuum without boundary conditions (``boundary_flag=None``).
+launching from vacuum without boundary conditions (``Psi_BC_flag=None``).
 
 The main check is a round trip: a plasma launch from a point on a vacuum
 launch's beam, with the beam's K and Psi there, gives the same beam. This is
@@ -144,13 +144,13 @@ def test_plasma_launch_inputs_are_saved(round_trip):
 
 
 def test_plasma_launch_has_no_beam_waist(round_trip):
-    """loc_b is normalised by the launched beam's waist, which a plasma
+    """filter_b is normalised by the launched beam's waist, which a plasma
     launch doesn't have"""
     _, plasma = round_trip
     dbs = plasma["dbs_analysis"]
 
     assert np.isnan(float(dbs["beam_waist"]))
-    assert np.isnan(dbs["loc_b"].values).all()
+    assert np.isnan(dbs["filter_b"].values).all()
 
 
 @pytest.mark.parametrize(("named", "mode_flag"), [("O", 1), ("X", -1)])
@@ -295,7 +295,7 @@ def test_plasma_launch_through_compat(tmp_path):
     so = vacuum["solver_output"]
 
     v3 = dict(kwargs)
-    for name in ("geometry", "launch_flag", "boundary_flag"):
+    for name in ("geometry", "launch_flag", "Psi_BC_flag"):
         v3.pop(name)
     v3.update(
         vacuumLaunch_flag=False,
@@ -352,7 +352,7 @@ def test_plasma_launch_needs_K_and_Psi(tmp_path, missing):
 
 
 ##################################################
-# boundary_flag = None
+# Psi_BC_flag = None
 ##################################################
 
 # n_e = 4 (1 - psi^2)^2: zero and flat at the edge psi = 1. (The simpler
@@ -366,8 +366,8 @@ def no_boundary_condition(tmp_path_factory):
     kwargs = synthetic(
         tmp_path_factory.mktemp("no_bc"), density_fit_method=FLAT_AT_EDGE, **TIGHT
     )
-    without = beam_me_up(**dict(kwargs, boundary_flag=None))
-    continuous = beam_me_up(**dict(kwargs, boundary_flag="continuous"))
+    without = beam_me_up(**dict(kwargs, Psi_BC_flag=None))
+    continuous = beam_me_up(**dict(kwargs, Psi_BC_flag="continuous"))
     return without, continuous
 
 
@@ -376,7 +376,7 @@ def test_no_boundary_condition_carries_K_and_Psi_over(no_boundary_condition):
     without, _ = no_boundary_condition
     so = without["solver_output"]
 
-    assert str(without["inputs"]["boundary_flag"].values) == "None"
+    assert str(without["inputs"]["Psi_BC_flag"].values) == "None"
     assert_allclose(so["K_initial_cartesian"], so["K_launch_cartesian"], rtol=1e-12)
     assert_allclose(
         so["Psi_3D_initial_labframe_cylindrical"],
@@ -402,7 +402,7 @@ def test_no_boundary_condition_with_named_mode(tmp_path, named, mode_flag):
     """The beam enters where the density is zero, where the modes are told
     apart by their zero-density polarisations"""
     kwargs = synthetic(
-        tmp_path, density_fit_method=FLAT_AT_EDGE, boundary_flag=None, mode_flag=named
+        tmp_path, density_fit_method=FLAT_AT_EDGE, Psi_BC_flag=None, mode_flag=named
     )
     dt = beam_me_up(**kwargs)
 
@@ -413,14 +413,14 @@ def test_no_boundary_condition_rejects_a_kink(tmp_path):
     """DBS_synthetic's quadratic profile goes to zero at the edge with a
     finite gradient"""
     with pytest.raises(ValueError, match="not flat"):
-        beam_me_up(**synthetic(tmp_path, boundary_flag=None))
+        beam_me_up(**synthetic(tmp_path, Psi_BC_flag=None))
 
 
 def test_no_boundary_condition_rejects_a_jump(tmp_path):
     """The profile is cut to zero at psi = 1, where it is still finite"""
     kwargs = synthetic(
         tmp_path,
-        boundary_flag=None,
+        Psi_BC_flag=None,
         density_fit_method=QuadraticFit(1.3, 4.0),
         poloidal_flux_zero_density=1.0,
     )

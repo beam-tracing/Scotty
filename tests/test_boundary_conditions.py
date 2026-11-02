@@ -1,8 +1,12 @@
 import numpy as np
 import numpy.testing as npt
+import pytest
+from scipy import constants
 
-from scotty.boundary_conditions import find_Psi_3D_plasma
-from scotty.geometry import MagneticField_Cylindrical
+from scotty.boundary_conditions import find_K_plasma, find_Psi_3D_plasma
+from scotty.geometry import CircularFluxSurfaceField, MagneticField_Cylindrical
+from scotty.hamiltonian import Hamiltonian
+from scotty.launch import find_O_mode_flag
 
 # Values from a test case (as in v3's test_find_Psi_3D_plasma_discontinuous)
 PSI_VACUUM_3D = np.array(
@@ -113,3 +117,57 @@ def test_find_Psi_3D_plasma_discontinuous():
         Pp @ g_K, -np.array([DH["dH_dR"], 0.0, DH["dH_dZ"]]), atol=1e-12
     )
     npt.assert_allclose(Pp, Pp.T)
+
+
+##################################################
+# Which cut-off is checked at the plasma boundary (discontinuous BC)
+##################################################
+
+
+_OMEGA = 2 * np.pi * 55e9
+_R_ENTRY = 2.0
+# Beam below the cyclotron frequency at the entry (Y = w_ce / w = 1.5), where
+# the O-mode is `mode_flag` = -1 and +1 is the X-mode
+_Y = 1.5
+_FIELD = CircularFluxSurfaceField(
+    _Y * _OMEGA * constants.m_e / constants.e * _R_ENTRY / 1.5, 1.5, 0.5, 0.01
+)
+
+
+def _jump_to(X):
+    """Density that jumps at the boundary (psi = 1) to w_pe^2 / w^2 = X"""
+    n_e = X * _OMEGA**2 * constants.epsilon_0 * constants.m_e / constants.e**2 / 1e19
+    return lambda psi: np.where(np.asarray(psi) < 1.0, n_e, 0.0)
+
+
+def _find_K_plasma(X, mode_flag):
+    q_entry = np.array([_R_ENTRY - 1e-9, 0.0, 0.0])
+    K_vacuum = np.array([-_OMEGA / constants.c, 0.0, 0.0])
+    hamiltonian = Hamiltonian(
+        _OMEGA, mode_flag, np.array([-1e-4, 1e-4, 0.1, 0.1, 0.1]), _FIELD, _jump_to(X)
+    )
+    assert (
+        find_O_mode_flag(q_entry, K_vacuum, _FIELD, _OMEGA, hamiltonian.density) == -1
+    )
+    return find_K_plasma("discontinuous", q_entry, K_vacuum, _FIELD, hamiltonian)
+
+
+def test_X_mode_at_entry_is_not_checked_against_the_O_mode_cut_off():
+    """At X = 1.2 the O-mode is cut off (w_pe > w) but the X-mode is not
+    (w_L < w < w_UH). `mode_flag` = +1 is the X-mode here, so it enters; it used
+    to be taken as the O-mode, and refused"""
+    K_plasma = _find_K_plasma(1.2, mode_flag=1)
+    assert np.all(np.isfinite(K_plasma))
+
+
+def test_O_mode_at_entry_checked_against_the_plasma_frequency():
+    with pytest.raises(
+        ValueError, match=r"for the O-mode \(`mode_flag` = -1\): w_plasma"
+    ):
+        _find_K_plasma(1.2, mode_flag=-1)
+
+
+def test_X_mode_at_entry_checked_against_the_L_cut_off():
+    """At X = 3, w_L > w: the X-mode (`mode_flag` = +1 here) is cut off"""
+    with pytest.raises(ValueError, match=r"for the X-mode \(`mode_flag` = 1\): w_L"):
+        _find_K_plasma(3.0, mode_flag=1)

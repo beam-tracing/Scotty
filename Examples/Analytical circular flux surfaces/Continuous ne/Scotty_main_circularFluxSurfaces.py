@@ -26,7 +26,7 @@ kwargs_dict = {
     "delta_Z": 0.00001,
     "density_fit_method": "quadratic",
     "find_B_method": "analytical",
-    "Psi_BC_flag": True,
+    "Psi_BC_flag": "continuous",
     "figure_flag": False,
     "vacuum_propagation_flag": True,
     "vacuumLaunch_flag": True,

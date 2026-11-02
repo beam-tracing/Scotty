@@ -1,4 +1,4 @@
-"""Checks of the ray piece of the localisation, loc_r = g_ant^2 / g^2, and of the
+"""Checks of the ray piece of the filter function, filter_r = g_ant^2 / g^2, and of the
 group velocity g = grad_K H it uses (H the eigenvalue of D, from Cardano's formula).
 
 Both checks need a toroidally steered beam and finite mismatch: for an unsteered
@@ -25,19 +25,19 @@ def steered_run(request, tmp_path_factory):
     kwargs_dict["toroidal_launch_angle_Torbeam"] = toroidal_angle
     kwargs_dict["mode_flag"] = mode_flag
     kwargs_dict["figure_flag"] = False
-    kwargs_dict["output_path"] = tmp_path_factory.mktemp("localisation")
+    kwargs_dict["output_path"] = tmp_path_factory.mktemp("filter_functions")
     return beam_me_up(**kwargs_dict)
 
 
-def test_loc_r_vacuum_limit(steered_run):
+def test_filter_r_vacuum_limit(steered_run):
     """The beam enters the plasma where the density is zero, so the first point
-    is in vacuum, where g = g_ant = 2c/omega and loc_r = 1"""
+    is in vacuum, where g = g_ant = 2c/omega and filter_r = 1"""
     omega = float(steered_run["inputs"]["launch_angular_frequency"])
     g_first = float(np.real(steered_run["analysis"]["g_magnitude_Cardano"].values[0]))
-    loc_r_first = float(np.real(steered_run["dbs_analysis"]["loc_r"].values[0]))
+    filter_r_first = float(np.real(steered_run["dbs_analysis"]["filter_r"].values[0]))
 
     assert np.isclose(g_first * omega / (2 * constants.c), 1.0, rtol=1e-5, atol=0)
-    assert np.isclose(loc_r_first, 1.0, rtol=1e-5, atol=0)
+    assert np.isclose(filter_r_first, 1.0, rtol=1e-5, atol=0)
 
 
 def test_g_Cardano_parallel_to_g_Booker(steered_run):

@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# Copyright 2018 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
 from functools import wraps
 import logging
 import matplotlib

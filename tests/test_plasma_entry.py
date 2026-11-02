@@ -19,7 +19,7 @@ import pytest
 @pytest.fixture(scope="module")
 def field():
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
-    kwargs_dict["find_B_method"] = "unit-tests"
+    kwargs_dict["find_B_method"] = "analytical"
     kwargs_dict.pop("interp_smoothing", None)
     kwargs_dict.pop("magnetic_data_path", None)
     return create_magnetic_geometry(
@@ -69,7 +69,7 @@ def test_entry_does_not_depend_on_the_search_grid(field, monkeypatch, scale):
         poloidal_launch_angle_deg_Torbeam=-1.0,
         toroidal_launch_angle_deg_Torbeam=10.0,
         q_launch=np.array([2.3, 0.0, -0.1]),
-        launch_flag="vacuum",
+        launch_flag="vacuum_analytic",
         field=field,
         poloidal_flux_enter=1.0,
     )

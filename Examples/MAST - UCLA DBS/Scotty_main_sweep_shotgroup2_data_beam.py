@@ -66,7 +66,7 @@ for ii, launch_freq_GHz in enumerate(launch_freqs_GHz):
 
     kwargs_dict["quick_run"] = False
     kwargs_dict["figure_flag"] = False
-    kwargs_dict["Psi_BC_flag"] = False
+    kwargs_dict["Psi_BC_flag"] = None
     kwargs_dict["output_path"] = "C:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 22\\"
     kwargs_dict["density_fit_parameters"] = None
     kwargs_dict["ne_data_path"] = "C:\\Dropbox\\VHChen2021\\Data - Equilibrium\\MAST\\"

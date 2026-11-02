@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# Copyright 2018 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
 import logging
 import numpy as np
 from scotty.checks import Parameters, VALID_FIELDS
@@ -36,7 +40,7 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "ray_tracing_flag": params.ray_tracing_flag,
         "launch_flag": params.launch_flag,
         # As a string, since netCDF cannot store `None`
-        "boundary_flag": str(params.boundary_flag),
+        "Psi_BC_flag": str(params.Psi_BC_flag),
         "relativistic_flag": params.relativistic_flag,
         "resonance_flag": params.resonance_flag,
         "auto_delta_sign": params.auto_delta_sign,

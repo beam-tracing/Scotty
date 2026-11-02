@@ -1,8 +1,12 @@
+# -*- coding: utf-8 -*-
+# Copyright 2018 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
 import logging
 import numpy as np
 from scipy import constants as const
 from scipy.integrate import trapezoid
-from scotty.checks import VALID_FIELDS, check_H_output, check_Psi_output
+from scotty.checks import VALID_FIELDS, check_H_output
 from scotty.data_io import CARTESIAN_VECTOR_COMPONENTS, SOLUTION_COMPONENTS
 from scotty.derivatives import derivative
 from scotty.fun_general import (
@@ -314,8 +318,17 @@ def basic_analysis(
         theta_m=theta_m,
     )
 
+    # The root is the one that vanishes along the ray, judged away from its
+    # ends. In vacuum (zero density) two of the roots vanish together, so
+    # which of them is smallest there is down to rounding: judge on the
+    # points in the plasma. With `launch_flag` = "vacuum_numerical", much of
+    # the ray is in vacuum
+    middle = np.zeros(len_tau, dtype=bool)
+    middle[len_tau // 10 : -len_tau // 10] = True
+    in_plasma = middle & (np.asarray(n_e) > 0)
+    judged = in_plasma if np.any(in_plasma) else middle
     abs_H_Cardano_all = np.abs(np.stack([H_Cardano_1, H_Cardano_2, H_Cardano_3]))[
-        :, len_tau // 10 : -len_tau // 10
+        :, judged
     ]
     min_H_Cardano_all = np.argmin(abs_H_Cardano_all, axis=0)
     if np.all(min_H_Cardano_all == 0):
@@ -340,7 +353,7 @@ def basic_analysis(
         ) / K_magnitude_trial
         # The Cardano formula works in complex arithmetic, but its roots are
         # eigenvalues of a Hermitian matrix: any imaginary part is rounding.
-        # Without np.real it made g_magnitude_Cardano, loc_r and loc_all
+        # Without np.real it made g_magnitude_Cardano, filter_r and filter_all
         # complex-typed
         return np.real(
             find_H_Cardano_formula(
@@ -487,12 +500,6 @@ def basic_analysis(
         )
         Psi_gg_output_beamframe_cartesian = dot(
             g_hat_cart, dot(Psi_3D_output_labframe_cartesian, g_hat_cart)
-        )
-
-        check_Psi_output(
-            Psi_xg_output_beamframe_cartesian,
-            Psi_yg_output_beamframe_cartesian,
-            Psi_gg_output_beamframe_cartesian,
         )
 
         Psi_w_output_beamframe_cartesian = np.zeros(
@@ -694,7 +701,7 @@ def dbs_analysis(
         )
 
     ##################################################
-    log.debug(f"Finding the polarisation piece (loc_p)")
+    log.debug(f"Finding the polarisation piece (filter_p)")
     ##################################################
 
     zero = np.zeros(len_tau, dtype=np.float64)
@@ -707,7 +714,7 @@ def dbs_analysis(
     w_launch = hamiltonian.angular_frequency
     temperature = analysis.get("electron_temperature")
     if temperature is not None:
-        # a plain array, like the inputs above, so that loc_p is not a DataArray
+        # a plain array, like the inputs above, so that filter_p is not a DataArray
         temperature = np.array(temperature[()])
 
     # equilibrium dielectric tensor - identity matrix, i.e.
@@ -722,52 +729,52 @@ def dbs_analysis(
 
     # Avoids dividing a small number by another small number,
     # leading to a big number because of numerical errors or something
-    loc_p_unnormalised = np.divide(
+    filter_p_unnormalised = np.divide(
         np.abs(dot(e_hat_conj, dot(epsilon_minus_identity, e_hat))) ** 2,
         (n_e * 1e19) ** 2,
         out=np.zeros_like(n_e),
         where=(n_e > 1e-6),
     )
 
-    loc_p = (
+    filter_p = (
         w_launch**2 * const.epsilon_0 * find_electron_mass(temperature) / const.e**2
-    ) ** 2 * loc_p_unnormalised
+    ) ** 2 * filter_p_unnormalised
 
     dbs_analysis_dict.update(
         {
-            "loc_p": (["tau"], loc_p),
-            "int_loc_p_dL": ([], trapezoid(loc_p, beam_path_length)),
+            "filter_p": (["tau"], filter_p),
+            "int_filter_p_dL": ([], trapezoid(filter_p, beam_path_length)),
         }
     )
 
     ##################################################
-    log.debug(f"Finding the ray piece (loc_r)")
+    log.debug(f"Finding the ray piece (filter_r)")
     ##################################################
 
     g_mag_Cardano = np.array(analysis["g_magnitude_Cardano"][()])
-    loc_r = (2 * const.c / w_launch) ** 2 / g_mag_Cardano**2
-    # needed by loc_b and loc_s; loc_s is also computed for ray tracing only
+    filter_r = (2 * const.c / w_launch) ** 2 / g_mag_Cardano**2
+    # needed by filter_b and filter_s; filter_s is also computed for ray tracing only
     launch_wavenumber = hamiltonian.wavenumber
 
     dbs_analysis_dict.update(
         {
-            "loc_r": (["tau"], loc_r),
-            "int_loc_r_dL": ([], trapezoid(loc_r, beam_path_length)),
+            "filter_r": (["tau"], filter_r),
+            "int_filter_r_dL": ([], trapezoid(filter_r, beam_path_length)),
         }
     )
 
     if btf:
         ##################################################
-        log.debug(f"Finding the beam piece (loc_b)")
+        log.debug(f"Finding the beam piece (filter_b)")
         ##################################################
 
         det_Im_Psi_w = np.imag(Psi_xx) * np.imag(Psi_yy) - np.imag(Psi_xy) ** 2
         if str(inputs["launch_flag"].values) == "plasma":
-            # loc_b is normalised by the waist of the beam the antenna
+            # filter_b is normalised by the waist of the beam the antenna
             # launches; a plasma launch has no antenna beam
             log.warning(
                 "`launch_flag` = 'plasma': there is no launched beam, so "
-                "`beam_waist`, and with it loc_b and loc_all, are NaN"
+                "`beam_waist`, and with it filter_b and filter_all, are NaN"
             )
             beam_waist = np.nan
         else:
@@ -776,7 +783,7 @@ def dbs_analysis(
             beam_waist = find_waist(
                 launch_beam_width, launch_wavenumber, launch_beam_curv
             )
-        loc_b = (beam_waist * det_Im_Psi_w) / (
+        filter_b = (beam_waist * det_Im_Psi_w) / (
             np.sqrt(2) * np.abs(det_M_w) * np.sqrt(-np.imag(M_w_inv_yy))
         )
 
@@ -784,17 +791,17 @@ def dbs_analysis(
             {
                 "det_Im_Psi_w": (["tau"], det_Im_Psi_w),
                 "beam_waist": beam_waist,
-                "loc_b": (["tau"], loc_b),
-                "int_loc_b_dL": ([], trapezoid(loc_b, beam_path_length)),
+                "filter_b": (["tau"], filter_b),
+                "int_filter_b_dL": ([], trapezoid(filter_b, beam_path_length)),
             }
         )
 
     else:
-        log.debug("No beam-tracing results; skipping beam piece (loc_b)")
+        log.debug("No beam-tracing results; skipping beam piece (filter_b)")
 
     if btf:
         ##################################################
-        log.debug(f"Finding the mismatch piece (loc_m)")
+        log.debug(f"Finding the mismatch piece (filter_m)")
         ##################################################
 
         delta_theta_m = (
@@ -807,26 +814,26 @@ def dbs_analysis(
             )
             / K_mag
         )
-        loc_m = np.exp(-2 * (theta_m / delta_theta_m) ** 2)
+        filter_m = np.exp(-2 * (theta_m / delta_theta_m) ** 2)
 
         dbs_analysis_dict.update(
             {
                 "delta_theta_m": (["tau"], delta_theta_m),
-                "loc_m": (["tau"], loc_m),
-                "int_loc_m_dL": ([], trapezoid(loc_m, beam_path_length)),
+                "filter_m": (["tau"], filter_m),
+                "int_filter_m_dL": ([], trapezoid(filter_m, beam_path_length)),
             }
         )
 
     else:
-        log.debug("No beam-tracing results; skipping beam piece (loc_b)")
+        log.debug("No beam-tracing results; skipping mismatch piece (filter_m)")
 
     ##################################################
-    log.debug(f"Finding the spectrum piece (loc_s)")
+    log.debug(f"Finding the spectrum piece (filter_s)")
     ##################################################
 
     spectrum_power_laws = ["-10/3", "-13/3"]
-    loc_s = {
-        f"loc_s_{power}": np.array(
+    filter_s = {
+        f"filter_s_{power}": np.array(
             (k_perp1_bs / (-2 * launch_wavenumber)) ** eval(power)
         )
         for power in spectrum_power_laws
@@ -835,10 +842,10 @@ def dbs_analysis(
     dbs_analysis_dict.update(
         {
             "spectrum_power_laws": spectrum_power_laws,
-            **{f"{k}": (["tau"], v) for k, v in loc_s.items()},
+            **{f"{k}": (["tau"], v) for k, v in filter_s.items()},
             **{
                 f"int_{k}_dL": ([], trapezoid(v, beam_path_length))
-                for k, v in loc_s.items()
+                for k, v in filter_s.items()
             },
         }
     )
@@ -846,28 +853,32 @@ def dbs_analysis(
     if btf:
         ##################################################
         log.debug(
-            f"Finding total localisation (loc_p * loc_r * loc_b * loc_m * loc_s) and backscattered power (p_r)"
+            f"Finding total filter function (filter_p * filter_r * filter_b * filter_m * filter_s) and backscattered power (p_r)"
         )
         ##################################################
 
-        loc_all = {
-            f"loc_all_{power}": loc_p * loc_r * loc_b * loc_m * loc_s[f"loc_s_{power}"]
+        filter_all = {
+            f"filter_all_{power}": filter_p
+            * filter_r
+            * filter_b
+            * filter_m
+            * filter_s[f"filter_s_{power}"]
             for power in spectrum_power_laws
         }
 
         dbs_analysis_dict.update(
             {
-                **{f"{k}": (["tau"], v) for k, v in loc_all.items()},
+                **{f"{k}": (["tau"], v) for k, v in filter_all.items()},
                 **{
                     f"int_{k}_dL": ([], trapezoid(v, beam_path_length))
-                    for k, v in loc_all.items()
+                    for k, v in filter_all.items()
                 },
             }
         )
 
     else:
         log.debug(
-            "No beam-tracing results; skipping total localisation (loc_p * loc_r * loc_b * loc_m * loc_s) and backscattered power (p_r)"
+            "No beam-tracing results; skipping total filter function (filter_p * filter_r * filter_b * filter_m * filter_s) and backscattered power (p_r)"
         )
 
     dbs_analysis_coords = {

@@ -1,5 +1,9 @@
+# -*- coding: utf-8 -*-
+# Copyright 2018 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
+import difflib
 import logging
-from multiprocessing.managers import ValueProxy
 from pathlib import Path
 from scotty.compat import V3_ONLY_ARGUMENTS
 from scotty.fun_general import (
@@ -31,8 +35,8 @@ import os
 
 VALID_GEOMETRIES = Literal["cylindrical", "cartesian"]
 VALID_LAUNCH_MODE_FLAGS = Literal[1, -1, "O", "X"]
-VALID_LAUNCH_FLAGS = Literal["plasma", "vacuum"]
-VALID_BOUNDARY_FLAGS = Optional[Literal["continuous", "discontinuous"]]
+VALID_LAUNCH_FLAGS = Literal["vacuum_analytic", "vacuum_numerical", "plasma"]
+VALID_PSI_BC_FLAGS = Optional[Literal["continuous", "discontinuous"]]
 VALID_FIELDS = Union[
     MagneticField_Cylindrical,
     MagneticField_Cartesian,
@@ -49,13 +53,40 @@ VALID_SOLVER_STATUS = Literal[-1, 0, 1]
 
 log = logging.getLogger(__name__)
 
+# Keyword arguments that `beam_me_up` takes through `**kwargs`
+EXTRA_ARGUMENTS = (
+    "B_T_axis",
+    "B_p_a",
+    "R_axis",
+    "minor_radius_a",
+    "plasmaLaunch_K_cartesian",
+    "plasmaLaunch_Psi_3D_lab_cartesian",
+    "create_magnetic_geometry",
+)
+
+
+def _known_argument_names() -> list:
+    """The names of `beam_me_up`'s arguments, to suggest the intended name of
+    a misspelt keyword argument"""
+    import inspect
+
+    # Imported here, since `scotty.beam_me_up` imports this module
+    from scotty.beam_me_up import beam_me_up
+
+    parameters = inspect.signature(beam_me_up).parameters
+    return [
+        name
+        for name, parameter in parameters.items()
+        if parameter.kind != inspect.Parameter.VAR_KEYWORD
+    ] + list(EXTRA_ARGUMENTS)
+
 
 class Parameters:
     # Initialisating here to stop type checker from complaining
     geometry: VALID_GEOMETRIES
     cartesian_flag: bool
     launch_flag: VALID_LAUNCH_FLAGS
-    boundary_flag: VALID_BOUNDARY_FLAGS
+    Psi_BC_flag: VALID_PSI_BC_FLAGS
     mode_flag_launch: VALID_LAUNCH_MODE_FLAGS
     mode_flag_initial: Literal[1, -1]
     mode_index: int
@@ -98,7 +129,7 @@ class Parameters:
         mode_flag_launch: VALID_LAUNCH_MODE_FLAGS,
         # Solver settings and finite-difference parameters
         launch_flag: VALID_LAUNCH_FLAGS,
-        boundary_flag: VALID_BOUNDARY_FLAGS,
+        Psi_BC_flag: VALID_PSI_BC_FLAGS,
         relativistic_flag: bool,
         resonance_flag: bool,
         auto_delta_sign: bool,
@@ -109,7 +140,7 @@ class Parameters:
         atol: float,
         poloidal_flux_enter: float,
         poloidal_flux_zero_density: float,
-        poloidal_flux_zero_temperature: float,
+        poloidal_flux_zero_temperature: Optional[float],
         # Data input and output arguments
         magnetic_data_path: Union[str, Path],
         ne_data_path: Union[str, Path],
@@ -195,8 +226,8 @@ class Parameters:
 
         self.benchmarking_flag = benchmarking_flag
         self.ray_tracing_flag = ray_tracing_flag
-        self.launch_flag = launch_flag
-        self.boundary_flag = boundary_flag
+        self.launch_flag = self._check_launch_flag(launch_flag)
+        self.Psi_BC_flag = self._check_Psi_BC_flag(Psi_BC_flag, self.launch_flag)
         self.relativistic_flag = relativistic_flag
         self.resonance_flag = resonance_flag
         self.auto_delta_sign = auto_delta_sign
@@ -254,10 +285,6 @@ class Parameters:
         self.further_analysis_flag = further_analysis_flag
         self.detailed_analysis_flag = detailed_analysis_flag
 
-        # TODO should check this works properly again
-        self._check_mode_flag_launch_and_launch_flag(
-            mode_flag_launch=mode_flag_launch, launch_flag=launch_flag
-        )
         self._unpack_kwargs_for_circular_flux_surfaces(extras=kwargs)
         self._unpack_kwargs_for_plasma_launch(extras=kwargs)
         self._unpack_unused_kwargs(extras=kwargs)
@@ -346,9 +373,12 @@ class Parameters:
         self,
         poloidal_flux_enter: float,
         poloidal_flux_zero_density: float,
-        poloidal_flux_zero_temperature: float,
+        poloidal_flux_zero_temperature: Optional[float],
         relativistic_flag: bool,
     ) -> Tuple[float, float, float]:
+        # By default, the temperature goes to zero where the density does
+        if poloidal_flux_zero_temperature is None:
+            poloidal_flux_zero_temperature = poloidal_flux_zero_density
         self._check_positive("poloidal_flux_enter", poloidal_flux_enter)
         self._check_positive("poloidal_flux_zero_density", poloidal_flux_zero_density)
         self._check_positive(
@@ -382,7 +412,7 @@ class Parameters:
         if name in ["magnetic", "ne", "Te"] and not path.is_dir():
             raise ValueError(f"`{name}_data_path` must be a valid directory")
         elif name in ["output"] and not path.is_dir():
-            print(f"`{name}_data_path` does not exist. Creating the folder now")
+            log.info(f"`output_path` = {path} does not exist. Creating the folder")
             os.makedirs(path)
 
         return path
@@ -407,16 +437,40 @@ class Parameters:
 
         return new_orders
 
-    def _check_mode_flag_launch_and_launch_flag(
-        self, mode_flag_launch: VALID_LAUNCH_MODE_FLAGS, launch_flag: VALID_LAUNCH_FLAGS
-    ):
-        # Any `mode_flag` (checked in `_check_mode_flag`) works with either
+    def _check_launch_flag(self, launch_flag) -> VALID_LAUNCH_FLAGS:
+        # Any `mode_flag` (checked in `_check_mode_flag`) works with any
         # launch: for "O" or "X", the mode is found from K where the solvers
         # start, for a plasma launch as for a vacuum one
-        if launch_flag not in get_args(VALID_LAUNCH_FLAGS):
+        if not isinstance(launch_flag, str) or launch_flag not in get_args(
+            VALID_LAUNCH_FLAGS
+        ):
             raise ValueError(
-                f"`launch_flag` must be one of {get_args(VALID_LAUNCH_FLAGS)}, but got {launch_flag}"
+                f"`launch_flag` must be one of {get_args(VALID_LAUNCH_FLAGS)}, but got {launch_flag!r}"
             )
+        return cast(VALID_LAUNCH_FLAGS, launch_flag)
+
+    def _check_Psi_BC_flag(
+        self, Psi_BC_flag, launch_flag: VALID_LAUNCH_FLAGS
+    ) -> VALID_PSI_BC_FLAGS:
+        # `isinstance` first, so that v3's booleans are refused rather than
+        # compared with the strings
+        if Psi_BC_flag is not None and (
+            not isinstance(Psi_BC_flag, str)
+            or Psi_BC_flag not in ["continuous", "discontinuous"]
+        ):
+            raise ValueError(
+                f"`Psi_BC_flag` must be 'continuous', 'discontinuous' or None, but got "
+                f"{Psi_BC_flag!r} (Scotty v3's deprecated True meant 'continuous', and "
+                "its False meant None)"
+            )
+        if launch_flag == "vacuum_numerical" and Psi_BC_flag is not None:
+            raise ValueError(
+                "`launch_flag` = 'vacuum_numerical' integrates from the antenna through "
+                "the plasma boundary, with no boundary conditions, so `Psi_BC_flag` "
+                f"must be None, but got {Psi_BC_flag!r}. For boundary conditions at "
+                "the plasma edge, use `launch_flag` = 'vacuum_analytic'"
+            )
+        return Psi_BC_flag
 
     def _unpack_kwargs_for_circular_flux_surfaces(self, **extras):
         # Pop from the caller's kwargs so they are not reported as unused
@@ -487,15 +541,23 @@ class Parameters:
         extras_copy.pop("create_magnetic_geometry", None)
 
         if extras_copy:
-            _indent = max(len(max(extras, key=len)), len("keyword")) + 3
-            _printmsg = "\n".join(
-                f"       - {k:<{_indent}} {v}" for k, v in extras_copy.items()
-            )
+            # Measured on the unused keywords themselves (not on `extras`,
+            # whose only key is "extras")
+            _indent = max(len(max(extras_copy, key=len)), len("keyword")) + 3
+            known = _known_argument_names()
 
-            print(f"""
-    There are unsued keyword arguments that do not correspond to any function:
-         {"keyword":<{_indent}} value \n{_printmsg}
-    """)
+            def _suggestion(name: str) -> str:
+                close = difflib.get_close_matches(name, known, n=1)
+                return f"   (did you mean `{close[0]}`?)" if close else ""
+
+            _msg = "\n".join(
+                f"       - {k:<{_indent}} {v!r}{_suggestion(k)}"
+                for k, v in extras_copy.items()
+            )
+            log.warning(
+                "Unused keyword arguments, which are not arguments of `beam_me_up` "
+                f"and are ignored:\n         {'keyword':<{_indent}} value\n{_msg}"
+            )
             v3_names = sorted(set(extras_copy) & set(V3_ONLY_ARGUMENTS))
             if v3_names:
                 log.warning(
@@ -728,29 +790,4 @@ def check_H_output(H_arr: ArrayLike, H_tol: float = 1e-2) -> None:
     elif H_max > H_tol:
         log.warning(
             f"`H_output` is unphysically large! `|max(H_output)|` = {H_max} but `H_tol` = {H_tol}"
-        )
-
-
-def check_Psi_output(
-    Psi_xg_output: FloatArray,
-    Psi_yg_output: FloatArray,
-    Psi_gg_output: FloatArray,
-    Psi_tol: float = 1e-3,
-) -> None:
-    log.debug("Checking Im(Psi) g-components along ray (it should be zero)")
-
-    max_xg = np.abs(np.max(Psi_xg_output))
-    max_yg = np.abs(np.max(Psi_yg_output))
-    max_gg = np.abs(np.max(Psi_gg_output))
-    if max_xg > Psi_tol:
-        log.warning(
-            f"`Psi_xg` is unphysically large! `|max(Psi_xg)|` = {max_xg} but `Psi_tol` = {Psi_tol}"
-        )
-    if max_yg > Psi_tol:
-        log.warning(
-            f"`Psi_yg` is unphysically large! `|max(Psi_yg)|` = {max_yg} but `Psi_tol` = {Psi_tol}"
-        )
-    if max_gg > Psi_tol:
-        log.warning(
-            f"`Psi_gg` is unphysically large! `|max(Psi_gg)|` = {max_gg} but `Psi_tol` = {Psi_tol}"
         )

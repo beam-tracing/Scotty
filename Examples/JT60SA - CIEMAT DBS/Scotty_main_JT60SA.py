@@ -27,7 +27,7 @@ kwargs_dict = dict(
             "find_B_method",
             "UDA_saved",
         ),  # either UDA_saved or test_notime for JT60-SA equilibria
-        ("Psi_BC_flag", True),
+        ("Psi_BC_flag", "continuous"),
         ("figure_flag", True),
         ("vacuum_propagation_flag", True),
         ("vacuumLaunch_flag", True),
@@ -71,7 +71,7 @@ kwargs_dict = dict(
 #             "find_B_method",
 #             "UDA_saved",
 #         ),  # either UDA_saved or test_notime for JT60-SA equilibria
-#         ("Psi_BC_flag", True),
+#         ("Psi_BC_flag", "continuous"),
 #         ("figure_flag", True),
 #         ("vacuum_propagation_flag", True),
 #         ("vacuumLaunch_flag", True),

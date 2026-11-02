@@ -57,7 +57,7 @@ def boundary(request, tmp_path_factory):
         find_B_method=field,
         len_tau=52,
         interp_smoothing=0,
-        boundary_flag="discontinuous",
+        Psi_BC_flag="discontinuous",
         # zero at psi = 1.3, but cut to zero at the boundary psi = 1: a jump
         density_fit_method=QuadraticFit(1.3, 4.0),
         poloidal_flux_enter=1.0,

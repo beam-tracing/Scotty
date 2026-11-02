@@ -32,7 +32,7 @@ kwargs_dict = {
     "equil_time": 0.4,
     "shot": 45176,
     "poloidal_flux_enter": 1.06520296**2,
-    "Psi_BC_flag": True,
+    "Psi_BC_flag": "continuous",
     "figure_flag": True,
     "vacuum_propagation_flag": True,
     "vacuumLaunch_flag": True,

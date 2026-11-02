@@ -1,8 +1,13 @@
 """master's (v3) geometry tests, in v4's call signature
 
-The bodies are master's: the only changes are the toroidal coordinate (zeta = 0.0, which
-axisymmetric fields ignore) and v4's names (``polflux``, ``unitvector``,
-``InterpolatedField_Cylindrical``)
+The bodies are master's: the changes are the toroidal coordinate (zeta = 0.0, which
+axisymmetric fields ignore), v4's names (``polflux``, ``unitvector``,
+``InterpolatedField_Cylindrical``), and the field: master's tests use
+``CircularCrossSectionField``, which v4 no longer has, so they run on
+``CircularFluxSurfaceField`` (``find_B_method="analytical"``), with the expected
+values for that field, checked against v3 (upstream/master feb9499). Its
+unnormalised flux is Psi = B_p_a a R_axis psi / 2, and
+B_p = B_p_a (r / a) (R_axis / R)
 """
 
 from scotty import geometry
@@ -16,7 +21,7 @@ def test_circular():
     R_axis = 2.0
     minor_radius_a = 1.0
     B_p_a = 0.5
-    field = geometry.CircularCrossSectionField(
+    field = geometry.CircularFluxSurfaceField(
         B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
     )
 
@@ -36,8 +41,9 @@ def test_circular():
 
     psi = field.polflux(R_grid, 0.0, Z_grid)
     grad_psi = np.gradient(psi, R, Z)
-    calculated_B_R = grad_psi[1] * B_p_a / R_grid
-    calculated_B_Z = -grad_psi[0] * B_p_a / R_grid
+    scale = B_p_a * minor_radius_a * R_axis / 2  # unnormalised flux per unit psi
+    calculated_B_R = grad_psi[1] * scale / R_grid
+    calculated_B_Z = -grad_psi[0] * scale / R_grid
 
     mask = (psi > 0.1) & (psi <= 1)
 
@@ -57,16 +63,15 @@ def test_circular_magnitude():
     R_axis = 2.0
     minor_radius_a = 1.0
     B_p_a = 0.5
-    field = geometry.CircularCrossSectionField(
+    field = geometry.CircularFluxSurfaceField(
         B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
     )
     assert np.isclose(
         field.magnitude(R_axis, 0.0, 0.0), B_T_axis
     ), "on axis"  ## This throws a divide by zero error
 
-    B_magnitude_top_bottom = np.sqrt(
-        B_T_axis**2 + (B_p_a / (R_axis * minor_radius_a)) ** 2
-    )
+    # v3: 1.118033988749895
+    B_magnitude_top_bottom = np.sqrt(B_T_axis**2 + B_p_a**2)
     assert np.isclose(
         field.magnitude(R_axis, 0.0, minor_radius_a), B_magnitude_top_bottom
     ), "top"
@@ -75,22 +80,31 @@ def test_circular_magnitude():
     ), "bottom"
 
     R_inboard = R_axis - minor_radius_a
+    # v3: 2.23606797749979
     B_magnitude_inboard = np.sqrt(
-        (R_axis * B_T_axis / R_inboard) ** 2
-        + (B_p_a / (R_inboard * minor_radius_a)) ** 2
+        (R_axis * B_T_axis / R_inboard) ** 2 + (B_p_a * R_axis / R_inboard) ** 2
     )
     assert np.isclose(
         field.magnitude(R_inboard, 0.0, 0.0), B_magnitude_inboard
     ), "inboard"
 
     R_outboard = R_axis + minor_radius_a
+    # v3: 0.7453559924999299
     B_magnitude_outboard = np.sqrt(
-        (R_axis * B_T_axis / R_outboard) ** 2
-        + (B_p_a / (R_outboard * minor_radius_a)) ** 2
+        (R_axis * B_T_axis / R_outboard) ** 2 + (B_p_a * R_axis / R_outboard) ** 2
     )
     assert np.isclose(
         field.magnitude(R_outboard, 0.0, 0.0), B_magnitude_outboard
     ), "outboard"
+
+
+def assert_unit_norm(vector, label: str) -> None:
+    """|vector| = 1 to 1 ulp: the norm of a normalised vector can round to
+    0.9999999999999999 (it does at top, bottom, inboard and outboard here, in
+    v3 as in v4)"""
+    npt.assert_allclose(
+        np.linalg.norm(vector), 1.0, rtol=0, atol=2.3e-16, err_msg=label
+    )
 
 
 def test_circular_unit():
@@ -98,45 +112,44 @@ def test_circular_unit():
     R_axis = 2.0
     minor_radius_a = 1.0
     B_p_a = 0.5
-    field = geometry.CircularCrossSectionField(
+    field = geometry.CircularFluxSurfaceField(
         B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
     )
 
     ## Something around here throws a divide by zero error
     unit_axis = field.unitvector(R_axis, 0.0, 0)
-    assert np.linalg.norm(unit_axis) == 1.0, "on axis, magnitude"
+    assert_unit_norm(unit_axis, "on axis, magnitude")
     assert np.allclose(unit_axis, [0, 1, 0]), "on axis, direction"
 
-    B_magnitude_top_bottom = np.sqrt(
-        B_T_axis**2 + (B_p_a / (R_axis * minor_radius_a)) ** 2
-    )
+    B_magnitude_top_bottom = np.sqrt(B_T_axis**2 + B_p_a**2)
     unit_top = field.unitvector(R_axis, 0.0, minor_radius_a)
-    expected_unit_top = np.array([0.25, 1, 0]) / B_magnitude_top_bottom
-    assert np.linalg.norm(unit_top) == 1.0, "top, magnitude"
+    # v3: [0.4472135954999579, 0.8944271909999159, 0]
+    expected_unit_top = np.array([0.5, 1, 0]) / B_magnitude_top_bottom
+    assert_unit_norm(unit_top, "top, magnitude")
     assert np.allclose(unit_top, expected_unit_top), "top, direction"
     unit_bottom = field.unitvector(R_axis, 0.0, -minor_radius_a)
-    expected_unit_bottom = np.array([-0.25, 1, 0]) / B_magnitude_top_bottom
-    assert np.linalg.norm(unit_bottom) == 1.0, "bottom, magnitude"
+    expected_unit_bottom = np.array([-0.5, 1, 0]) / B_magnitude_top_bottom
+    assert_unit_norm(unit_bottom, "bottom, magnitude")
     assert np.allclose(unit_bottom, expected_unit_bottom), "bottom, direction"
 
     R_inboard = R_axis - minor_radius_a
     B_magnitude_inboard = np.sqrt(
-        (R_axis * B_T_axis / R_inboard) ** 2
-        + (B_p_a / (R_inboard * minor_radius_a)) ** 2
+        (R_axis * B_T_axis / R_inboard) ** 2 + (B_p_a * R_axis / R_inboard) ** 2
     )
     unit_inboard = field.unitvector(R_inboard, 0.0, 0)
-    expected_unit_inboard = np.array([0, 2, 0.5]) / B_magnitude_inboard
-    assert np.linalg.norm(unit_inboard) == 1.0, "inboard, magnitude"
+    # v3: [0, 0.8944271909999159, 0.4472135954999579]
+    expected_unit_inboard = np.array([0, 2, 1]) / B_magnitude_inboard
+    assert_unit_norm(unit_inboard, "inboard, magnitude")
     assert np.allclose(unit_inboard, expected_unit_inboard), "inboard, direction"
 
     R_outboard = R_axis + minor_radius_a
     B_magnitude_outboard = np.sqrt(
-        (R_axis * B_T_axis / R_outboard) ** 2
-        + (B_p_a / (R_outboard * minor_radius_a)) ** 2
+        (R_axis * B_T_axis / R_outboard) ** 2 + (B_p_a * R_axis / R_outboard) ** 2
     )
     unit_outboard = field.unitvector(R_outboard, 0.0, 0)
-    expected_unit_outboard = np.array([0, 2 / 3, -1 / 6]) / B_magnitude_outboard
-    assert np.linalg.norm(unit_outboard) == 1.0, "outboard, magnitude"
+    # v3: [0, 0.8944271909999159, -0.4472135954999579]
+    expected_unit_outboard = np.array([0, 2 / 3, -1 / 3]) / B_magnitude_outboard
+    assert_unit_norm(unit_outboard, "outboard, magnitude")
     assert np.allclose(unit_outboard, expected_unit_outboard), "outboard, direction"
 
 
@@ -145,7 +158,7 @@ def test_interpolated():
     R_axis = 2.0
     minor_radius_a = 1.0
     B_p_a = 0.5
-    circular_field = geometry.CircularCrossSectionField(
+    circular_field = geometry.CircularFluxSurfaceField(
         B_T_axis=B_T_axis, R_axis=R_axis, minor_radius_a=minor_radius_a, B_p_a=B_p_a
     )
 

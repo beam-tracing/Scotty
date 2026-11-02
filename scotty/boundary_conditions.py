@@ -1,8 +1,12 @@
+# -*- coding: utf-8 -*-
+# Copyright 2018 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
 import logging
 import numpy as np
 from scipy.optimize import newton
 from scotty.checks import (
-    VALID_BOUNDARY_FLAGS,
+    VALID_PSI_BC_FLAGS,
     VALID_FIELDS,
     MagneticField_Cylindrical,
     MagneticField_Cartesian,
@@ -123,7 +127,7 @@ def find_H_bar(
 
 
 def find_K_plasma(
-    boundary_flag: VALID_BOUNDARY_FLAGS,
+    Psi_BC_flag: VALID_PSI_BC_FLAGS,
     q_entry: FloatArray,
     K_vacuum: FloatArray,
     field: VALID_FIELDS,
@@ -131,9 +135,9 @@ def find_K_plasma(
 ) -> FloatArray:
     """NOTE: if K_vacuum is in cyl (cart), K_plasma is in cyl (cart)"""
 
-    if boundary_flag in ["continuous", None]:
+    if Psi_BC_flag in ["continuous", None]:
         K_plasma = K_vacuum
-    else:  # elif boundary_flag == "discontinuous":
+    else:  # elif Psi_BC_flag == "discontinuous":
 
         # The cylindrical calculations which follow are all special cases
         # of the cartesian calculations (when Y=0). Hence, for example,
@@ -181,7 +185,7 @@ def find_K_plasma(
         )
 
         log.debug(f"""
-        Finding K at the plasma entry point with {boundary_flag} boundary conditions
+        Finding K at the plasma entry point with {Psi_BC_flag} boundary conditions
         ##################################################
         #
         # Calculated at {"[X, Y, Z]" if cart else "[R, zeta, Z]"} = {q_entry}:
@@ -202,36 +206,43 @@ def find_K_plasma(
         ##################################################
         """)
 
-        # TODO -- need to rewrite andf refactor this properly. 12 Nov
-        mode_flag_sign = 1  # find_mode_flag_sign(electron_density_p, B_magnitude, launch_angular_frequency, temperature)
-        if (
-            (mode_flag_sign * mode_flag == 1 and normalised_plasma_freq >= 1)
-            or (mode_flag_sign * mode_flag == -1 and normalised_LH_cutoff_freq >= 1)
-            or (
-                mode_flag_sign * mode_flag == -1
-                and normalised_RH_cutoff_freq >= 1
-                and normalised_UH_freq <= 1
+        # Which root is the O-mode depends on the plasma and K, so decide it
+        # from the two roots' polarisations at the entry point, with the vacuum
+        # K there (as `scotty.launch` does), rather than assuming that
+        # `mode_flag` = 1 is the O-mode. Imported here: `scotty.launch`
+        # imports this module
+        from scotty.launch import find_O_mode_flag
+
+        try:
+            O_mode = mode_flag == find_O_mode_flag(
+                q_entry,
+                K_vacuum,
+                field,
+                angular_freq,
+                hamiltonian.density,
+                hamiltonian.temperature,
             )
-        ):
-            raise ValueError(
-                "Error: cut-off freq higher than beam freq on plasma side of plasma-vac boundary"
+        except ValueError as error:
+            # K nearly along B: the roots' polarisations are too alike to label
+            O_mode = mode_flag == 1
+            log.warning(
+                f"{error}. For the cut-off check at the plasma boundary, taking "
+                f"`mode_flag` = 1 as the O-mode, so this is the {'O' if O_mode else 'X'}-mode"
             )
 
-        if mode_flag_sign * mode_flag == 1 and normalised_plasma_freq >= 1:
+        # The O-mode is cut off where w_pe >= w; the X-mode where w_L >= w,
+        # or where w_UH <= w <= w_R
+        if O_mode and normalised_plasma_freq >= 1:
             raise ValueError(
-                f"Cut-off freq higher than beam freq on plasma side of plasma-vacuum boundary: w_plasma / w_launch = {normalised_plasma_freq} >= 1"
+                f"Cut-off freq higher than beam freq on plasma side of plasma-vacuum boundary for the O-mode (`mode_flag` = {mode_flag}): w_plasma / w_launch = {normalised_plasma_freq} >= 1"
             )
-        elif mode_flag_sign * mode_flag == -1 and normalised_LH_cutoff_freq >= 1:
+        elif not O_mode and normalised_LH_cutoff_freq >= 1:
             raise ValueError(
-                f"Cut-off freq higher than beam freq on plasma side of plasma-vacuum boundary: w_L / w_launch = {normalised_LH_cutoff_freq} >= 1"
+                f"Cut-off freq higher than beam freq on plasma side of plasma-vacuum boundary for the X-mode (`mode_flag` = {mode_flag}): w_L / w_launch = {normalised_LH_cutoff_freq} >= 1"
             )
-        elif (
-            mode_flag_sign * mode_flag == -1
-            and normalised_RH_cutoff_freq >= 1
-            and normalised_UH_freq <= 1
-        ):
+        elif not O_mode and normalised_RH_cutoff_freq >= 1 and normalised_UH_freq <= 1:
             raise ValueError(
-                f"Cut-off freq higher than beam freq on plasma side of plasma-vacuum boundary: w_R / w_launch = {normalised_RH_cutoff_freq} >= 1 and w_UH / w_launch = {normalised_UH_freq} <= 1"
+                f"Cut-off freq higher than beam freq on plasma side of plasma-vacuum boundary for the X-mode (`mode_flag` = {mode_flag}): w_R / w_launch = {normalised_RH_cutoff_freq} >= 1 and w_UH / w_launch = {normalised_UH_freq} <= 1"
             )
 
         # In our derivations, we find three vectors which are parallel to
@@ -400,7 +411,7 @@ def find_K_plasma(
 
 
 def find_Psi_3D_plasma(
-    boundary_flag: VALID_BOUNDARY_FLAGS,
+    Psi_BC_flag: VALID_PSI_BC_FLAGS,
     q_entry: FloatArray,
     K_vacuum: FloatArray,
     K_plasma: FloatArray,
@@ -412,9 +423,9 @@ def find_Psi_3D_plasma(
     cart = False if isinstance(field, MagneticField_Cylindrical) else True
 
     # No boundary conditions to be applied
-    if boundary_flag is None:
+    if Psi_BC_flag is None:
         log.debug(f"""
-        Finding Psi at the plasma entry point with {boundary_flag} boundary conditions
+        Finding Psi at the plasma entry point with {Psi_BC_flag} boundary conditions
         ##################################################
         #""")
 
@@ -483,7 +494,7 @@ def find_Psi_3D_plasma(
             f"        #   - {k} = {v}" for k, v in derivatives.items()
         )
         log.debug(f"""
-        Finding Psi at the plasma entry point with {boundary_flag} boundary conditions
+        Finding Psi at the plasma entry point with {Psi_BC_flag} boundary conditions
         ##################################################
         # Derivatives at {"[X, Y, Z]" if cart else "[R, zeta, Z]"} = {q_entry} with {"[K_X, K_Y, K_Z]" if cart else "[K_R, K_zeta, K_Z]"} = {K_plasma}: \n{_printmsg}
         #""")
@@ -590,9 +601,9 @@ def find_Psi_3D_plasma(
         # -2 psi_XY psi_X psi_Y for t = (-psi_Y, psi_X, 0). (Hall-Chen, Parra &
         # Hillesheim 2022, eq. (C.6), prints +2: an erratum.)
         delta_K = K_vacuum - K_plasma
-        if boundary_flag == "continuous":
+        if Psi_BC_flag == "continuous":
             eta_XY = eta_XZ = eta_XYZ = 0
-        else:  # boundary_flag == "discontinuous"
+        else:  # Psi_BC_flag == "discontinuous"
             eta_XY = (
                 -0.5
                 * (
@@ -719,7 +730,7 @@ def check_density_smooth_at_edge(
     step: float = 1e-4,
 ) -> None:
     r"""Check that the density profile is continuous and flat at the plasma
-    edge, as `boundary_flag` = None assumes, and raise a `ValueError` if not.
+    edge, as `Psi_BC_flag` = None assumes, and raise a `ValueError` if not.
 
     At the edge, `poloidal_flux_zero_density` (:math:`\psi_e`), the density
     must go to zero (continuous, since it is zero outside) with zero gradient
@@ -738,7 +749,7 @@ def check_density_smooth_at_edge(
     if edge is None:
         raise ValueError(
             "`poloidal_flux_zero_density` is needed to check the density at the "
-            "plasma edge for `boundary_flag` = None"
+            "plasma edge for `Psi_BC_flag` = None"
         )
 
     n_max = float(np.max(np.abs(density_fit(np.linspace(0.0, edge, 201)))))
@@ -778,17 +789,17 @@ def check_density_smooth_at_edge(
         )
     if problems:
         raise ValueError(
-            f"`boundary_flag` = None assumes the density is continuous and "
+            f"`Psi_BC_flag` = None assumes the density is continuous and "
             f"differentiable at the plasma edge (poloidal flux = {edge}), but "
             + " and ".join(problems)
-            + f" (tolerance {rtol}). Use `boundary_flag` = 'continuous' (or "
+            + f" (tolerance {rtol}). Use `Psi_BC_flag` = 'continuous' (or "
             "'discontinuous') to apply the boundary conditions instead"
         )
 
 
 def apply_boundary_conditions(
     ray_tracing_flag: bool,
-    boundary_flag: VALID_BOUNDARY_FLAGS,
+    Psi_BC_flag: VALID_PSI_BC_FLAGS,
     q_vacuum_entry_cartesian: FloatArray,
     K_vacuum_entry_cartesian: FloatArray,
     Psi_3D_vacuum_entry_labframe: Optional[ComplexFloatArray],
@@ -838,7 +849,7 @@ def apply_boundary_conditions(
 
     # Find `K_plasma`
     K_plasma = find_K_plasma(
-        boundary_flag=boundary_flag,
+        Psi_BC_flag=Psi_BC_flag,
         q_entry=q_entry,
         K_vacuum=K_vacuum,
         field=field,
@@ -850,7 +861,7 @@ def apply_boundary_conditions(
         Psi_3D_plasma = None
     else:
         Psi_3D_plasma = find_Psi_3D_plasma(
-            boundary_flag=boundary_flag,
+            Psi_BC_flag=Psi_BC_flag,
             q_entry=q_entry,
             K_vacuum=K_vacuum,
             K_plasma=K_plasma,

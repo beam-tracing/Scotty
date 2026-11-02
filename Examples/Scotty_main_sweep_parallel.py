@@ -90,7 +90,7 @@ def loop(
                 kwargs_dict["detailed_analysis_flag"] = False
 
                 kwargs_dict["poloidal_flux_enter"] = 1.04080884**2
-                kwargs_dict["Psi_BC_flag"] = True
+                kwargs_dict["Psi_BC_flag"] = "continuous"
                 kwargs_dict["vacuum_propagation_flag"] = True
 
                 kwargs_dict["delta_R"] = -0.0001

@@ -26,7 +26,7 @@ kwargs_dict = dict(
 kwargs_dict = dict(
     [
         ("find_B_method", "UDA_saved"),
-        ("Psi_BC_flag", True),
+        ("Psi_BC_flag", "continuous"),
         ("figure_flag", False),
         ("vacuum_propagation_flag", True),
         ("vacuumLaunch_flag", True),

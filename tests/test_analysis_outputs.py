@@ -2,7 +2,7 @@
 
 Regression tests for bugs where an output was silently lost or had the wrong
 type: a dict key written twice (the second value replacing the first), a
-variable defined only in the beam-tracing branch, complex-typed localisation,
+variable defined only in the beam-tracing branch, complex-typed filter functions,
 and the polarisation vector taken from the wrong eigenvector.
 """
 
@@ -33,32 +33,38 @@ def ray_run(tmp_path_factory):
 
 
 def test_ray_tracing_only_analysis_completes(ray_run):
-    """loc_s needs the launch wavenumber, which used to be set only for beam
+    """filter_s needs the launch wavenumber, which used to be set only for beam
     tracing, so a ray-tracing-only run failed in dbs_analysis"""
     dbs = ray_run["dbs_analysis"]
     for power in ("-10_3", "-13_3"):
-        assert np.all(np.isfinite(dbs[f"loc_s_{power}"].values))
+        assert np.all(np.isfinite(dbs[f"filter_s_{power}"].values))
 
 
-def test_loc_all_is_an_array_with_its_own_integral(beam_run):
-    """The array and its path integral used to share the key loc_all_<power>,
+def test_filter_all_is_an_array_with_its_own_integral(beam_run):
+    """The array and its path integral used to share the key filter_all_<power>,
     and the 0-d integral replaced the array"""
     dbs = beam_run["dbs_analysis"]
     length = dbs["beam_path_length"].values
     for power in ("-10_3", "-13_3"):
-        loc_all = dbs[f"loc_all_{power}"].values
-        assert loc_all.shape == length.shape
+        filter_all = dbs[f"filter_all_{power}"].values
+        assert filter_all.shape == length.shape
         product = np.prod(
             [
                 dbs[k].values
-                for k in ("loc_p", "loc_r", "loc_b", "loc_m", f"loc_s_{power}")
+                for k in (
+                    "filter_p",
+                    "filter_r",
+                    "filter_b",
+                    "filter_m",
+                    f"filter_s_{power}",
+                )
             ],
             axis=0,
         )
-        np.testing.assert_allclose(loc_all, product, rtol=1e-12)
+        np.testing.assert_allclose(filter_all, product, rtol=1e-12)
         np.testing.assert_allclose(
-            dbs[f"int_loc_all_{power}_dL"].values,
-            trapezoid(loc_all, length),
+            dbs[f"int_filter_all_{power}_dL"].values,
+            trapezoid(filter_all, length),
             rtol=1e-12,
         )
 
@@ -76,12 +82,17 @@ def test_d_xhat_d_tau_keeps_vector_and_scalar(beam_run):
     )
 
 
-def test_localisation_is_real(beam_run):
-    """Rounding in the complex Cardano formula used to make loc_r, loc_all and
+def test_filter_functions_are_real(beam_run):
+    """Rounding in the complex Cardano formula used to make filter_r, filter_all and
     their integrals complex-typed"""
     analysis, dbs = beam_run["analysis"], beam_run["dbs_analysis"]
     assert not np.iscomplexobj(analysis["g_magnitude_Cardano"].values)
-    for k in ("loc_r", "loc_all_-10_3", "int_loc_r_dL", "int_loc_all_-10_3_dL"):
+    for k in (
+        "filter_r",
+        "filter_all_-10_3",
+        "int_filter_r_dL",
+        "int_filter_all_-10_3_dL",
+    ):
         assert not np.iscomplexobj(dbs[k].values), k
 
 

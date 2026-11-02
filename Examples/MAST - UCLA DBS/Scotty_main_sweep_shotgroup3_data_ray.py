@@ -95,7 +95,7 @@ for ii, equil_time in enumerate(equil_times):
 
                 kwargs_dict["quick_run"] = True
                 kwargs_dict["figure_flag"] = False
-                kwargs_dict["Psi_BC_flag"] = False
+                kwargs_dict["Psi_BC_flag"] = None
                 kwargs_dict[
                     "output_path"
                 ] = "C:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 23\\"

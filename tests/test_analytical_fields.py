@@ -2,14 +2,17 @@
 surfaces, comparing their exact poloidal flux derivatives with finite
 differences, plus checks that the field base classes are abstract.
 
+`CircularFluxSurfaceField` (psi = (r/a)^2) is the only analytical field in v4.
+The base class `CircularFieldBase` has its own psi = r/a with exact derivatives,
+tested here through `RhoField`, a minimal subclass (v4 had two such fields,
+`CircularCrossSectionField` and `ConstantCurrentDensityField`, now removed).
+
 Run with ``pytest -s tests/test_analytical_fields.py`` to see the timing
 benchmark printed."""
 
 from scotty.geometry import (
-    CircularCrossSectionField,
     CircularFieldBase,
     CircularFluxSurfaceField,
-    ConstantCurrentDensityField,
     MagneticField_Cartesian,
     MagneticField_Cylindrical,
     create_magnetic_geometry,
@@ -26,12 +29,35 @@ R_AXIS = 1.5
 MINOR_RADIUS_A = 0.5
 B_P_A = 0.1
 
-# Step size used by default in beam_me_up
+# Step size (v3's default in beam_me_up; v4's is 1e-5)
 DELTA = 1e-4
 
+
+class RhoField(CircularFieldBase):
+    """The base class's flux psi = r/a and its exact derivatives, with a
+    toroidal field only: enough to test what `CircularFieldBase` implements"""
+
+    def __init__(
+        self, B_T_axis, R_axis, minor_radius_a, B_p_a, derivative_method="analytic"
+    ):
+        self.B_T_axis = B_T_axis
+        self.R_axis = R_axis
+        self.minor_radius_a = minor_radius_a
+        self.B_p_a = B_p_a
+        self._set_derivative_method(derivative_method)
+
+    def B_R(self, R, _, Z):
+        return np.zeros(np.broadcast(R, Z).shape)
+
+    def B_T(self, R, _, Z):
+        return self.B_T_axis * self.R_axis / np.asarray(R, dtype=float)
+
+    def B_Z(self, R, _, Z):
+        return np.zeros(np.broadcast(R, Z).shape)
+
+
 FIELD_CLASSES = [
-    pytest.param(CircularCrossSectionField, id="circular-cross-section"),
-    pytest.param(ConstantCurrentDensityField, id="constant-current-density"),
+    pytest.param(RhoField, id="base-class-rho"),
     pytest.param(CircularFluxSurfaceField, id="circular-flux-surface"),
 ]
 
@@ -91,7 +117,7 @@ def test_analytic_matches_numerical(field_class, name, n_steps, tol_factor):
 def test_numerical_converges_at_second_order(name, n_steps, tol_factor):
     """Halving the step size should divide the finite-difference error by
     about 4, for steps large enough that rounding errors are negligible"""
-    exact, numerical = make_fields(CircularCrossSectionField)
+    exact, numerical = make_fields(RhoField)
     R, Z = sample_points(seed=1)
     reference = call(exact, name, n_steps, R, Z, DELTA)
 
@@ -104,8 +130,9 @@ def test_numerical_converges_at_second_order(name, n_steps, tol_factor):
 
 
 def test_analytic_known_values():
-    """Exact derivatives at a point with rho = 0.5, theta = 45 degrees"""
-    field, _ = make_fields(CircularCrossSectionField)
+    """Exact derivatives of the base class's psi = rho / a at a point with
+    rho = 0.5, theta = 45 degrees"""
+    field, _ = make_fields(RhoField)
     offset = 0.5 / np.sqrt(2)
     R, Z = R_AXIS + offset, offset
 
@@ -116,20 +143,6 @@ def test_analytic_known_values():
     assert_allclose(field.d2_polflux_dR2(R, 0.0, Z, DELTA), 2.0)
     assert_allclose(field.d2_polflux_dZ2(R, 0.0, Z, DELTA), 2.0)
     assert_allclose(field.d2_polflux_dRdZ(R, 0.0, Z, DELTA, DELTA), -2.0)
-
-
-def test_circular_field_is_consistent_with_poloidal_flux():
-    """For CircularCrossSectionField, B_R = B_p_a dpsi/dZ / R and
-    B_Z = -B_p_a dpsi/dR / R"""
-    field, _ = make_fields(CircularCrossSectionField)
-    R, Z = sample_points(seed=2)
-
-    assert_allclose(
-        field.B_R(R, 0.0, Z), B_P_A * field.d_polflux_dZ(R, 0.0, Z, DELTA) / R
-    )
-    assert_allclose(
-        field.B_Z(R, 0.0, Z), -B_P_A * field.d_polflux_dR(R, 0.0, Z, DELTA) / R
-    )
 
 
 ##################################################
@@ -149,20 +162,35 @@ def test_invalid_derivative_method(field_class):
         field_class(B_T_AXIS, R_AXIS, MINOR_RADIUS_A, B_P_A, derivative_method="spline")
 
 
-@pytest.mark.parametrize(
-    ("find_B_method", "field_class"),
-    [
-        ("analytical", CircularFluxSurfaceField),
-        ("unit-tests", CircularCrossSectionField),
-    ],
-)
-@pytest.mark.parametrize("derivative_method", ["analytic", "numerical"])
-def test_create_magnetic_geometry_passes_derivative_method(
-    find_B_method, field_class, derivative_method
-):
-    field = create_magnetic_geometry(
+def _analytical_field(find_B_method, **kwargs):
+    return create_magnetic_geometry(
         geometry="cylindrical",
         find_B_method=find_B_method,
+        interp_order_str="quintic",
+        interp_order_int=5,
+        interp_smoothing=0,
+        magnetic_data_path=pathlib.Path("."),
+        B_T_axis=B_T_AXIS,
+        R_axis=R_AXIS,
+        minor_radius_a=MINOR_RADIUS_A,
+        B_p_a=B_P_A,
+        **kwargs,
+    )
+
+
+def test_unit_tests_field_removed():
+    """find_B_method="unit-tests" (CircularCrossSectionField) was removed in
+    v4; "analytical" is the analytical field"""
+    with pytest.raises(ValueError, match="unit-tests"):
+        _analytical_field("unit-tests")
+
+
+@pytest.mark.parametrize("derivative_method", ["analytic", "numerical"])
+def test_create_magnetic_geometry_passes_derivative_method(derivative_method):
+    field_class = CircularFluxSurfaceField
+    field = create_magnetic_geometry(
+        geometry="cylindrical",
+        find_B_method="analytical",
         interp_order_str="quintic",
         interp_order_int=5,
         interp_smoothing=0,
@@ -285,7 +313,7 @@ def test_circular_flux_surface_field():
     ) + B_Z * field.d_polflux_dZ(R_grid, 0.0, Z_grid, DELTA)
     assert_allclose(tangency, 0.0, atol=1e-14)
 
-    # Same direction of rotation as CircularCrossSectionField
+    # Same direction of rotation as v3's CircularCrossSectionField
     total_sign = np.sign(B_R) * np.sign(B_Z)
     assert total_sign[0, 0] == -1, "Top left"
     assert total_sign[0, -1] == 1, "Top right"

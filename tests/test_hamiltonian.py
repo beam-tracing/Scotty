@@ -232,12 +232,15 @@ def test_golden(trace_level):
 
 
 def test_golden_v3(trace_level):
-    """master's (v3) golden answer: the `DBS_synthetic` preset on the unit-test
-    field, at R = 1.75, Z = 0.1 and K_R = K_zeta = K_Z = 1"""
+    """master's (v3) golden answer: the `DBS_synthetic` preset on the analytical
+    field (CircularFluxSurfaceField), at R = 1.75, Z = 0.1 and
+    K_R = K_zeta = K_Z = 1. Value from v3 (upstream/master feb9499), as in its
+    tests/test_hamiltonian.py::test_golden, with find_B_method="analytical"
+    """
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
     field = create_magnetic_geometry(
         geometry="cylindrical",
-        find_B_method="unit-tests",
+        find_B_method="analytical",
         interp_order_str="5",
         interp_order_int=5,
         interp_smoothing=0,
@@ -256,7 +259,7 @@ def test_golden_v3(trace_level):
         field=field,
         density_fit=kwargs_dict["density_fit_method"],
     )
-    assert np.isclose(H(1.75, 0.0, 0.1, 1, 1, 1), -0.2632447148279265)
+    assert np.isclose(H(1.75, 0.0, 0.1, 1, 1, 1), -0.026952118676502185)
 
 
 def test_two_argument_call(trace_level):

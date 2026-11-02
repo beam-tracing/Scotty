@@ -14,7 +14,7 @@ from scotty.checks import (
     VALID_FIELDS,
     VALID_LAUNCH_FLAGS,
     VALID_LAUNCH_MODE_FLAGS,
-    VALID_BOUNDARY_FLAGS,
+    VALID_PSI_BC_FLAGS,
 )
 from scotty.fun_general import (
     find_K_labframe_cart_to_cyl,
@@ -85,7 +85,10 @@ def find_plasma_entry_position(
     poloidal_flux_enter: float,
     boundary_adjust: float = 1e-6,
 ) -> FloatArray:
-    r"""Returns `q_initial` in cartesian or cylindrical.
+    r"""Returns the plasma entry position in cartesian or cylindrical: where
+    the launch line first reaches `poloidal_flux_enter` (for a vacuum launch),
+    or `q_launch` (for `launch_flag` = "plasma", after checking that it is
+    inside the plasma).
 
     As in v3, the launch angles are taken in the TORBEAM convention for an
     antenna at zeta = 0: the launch line's direction, like the launch K, is
@@ -105,7 +108,8 @@ def find_plasma_entry_position(
                 f"`launch_flag` = 'plasma', but `launch_position` = {q_launch} is "
                 f"outside the plasma (poloidal flux {polflux_launch:.6g} > "
                 f"`poloidal_flux_enter` = {poloidal_flux_enter}). Use "
-                "`launch_flag` = 'vacuum' to launch from outside the plasma"
+                "`launch_flag` = 'vacuum_analytic' or 'vacuum_numerical' to launch "
+                "from outside the plasma"
             )
         return q_launch
 
@@ -336,7 +340,7 @@ def find_mode_index_and_ehat(
 
     elif soln_idxs.shape == (2,) and mode_flag in [1, -1]:
         log.warning(
-            f"Specific mode to be used not specified (`mode_flag` = {mode_flag}) and unable to determine which mode indices correspond to O- and X-mode. Perhaps `tol_H` may be too large, so try selecting a deeper `poloidal_flux_enter` or use `boundary_flag` = `continuous` instead"
+            f"Specific mode to be used not specified (`mode_flag` = {mode_flag}) and unable to determine which mode indices correspond to O- and X-mode. Perhaps `tol_H` may be too large, so try selecting a deeper `poloidal_flux_enter` or use `Psi_BC_flag` = `continuous` instead"
         )
         log.warning(f"Selecting min(H) as the solution")
         mode_idx = np.argmin(np.abs(H_Cardanos))
@@ -662,7 +666,7 @@ def _mode_from_K(
     **mode_kwargs,
 ) -> dict:
     r"""The mode solution when K is given rather than solved for (a plasma
-    launch, or `boundary_flag` = None): the mode is the Hamiltonian whose
+    launch, or `Psi_BC_flag` = None): the mode is the Hamiltonian whose
     dispersion relation K satisfies, and `O_mode_flag` (from the two roots'
     polarisations, see `_O_mode_flag`) says whether it is O or X. Raises if
     `mode_flag_launch` asks for a different mode.
@@ -723,7 +727,7 @@ def _mode_from_K(
 def find_plasma_entry_parameters(
     ray_tracing_flag: bool,
     launch_flag: VALID_LAUNCH_FLAGS,
-    boundary_flag: VALID_BOUNDARY_FLAGS,
+    Psi_BC_flag: VALID_PSI_BC_FLAGS,
     mode_flag_launch: VALID_LAUNCH_MODE_FLAGS,
     poloidal_launch_angle_deg_Torbeam: float,
     toroidal_launch_angle_deg_Torbeam: float,
@@ -762,7 +766,7 @@ def find_plasma_entry_parameters(
         #
         # Finding plasma entry parameters with:
         #   - launch_flag = {launch_flag}
-        #   - boundary_flag = {boundary_flag}
+        #   - Psi_BC_flag = {Psi_BC_flag}
         #   - mode_flag (at launch, from user) = {mode_flag_launch}
         #
         ##################################################
@@ -782,8 +786,13 @@ def find_plasma_entry_parameters(
         q_launch_cartesian = q_launch
         q_initial_cartesian = q_initial
 
-    distance_from_launch_to_entry = cast(
-        float, np.linalg.norm(q_launch_cartesian - q_initial_cartesian)
+    # A numerical vacuum launch starts the solvers at the antenna, so it has no
+    # entry point: its entry quantities are NaN
+    numerical_vacuum = launch_flag == "vacuum_numerical"
+    distance_from_launch_to_entry = (
+        np.nan
+        if numerical_vacuum
+        else cast(float, np.linalg.norm(q_launch_cartesian - q_initial_cartesian))
     )
 
     # Launch frequency, wavenumber and profiles, shared by both Hamiltonians
@@ -940,6 +949,15 @@ def find_plasma_entry_parameters(
                 )
             )
 
+        if numerical_vacuum:
+            # The solvers start at the antenna, so the beam is not propagated
+            # to the plasma boundary here
+            Psi_3D_entry_labframe = (
+                None
+                if ray_tracing_flag
+                else np.full((3, 3), np.nan + 1j * np.nan, dtype=complex)
+            )
+        elif not ray_tracing_flag:
             # Now we propagate the beam until it reaches the plasma boundary,
             # and then apply either the continuous or discontinuous or no
             # boundary conditions to find K_entry and Psi_entry when the
@@ -971,15 +989,31 @@ def find_plasma_entry_parameters(
                 )
             )
 
-        # If `boundary_flag` is None, then we assume that the electron density
+        # A numerical vacuum launch starts the solvers at the antenna, with the
+        # launched K and Psi, and integrates through the plasma boundary: no
+        # boundary conditions, and no assumption about the density there
+        if numerical_vacuum:
+            log.debug(
+                "`launch_flag` = 'vacuum_numerical'. Starting the solvers at the "
+                "antenna, with no boundary conditions"
+            )
+            _check_dispersion_relation(
+                hamiltonians,
+                q_initial,
+                K_launch,
+                "Vacuum launch with `launch_flag` = 'vacuum_numerical'",
+            )
+
+            def initial_K_and_Psi(hamiltonian):
+                return K_launch, Psi_3D_launch_labframe
+
+        # If `Psi_BC_flag` is None, then we assume that the electron density
         # profile is both continuous and differentiable at the plasma boundary,
         # so K and Psi carry straight over from vacuum: K_initial is the vacuum
         # K (in the field's coordinates at the entry point), and Psi_initial is
         # Psi_entry. Check that assumption holds for the density profile
-        if boundary_flag is None:
-            log.debug(
-                f"`boundary_flag` = {boundary_flag}. No boundary conditions applied"
-            )
+        elif Psi_BC_flag is None:
+            log.debug(f"`Psi_BC_flag` = {Psi_BC_flag}. No boundary conditions applied")
             check_density_smooth_at_edge(density_fit, poloidal_flux_zero_density)
 
             K_entry = (
@@ -993,13 +1027,13 @@ def find_plasma_entry_parameters(
                 hamiltonians,
                 q_initial,
                 K_entry,
-                "Vacuum launch with `boundary_flag` = None",
+                "Vacuum launch with `Psi_BC_flag` = None",
             )
 
             def initial_K_and_Psi(hamiltonian):
                 return K_entry, Psi_3D_entry_labframe
 
-        # If `boundary_flag` = "continuous" or "discontinuous", then we assume
+        # If `Psi_BC_flag` = "continuous" or "discontinuous", then we assume
         # that the electron density is not differentiable at the plasma boundary,
         # so we apply the appropriate boundary condition calculations. Here, we use
         # K_entry and Psi_entry (without boundary conditions) and get K_initial and
@@ -1009,13 +1043,13 @@ def find_plasma_entry_parameters(
         # corresponds to O or X mode
         else:
             log.debug(
-                f"`boundary_flag` = {boundary_flag}. Applying {boundary_flag} boundary conditions to find K and Psi"
+                f"`Psi_BC_flag` = {Psi_BC_flag}. Applying {Psi_BC_flag} boundary conditions to find K and Psi"
             )
 
             def initial_K_and_Psi(hamiltonian):
                 return apply_boundary_conditions(
                     ray_tracing_flag=ray_tracing_flag,
-                    boundary_flag=boundary_flag,
+                    Psi_BC_flag=Psi_BC_flag,
                     q_vacuum_entry_cartesian=q_initial_cartesian,
                     K_vacuum_entry_cartesian=K_launch_cartesian,
                     Psi_3D_vacuum_entry_labframe=Psi_3D_entry_labframe,
@@ -1062,7 +1096,9 @@ def find_plasma_entry_parameters(
     # density too, where K cannot tell the modes apart, from the
     # polarisations' zero-density limits. For a vacuum launch, the vacuum K
     # at the entry is used (the boundary conditions change it little)
-    no_boundary_conditions = launch_flag == "plasma" or boundary_flag is None
+    no_boundary_conditions = (
+        launch_flag in ["plasma", "vacuum_numerical"] or Psi_BC_flag is None
+    )
     if no_boundary_conditions:
         K_given, Psi_given = initial_K_and_Psi(None)
         K_for_polarisation = K_given
@@ -1088,8 +1124,8 @@ def find_plasma_entry_parameters(
         O_mode_flag = None
     log.debug(f"The O-mode is `mode_flag` = {O_mode_flag}")
 
-    # Without boundary conditions (a plasma launch, or `boundary_flag` =
-    # None), K is given rather than solved for each mode, so the mode is the
+    # Without boundary conditions (a plasma or numerical vacuum launch, or
+    # `Psi_BC_flag` = None), K is given rather than solved for each mode, so the mode is the
     # one whose dispersion relation K satisfies
     if no_boundary_conditions:
         toreturn = _mode_from_K(
