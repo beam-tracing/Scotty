@@ -119,6 +119,8 @@ Removed
   a later release, as the old ones were poor and rarely used.
 - v3's other matplotlib plots (beam widths, filter functions, 3D beam profile,
   Psi).
+- The figures v3 saved with ``figure_flag=True`` (``Ray1_*.png``, ``H_*.png``):
+  v4 only stores the flag. Call ``scotty.plotting`` directly.
 - ``CurvySlabField`` (``find_B_method="curvy_slab"``).
 - The analytical fields ``CircularCrossSectionField`` and
   ``ConstantCurrentDensityField``, and ``find_B_method="unit-tests"``; use
