@@ -67,10 +67,16 @@ Defaults
   unchanged (0.1).
 - The default solver tolerances are ``rtol=1e-4`` and ``atol=1e-7`` (v3: 1e-3,
   1e-6). Use tighter ones (e.g. 1e-6, 1e-9) for anything read close to the
-  cut-off.
-- The default number of output points ``len_tau`` is 1002 (v3: 102). The filter
-  function is integrated on these points, and 102 can be too few to resolve its
-  peak.
+  cut-off, and when :math:`K` at the cut-off is below about a tenth of its
+  vacuum value, where the default tolerances were tens of percent off in the
+  integrated filter function on the launches tried.
+- The default number of output points ``len_tau`` is 4002 (v3: 102). The filter
+  function is integrated on these points, and where the beam focuses sharply at
+  the cut-off its peak can be narrower than their spacing: on one case tried,
+  the integral was 69% off at 102 and up to 5% off near 1000. An output file is
+  about 10 MB at this ``len_tau``.
+- So a run at the default settings can give a noticeably different integrated
+  filter function from one at v3's defaults.
 - ``from_v3_kwargs`` keeps v3's tolerances, spatial steps and ``len_tau``, so a
   v3 script gives v3's accuracy.
 - ``interp_smoothing=0``, ``find_B_method="torbeam"`` and

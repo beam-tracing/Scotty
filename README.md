@@ -40,7 +40,7 @@ anything you need to reproduce later, use v3.
     `filter_*`;
   - the default spatial finite-difference step (`delta_R`, `delta_Z`, ...) is
     1e-5 (v3: 1e-4), the default solver tolerances are `rtol=1e-4`,
-    `atol=1e-7` (v3: 1e-3, 1e-6), and the default `len_tau` is 1002 (v3: 102);
+    `atol=1e-7` (v3: 1e-3, 1e-6), and the default `len_tau` is 4002 (v3: 102);
   - not yet ported: most of v3's matplotlib plots (`scotty.plotting` has
     `plot_dispersion_relation`, `plot_poloidal_beam_path` and
     `plot_toroidal_beam_path`), the filter-function widths (`delta_l`,

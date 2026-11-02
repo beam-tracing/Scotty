@@ -603,6 +603,7 @@ def test_flag_false(tmp_path):
         "atol": 1e-6,
         "delta_R": -1e-4,
         "delta_Z": 1e-4,
+        "len_tau": 102,
         "resonance_flag": False,
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",

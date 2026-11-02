@@ -112,7 +112,7 @@ def test_v3_tolerances(caplog):
 
 
 def test_v3_len_tau():
-    # v3's default (upstream/master feb9499); v4's is 1002
+    # v3's default (upstream/master feb9499); v4's is 4002
     assert from_v3_kwargs({})["len_tau"] == 102
     assert from_v3_kwargs({"len_tau": 52})["len_tau"] == 52
 
@@ -339,7 +339,7 @@ def test_quick_cutoff_reproduces_v3_quick_run(tmp_path):
     """v3's quick_run returned (R, Z, |K|, poloidal flux, theta_m) at the
     minimum of |K|; the v3 values here are from v3 (upstream/master feb9499) on
     the same case, on the analytical field (find_B_method="analytical"), at
-    rtol = 1e-6 in both. At the default rtol = 1e-3 v4's ray cut-off is 1e-3
+    rtol = 1e-6 in both. At rtol = 1e-3 v4's ray cut-off is 1e-3
     from the converged value and v3's 4e-6 (open, with where the saved beam
     ends); at rtol = 1e-6 they agree to 5e-7"""
     from scotty.compat import quick_cutoff

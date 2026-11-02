@@ -785,9 +785,9 @@ def check_H_output(H_arr: ArrayLike, H_tol: float = 1e-2) -> None:
     H_max = np.max(np.abs(H_arr))
     if H_max > 1.0:
         raise ValueError(
-            f"`H_output` is unphysically large! `|max(H_output)|` = {H_max}"
+            f"`H_output` is unphysically large! `max(|H_output|)` = {H_max}"
         )
     elif H_max > H_tol:
         log.warning(
-            f"`H_output` is unphysically large! `|max(H_output)|` = {H_max} but `H_tol` = {H_tol}"
+            f"`H_output` is unphysically large! `max(|H_output|)` = {H_max} but `H_tol` = {H_tol}"
         )

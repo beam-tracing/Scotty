@@ -8,7 +8,7 @@ with vacuum_propagation_flag = False, Psi_BC_flag = None, mode_flag = -1,
 len_tau = 102, rtol = 1e-6, atol = 1e-8, at seven of its output points. (v3's own
 analysis fails in this mode, as Psi_3D_lab_entry is None, so they are its solver
 output.) At these tolerances v4 agrees with them to 6e-8 in q and K, 2e-8 in the
-exit tau and 5e-5 in Psi (relative to max |Psi| at each point). At the default
+exit tau and 5e-5 in Psi (relative to max |Psi| at each point). At v3's default
 rtol = 1e-3 both codes are much less accurate here, as the beam crosses the
 density's kink at the plasma boundary (psi = 1): for mode_flag = 1, v3's and
 v4's exit tau differ from the converged value by 10% and 4%.

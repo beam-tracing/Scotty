@@ -77,7 +77,7 @@ def test_eigenvalue_of_D_consistent_with_Booker(steered_run):
 
 def test_dispersion_relation_satisfied_on_ray(steered_run):
     """The ray is traced on H = 0, so the Booker H must stay near zero, to within
-    the solver's step error. At the default rtol 1e-3, a steered X-mode ray drifts
+    the solver's step error. At rtol 1e-3, a steered X-mode ray drifts
     to |H| ~ 4e-3 in its last few points (step error on K ~ 1000 m^-1), so the
     bound scales with rtol rather than being fixed"""
     rtol = float(steered_run["inputs"]["rtol"])
