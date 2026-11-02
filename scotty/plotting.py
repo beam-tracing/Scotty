@@ -68,7 +68,7 @@ def beam_path_cylindrical(dt: xr.DataTree) -> Tuple[FloatArray, FloatArray, Floa
     """The central ray as (R, zeta, Z), from the solver output in either
     geometry: for ``geometry="cartesian"``, R = sqrt(X^2 + Y^2) and
     zeta = atan2(Y, X)"""
-    so = dt["solver_output"]
+    so = dt["solver"]
     if _is_cartesian(dt):
         X, Y = so["q_X_output"].values, so["q_Y_output"].values
         return np.hypot(X, Y), np.arctan2(Y, X), so["q_Z_output"].values
@@ -83,7 +83,7 @@ def beam_path_cartesian(dt: xr.DataTree) -> Tuple[FloatArray, FloatArray, FloatA
     """The central ray as (X, Y, Z), from the solver output in either
     geometry"""
     if _is_cartesian(dt):
-        so = dt["solver_output"]
+        so = dt["solver"]
         return so["q_X_output"].values, so["q_Y_output"].values, so["q_Z_output"].values
     R, zeta, Z = beam_path_cylindrical(dt)
     return R * np.cos(zeta), R * np.sin(zeta), Z
@@ -91,7 +91,7 @@ def beam_path_cartesian(dt: xr.DataTree) -> Tuple[FloatArray, FloatArray, FloatA
 
 def _launch_position(dt: xr.DataTree) -> Tuple[FloatArray, FloatArray]:
     """The launch position, (R, zeta, Z) and (X, Y, Z)"""
-    so = dt["solver_output"]
+    so = dt["solver"]
     return so["q_launch_cylindrical"].values, so["q_launch_cartesian"].values
 
 
@@ -102,11 +102,11 @@ def _beam_edges(
     beam's half-width vector along g x orthogonal_dir: |w| = sqrt(2 / Im(u .
     Psi . u)) with u its unit vector. ``None`` for a ray-tracing run, which
     has no Psi"""
-    so = dt["solver_output"]
+    so = dt["solver"]
     if "Psi_3D_output_labframe_cartesian" not in so:
         return None
     q = np.stack(beam_path_cartesian(dt), axis=-1)
-    g_hat = dt["analysis"]["g_hat_cartesian"].values
+    g_hat = dt["beam"]["g_hat_cartesian"].values
     Psi = so["Psi_3D_output_labframe_cartesian"].values
     W_vec = np.cross(g_hat, orthogonal_dirs)
     W_hat = W_vec / np.linalg.norm(W_vec, axis=-1, keepdims=True)
@@ -182,7 +182,7 @@ def plot_flux_surfaces(
 
 
 def plot_dispersion_relation(
-    analysis: Union[xr.Dataset, xr.DataTree],
+    dt: xr.DataTree,
     filename: Optional[PathLike] = None,
     ax: Optional[plt.Axes] = None,
 ) -> plt.Axes:
@@ -191,15 +191,15 @@ def plot_dispersion_relation(
     from the cut-off). One of them should be zero all along the path; this
     shows if the root that is zero changes.
 
-    ``analysis`` is the output's ``analysis`` group (``dt["analysis"]``)."""
+    ``dt`` is the output of `beam_me_up`."""
     ax = maybe_make_axis(ax)
-    l_lc = analysis["beam_path_length_wrt_cutoff"].values
+    l_lc = dt["beam"]["beam_path_length_wrt_cutoff"].values
 
     styles = [("pink", "lightgreen", "gray"), ("k", "r", "g")]
     for (name, linestyle), colours in zip(
         (("H_eigvals", "-"), ("H_Cardano", ":")), styles
     ):
-        values = np.abs(np.asarray(analysis[name].values))
+        values = np.abs(np.asarray(dt["checks"][name].values))
         for i, colour in enumerate(colours):
             ax.plot(
                 l_lc,

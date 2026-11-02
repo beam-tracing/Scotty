@@ -59,8 +59,8 @@ Notes
 Output
 ~~~~~~
 
-An `xarray.DataTree` with the groups ``inputs``, ``solver_output``,
-``analysis`` and ``dbs_analysis``, saved as ``scotty_output<suffix>.h5``.
+An `xarray.DataTree` with the groups ``inputs``, ``solver``, ``beam``, ``checks``
+and ``diagnostics/dbs``, saved as ``scotty_output<suffix>.h5``.
 
 Coordinates
 ~~~~~~~~~~~
@@ -108,7 +108,12 @@ from scotty.checks import (
     VALID_PSI_BC_FLAGS,
     Parameters,
 )
-from scotty.data_io import inputs_to_dicts, solver_output_to_dicts, dict_to_dataset
+from scotty.data_io import (
+    dict_to_dataset,
+    inputs_to_dicts,
+    solver_output_to_dicts,
+)
+from scotty.output_tree import to_output_tree
 from scotty.geometry import (
     MagneticField_Cylindrical,
     MagneticField_Cartesian,
@@ -375,9 +380,8 @@ def beam_me_up(
     Returns
     -------
     xarray.DataTree, or tuple of (xarray.DataTree, field)
-        The output, with the groups ``inputs``, ``solver_output``,
-        ``analysis`` and ``dbs_analysis``, and the field if
-        ``return_dt_field``
+        The output, with the groups ``inputs``, ``solver``, ``beam``, ``checks``
+        and ``diagnostics/dbs``, and the field if ``return_dt_field``
     """
 
     ##################################################
@@ -789,14 +793,7 @@ def beam_me_up(
         )
     )
 
-    dt = xr.DataTree.from_dict(
-        {
-            "inputs": inputs_ds,
-            "solver_output": solver_output_ds,
-            "analysis": analysis_ds,
-            "dbs_analysis": dbs_analysis_ds,
-        }
-    )
+    dt = to_output_tree(inputs_ds, solver_output_ds, analysis_ds, dbs_analysis_ds)
     dt.attrs = {
         "title": output_filename_suffix,
         "software_name": "scotty-beam-tracing",

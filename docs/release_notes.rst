@@ -9,6 +9,13 @@ outputs may still change, and some of v3's features have not been ported. v3
 (latest release 3.2.0) is the stable line; use it for published work, or
 anything you need to reproduce later.
 
+Output layout
+~~~~~~~~~~~~~
+
+- The output's groups are ``inputs``, ``solver`` (was ``solver_output``), ``beam``
+  (most of ``analysis``), ``checks`` (the rest of ``analysis``) and
+  ``diagnostics/dbs`` (most of ``dbs_analysis``). Variables keep their names.
+
 Geometry, launch and boundary conditions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -117,7 +117,7 @@ PSI_FINAL_EXPECTED_1 = np.array(
 
 
 EXPECTED_1 = {
-    "solver_output/q_R_output": np.array(
+    "solver/q_R_output": np.array(
         [
             1.99387212,
             1.91867246,
@@ -131,7 +131,7 @@ EXPECTED_1 = {
             1.78804407,
         ]
     ),
-    "solver_output/q_Z_output": np.array(
+    "solver/q_Z_output": np.array(
         [
             -0.0780402519,
             -0.0899700029,
@@ -145,7 +145,7 @@ EXPECTED_1 = {
             -0.317399807,
         ]
     ),
-    "solver_output/q_zeta_output": np.array(
+    "solver/q_zeta_output": np.array(
         [
             3.64302277e-17,
             -0.000333582376,
@@ -159,7 +159,7 @@ EXPECTED_1 = {
             -0.00710860701,
         ]
     ),
-    "solver_output/K_R_output": np.array(
+    "solver/K_R_output": np.array(
         [
             -1146.40007,
             -800.675087,
@@ -173,7 +173,7 @@ EXPECTED_1 = {
             244.095056,
         ]
     ),
-    "solver_output/K_Z_output": np.array(
+    "solver/K_Z_output": np.array(
         [
             -120.491503,
             -183.759751,
@@ -187,8 +187,8 @@ EXPECTED_1 = {
             -786.183905,
         ]
     ),
-    "solver_output/K_zeta_output": np.array(8.327130896577119e-14),
-    "solver_output/tau": np.array(
+    "solver/K_zeta_output": np.array(8.327130896577119e-14),
+    "solver/tau": np.array(
         [
             0,
             52.0411325,
@@ -202,7 +202,7 @@ EXPECTED_1 = {
             416.32906,
         ]
     ),
-    "analysis/B_magnitude": np.array(
+    "beam/B_magnitude": np.array(
         [
             0.756057183,
             0.784652628,
@@ -216,7 +216,7 @@ EXPECTED_1 = {
             0.841982198,
         ]
     ),
-    "analysis/normalised_omega_ce": np.array(
+    "beam/normalised_omega_ce": np.array(
         [
             0.3847986,
             0.399352377,
@@ -230,7 +230,7 @@ EXPECTED_1 = {
             0.428530511,
         ]
     ),
-    "analysis/normalised_omega_pe": np.array(
+    "beam/normalised_omega_pe": np.array(
         [
             0.000616658561,
             0.701733681,
@@ -316,7 +316,7 @@ PSI_FINAL_EXPECTED_NEG1 = np.array(
 
 
 EXPECTED_NEG1 = {
-    "solver_output/q_R_output": np.array(
+    "solver/q_R_output": np.array(
         [
             1.99387212,
             1.96059083,
@@ -330,7 +330,7 @@ EXPECTED_NEG1 = {
             1.93940959,
         ]
     ),
-    "solver_output/q_Z_output": np.array(
+    "solver/q_Z_output": np.array(
         [
             -0.0780402519,
             -0.0824297705,
@@ -344,7 +344,7 @@ EXPECTED_NEG1 = {
             -0.161754612,
         ]
     ),
-    "solver_output/q_zeta_output": np.array(
+    "solver/q_zeta_output": np.array(
         [
             3.64302277e-17,
             7.7115709e-05,
@@ -358,7 +358,7 @@ EXPECTED_NEG1 = {
             0.00238006514,
         ]
     ),
-    "solver_output/K_R_output": np.array(
+    "solver/K_R_output": np.array(
         [
             -1146.40007,
             -943.487694,
@@ -372,7 +372,7 @@ EXPECTED_NEG1 = {
             745.322637,
         ]
     ),
-    "solver_output/K_Z_output": np.array(
+    "solver/K_Z_output": np.array(
         [
             -120.491503,
             -154.448341,
@@ -386,8 +386,8 @@ EXPECTED_NEG1 = {
             -600.310963,
         ]
     ),
-    "solver_output/K_zeta_output": np.array(8.327130896577119e-14),
-    "solver_output/tau": np.array(
+    "solver/K_zeta_output": np.array(8.327130896577119e-14),
+    "solver/tau": np.array(
         [
             0,
             21.1774728,
@@ -401,7 +401,7 @@ EXPECTED_NEG1 = {
             169.419783,
         ]
     ),
-    "analysis/B_magnitude": np.array(
+    "beam/B_magnitude": np.array(
         [
             0.756057183,
             0.768418283,
@@ -415,7 +415,7 @@ EXPECTED_NEG1 = {
             0.77681528,
         ]
     ),
-    "analysis/normalised_omega_ce": np.array(
+    "beam/normalised_omega_ce": np.array(
         [
             0.3847986,
             0.391089836,
@@ -429,7 +429,7 @@ EXPECTED_NEG1 = {
             0.395363524,
         ]
     ),
-    "analysis/normalised_omega_pe": np.array(
+    "beam/normalised_omega_pe": np.array(
         [
             0.000616658561,
             0.498433924,
@@ -521,7 +521,7 @@ PSI_FINAL_EXPECTED_REL_1_RTOL_1E_6 = np.array(
 
 
 EXPECTED_REL_1 = {
-    "solver_output/q_R_output": np.array(
+    "solver/q_R_output": np.array(
         [
             1.99387212,
             1.9135442,
@@ -535,7 +535,7 @@ EXPECTED_REL_1 = {
             1.75604055,
         ]
     ),
-    "solver_output/q_Z_output": np.array(
+    "solver/q_Z_output": np.array(
         [
             -0.0780402519,
             -0.0910440689,
@@ -549,7 +549,7 @@ EXPECTED_REL_1 = {
             -0.337117394,
         ]
     ),
-    "solver_output/q_zeta_output": np.array(
+    "solver/q_zeta_output": np.array(
         [
             3.64302277e-17,
             -0.000375041028,
@@ -563,7 +563,7 @@ EXPECTED_REL_1 = {
             -0.00773851539,
         ]
     ),
-    "solver_output/K_R_output": np.array(
+    "solver/K_R_output": np.array(
         [
             -1146.40007,
             -788.991072,
@@ -577,7 +577,7 @@ EXPECTED_REL_1 = {
             161.206655,
         ]
     ),
-    "solver_output/K_Z_output": np.array(
+    "solver/K_Z_output": np.array(
         [
             -120.491503,
             -186.527638,
@@ -591,8 +591,8 @@ EXPECTED_REL_1 = {
             -794.120485,
         ]
     ),
-    "solver_output/K_zeta_output": np.array(8.327130896577119e-14),
-    "solver_output/tau": np.array(
+    "solver/K_zeta_output": np.array(8.327130896577119e-14),
+    "solver/tau": np.array(
         [
             0,
             56.0970628,
@@ -606,7 +606,7 @@ EXPECTED_REL_1 = {
             448.776503,
         ]
     ),
-    "analysis/B_magnitude": np.array(
+    "beam/B_magnitude": np.array(
         [
             0.756057183,
             0.786691848,
@@ -620,7 +620,7 @@ EXPECTED_REL_1 = {
             0.857250447,
         ]
     ),
-    "analysis/normalised_omega_ce": np.array(
+    "beam/normalised_omega_ce": np.array(
         [
             0.384798594,
             0.391099851,
@@ -634,7 +634,7 @@ EXPECTED_REL_1 = {
             0.426165676,
         ]
     ),
-    "analysis/normalised_omega_pe": np.array(
+    "beam/normalised_omega_pe": np.array(
         [
             0.000616658555,
             0.711067949,
@@ -778,7 +778,7 @@ PSI_FINAL_EXPECTED_REL_NEG1 = np.array(
 
 
 EXPECTED_REL_NEG1 = {
-    "solver_output/q_R_output": np.array(
+    "solver/q_R_output": np.array(
         [
             1.99387212,
             1.95826379,
@@ -792,7 +792,7 @@ EXPECTED_REL_NEG1 = {
             1.93372322,
         ]
     ),
-    "solver_output/q_Z_output": np.array(
+    "solver/q_Z_output": np.array(
         [
             -0.0780402519,
             -0.082802406,
@@ -806,7 +806,7 @@ EXPECTED_REL_NEG1 = {
             -0.168908009,
         ]
     ),
-    "solver_output/q_zeta_output": np.array(
+    "solver/q_zeta_output": np.array(
         [
             3.64302277e-17,
             8.77926377e-05,
@@ -820,7 +820,7 @@ EXPECTED_REL_NEG1 = {
             0.00260650258,
         ]
     ),
-    "solver_output/K_R_output": np.array(
+    "solver/K_R_output": np.array(
         [
             -1146.40007,
             -932.547927,
@@ -834,7 +834,7 @@ EXPECTED_REL_NEG1 = {
             719.289707,
         ]
     ),
-    "solver_output/K_Z_output": np.array(
+    "solver/K_Z_output": np.array(
         [
             -120.491503,
             -156.42311,
@@ -848,8 +848,8 @@ EXPECTED_REL_NEG1 = {
             -609.163098,
         ]
     ),
-    "solver_output/K_zeta_output": np.array(8.327130896577119e-14),
-    "solver_output/tau": np.array(
+    "solver/K_zeta_output": np.array(8.327130896577119e-14),
+    "solver/tau": np.array(
         [
             0,
             22.7943506,
@@ -863,7 +863,7 @@ EXPECTED_REL_NEG1 = {
             182.354805,
         ]
     ),
-    "analysis/B_magnitude": np.array(
+    "beam/B_magnitude": np.array(
         [
             0.756057183,
             0.769299733,
@@ -877,7 +877,7 @@ EXPECTED_REL_NEG1 = {
             0.779059451,
         ]
     ),
-    "analysis/normalised_omega_ce": np.array(
+    "beam/normalised_omega_ce": np.array(
         [
             0.384798594,
             0.386853892,
@@ -891,7 +891,7 @@ EXPECTED_REL_NEG1 = {
             0.39173332,
         ]
     ),
-    "analysis/normalised_omega_pe": np.array(
+    "beam/normalised_omega_pe": np.array(
         [
             0.000616658555,
             0.510602594,
@@ -1216,7 +1216,7 @@ def assert_ray_matches_golden(output, expected: dict, rtol=1e-2, atol=1e-2):
     agree to 3e-4 in K_R; at matched tau the default-tolerance run is within
     0.1% of the golden values.
     """
-    tau_key = "solver_output/tau"
+    tau_key = "solver/tau"
     tau_expected = expected[tau_key]
     tau = np.asarray(output[tau_key])
     assert_allclose(tau, tau_expected, rtol=rtol, atol=atol, err_msg=tau_key)
@@ -1259,13 +1259,11 @@ def test_integrated_O_mode(tmp_path, generator):
     for key, value in EXPECTED_1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
-    K_magnitude = np.hypot(
-        output["solver_output/K_R_output"], output["solver_output/K_Z_output"]
-    )
+    K_magnitude = np.hypot(output["solver/K_R_output"], output["solver/K_Z_output"])
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_1
 
     check_Psi(
-        output["solver_output/Psi_3D_output_labframe_cylindrical"],
+        output["solver/Psi_3D_output_labframe_cylindrical"],
         PSI_START_EXPECTED_1,
         CUTOFF_INDEX_1,
         PSI_CUTOFF_EXPECTED_1,
@@ -1301,14 +1299,12 @@ def test_integrated_X_mode(tmp_path, generatorneg):
 
     assert_ray_matches_golden(output, EXPECTED_NEG1)
 
-    K_magnitude = np.hypot(
-        output["solver_output/K_R_output"], output["solver_output/K_Z_output"]
-    )
+    K_magnitude = np.hypot(output["solver/K_R_output"], output["solver/K_Z_output"])
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_NEG1
 
     # Psi at the cut-off: test_X_mode_cutoff_Psi, at rtol = 1e-6
     check_Psi(
-        output["solver_output/Psi_3D_output_labframe_cylindrical"],
+        output["solver/Psi_3D_output_labframe_cylindrical"],
         PSI_START_EXPECTED_NEG1,
         CUTOFF_INDEX_NEG1,
         None,
@@ -1346,14 +1342,12 @@ def test_relativistic_O_mode(tmp_path, generator_rel):
     # near the end, so index-by-index comparison compares different points
     assert_ray_matches_golden(output, EXPECTED_REL_1)
 
-    K_magnitude = np.hypot(
-        output["solver_output/K_R_output"], output["solver_output/K_Z_output"]
-    )
+    K_magnitude = np.hypot(output["solver/K_R_output"], output["solver/K_Z_output"])
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_REL_1
 
     # Psi at the final point: test_relativistic_O_mode_final_Psi, at rtol = 1e-6
     check_Psi(
-        output["solver_output/Psi_3D_output_labframe_cylindrical"],
+        output["solver/Psi_3D_output_labframe_cylindrical"],
         PSI_START_EXPECTED_REL_1,
         CUTOFF_INDEX_REL_1,
         PSI_CUTOFF_EXPECTED_REL_1,
@@ -1387,13 +1381,13 @@ def test_relativistic_O_mode_final_Psi(tmp_path, generator_relfinal):
     output = beam_me_up(**kwargs_dict)
 
     assert_allclose(
-        output["solver_output/tau"][-1],
+        output["solver/tau"][-1],
         TAU_LEAVE_EXPECTED_REL_1_RTOL_1E_6,
         rtol=1e-2,
         atol=1e-2,
     )
     check_Psi_final(
-        output["solver_output/Psi_3D_output_labframe_cylindrical"][-1],
+        output["solver/Psi_3D_output_labframe_cylindrical"][-1],
         PSI_FINAL_EXPECTED_REL_1_RTOL_1E_6,
     )
 
@@ -1427,16 +1421,14 @@ def test_relativistic_X_mode(tmp_path, generator_relneg):
 
     assert_ray_matches_golden(output, EXPECTED_REL_NEG1)
 
-    K_magnitude = np.hypot(
-        output["solver_output/K_R_output"], output["solver_output/K_Z_output"]
-    )
+    K_magnitude = np.hypot(output["solver/K_R_output"], output["solver/K_Z_output"])
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_REL_NEG1
 
     # The cut-off tau on its own, then Psi there against v3's Psi at the same tau
-    tau_cutoff = float(output["solver_output/tau"][CUTOFF_INDEX_REL_NEG1])
+    tau_cutoff = float(output["solver/tau"][CUTOFF_INDEX_REL_NEG1])
     assert_allclose(tau_cutoff, TAU_CUTOFF_EXPECTED_REL_NEG1, rtol=2e-3)
     check_Psi(
-        output["solver_output/Psi_3D_output_labframe_cylindrical"],
+        output["solver/Psi_3D_output_labframe_cylindrical"],
         PSI_START_EXPECTED_REL_NEG1,
         CUTOFF_INDEX_REL_NEG1,
         psi_cutoff_expected_rel_neg1(tau_cutoff),
@@ -1475,13 +1467,11 @@ def test_null_relativistic_O_mode(tmp_path, generator_nullrel):
     for key, value in EXPECTED_1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)
 
-    K_magnitude = np.hypot(
-        output["solver_output/K_R_output"], output["solver_output/K_Z_output"]
-    )
+    K_magnitude = np.hypot(output["solver/K_R_output"], output["solver/K_Z_output"])
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_1
 
     check_Psi(
-        output["solver_output/Psi_3D_output_labframe_cylindrical"],
+        output["solver/Psi_3D_output_labframe_cylindrical"],
         PSI_START_EXPECTED_1,
         CUTOFF_INDEX_1,
         PSI_CUTOFF_EXPECTED_1,
@@ -1520,14 +1510,12 @@ def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
 
     assert_ray_matches_golden(output, EXPECTED_NEG1)
 
-    K_magnitude = np.hypot(
-        output["solver_output/K_R_output"], output["solver_output/K_Z_output"]
-    )
+    K_magnitude = np.hypot(output["solver/K_R_output"], output["solver/K_Z_output"])
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_NEG1
 
     # Psi at the cut-off: test_X_mode_cutoff_Psi, at rtol = 1e-6
     check_Psi(
-        output["solver_output/Psi_3D_output_labframe_cylindrical"],
+        output["solver/Psi_3D_output_labframe_cylindrical"],
         PSI_START_EXPECTED_NEG1,
         CUTOFF_INDEX_NEG1,
         None,
@@ -1570,18 +1558,16 @@ def test_X_mode_cutoff_Psi(tmp_path, generator_cutoff, temperature):
 
     output = beam_me_up(**kwargs_dict)
 
-    K_magnitude = np.hypot(
-        output["solver_output/K_R_output"], output["solver_output/K_Z_output"]
-    )
+    K_magnitude = np.hypot(output["solver/K_R_output"], output["solver/K_Z_output"])
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_NEG1
     assert_allclose(
-        output["solver_output/tau"][CUTOFF_INDEX_NEG1],
+        output["solver/tau"][CUTOFF_INDEX_NEG1],
         TAU_CUTOFF_EXPECTED_NEG1_RTOL_1E_6,
         rtol=1e-2,
         atol=1e-2,
     )
     check_Psi_cutoff(
-        output["solver_output/Psi_3D_output_labframe_cylindrical"][CUTOFF_INDEX_NEG1],
+        output["solver/Psi_3D_output_labframe_cylindrical"][CUTOFF_INDEX_NEG1],
         PSI_CUTOFF_EXPECTED_NEG1_RTOL_1E_6,
     )
 
@@ -1955,7 +1941,7 @@ def test_beam_me_up_uses_flipped_deltas(tmp_path):
 
     assert float(output["inputs/delta_R"]) < 0
     assert_allclose(
-        output["solver_output/Psi_3D_output_labframe_cylindrical"][0],
+        output["solver/Psi_3D_output_labframe_cylindrical"][0],
         PSI_START_EXPECTED_1,
         rtol=1e-3,
         atol=0.1,

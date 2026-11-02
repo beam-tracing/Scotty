@@ -35,7 +35,7 @@ def ray_run(tmp_path_factory):
 def test_ray_tracing_only_analysis_completes(ray_run):
     """filter_s needs the launch wavenumber, which used to be set only for beam
     tracing, so a ray-tracing-only run failed in dbs_analysis"""
-    dbs = ray_run["dbs_analysis"]
+    dbs = ray_run["diagnostics/dbs"]
     for power in ("-10_3", "-13_3"):
         assert np.all(np.isfinite(dbs[f"filter_s_{power}"].values))
 
@@ -43,7 +43,7 @@ def test_ray_tracing_only_analysis_completes(ray_run):
 def test_filter_all_is_an_array_with_its_own_integral(beam_run):
     """The array and its path integral used to share the key filter_all_<power>,
     and the 0-d integral replaced the array"""
-    dbs = beam_run["dbs_analysis"]
+    dbs = beam_run["diagnostics/dbs"]
     length = dbs["beam_path_length"].values
     for power in ("-10_3", "-13_3"):
         filter_all = dbs[f"filter_all_{power}"].values
@@ -71,7 +71,7 @@ def test_filter_all_is_an_array_with_its_own_integral(beam_run):
 
 def test_d_xhat_d_tau_keeps_vector_and_scalar(beam_run):
     """The scalar d_xhat_d_tau . y_hat used to overwrite the vector"""
-    analysis = beam_run["analysis"]
+    analysis = beam_run["beam"]
     vector = analysis["d_xhat_d_tau"].values
     assert vector.shape == analysis["x_hat_cartesian"].values.shape
     np.testing.assert_allclose(
@@ -85,8 +85,8 @@ def test_d_xhat_d_tau_keeps_vector_and_scalar(beam_run):
 def test_filter_functions_are_real(beam_run):
     """Rounding in the complex Cardano formula used to make filter_r, filter_all and
     their integrals complex-typed"""
-    analysis, dbs = beam_run["analysis"], beam_run["dbs_analysis"]
-    assert not np.iscomplexobj(analysis["g_magnitude_Cardano"].values)
+    analysis, dbs = beam_run["beam"], beam_run["diagnostics/dbs"]
+    assert not np.iscomplexobj(beam_run["checks"]["g_magnitude_Cardano"].values)
     for k in (
         "filter_r",
         "filter_all_-10_3",
@@ -100,10 +100,10 @@ def test_e_hat_belongs_to_the_traced_mode(beam_run):
     """e_hat is the eigenvector whose eigenvalue is the Cardano root the beam
     follows (eigh sorts eigenvalues, so the solver's Cardano index cannot be
     used to pick it)"""
-    analysis = beam_run["analysis"]
+    analysis = beam_run["beam"]
     np.testing.assert_allclose(
-        analysis["H_eigval_solution"].values,
-        analysis["H_Cardano_solution"].values,
+        beam_run["checks"]["H_eigval_solution"].values,
+        beam_run["checks"]["H_Cardano_solution"].values,
         rtol=0,
         atol=1e-10,
     )
@@ -115,9 +115,9 @@ def test_k_perp1_bs_splits_into_normal_and_binormal(beam_run):
     plane of k_perp1_hat: the two components add in quadrature to k_perp1_bs.
     At the cut-off K is tangent to the flux surface, so the backscattered
     wavevector is almost purely binormal (the usual DBS picture)"""
-    analysis, dbs = beam_run["analysis"], beam_run["dbs_analysis"]
+    analysis, dbs = beam_run["beam"], beam_run["diagnostics/dbs"]
     b_hat = analysis["b_hat_cartesian"].values
-    normal_hat = dbs["normal_hat"].values
+    normal_hat = analysis["normal_hat"].values
     np.testing.assert_allclose(
         np.einsum("ti,ti->t", normal_hat, b_hat), 0, rtol=0, atol=1e-6
     )

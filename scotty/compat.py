@@ -75,6 +75,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 import numpy as np
 import xarray as xr
 
+from scotty.output_tree import from_output_tree, to_output_tree
 from scotty.fun_general import find_K_labframe_cyl_to_cart
 
 log = logging.getLogger(__name__)
@@ -219,7 +220,7 @@ def quick_cutoff(dt: xr.DataTree) -> CutoffData:
 
         q_R, q_Z, K_norm, polflux, theta_m = quick_cutoff(beam_me_up(**from_v3_kwargs(kwargs)))
     """
-    so, an = dt["solver_output"].ds, dt["analysis"].ds
+    so, an = dt["solver"].ds, dt["beam"].ds
     K = np.asarray(so["K_output_magnitude"])
     i = int(np.argmin(K))
     return CutoffData(
@@ -469,7 +470,10 @@ for _v3, _v4 in (
 
 def detect_version(dt: xr.DataTree) -> str:
     """'v3' or 'v4', from the layout"""
-    if "dbs_analysis" in dt.children or "q_R_output" in dt["solver_output"].ds:
+    # "dbs_analysis": files from v4.0.0.dev0, before the output had its groups
+    if "beam" in dt.children or "dbs_analysis" in dt.children:
+        return "v4"
+    if "q_R_output" in dt["solver_output"].ds:
         return "v4"
     if "q_R" in dt["solver_output"].ds:
         return "v3"
@@ -623,13 +627,27 @@ def to_v4_output(dt: xr.DataTree) -> xr.DataTree:
     """A v3 output tree in the v4 layout"""
     if detect_version(dt) != "v3":
         raise ValueError("Expected a v3 output tree")
-    return _convert(dt, "v3")
+    out = _convert(dt, "v3")
+    flat = {name: out[name].to_dataset() for name in out.children}
+    empty = xr.Dataset()
+    tree = to_output_tree(
+        flat.get("inputs", empty),
+        flat.get("solver_output", empty),
+        flat.get("analysis", empty),
+        flat.get("dbs_analysis", empty),
+    )
+    tree.attrs = out.attrs
+    return tree
 
 
 def to_v3_output(dt: xr.DataTree) -> xr.DataTree:
     """A v4 output tree in the v3 layout"""
     if detect_version(dt) != "v4":
         raise ValueError("Expected a v4 output tree")
+    if "beam" in dt.children:
+        attrs = dt.attrs
+        dt = xr.DataTree.from_dict(from_output_tree(dt))
+        dt.attrs = attrs
     return _convert(dt, "v4")
 
 

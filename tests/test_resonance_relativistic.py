@@ -53,9 +53,9 @@ def test_fund_1_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.9103564491962086, -0.05809777044206722, -8.882382142451245e-05],
         rtol=1e-2,
@@ -97,9 +97,9 @@ def test_fund_2_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.9514969586482378, 0.10535069088939782, 3.9809690264897525e-05],
         rtol=1e-2,
@@ -139,9 +139,9 @@ def test_fund_3_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.8345510858149414, 0.17316950433821163, 0.0023098532726736633],
         rtol=1e-2,
@@ -181,9 +181,9 @@ def test_fund_4_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.7307657759972634, 0.015302520233810981, 1.7185443880748966e-05],
         rtol=1e-2,
@@ -223,9 +223,9 @@ def test_fund_5_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.8841856569285043, -0.4082171370330961, -0.000483268825027544],
         rtol=1e-2,
@@ -265,9 +265,9 @@ def test_fund_6_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.0957854232564677, 0.26627001769942255, 3.1415811409120136],
         rtol=1e-2,
@@ -319,9 +319,9 @@ def test_sec_harm_1_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.8631895522670991, -0.016173229853573817, -4.274971098350256e-05],
         rtol=1e-2,
@@ -361,9 +361,9 @@ def test_sec_harm_2_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.8373067418891855, -0.15175779104290016, -0.0004711781281609329],
         rtol=1e-2,
@@ -403,9 +403,9 @@ def test_sec_harm_3_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.7142201582176726, -0.19048766599900008, 0.03326574032585646],
         rtol=1e-2,
@@ -445,9 +445,9 @@ def test_sec_harm_4_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.393558370046402, -0.3443703253176513, -2.9533975261126915],
         rtol=1e-2,
@@ -488,9 +488,9 @@ def test_sec_harm_5_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.7165072858256694, -0.03699963289704433, 3.1427380476219575],
         rtol=1e-2,
@@ -530,9 +530,9 @@ def test_sec_harm_6_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.8134002015544437, -0.16923651161742756, 0.0012300719829534358],
         rtol=1e-2,
@@ -573,9 +573,9 @@ def test_flag_true(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.9162396978780787, -0.05765344712076549, -7.654831340237264e-05],
         rtol=1e-2,
@@ -620,4 +620,4 @@ def test_flag_false(tmp_path):
     # ray is not stopped at the fundamental resonance, where the same case with resonance_flag=True
     # stops (test_flag_true: R = 1.916 m; f_ce = 33 GHz at B = 1.18 T, R = 1.91 m), but carries on
     # well past it, to smaller R
-    assert float(output["solver_output/q_R_output"][-1]) < 1.916 - 0.02
+    assert float(output["solver/q_R_output"][-1]) < 1.916 - 0.02

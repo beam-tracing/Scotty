@@ -33,8 +33,10 @@ def test_filter_r_vacuum_limit(steered_run):
     """The beam enters the plasma where the density is zero, so the first point
     is in vacuum, where g = g_ant = 2c/omega and filter_r = 1"""
     omega = float(steered_run["inputs"]["launch_angular_frequency"])
-    g_first = float(np.real(steered_run["analysis"]["g_magnitude_Cardano"].values[0]))
-    filter_r_first = float(np.real(steered_run["dbs_analysis"]["filter_r"].values[0]))
+    g_first = float(np.real(steered_run["checks"]["g_magnitude_Cardano"].values[0]))
+    filter_r_first = float(
+        np.real(steered_run["diagnostics/dbs"]["filter_r"].values[0])
+    )
 
     assert np.isclose(g_first * omega / (2 * constants.c), 1.0, rtol=1e-5, atol=0)
     assert np.isclose(filter_r_first, 1.0, rtol=1e-5, atol=0)
@@ -45,10 +47,10 @@ def test_g_Cardano_parallel_to_g_Booker(steered_run):
     the ray, so their K-gradients must be parallel there (eq. 46). This fails
     if theta_m is held fixed while K is varied (which makes g parallel to K),
     or if b_hat is inconsistent between the Hamiltonian and the analysis"""
-    analysis = steered_run["analysis"]
+    analysis = steered_run["beam"]
     cos_angle = np.abs(
         np.sum(
-            np.real(analysis["g_hat_Cardano"].values)
+            np.real(steered_run["checks"]["g_hat_Cardano"].values)
             * analysis["g_hat_cartesian"].values,
             axis=-1,
         )
@@ -78,9 +80,9 @@ def eigenvalues_of_D(K_cart, b_cart, omega, eps_para, eps_perp, eps_g):
 def test_g_magnitude_matches_independent_gradient(steered_run):
     """|g| = |grad_K H| with H the eigenvalue of D, recomputed independently:
     eigenvalues from a Hermitian eigensolver, derivatives in Cartesian K"""
-    analysis = steered_run["analysis"]
+    analysis = steered_run["beam"]
     omega = float(steered_run["inputs"]["launch_angular_frequency"])
-    K_cart = steered_run["solver_output"]["K_output_cartesian"].values
+    K_cart = steered_run["solver"]["K_output_cartesian"].values
     b_cart = analysis["b_hat_cartesian"].values
     eps = [
         np.real(analysis[name].values)
@@ -99,7 +101,7 @@ def test_g_magnitude_matches_independent_gradient(steered_run):
         g_cart[:, j] = (H_plus - H_minus) / (2 * step)
 
     np.testing.assert_allclose(
-        np.real(analysis["g_magnitude_Cardano"].values),
+        np.real(steered_run["checks"]["g_magnitude_Cardano"].values),
         np.linalg.norm(g_cart, axis=-1),
         rtol=1e-3,
     )
