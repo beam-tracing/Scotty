@@ -9,6 +9,7 @@ Valerian Hongjie Hall-Chen
 """
 
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs
 import numpy as np
 
 
@@ -25,7 +26,7 @@ kwargs_dict = {
     "delta_Z": 0.00001,
     "density_fit_method": "quadratic",
     "find_B_method": "analytical",
-    "Psi_BC_flag": True,
+    "Psi_BC_flag": "continuous",
     "figure_flag": False,
     "vacuum_propagation_flag": True,
     "vacuumLaunch_flag": True,
@@ -37,4 +38,4 @@ kwargs_dict = {
     "minor_radius_a": 0.5,
 }
 
-beam_me_up(**kwargs_dict)
+beam_me_up(**from_v3_kwargs(kwargs_dict))

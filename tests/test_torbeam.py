@@ -66,3 +66,24 @@ def test_torbeam_no_grid_header(tmp_path):
     filename.write_text("Dummy line\n1 2\n")
     with pytest.raises(ValueError, match="No radial grid header"):
         Torbeam.from_file(filename)
+
+
+def test_torbeam_main_writes_inputs(tmp_path):
+    # main() writes ne.dat, Te.dat, inbeam.dat and a topfile of the
+    # analytical circular field, which reads back as that field
+    from scotty.geometry import CircularFluxSurfaceField
+    from scotty.torbeam import main
+
+    main(B_poloidal_max=0.1, torbeam_directory_path=tmp_path)
+    for name in ("ne.dat", "Te.dat", "inbeam.dat", "topfile"):
+        assert (tmp_path / name).is_file(), name
+
+    torbeam = Torbeam.from_file(tmp_path / "topfile")
+    field = CircularFluxSurfaceField(1.0, 0.75, 0.5, 0.1, 130, 65, 1.1)
+    R, Z = np.meshgrid(field.R_coord, field.Z_coord, indexing="ij")
+    npt.assert_allclose(torbeam.R_grid, field.R_coord)
+    npt.assert_allclose(torbeam.Z_grid, field.Z_coord)
+    npt.assert_allclose(torbeam.B_R, field.B_R(R, 0.0, Z), atol=1e-12)
+    npt.assert_allclose(torbeam.B_T, field.B_T(R, 0.0, Z))
+    npt.assert_allclose(torbeam.B_Z, field.B_Z(R, 0.0, Z), atol=1e-12)
+    npt.assert_allclose(torbeam.psi, field.polflux(R, 0.0, Z))

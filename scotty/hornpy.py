@@ -9,10 +9,9 @@ note that what he calls 'flare angle', I call 'semiflare angle'.
 - Table 7.1 for ratios of beam widths to aperture radii
 """
 
-from typing import Dict
-
 import numpy as np
 from scipy import constants
+from typing import Dict
 
 
 def inch2m(length_inches):

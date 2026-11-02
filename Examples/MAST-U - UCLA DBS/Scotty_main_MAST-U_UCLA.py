@@ -14,6 +14,7 @@ launch_beam_curvatures = np.array([-0.74971565, -0.75653105, -0.76383412, -0.771
 
 """
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs
 import numpy as np
 
 kwargs_dict = {
@@ -31,7 +32,7 @@ kwargs_dict = {
     "equil_time": 0.4,
     "shot": 45176,
     "poloidal_flux_enter": 1.06520296**2,
-    "Psi_BC_flag": True,
+    "Psi_BC_flag": "continuous",
     "figure_flag": True,
     "vacuum_propagation_flag": True,
     "vacuumLaunch_flag": True,
@@ -48,4 +49,4 @@ kwargs_dict = {
 
 # sys.exit()
 
-beam_me_up(**kwargs_dict)
+beam_me_up(**from_v3_kwargs(kwargs_dict))

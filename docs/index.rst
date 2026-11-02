@@ -19,6 +19,7 @@ through `get_parameters_for_Scotty()
    input
    output
    references
+   release_notes
    api/modules
 
 

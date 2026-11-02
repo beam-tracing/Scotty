@@ -1,7 +1,6 @@
-from scotty.derivatives import derivative, cache
-
 import numpy as np
 import numpy.testing as npt
+from scotty.derivatives import derivative, cache
 from time import sleep, time_ns
 
 
