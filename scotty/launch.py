@@ -489,7 +489,7 @@ def _theta_m(q: FloatArray, K: FloatArray, field: VALID_FIELDS, cart: bool) -> f
 
 
 def _mode_name(mode_flag: int, O_mode_flag: Optional[int]) -> str:
-    """"O" or "X", or "O or X" if the two polarisations are too alike to label."""
+    """ "O" or "X", or "O or X" if the two polarisations are too alike to label."""
     if O_mode_flag is None:
         return "O or X"
     return "O" if mode_flag == O_mode_flag else "X"

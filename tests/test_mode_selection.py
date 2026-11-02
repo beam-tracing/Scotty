@@ -187,11 +187,15 @@ def test_named_mode_raises_when_modes_cannot_be_labelled(tmp_path):
 
 @pytest.mark.parametrize("poloidal_flux_enter", [0.999, 0.99])
 @pytest.mark.parametrize("mode_flag", [1, -1])
-def test_e_hat_initial_is_the_traced_roots_at_low_density(tmp_path, poloidal_flux_enter, mode_flag):
+def test_e_hat_initial_is_the_traced_roots_at_low_density(
+    tmp_path, poloidal_flux_enter, mode_flag
+):
     """Each root's own polarisation, as on the ray's first point, not the same
     vector for both."""
     dt = beam_me_up(
-        **synthetic(tmp_path, mode_flag=mode_flag, poloidal_flux_enter=poloidal_flux_enter)
+        **synthetic(
+            tmp_path, mode_flag=mode_flag, poloidal_flux_enter=poloidal_flux_enter
+        )
     )
     assert_allclose(
         np.abs(dt["solver_output"]["e_hat_initial"].values),
