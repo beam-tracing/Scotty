@@ -599,6 +599,9 @@ def test_flag_false(tmp_path):
         "density_fit_parameters": np.array([1.0]),
         "delta_R": -0.00001,
         "delta_Z": 0.00001,
+        # The tolerances the expected values were made with (v3's defaults)
+        "rtol": 1e-3,
+        "atol": 1e-6,
         "resonance_flag": False,
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",

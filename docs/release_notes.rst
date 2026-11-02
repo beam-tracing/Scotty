@@ -65,6 +65,10 @@ Defaults
 - The default spatial finite-difference steps ``delta_X``, ``delta_Y``,
   ``delta_R`` and ``delta_Z`` are 1e-5 (v3: 1e-4). The wavevector steps are
   unchanged (0.1).
+- The default solver tolerances are ``rtol=1e-4`` and ``atol=1e-7`` (v3: 1e-3,
+  1e-6). Use tighter ones (e.g. 1e-6, 1e-9) for anything read close to the
+  cut-off. ``from_v3_kwargs`` keeps v3's tolerances and spatial steps, so a v3
+  script gives v3's accuracy.
 - ``interp_smoothing=0``, ``find_B_method="torbeam"`` and
   ``detailed_analysis_flag=True``, as in v3.
 - ``poloidal_flux_zero_temperature`` defaults to ``None``, which is

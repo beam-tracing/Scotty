@@ -22,7 +22,7 @@ from scotty.fun_general import (
 )
 from scotty.hamiltonian import DielectricTensor, Hamiltonian, convert_hessians, hessians
 from scotty.profile_fit import ProfileFitLike
-from scotty.typing import ArrayLike
+from scotty.typing import ArrayLike, FloatArray
 from typing import Optional, Tuple
 import xarray as xr
 
@@ -38,6 +38,32 @@ FIELD_ALIGNED_COMPONENTS = ["u1", "u2", "b"]
 
 # Transverse directions of the beam frame (x, y, g), for Psi_w
 BEAM_TRANSVERSE_COMPONENTS = ["x", "y"]
+
+
+def find_mode_index_Cardano(abs_H_Cardano: FloatArray) -> int:
+    """The Cardano root that the ray follows: the one with the smallest
+    :math:`|H|` at most points. `abs_H_Cardano` has shape (3, N).
+
+    Near the plasma edge, two of the roots are close together, and the step
+    error of the solvers can put the ray nearer the wrong one at a few points
+    without the ray having changed root, so these are warned about, not fatal.
+    It raises if no root is the smallest at more than half of the points.
+    """
+    closest = np.argmin(abs_H_Cardano, axis=0)
+    counts = np.bincount(closest, minlength=3)
+    mode_index = int(np.argmax(counts))
+    if 2 * counts[mode_index] <= closest.size:
+        raise ValueError(
+            f"Unable to select correct mode index for H_Cardano: {counts} points are "
+            "closest to each root"
+        )
+    others = closest.size - counts[mode_index]
+    if others > 0:
+        log.warning(
+            f"{others} of {closest.size} points along the ray are closer to another "
+            f"root of H_Cardano than to root {mode_index}. Consider a tighter `rtol`"
+        )
+    return mode_index
 
 
 def basic_analysis(
@@ -327,18 +353,10 @@ def basic_analysis(
     middle[len_tau // 10 : -len_tau // 10] = True
     in_plasma = middle & (np.asarray(n_e) > 0)
     judged = in_plasma if np.any(in_plasma) else middle
-    abs_H_Cardano_all = np.abs(np.stack([H_Cardano_1, H_Cardano_2, H_Cardano_3]))[
-        :, judged
-    ]
-    min_H_Cardano_all = np.argmin(abs_H_Cardano_all, axis=0)
-    if np.all(min_H_Cardano_all == 0):
-        mode_index_Cardano, H_Cardano_solution = 0, H_Cardano_1
-    elif np.all(min_H_Cardano_all == 1):
-        mode_index_Cardano, H_Cardano_solution = 1, H_Cardano_2
-    elif np.all(min_H_Cardano_all == 2):
-        mode_index_Cardano, H_Cardano_solution = 2, H_Cardano_3
-    else:
-        raise ValueError(f"Unable to select correct mode index for H_Cardano")
+    mode_index_Cardano = find_mode_index_Cardano(
+        np.abs(np.stack([H_Cardano_1, H_Cardano_2, H_Cardano_3]))[:, judged]
+    )
+    H_Cardano_solution = (H_Cardano_1, H_Cardano_2, H_Cardano_3)[mode_index_Cardano]
 
     check_H_output(H_Cardano_solution)
 

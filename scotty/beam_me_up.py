@@ -157,8 +157,8 @@ def beam_me_up(
     delta_K_zeta: float = 1e-1,
     delta_K_Z: float = 1e-1,  # in the same units as K_Z
     len_tau: int = 102,
-    rtol: float = 1e-3,  # for solve_ivp of the ray/beam solvers
-    atol: float = 1e-6,  # for solve_ivp of the ray/beam solvers
+    rtol: float = 1e-4,  # for solve_ivp of the ray/beam solvers
+    atol: float = 1e-7,  # for solve_ivp of the ray/beam solvers
     poloidal_flux_enter: float = 1.0,
     poloidal_flux_zero_density: float = 1.0,  # When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
     poloidal_flux_zero_temperature: Optional[
@@ -293,9 +293,11 @@ def beam_me_up(
         step in the toroidal mode number)
     len_tau : int, default 102
         Number of points along the ray in the output
-    rtol, atol : float, default 1e-3, 1e-6
+    rtol, atol : float, default 1e-4, 1e-7
         Relative and absolute tolerances of the ray and beam solvers
-        (`scipy.integrate.solve_ivp`)
+        (`scipy.integrate.solve_ivp`). Use tighter ones (e.g. 1e-6, 1e-9) for
+        anything read close to the cut-off, where :math:`\Psi` is steep. v3's
+        defaults were 1e-3, 1e-6
     poloidal_flux_enter : float, default 1.0
         Normalised poloidal flux of the plasma boundary: where the beam
         enters the plasma, and where the ray is stopped when it leaves

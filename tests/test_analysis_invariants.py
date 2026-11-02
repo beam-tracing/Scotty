@@ -5,8 +5,11 @@ zeta = 0 and errors in the cylindrical-to-Cartesian conversion of the field
 vanish. These cases steer the beam toroidally so that zeta changes along the ray.
 """
 
+from scotty.analysis import find_mode_index_Cardano
 from scotty.beam_me_up import beam_me_up
 from scotty.init_bruv import get_parameters_for_Scotty
+
+import logging
 
 import numpy as np
 import pytest
@@ -106,3 +109,28 @@ def test_dispersion_drift_is_step_error(tmp_path):
 
     assert tight < 1e-5
     assert tight < loose / 100
+
+
+def test_mode_index_Cardano_consistent(caplog):
+    abs_H = np.array([np.ones(10), np.zeros(10), np.ones(10)])
+    with caplog.at_level(logging.WARNING):
+        assert find_mode_index_Cardano(abs_H) == 1
+    assert caplog.text == ""
+
+
+def test_mode_index_Cardano_few_points_near_another_root(caplog):
+    """As near the plasma edge, where two roots are close together: a few points
+    nearer the other one, from step error, don't stop the run"""
+    abs_H = np.array([np.ones(100), np.full(100, 1e-4), np.full(100, 0.1)])
+    abs_H[2, -10:] = 1e-5
+    with caplog.at_level(logging.WARNING):
+        assert find_mode_index_Cardano(abs_H) == 1
+    assert "10 of 100 points" in caplog.text
+    assert "`rtol`" in caplog.text
+
+
+def test_mode_index_Cardano_no_majority_raises():
+    abs_H = np.array([np.ones(10), np.full(10, 1e-4), np.full(10, 0.1)])
+    abs_H[2, 5:] = 1e-5
+    with pytest.raises(ValueError, match="Unable to select correct mode index"):
+        find_mode_index_Cardano(abs_H)

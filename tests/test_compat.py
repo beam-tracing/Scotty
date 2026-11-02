@@ -101,6 +101,16 @@ def test_explicit_arguments_kept_and_idempotent():
     assert from_v3_kwargs(kw) == kw
 
 
+def test_v3_tolerances(caplog):
+    # v3's defaults (upstream/master feb9499); v4's are 1e-4, 1e-7
+    kw = from_v3_kwargs({})
+    assert kw["rtol"] == 1e-3
+    assert kw["atol"] == 1e-6
+    kw = from_v3_kwargs({"rtol": 1e-6, "atol": 1e-9})
+    assert kw["rtol"] == 1e-6
+    assert kw["atol"] == 1e-9
+
+
 def test_explicit_spatial_steps_kept(caplog):
     kw = from_v3_kwargs({"delta_R": 2e-5, "delta_Z": -3e-5})
     assert kw["delta_R"] == 2e-5
@@ -181,14 +191,18 @@ def test_plasma_launch_K_cylindrical_to_cartesian():
 
 
 def test_v3_script_gives_same_result_as_v4(tmp_path):
-    """The v3 script leaves the spatial steps unset, so from_v3_kwargs sets
-    v3's; the v4 run passes them explicitly"""
+    """The v3 script leaves the spatial steps and tolerances unset, so
+    from_v3_kwargs sets v3's; the v4 run passes them explicitly"""
     v4 = get_parameters_for_Scotty("DBS_synthetic")
-    v4.update(len_tau=52, interp_smoothing=0, delta_R=-1e-4, delta_Z=1e-4)
+    v4.update(
+        len_tau=52, interp_smoothing=0, delta_R=-1e-4, delta_Z=1e-4, rtol=1e-3, atol=1e-6
+    )
     v3_script = v3_style(v4)
-    del v3_script["delta_R"], v3_script["delta_Z"]
+    for name in ("delta_R", "delta_Z", "rtol", "atol"):
+        del v3_script[name]
     v3 = from_v3_kwargs(v3_script)
     assert (v3["delta_R"], v3["delta_Z"]) == (-1e-4, 1e-4)
+    assert (v3["rtol"], v3["atol"]) == (1e-3, 1e-6)
 
     out_v4 = beam_me_up(**v4, output_path=tmp_path, output_filename_suffix="_v4")
     out_v3 = beam_me_up(**v3, output_path=tmp_path, output_filename_suffix="_v3")

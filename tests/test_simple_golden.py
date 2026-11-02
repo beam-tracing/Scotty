@@ -1339,6 +1339,9 @@ def test_relativistic_O_mode(tmp_path, generator_rel):
     kwargs_dict["output_path"] = tmp_path
     kwargs_dict["relativistic_flag"] = True
     kwargs_dict["temperature_fit_method"] = Te_fit
+    # The tolerances the expected values were made with (v3's defaults)
+    kwargs_dict["rtol"] = 1e-3
+    kwargs_dict["atol"] = 1e-6
 
     output = beam_me_up(**kwargs_dict)
 
