@@ -111,6 +111,12 @@ def test_v3_tolerances(caplog):
     assert kw["atol"] == 1e-9
 
 
+def test_v3_len_tau():
+    # v3's default (upstream/master feb9499); v4's is 1002
+    assert from_v3_kwargs({})["len_tau"] == 102
+    assert from_v3_kwargs({"len_tau": 52})["len_tau"] == 52
+
+
 def test_explicit_spatial_steps_kept(caplog):
     kw = from_v3_kwargs({"delta_R": 2e-5, "delta_Z": -3e-5})
     assert kw["delta_R"] == 2e-5

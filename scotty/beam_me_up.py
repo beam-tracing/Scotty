@@ -156,7 +156,7 @@ def beam_me_up(
     delta_K_R: float = 1e-1,
     delta_K_zeta: float = 1e-1,
     delta_K_Z: float = 1e-1,  # in the same units as K_Z
-    len_tau: int = 102,
+    len_tau: int = 1002,
     rtol: float = 1e-4,  # for solve_ivp of the ray/beam solvers
     atol: float = 1e-7,  # for solve_ivp of the ray/beam solvers
     poloidal_flux_enter: float = 1.0,
@@ -291,8 +291,10 @@ def beam_me_up(
     delta_K_X, delta_K_Y, delta_K_R, delta_K_zeta, delta_K_Z : float, default 0.1
         Wavevector finite-difference steps, in m⁻¹ (``delta_K_zeta`` is a
         step in the toroidal mode number)
-    len_tau : int, default 102
-        Number of points along the ray in the output
+    len_tau : int, default 1002
+        Number of points along the ray in the output. The filter function is
+        integrated on these points, so too few of them change the result near
+        a narrow peak. v3's default was 102
     rtol, atol : float, default 1e-4, 1e-7
         Relative and absolute tolerances of the ray and beam solvers
         (`scipy.integrate.solve_ivp`). Use tighter ones (e.g. 1e-6, 1e-9) for

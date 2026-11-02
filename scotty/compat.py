@@ -47,7 +47,8 @@ What it converts:
   ``poloidal_flux_enter`` if that is larger, since v4 requires it); the
   spatial finite-difference steps ``delta_R`` = -1e-4 and ``delta_Z`` = 1e-4
   (v4's default is 1e-5 for both; v3 had no other spatial step); and the
-  solver tolerances ``rtol`` = 1e-3 and ``atol`` = 1e-6 (v4's are 1e-4, 1e-7).
+  solver tolerances ``rtol`` = 1e-3 and ``atol`` = 1e-6 (v4's are 1e-4, 1e-7);
+  and the number of output points ``len_tau`` = 102 (v4's is 1002).
 
 ``resonance_flag`` is passed through unchanged (v4 has it since #151 was ported).
 
@@ -98,6 +99,9 @@ V3_DEFAULT_SPATIAL_STEPS = {"delta_R": -1e-4, "delta_Z": 1e-4}
 
 #: v3's beam_me_up defaults for the solver tolerances; v4's are 1e-4, 1e-7
 V3_DEFAULT_TOLERANCES = {"rtol": 1e-3, "atol": 1e-6}
+
+#: v3's beam_me_up default for the number of output points; v4's is 1002
+V3_DEFAULT_LEN_TAU = 102
 
 
 _warned = set()
@@ -207,6 +211,10 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         if name not in kw:
             kw[name] = value
             _warn(f"set `{name}` = {value} (v3's default; v4's are 1e-4, 1e-7)")
+
+    if "len_tau" not in kw:
+        kw["len_tau"] = V3_DEFAULT_LEN_TAU
+        _warn(f"set `len_tau` = {V3_DEFAULT_LEN_TAU} (v3's default; v4's is 1002)")
 
     return kw
 
