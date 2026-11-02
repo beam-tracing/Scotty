@@ -2,8 +2,7 @@
 
 Generated from #151's v3 tests in the version of #161, whose expected end points are for
 find_B_method="analytical" = CircularFluxSurfaceField, the field v4's "analytical" now gives too
-(students/kai/projects/002-scotty-v4/scripts/port_151_tests.py; only the v3 -> v4 argument and output
-names are changed). From the v3 file:
+(only the v3 -> v4 argument and output names are changed). From the v3 file:
 
 The tests are verified by first plotting the absorption curves in the R-Z plane. Then, the trajectory
 is plotted on this same plot. If the trajectory stops at the curve, it means that the function is

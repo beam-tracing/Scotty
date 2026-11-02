@@ -1,7 +1,6 @@
 """Cylindrical -> Cartesian conversion of the Hessians of H (hamiltonian.convert_hessians).
 
-Test Hamiltonian, after Aurora's check (students/aurora/projects/004-scotty4-analysis/
-scripts/check_convert_hessians.py): H(x, K) = K.K - n(R, Z) + c (b(R, Z).K)^2 with a
+Test Hamiltonian, after Aurora's check: H(x, K) = K.K - n(R, Z) + c (b(R, Z).K)^2 with a
 sheared, position-dependent b, so that it is axisymmetric (dH/dzeta = 0, as Scotty
 assumes) but every block of the Hessian is non-trivial. The exact Cartesian Hessians
 are central differences of H in (X, Y, Z, K_X, K_Y, K_Z); the cylindrical inputs are
