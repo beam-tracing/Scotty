@@ -327,7 +327,7 @@ def find_mode_index_and_ehat(
         log.warning(f"Selecting min(H) as the solution")
         mode_idx = np.argmin(np.abs(H_Cardanos))
         H = H_Cardanos[mode_idx]
-        ehat = ehats[mode_idx]
+        ehat = ehats[:, mode_idx]
 
     elif soln_idxs.shape == (1,):
         mode_idx = soln_idxs[0]
@@ -341,7 +341,7 @@ def find_mode_index_and_ehat(
         log.warning(f"Selecting min(H) as the solution")
         mode_idx = np.argmin(np.abs(H_Cardanos))
         H = H_Cardanos[mode_idx]
-        ehat = ehats[mode_idx]
+        ehat = ehats[:, mode_idx]
 
     else:  # soln_idxs.shape == (2,) and mode_flag in ["O", "X"]:
         H0, H1 = H_Cardanos[soln_idxs]
@@ -486,6 +486,13 @@ def _theta_m(q: FloatArray, K: FloatArray, field: VALID_FIELDS, cart: bool) -> f
     K_magnitude = find_K_magnitude(cart, *K, q[0])  # type: ignore
     K_hat = K / (K_magnitude * np.array([1, 1 if cart else q[0], 1]))
     return float(np.arcsin(np.dot(field.unitvector(*q), K_hat)))
+
+
+def _mode_name(mode_flag: int, O_mode_flag: Optional[int]) -> str:
+    """"O" or "X", or "O or X" if the two polarisations are too alike to label."""
+    if O_mode_flag is None:
+        return "O or X"
+    return "O" if mode_flag == O_mode_flag else "X"
 
 
 def find_O_mode_flag(
@@ -650,7 +657,7 @@ def _mode_from_K(
     Psi_3D_initial_labframe: Optional[ComplexFloatArray],
     mode_flag_launch: VALID_LAUNCH_MODE_FLAGS,
     q_initial: FloatArray,
-    O_mode_flag: int,
+    O_mode_flag: Optional[int],
     tol_H_error: float = 1e-3,
     **mode_kwargs,
 ) -> dict:
@@ -699,7 +706,7 @@ def _mode_from_K(
         **mode_kwargs,
     )
 
-    mode_name = "O" if mode_flag_found == O_mode_flag else "X"
+    mode_name = _mode_name(mode_flag_found, O_mode_flag)
     if mode_flag_launch in ["O", "X"] and mode_flag_launch != mode_name:
         raise ValueError(
             f"`mode_flag` = {mode_flag_launch!r}, but K is the {mode_name}-mode "
@@ -1072,10 +1079,14 @@ def find_plasma_entry_parameters(
         electron_density,
         electron_temperature,
     )
-    O_mode_flag = _O_mode_flag(polarisations)
-    log.debug(
-        f"The O-mode is `mode_flag` = {O_mode_flag}, the X-mode `mode_flag` = {-O_mode_flag}"
-    )
+    try:
+        O_mode_flag = _O_mode_flag(polarisations)
+    except ValueError:
+        # Only "O" or "X" needs the label: 1 or -1 says which root to trace
+        if mode_flag_launch not in [1, -1]:
+            raise
+        O_mode_flag = None
+    log.debug(f"The O-mode is `mode_flag` = {O_mode_flag}")
 
     # Without boundary conditions (a plasma launch, or `boundary_flag` =
     # None), K is given rather than solved for each mode, so the mode is the
@@ -1116,13 +1127,13 @@ def find_plasma_entry_parameters(
             **mode_kwargs,
         )
 
-    # At (near-)zero density, the eigenvector of D is any transverse vector,
-    # so keep the mode's zero-density polarisation instead
-    if electron_density < POLARISATION_PROBE_DENSITY:
-        toreturn["e_hat_initial"] = polarisations[toreturn["mode_flag"]]
+    # The traced root's own polarisation. At (near-)zero density, the eigenvector
+    # of D is any transverse vector, and at low density the two roots can be too
+    # close for `H` to choose between them
+    toreturn["e_hat_initial"] = polarisations[toreturn["mode_flag"]]
 
     log.debug(
-        f"Starting the solvers in the {'O' if toreturn['mode_flag'] == O_mode_flag else 'X'}-mode, `mode_flag` = {toreturn['mode_flag']}"
+        f"Starting the solvers in the {_mode_name(toreturn['mode_flag'], O_mode_flag)}-mode, `mode_flag` = {toreturn['mode_flag']}"
     )
 
     (

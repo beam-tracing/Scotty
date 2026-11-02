@@ -166,3 +166,35 @@ def test_beam_me_up_passes_X_mode_to_the_ray_solver(
     beam_me_up(**synthetic(tmp_path, mode_flag=mode_flag, len_tau=10))
 
     assert seen["X_mode"] is X_mode
+
+
+@pytest.mark.parametrize("mode_flag", [1, -1])
+def test_numeric_mode_flag_needs_no_label(tmp_path, mode_flag):
+    """Far enough from perpendicular, the polarisations are too alike to label,
+    but 1 or -1 still says which root to trace."""
+    dt = beam_me_up(
+        **synthetic(tmp_path, mode_flag=mode_flag, toroidal_launch_angle_Torbeam=45.0)
+    )
+    assert int(dt["solver_output"]["mode_flag_initial"]) == mode_flag
+
+
+def test_named_mode_raises_when_modes_cannot_be_labelled(tmp_path):
+    with pytest.raises(ValueError, match="too alike"):
+        beam_me_up(
+            **synthetic(tmp_path, mode_flag="O", toroidal_launch_angle_Torbeam=45.0)
+        )
+
+
+@pytest.mark.parametrize("poloidal_flux_enter", [0.999, 0.99])
+@pytest.mark.parametrize("mode_flag", [1, -1])
+def test_e_hat_initial_is_the_traced_roots_at_low_density(tmp_path, poloidal_flux_enter, mode_flag):
+    """Each root's own polarisation, as on the ray's first point, not the same
+    vector for both."""
+    dt = beam_me_up(
+        **synthetic(tmp_path, mode_flag=mode_flag, poloidal_flux_enter=poloidal_flux_enter)
+    )
+    assert_allclose(
+        np.abs(dt["solver_output"]["e_hat_initial"].values),
+        np.abs(dt["analysis"]["e_hat"].values[0]),
+        atol=0.01,
+    )
