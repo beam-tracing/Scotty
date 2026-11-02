@@ -73,6 +73,12 @@ Defaults
 Other interface changes
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- The ``DBS_SWIP_MAST-U`` launch beam: its width and curvature were wrong
+  (-12.4 m and 24.4 m⁻¹ at 52 GHz, from swapped arguments), and are now
+  0.0420 m and -0.331 m⁻¹. They are still estimates, assuming a waist at the
+  window and the UCLA DBS's distance to the steering mirror, so give
+  ``launch_beam_width`` and ``launch_beam_curvature`` for anything quantitative.
+
 - ``output_path``, ``magnetic_data_path``, ``ne_data_path`` and
   ``Te_data_path`` accept a ``str`` or a ``pathlib.Path``. The output folder is
   created if it does not exist.

@@ -35,9 +35,9 @@ def test_bad_ne_settings():
         ("DBS_CIEMAT_JT60SA", "data", 90.0, 0.06323503329291348, -0.5535179506038995),
         ("DBS_UCLA_DIII-D_240", "thin_lens", 55.0, 0.02216858596, -1.0831303),
         ("DBS_UCLA_MAST-U", "thin_lens", 48.0, 0.05165271, -0.7997469),
-        # TODO: Check following, have different signs and magnitude to others
-        ("DBS_SWIP_MAST-U", "estimate_var_w0", 52.0, -11.518604, 26.2085140),
-        ("DBS_SWIP_MAST-U", "estimate_fix_w0", 52.0, -12.352420, 24.4393811),
+        # A Gaussian beam with its waist at the window, 27.7 cm in front of the mirror
+        ("DBS_SWIP_MAST-U", "estimate_var_w0", 52.0, 0.03966124, -0.42767136),
+        ("DBS_SWIP_MAST-U", "estimate_fix_w0", 52.0, 0.04197024, -0.33098776),
     ],
 )
 def test_beam_settings(

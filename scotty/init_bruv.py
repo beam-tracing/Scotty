@@ -72,7 +72,7 @@ def parameters_DBS_UCLA_MAST_U(launch_freq_GHz: float) -> dict:
 
 
 def parameters_DBS_SWIP_MAST_U(launch_freq_GHz: float) -> dict:
-    log.warning("`launch_position` is an estimate")
+    log.warning("`launch_position` and the launch beam are estimates")
     launch_beam = beam_settings(
         "DBS_SWIP_MAST-U", launch_freq_GHz, method="estimate_fix_w0"
     )
@@ -334,6 +334,10 @@ def launch_beam_DBS_UCLA_MAST_U_thin_lens(launch_freq_GHz):
     return launch_beam_width, launch_beam_curvature
 
 
+# Estimates, not the installed optics. These two assume the waist is at the window,
+# with the steering mirror 27.7 cm behind it (the geometry of the UCLA DBS on MAST,
+# which may not be SWIP's). SWIP's bench measurements (40 and 60 GHz) differ from
+# these waists by about 10% at the window, and put the 40 GHz waist closer to the lens
 def launch_beam_DBS_SWIP_MAST_U_estimate_var_w0(launch_freq_GHz):
     if launch_freq_GHz <= 50.0:  # Q band
         w0 = np.sqrt(launch_freq_GHz / 40) * 0.08
@@ -342,8 +346,7 @@ def launch_beam_DBS_SWIP_MAST_U_estimate_var_w0(launch_freq_GHz):
 
     # window to steering mirror, negative because the mirror is behind the window
     distance = -0.277
-    wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
-    return propagate_circular_beam(distance, wavenumber_K0, w0, launch_freq_GHz)
+    return propagate_circular_beam(w0, 0.0, distance, launch_freq_GHz)
 
 
 def launch_beam_DBS_SWIP_MAST_U_estimate_fix_w0(launch_freq_GHz):
@@ -354,8 +357,7 @@ def launch_beam_DBS_SWIP_MAST_U_estimate_fix_w0(launch_freq_GHz):
 
     # window to steering mirror, negative because the mirror is behind the window
     distance = -0.277
-    wavenumber_K0 = freq_GHz_to_wavenumber(launch_freq_GHz)
-    return propagate_circular_beam(distance, wavenumber_K0, w0, launch_freq_GHz)
+    return propagate_circular_beam(w0, 0.0, distance, launch_freq_GHz)
 
 
 # TODO fix typechecker errors
