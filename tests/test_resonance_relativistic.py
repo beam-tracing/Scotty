@@ -598,8 +598,11 @@ def test_flag_false(tmp_path):
         "launch_beam_curvature": -0.25,
         "launch_position": np.array([3, 0, 0]),
         "density_fit_parameters": np.array([1.0]),
-        "delta_R": -0.00001,
-        "delta_Z": 0.00001,
+        # v3's defaults, for now: what this does past the resonance depends on the numerics
+        "rtol": 1e-3,
+        "atol": 1e-6,
+        "delta_R": -1e-4,
+        "delta_Z": 1e-4,
         "resonance_flag": False,
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",
@@ -616,7 +619,7 @@ def test_flag_false(tmp_path):
     kwargs_dict["output_path"] = tmp_path
     # Past the resonance H is about -1 at these tolerances: the ray carried on,
     # off the dispersion relation, where the same case with resonance_flag=True
-    # stops cleanly (test_flag_true). At rtol = 1e-6 it stays on it, and ends at
-    # R = 1.03 m, but that takes minutes
+    # stops cleanly (test_flag_true). At rtol = 1e-6, with delta_R = -1e-5 and
+    # delta_Z = 1e-5, it stays on it, and ends at R = 1.03 m, but that takes minutes
     with pytest.raises(ValueError, match="unphysically large"):
         beam_me_up(**kwargs_dict)
