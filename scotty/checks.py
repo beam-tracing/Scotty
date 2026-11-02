@@ -782,7 +782,7 @@ class Parameters:
 def check_H_output(H_arr: ArrayLike, H_tol: float = 1e-2) -> None:
     log.debug("Checking `H` output along the ray (it should be zero)")
 
-    H_max = np.abs(np.max(H_arr))
+    H_max = np.max(np.abs(H_arr))
     if H_max > 1.0:
         raise ValueError(
             f"`H_output` is unphysically large! `|max(H_output)|` = {H_max}"

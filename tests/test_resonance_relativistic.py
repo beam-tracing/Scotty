@@ -13,6 +13,7 @@ test_flag_true and test_flag_false check resonance_flag.
 """
 
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose
 from scotty.beam_me_up import beam_me_up
 
@@ -586,7 +587,7 @@ def test_flag_true(tmp_path):
 def test_flag_false(tmp_path):
     # Regression check only: with resonance_flag=False the ray carries on past f_ce = f, but there the root
     # selected by mode_flag switches from O to X, H jumps from 0 to -1 and stays there, so the rest of the ray is
-    # unphysical (the LCFS acts as a cutoff). This checks that Scotty keeps doing the same thing.
+    # unphysical (the LCFS acts as a cutoff). This checks that Scotty says so.
     kwargs_dict = {
         "geometry": "cylindrical",
         "poloidal_launch_angle_Torbeam": 3,
@@ -599,9 +600,6 @@ def test_flag_false(tmp_path):
         "density_fit_parameters": np.array([1.0]),
         "delta_R": -0.00001,
         "delta_Z": 0.00001,
-        # The tolerances the expected values were made with (v3's defaults)
-        "rtol": 1e-3,
-        "atol": 1e-6,
         "resonance_flag": False,
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",
@@ -616,11 +614,9 @@ def test_flag_false(tmp_path):
         "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
-    output = beam_me_up(**kwargs_dict)
-    # In v3 (#161) this compared the end point with [1.884, 0.218, -0.0127], the last point of the
-    # unphysical path described above (it moved by ~2 cm between platforms there). v4 follows that
-    # path differently (it ends on the inboard side, R = 1.20 m), so check what the flag must do: the
-    # ray is not stopped at the fundamental resonance, where the same case with resonance_flag=True
-    # stops (test_flag_true: R = 1.916 m; f_ce = 33 GHz at B = 1.18 T, R = 1.91 m), but carries on
-    # well past it, to smaller R
-    assert float(output["solver_output/q_R_output"][-1]) < 1.916 - 0.02
+    # Past the resonance H is about -1 at these tolerances: the ray carried on,
+    # off the dispersion relation, where the same case with resonance_flag=True
+    # stops cleanly (test_flag_true). At rtol = 1e-6 it stays on it, and ends at
+    # R = 1.03 m, but that takes minutes
+    with pytest.raises(ValueError, match="unphysically large"):
+        beam_me_up(**kwargs_dict)

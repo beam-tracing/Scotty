@@ -41,27 +41,24 @@ BEAM_TRANSVERSE_COMPONENTS = ["x", "y"]
 
 
 def find_mode_index_Cardano(abs_H_Cardano: FloatArray) -> int:
-    """The Cardano root that the ray follows: the one with the smallest
-    :math:`|H|` at most points. `abs_H_Cardano` has shape (3, N).
+    """The Cardano root that the ray follows: the one with the smallest total
+    :math:`|H|` along it. `abs_H_Cardano` has shape (3, N).
 
     Near the plasma edge, two of the roots are close together, and the step
-    error of the solvers can put the ray nearer the wrong one at a few points
+    error of the solvers can leave the ray nearer the other one at some points
     without the ray having changed root, so these are warned about, not fatal.
-    It raises if no root is the smallest at more than half of the points.
+    `scotty.checks.check_H_output` then checks the size of :math:`|H|` on the
+    root chosen, which catches a ray that really has left it.
     """
-    closest = np.argmin(abs_H_Cardano, axis=0)
-    counts = np.bincount(closest, minlength=3)
-    mode_index = int(np.argmax(counts))
-    if 2 * counts[mode_index] <= closest.size:
-        raise ValueError(
-            f"Unable to select correct mode index for H_Cardano: {counts} points are "
-            "closest to each root"
-        )
-    others = closest.size - counts[mode_index]
-    if others > 0:
+    mode_index = int(np.argmin(np.nansum(abs_H_Cardano, axis=1)))
+    elsewhere = np.argmin(abs_H_Cardano, axis=0) != mode_index
+    if np.any(elsewhere):
         log.warning(
-            f"{others} of {closest.size} points along the ray are closer to another "
-            f"root of H_Cardano than to root {mode_index}. Consider a tighter `rtol`"
+            f"{np.count_nonzero(elsewhere)} of {elsewhere.size} points along the ray "
+            f"are closer to another root of H_Cardano than to root {mode_index}, "
+            f"where |H| on this root is up to {np.max(abs_H_Cardano[mode_index, elsewhere]):.2e}. "
+            "If that is small, it is step error near the plasma edge: consider a "
+            "tighter `rtol`"
         )
     return mode_index
 

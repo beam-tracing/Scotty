@@ -6,6 +6,7 @@ vanish. These cases steer the beam toroidally so that zeta changes along the ray
 """
 
 from scotty.analysis import find_mode_index_Cardano
+from scotty.checks import check_H_output
 from scotty.beam_me_up import beam_me_up
 from scotty.init_bruv import get_parameters_for_Scotty
 
@@ -118,19 +119,30 @@ def test_mode_index_Cardano_consistent(caplog):
     assert caplog.text == ""
 
 
-def test_mode_index_Cardano_few_points_near_another_root(caplog):
-    """As near the plasma edge, where two roots are close together: a few points
-    nearer the other one, from step error, don't stop the run"""
+def test_mode_index_Cardano_some_points_near_another_root(caplog):
+    """As near the plasma edge, where two roots are close together: points nearer
+    the other one, from step error, don't stop the run or change the root"""
     abs_H = np.array([np.ones(100), np.full(100, 1e-4), np.full(100, 0.1)])
     abs_H[2, -10:] = 1e-5
     with caplog.at_level(logging.WARNING):
         assert find_mode_index_Cardano(abs_H) == 1
     assert "10 of 100 points" in caplog.text
+    assert "up to 1.00e-04" in caplog.text
     assert "`rtol`" in caplog.text
 
 
-def test_mode_index_Cardano_no_majority_raises():
-    abs_H = np.array([np.ones(10), np.full(10, 1e-4), np.full(10, 0.1)])
-    abs_H[2, 5:] = 1e-5
-    with pytest.raises(ValueError, match="Unable to select correct mode index"):
-        find_mode_index_Cardano(abs_H)
+def test_mode_index_Cardano_long_low_density_stretch():
+    """Most of the ray at low density, where two roots are both near zero and
+    which is the smaller is down to rounding: the root isn't chosen by a vote"""
+    abs_H = np.array([np.ones(100), np.full(100, 1e-4), np.full(100, 1e-4)])
+    abs_H[2, :70] = 0.9e-4
+    abs_H[2, 70:] = 0.5
+    assert find_mode_index_Cardano(abs_H) == 1
+
+
+@pytest.mark.parametrize("sign", [1.0, -1.0])
+def test_check_H_output_sees_either_sign(sign):
+    H = np.zeros(10)
+    H[5] = sign * 2.0
+    with pytest.raises(ValueError, match="unphysically large"):
+        check_H_output(H)

@@ -44,9 +44,9 @@ What it converts:
 - defaults that differ between v3 and v4, restored when the v3 script left
   them unset: ``poloidal_flux_zero_density`` and
   ``poloidal_flux_zero_temperature`` (1.01, raised to
-  ``poloidal_flux_enter`` if that is larger, since v4 requires it), and the
+  ``poloidal_flux_enter`` if that is larger, since v4 requires it); the
   spatial finite-difference steps ``delta_R`` = -1e-4 and ``delta_Z`` = 1e-4
-  (v4's default is 1e-5 for both; v3 had no other spatial step), and the
+  (v4's default is 1e-5 for both; v3 had no other spatial step); and the
   solver tolerances ``rtol`` = 1e-3 and ``atol`` = 1e-6 (v4's are 1e-4, 1e-7).
 
 ``resonance_flag`` is passed through unchanged (v4 has it since #151 was ported).
@@ -206,7 +206,7 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
     for name, value in V3_DEFAULT_TOLERANCES.items():
         if name not in kw:
             kw[name] = value
-            _warn(f"set `{name}` = {value} (v3's default; v4's is tighter)")
+            _warn(f"set `{name}` = {value} (v3's default; v4's are 1e-4, 1e-7)")
 
     return kw
 
