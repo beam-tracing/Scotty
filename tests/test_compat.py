@@ -201,7 +201,12 @@ def test_v3_script_gives_same_result_as_v4(tmp_path):
     from_v3_kwargs sets v3's; the v4 run passes them explicitly"""
     v4 = get_parameters_for_Scotty("DBS_synthetic")
     v4.update(
-        len_tau=52, interp_smoothing=0, delta_R=-1e-4, delta_Z=1e-4, rtol=1e-3, atol=1e-6
+        len_tau=52,
+        interp_smoothing=0,
+        delta_R=-1e-4,
+        delta_Z=1e-4,
+        rtol=1e-3,
+        atol=1e-6,
     )
     v3_script = v3_style(v4)
     for name in ("delta_R", "delta_Z", "rtol", "atol"):
