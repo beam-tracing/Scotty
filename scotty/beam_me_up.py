@@ -293,9 +293,9 @@ def beam_me_up(
         step in the toroidal mode number)
     len_tau : int, default 4002
         Number of points along the ray in the output. The filter function is
-        integrated on these points, and where the beam focuses sharply at the
-        cut-off its peak can be narrower than their spacing at far fewer of
-        them. v3's default was 102
+        integrated on these points. Where the beam focuses sharply at the
+        cut-off, its peak can be narrower than their spacing if there are far
+        fewer of them. v3's default was 102
     rtol, atol : float, default 1e-4, 1e-7
         Relative and absolute tolerances of the ray and beam solvers
         (`scipy.integrate.solve_ivp`). Use tighter ones (e.g. 1e-6, 1e-9) for
