@@ -619,7 +619,8 @@ def test_flag_false(tmp_path):
     kwargs_dict["output_path"] = tmp_path
     # Past the resonance H is about -1 at these tolerances: the ray carried on,
     # off the dispersion relation, where the same case with resonance_flag=True
-    # stops cleanly (test_flag_true). At rtol = 1e-6, with delta_R = -1e-5 and
-    # delta_Z = 1e-5, it stays on it, and ends at R = 1.03 m, but that takes minutes
+    # stops cleanly (test_flag_true). With tighter tolerances or wider steps, H
+    # stays near 0 instead, but only because K jumps onto the other root at the
+    # resonance, which is no more physical and which this check can't see
     with pytest.raises(ValueError, match="unphysically large"):
         beam_me_up(**kwargs_dict)
