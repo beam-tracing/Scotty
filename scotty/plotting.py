@@ -400,6 +400,9 @@ def plot_3d_flux_surfaces(
 
     fig = make_fig_if_None(existing_fig)
 
+    # Built outside the f-string: before Python 3.12 its {} can't hold a backslash
+    flux_label = r"$\rho_n$" if use_rho else r"$\psi_n$"
+
     fig.add_trace(
         pgo.Isosurface(
             x=XX.ravel(),
@@ -412,9 +415,9 @@ def plot_3d_flux_surfaces(
             opacity=0.1,
             colorscale="plasma_r",
             caps={"x_show": show_axes, "y_show": show_axes, "z_show": show_axes},
-            name=f"Flux surfaces, {r'$\rho_n' if use_rho else r'$\psi_n$'}",
+            name=f"Flux surfaces, {flux_label}",
             colorbar={
-                "title": r"$\rho_n$" if use_rho else r"$\psi_n$",
+                "title": flux_label,
                 "thickness": 10,
                 "len": 0.7,
             },
