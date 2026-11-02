@@ -40,6 +40,27 @@ FIELD_ALIGNED_COMPONENTS = ["u1", "u2", "b"]
 BEAM_TRANSVERSE_COMPONENTS = ["x", "y"]
 
 
+def select_H_Cardano_root(
+    H_Cardano_all: Tuple[ArrayLike, ArrayLike, ArrayLike],
+    judged: ArrayLike,
+    H_tol: float,
+) -> int:
+    """The root of the eigenvalue of D that the ray follows: the one that is
+    smallest over the ``judged`` points. The ray drifts off H = 0 by solver step
+    error, and at low density the gap between two roots can be smaller than that,
+    so another root can be the smallest at some points. That is allowed as long as
+    the chosen root is within ``H_tol`` of zero there. If it isn't, the root's label
+    has changed along the ray by more than ``H_tol``. The labels are the branches of
+    the Cardano formula, so this isn't necessarily a change of mode. A NaN counts as
+    far from zero"""
+    abs_H = np.nan_to_num(np.abs(np.stack(H_Cardano_all))[:, judged], nan=np.inf)
+    mode_index = int(np.argmin(np.median(abs_H, axis=1)))
+    elsewhere = np.argmin(abs_H, axis=0) != mode_index
+    if np.any(abs_H[mode_index, elsewhere] > H_tol):
+        raise ValueError("Unable to select correct mode index for H_Cardano")
+    return mode_index
+
+
 def basic_analysis(
     inputs: xr.Dataset,
     solver_output: xr.Dataset,
@@ -327,18 +348,11 @@ def basic_analysis(
     middle[len_tau // 10 : -len_tau // 10] = True
     in_plasma = middle & (np.asarray(n_e) > 0)
     judged = in_plasma if np.any(in_plasma) else middle
-    abs_H_Cardano_all = np.abs(np.stack([H_Cardano_1, H_Cardano_2, H_Cardano_3]))[
-        :, judged
-    ]
-    min_H_Cardano_all = np.argmin(abs_H_Cardano_all, axis=0)
-    if np.all(min_H_Cardano_all == 0):
-        mode_index_Cardano, H_Cardano_solution = 0, H_Cardano_1
-    elif np.all(min_H_Cardano_all == 1):
-        mode_index_Cardano, H_Cardano_solution = 1, H_Cardano_2
-    elif np.all(min_H_Cardano_all == 2):
-        mode_index_Cardano, H_Cardano_solution = 2, H_Cardano_3
-    else:
-        raise ValueError(f"Unable to select correct mode index for H_Cardano")
+    H_Cardano_all = (H_Cardano_1, H_Cardano_2, H_Cardano_3)
+    mode_index_Cardano = select_H_Cardano_root(
+        H_Cardano_all, judged, H_tol=10 * float(inputs["rtol"][()])
+    )
+    H_Cardano_solution = H_Cardano_all[mode_index_Cardano]
 
     check_H_output(H_Cardano_solution)
 

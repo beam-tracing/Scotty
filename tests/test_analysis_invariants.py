@@ -5,6 +5,7 @@ zeta = 0 and errors in the cylindrical-to-Cartesian conversion of the field
 vanish. These cases steer the beam toroidally so that zeta changes along the ray.
 """
 
+from scotty.analysis import select_H_Cardano_root
 from scotty.beam_me_up import beam_me_up
 from scotty.init_bruv import get_parameters_for_Scotty
 
@@ -106,3 +107,67 @@ def test_dispersion_drift_is_step_error(tmp_path):
 
     assert tight < 1e-5
     assert tight < loose / 100
+
+
+def _roots_with_drift(ray, other):
+    """Three roots at six points, where the ray is on the middle one"""
+    far = np.full(6, 0.5)
+    return far, np.asarray(ray, dtype=float), np.asarray(other, dtype=float)
+
+
+def test_select_root_when_all_points_agree():
+    roots = _roots_with_drift([1e-5] * 6, [1e-1] * 6)
+    assert select_H_Cardano_root(roots, np.ones(6, dtype=bool), H_tol=1e-2) == 1
+
+
+def test_select_root_allows_drift_past_a_small_gap():
+    """At low density the gap between two roots can be smaller than the solver's
+    drift, so the neighbouring root is the smallest at some points. This raised on
+    a MAST-U ray at the default rtol, on the last 10 of 801 points"""
+    roots = _roots_with_drift(
+        [1e-4, 1e-4, 1e-4, 1e-4, 4.5e-4, 4.5e-4],
+        [1e-1, 1e-1, 1e-1, 1e-1, 3.0e-4, 3.0e-4],
+    )
+    assert select_H_Cardano_root(roots, np.ones(6, dtype=bool), H_tol=1e-2) == 1
+
+
+def test_select_root_raises_if_the_ray_moves_to_another_root():
+    roots = _roots_with_drift(
+        [1e-4, 1e-4, 1e-4, 1e-4, 0.9, 0.9],
+        [0.9, 0.9, 0.9, 0.9, 1e-4, 1e-4],
+    )
+    with pytest.raises(ValueError, match="Unable to select"):
+        select_H_Cardano_root(roots, np.ones(6, dtype=bool), H_tol=1e-2)
+
+
+def test_select_root_ignores_points_not_judged():
+    roots = _roots_with_drift(
+        [0.9, 1e-4, 1e-4, 1e-4, 1e-4, 0.9], [1e-4, *[0.1] * 4, 1e-4]
+    )
+    judged = np.array([False, True, True, True, True, False])
+    assert select_H_Cardano_root(roots, judged, H_tol=1e-2) == 1
+
+
+@pytest.mark.parametrize("H_at_odd_points, allowed", [(0.9e-2, True), (1.1e-2, False)])
+def test_select_root_limit_is_H_tol(H_at_odd_points, allowed):
+    roots = _roots_with_drift(
+        [1e-4, 1e-4, 1e-4, 1e-4, H_at_odd_points, H_at_odd_points],
+        [1e-1, 1e-1, 1e-1, 1e-1, 1e-4, 1e-4],
+    )
+    judged = np.ones(6, dtype=bool)
+    if allowed:
+        assert select_H_Cardano_root(roots, judged, H_tol=1e-2) == 1
+    else:
+        with pytest.raises(ValueError, match="Unable to select"):
+            select_H_Cardano_root(roots, judged, H_tol=1e-2)
+
+
+def test_select_root_nan_in_another_root_is_ignored():
+    roots = _roots_with_drift([1e-4] * 6, [1e-1, np.nan, *[1e-1] * 4])
+    assert select_H_Cardano_root(roots, np.ones(6, dtype=bool), H_tol=1e-2) == 1
+
+
+def test_select_root_nan_in_the_ray_root_raises():
+    roots = _roots_with_drift([1e-4, np.nan, *[1e-4] * 4], [1e-1] * 6)
+    with pytest.raises(ValueError, match="Unable to select"):
+        select_H_Cardano_root(roots, np.ones(6, dtype=bool), H_tol=1e-2)
