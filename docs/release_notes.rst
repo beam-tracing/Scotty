@@ -87,6 +87,12 @@ Defaults
 Other interface changes
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+- The ``DBS_SWIP_MAST-U`` launch beam: its width and curvature were wrong
+  (-12.4 m and 24.4 m⁻¹ at 52 GHz, from swapped arguments), and are now
+  0.0420 m and -0.331 m⁻¹. They are still estimates, assuming a waist at the
+  window and the UCLA DBS's distance to the steering mirror, so give
+  ``launch_beam_width`` and ``launch_beam_curvature`` for anything quantitative.
+
 - ``output_path``, ``magnetic_data_path``, ``ne_data_path`` and
   ``Te_data_path`` accept a ``str`` or a ``pathlib.Path``. The output folder is
   created if it does not exist.
@@ -134,7 +140,10 @@ Removed
 - v3's other matplotlib plots (beam widths, filter functions, 3D beam profile,
   Psi).
 - The figures v3 saved with ``figure_flag=True`` (``Ray1_*.png``, ``H_*.png``):
-  v4 only stores the flag. Call ``scotty.plotting`` directly.
+  v4 only stores the flag, which now defaults to ``False`` and is no longer set
+  by the presets, and ``True`` logs a warning. Call ``scotty.plotting`` directly.
+- The dependency on ``freeqdsk``. Topfiles are now written by ``scotty.torbeam``
+  itself, in the same format.
 - ``CurvySlabField`` (``find_B_method="curvy_slab"``).
 - The analytical fields ``CircularCrossSectionField`` and
   ``ConstantCurrentDensityField``, and ``find_B_method="unit-tests"``; use

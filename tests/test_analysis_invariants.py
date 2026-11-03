@@ -14,6 +14,7 @@ import logging
 
 import numpy as np
 import pytest
+from scipy.interpolate import CubicSpline
 
 
 @pytest.fixture(
@@ -146,3 +147,43 @@ def test_check_H_output_sees_either_sign(sign):
     H[5] = sign * 2.0
     with pytest.raises(ValueError, match="unphysically large"):
         check_H_output(H)
+
+
+@pytest.fixture(
+    scope="module",
+    params=[(0.0, 1), (10.0, 1), (10.0, -1)],
+    ids=["O-tor0", "O-tor10", "X-tor10"],
+)
+def tight_run(request, tmp_path_factory):
+    toroidal_angle, mode_flag = request.param
+    kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
+    kwargs_dict["toroidal_launch_angle_Torbeam"] = toroidal_angle
+    kwargs_dict["mode_flag"] = mode_flag
+    kwargs_dict["figure_flag"] = False
+    kwargs_dict["rtol"] = 1e-5
+    kwargs_dict["atol"] = 1e-8
+    kwargs_dict["output_path"] = tmp_path_factory.mktemp("analysis_invariants")
+    return beam_me_up(**kwargs_dict)
+
+
+def test_g_matches_dq_dtau(tight_run):
+    """The ray equation dq/dtau = g, comparing the path the
+    solver integrated with the g the analysis recalculates from H. This tests
+    size and sign as well as direction, and fails if the solver and the analysis
+    disagree on H or on tau. The difference falls as rtol is tightened, so the
+    run needs a tighter rtol than the default for the test to be sharp"""
+    solver_output = tight_run["solver_output"]
+    tau = solver_output["tau"].values
+    dq_dtau = np.stack(
+        [
+            CubicSpline(tau, solver_output[name].values)(tau, 1)
+            for name in ("q_X_output", "q_Y_output", "q_Z_output")
+        ],
+        axis=-1,
+    )
+    g = np.real(tight_run["analysis"]["g_vector_cartesian"].values)
+
+    relative_difference = np.linalg.norm(dq_dtau - g, axis=-1) / np.linalg.norm(
+        g, axis=-1
+    )
+    assert relative_difference.max() < 1e-4

@@ -87,3 +87,26 @@ def test_torbeam_main_writes_inputs(tmp_path):
     npt.assert_allclose(torbeam.B_T, field.B_T(R, 0.0, Z))
     npt.assert_allclose(torbeam.B_Z, field.B_Z(R, 0.0, Z), atol=1e-12)
     npt.assert_allclose(torbeam.psi, field.polflux(R, 0.0, Z))
+
+
+def test_torbeam_write_format(tmp_path):
+    """Exact text of a small topfile: TORBEAM reads this format, and 2D arrays
+    are written with R varying fastest"""
+    R_grid = np.array([1.0, 2.0, 3.0])
+    Z_grid = np.array([-1.0, 1.0])
+    values = np.array([[1.0, -2.0], [3.5, 0.0], [-0.25, 6.0]])
+
+    filename = tmp_path / "topfile"
+    Torbeam(R_grid, Z_grid, values, values, values, values).write(filename)
+
+    block = (
+        "  1.000000000E+00  3.500000000E+00 -2.500000000E-01 -2.000000000E+00  0.000000000E+00\n"
+        "  6.000000000E+00\n"
+    )
+    assert filename.read_text() == (
+        "Dummy line\n3 2\nDummy line\n0 0 1\n"
+        "Grid: X-coordinates\n1.00000000e+00\n2.00000000e+00\n3.00000000e+00\n"
+        "Grid: Z-coordinates\n -1.000000000E+00  1.000000000E+00\n"
+        f"Magnetic field: B_R\n{block}Magnetic field: B_t\n{block}"
+        f"Magnetic field: B_Z\n{block}Poloidal flux: psi\n{block}"
+    )
