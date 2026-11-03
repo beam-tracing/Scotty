@@ -120,7 +120,10 @@ Removed
 - v3's other matplotlib plots (beam widths, filter functions, 3D beam profile,
   Psi).
 - The figures v3 saved with ``figure_flag=True`` (``Ray1_*.png``, ``H_*.png``):
-  v4 only stores the flag. Call ``scotty.plotting`` directly.
+  v4 only stores the flag, which now defaults to ``False`` and is no longer set
+  by the presets, and ``True`` logs a warning. Call ``scotty.plotting`` directly.
+- The dependency on ``freeqdsk``. Topfiles are now written by ``scotty.torbeam``
+  itself, in the same format.
 - ``CurvySlabField`` (``find_B_method="curvy_slab"``).
 - The analytical fields ``CircularCrossSectionField`` and
   ``ConstantCurrentDensityField``, and ``find_B_method="unit-tests"``; use
