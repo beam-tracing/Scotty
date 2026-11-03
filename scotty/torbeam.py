@@ -46,7 +46,6 @@ Version history
 
 from __future__ import annotations
 import argparse
-import freeqdsk._fileutils as fortran
 import numpy as np
 import pathlib
 from scotty.fun_general import read_floats_into_list_until
@@ -138,8 +137,6 @@ class Torbeam:
         z_grid_length = len(self.Z_grid)
 
         with open(filename, "w") as topfile_file:
-            chunks = fortran.ChunkOutput(topfile_file, extraspaces=1)
-
             topfile_file.write("Dummy line\n")
             topfile_file.write(f"{x_grid_length} {z_grid_length}\n")
             topfile_file.write("Dummy line\n")
@@ -149,19 +146,29 @@ class Torbeam:
                 topfile_file.write("{:.8e}\n".format(self.R_grid[ii]))
 
             topfile_file.write("Grid: Z-coordinates\n")
-            fortran.write_1d(self.Z_grid, chunks)
+            _write_floats(topfile_file, self.Z_grid)
 
             topfile_file.write("Magnetic field: B_R\n")
-            fortran.write_2d(self.B_R, chunks)
+            _write_floats(topfile_file, np.transpose(self.B_R))
 
             topfile_file.write("Magnetic field: B_t\n")
-            fortran.write_2d(self.B_T, chunks)
+            _write_floats(topfile_file, np.transpose(self.B_T))
 
             topfile_file.write("Magnetic field: B_Z\n")
-            fortran.write_2d(self.B_Z, chunks)
+            _write_floats(topfile_file, np.transpose(self.B_Z))
 
             topfile_file.write("Poloidal flux: psi\n")
-            fortran.write_2d(self.psi, chunks)
+            _write_floats(topfile_file, np.transpose(self.psi))
+
+
+def _write_floats(file, values):
+    """Write floats five to a line, in the format of a topfile's data blocks.
+    A 2D array is written row by row, so transpose it first for Fortran's order"""
+    values = np.ravel(values)
+    for start in range(0, len(values), 5):
+        chunk = values[start : start + 5]
+        file.write("".join(f" {' ' if v >= 0.0 else ''}{v:1.9E}" for v in chunk))
+        file.write("\n")
 
 
 def write_inbeam(

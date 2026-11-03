@@ -191,10 +191,9 @@ def beam_me_up(
         Union[str, int]
     ] = None,  # For returning log messages on a log file
     # Plotting flags
-    figure_flag: bool = True,
+    figure_flag: bool = False,
     further_analysis_flag: bool = False,
     detailed_analysis_flag: bool = True,
-    # TODO -- need to put individual flags for each plot
     # Additional flags
     benchmarking_flag: bool = False,
     ray_tracing_flag: bool = False,
@@ -349,9 +348,9 @@ def beam_me_up(
     file_log_level : str or int, optional
         Level of the log messages written to a log file in ``output_path``;
         ``None`` for no log file
-    figure_flag : bool, default True
-        Stored in the output's inputs; v4 does not make figures here (see
-        `scotty.plotting`)
+    figure_flag : bool, default False
+        Stored in the output's inputs. v4 does not make figures here, so
+        ``True`` only logs a warning; see `scotty.plotting`
     further_analysis_flag : bool, default False
         Stored in the output's inputs
     detailed_analysis_flag : bool, default True
@@ -452,6 +451,10 @@ def beam_me_up(
     log = logging.getLogger(__name__)
     log.debug(f"Saved and validated launch parameters")
     log.debug(f"Initialised logger")
+    if figure_flag:
+        log.warning(
+            "figure_flag=True makes no figures in v4: use scotty.plotting instead"
+        )
 
     log.info(f"""\n
     ##################################################
