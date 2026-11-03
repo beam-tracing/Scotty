@@ -141,6 +141,48 @@ def test_mode_index_Cardano_long_low_density_stretch():
     assert find_mode_index_Cardano(abs_H) == 1
 
 
+def test_mode_index_Cardano_warns_if_the_ray_moves_to_another_root(caplog):
+    """The labels are the branches of the Cardano formula. Moving between them isn't
+    fatal here: `check_H_output` judges the size of |H| on the root chosen"""
+    abs_H = np.array(
+        [
+            np.ones(6),
+            [1e-4, 1e-4, 1e-4, 1e-4, 0.9, 0.9],
+            [0.9, 0.9, 0.9, 0.9, 1e-4, 1e-4],
+        ]
+    )
+    with caplog.at_level(logging.WARNING):
+        assert find_mode_index_Cardano(abs_H) == 1
+    assert "2 of 6 points" in caplog.text
+    assert "up to 9.00e-01" in caplog.text
+
+
+def test_mode_index_Cardano_nan_in_another_root_is_ignored():
+    abs_H = np.array([np.ones(6), np.full(6, 1e-4), np.full(6, 0.1)])
+    abs_H[2, 1] = np.nan
+    assert find_mode_index_Cardano(abs_H) == 1
+
+
+def test_mode_index_Cardano_does_not_favour_a_root_with_many_nans():
+    abs_H = np.array([np.ones(6), np.full(6, 1e-4), np.full(6, np.nan)])
+    abs_H[2, 0] = 1e-6
+    assert find_mode_index_Cardano(abs_H) == 1
+
+
+def test_mode_index_Cardano_nan_in_the_ray_root_leaves_it_to_the_check():
+    """A NaN on the ray's own root: another root is chosen, whose large |H| is then
+    for `check_H_output` to judge"""
+    abs_H = np.array([np.ones(6), np.full(6, 1e-4), np.full(6, 0.1)])
+    abs_H[1, 1] = np.nan
+    assert find_mode_index_Cardano(abs_H) == 2
+
+
+def test_mode_index_Cardano_nan_in_every_root_at_one_point():
+    abs_H = np.array([np.ones(6), np.full(6, 1e-4), np.full(6, 0.1)])
+    abs_H[:, 1] = np.nan
+    assert find_mode_index_Cardano(abs_H) == 1
+
+
 @pytest.mark.parametrize("sign", [1.0, -1.0])
 def test_check_H_output_sees_either_sign(sign):
     H = np.zeros(10)

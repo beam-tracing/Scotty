@@ -49,14 +49,20 @@ def find_mode_index_Cardano(abs_H_Cardano: FloatArray) -> int:
     without the ray having changed root, so these are warned about, not fatal.
     `scotty.checks.check_H_output` then checks the size of :math:`|H|` on the
     root chosen, which catches a ray that really has left it.
+
+    A NaN counts as far from zero: only the roots with the fewest NaNs are
+    considered, so that a root isn't favoured for having fewer points in its total.
     """
-    mode_index = int(np.argmin(np.nansum(abs_H_Cardano, axis=1)))
-    elsewhere = np.argmin(abs_H_Cardano, axis=0) != mode_index
+    nan_counts = np.count_nonzero(np.isnan(abs_H_Cardano), axis=1)
+    totals = np.nansum(abs_H_Cardano, axis=1)
+    mode_index = int(np.argmin(np.where(nan_counts > nan_counts.min(), np.inf, totals)))
+    abs_H = np.nan_to_num(abs_H_Cardano, nan=np.inf)
+    elsewhere = np.argmin(abs_H, axis=0) != mode_index
     if np.any(elsewhere):
         log.warning(
             f"{np.count_nonzero(elsewhere)} of {elsewhere.size} points along the ray "
             f"are closer to another root of H_Cardano than to root {mode_index}, "
-            f"where |H| on this root is up to {np.max(abs_H_Cardano[mode_index, elsewhere]):.2e}. "
+            f"where |H| on this root is up to {np.max(abs_H[mode_index, elsewhere]):.2e}. "
             "If that is small, it is step error near the plasma edge: consider a "
             "tighter `rtol`"
         )
