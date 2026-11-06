@@ -31,7 +31,7 @@ anything you need to reproduce later, use v3.
   - a plasma launch (`launch_flag="plasma"`, v3's `vacuumLaunch_flag=False`)
     checks that the launch point is inside the plasma and that K satisfies the
     dispersion relation, and takes K and Ψ in Cartesian components. With no
-    launched beam, `filterfun_b` and `filterfun_all_<power>` are NaN;
+    launched beam, `filterfun_b` and `filterfun_all` are NaN;
   - `Psi_BC_flag` is `"continuous"`, `"discontinuous"` or `None`; v3's
     deprecated `True` and `False` raise an error. `Psi_BC_flag=None` (v3's
     default) checks that the density is zero and flat at the plasma edge, and

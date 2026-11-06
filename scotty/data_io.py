@@ -36,7 +36,6 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "launch_position": params.q_launch,
         "mode_flag": params.mode_flag_launch,
         # Solver settings and finite-difference parameters
-        "benchmarking_flag": params.benchmarking_flag,
         "ray_tracing_flag": params.ray_tracing_flag,
         "launch_flag": params.launch_flag,
         # As a string, since netCDF cannot store `None`

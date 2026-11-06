@@ -203,7 +203,6 @@ def beam_me_up(
     further_analysis_flag: bool = False,
     detailed_analysis_flag: bool = True,
     # Additional flags
-    benchmarking_flag: bool = False,
     ray_tracing_flag: bool = False,
     return_dt_field: bool = False,  # For returning the datatree, field class
     # Keeping the extra kwargs for parsing later
@@ -369,8 +368,6 @@ def beam_me_up(
         Stored in the output's inputs
     detailed_analysis_flag : bool, default True
         Stored in the output's inputs
-    benchmarking_flag : bool, default False
-        Stored in the output's inputs
     ray_tracing_flag : bool, default False
         Trace only the ray, with no beam (v3's ``quick_run``; see
         `scotty.compat.quick_cutoff`)
@@ -447,7 +444,6 @@ def beam_me_up(
         further_analysis_flag=further_analysis_flag,
         detailed_analysis_flag=detailed_analysis_flag,
         # Additional flags
-        benchmarking_flag=benchmarking_flag,
         ray_tracing_flag=ray_tracing_flag,
         # return_dt_field = return_dt_field,
         # Extra kwargs for parsing

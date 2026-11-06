@@ -335,32 +335,28 @@ def dbs_analysis(
     if btf:
         ##################################################
         log.debug(
-            f"Finding total filter function (filterfun_p * filterfun_r * filterfun_b * filterfun_m * delta_ne_sq) and backscattered power (p_r)"
+            "Finding the filter function (filterfun_p * filterfun_r * filterfun_b * filterfun_m)"
         )
         ##################################################
 
-        filterfun_all = {
-            f"filterfun_all_{power}": filterfun_p
-            * filterfun_r
-            * filterfun_b
-            * filterfun_m
-            * delta_ne_sq[f"delta_ne_sq_{power}"]
-            for power in spectrum_power_laws
-        }
+        # Without the turbulence spectrum, which is not part of the filter
+        # function: the backscattered power is the integral of filterfun_all
+        # times delta_ne_sq along the ray
+        filterfun_all = filterfun_p * filterfun_r * filterfun_b * filterfun_m
 
         dbs_analysis_dict.update(
             {
-                **{f"{k}": (["tau"], v) for k, v in filterfun_all.items()},
-                **{
-                    f"int_{k}_dl": ([], trapezoid(v, beam_path_length))
-                    for k, v in filterfun_all.items()
-                },
+                "filterfun_all": (["tau"], filterfun_all),
+                "int_filterfun_all_dl": (
+                    [],
+                    trapezoid(filterfun_all, beam_path_length),
+                ),
             }
         )
 
     else:
         log.debug(
-            "No beam-tracing results; skipping total filter function (filterfun_p * filterfun_r * filterfun_b * filterfun_m * delta_ne_sq) and backscattered power (p_r)"
+            "No beam-tracing results; skipping the filter function (filterfun_p * filterfun_r * filterfun_b * filterfun_m)"
         )
 
     dbs_analysis_coords = {

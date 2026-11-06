@@ -41,32 +41,26 @@ def test_ray_tracing_only_analysis_completes(ray_run):
 
 
 def test_filterfun_all_is_an_array_with_its_own_integral(beam_run):
-    """The array and its path integral used to share the key filterfun_all_<power>,
-    and the 0-d integral replaced the array"""
+    """filterfun_all is the product of the four pieces of the filter function,
+    without the turbulence spectrum delta_ne_sq. The array and its path integral
+    used to share a key, and the 0-d integral replaced the array"""
     dbs = beam_run["diagnostics/dbs"]
     length = dbs["beam_path_length"].values
-    for power in ("-10_3", "-13_3"):
-        filterfun_all = dbs[f"filterfun_all_{power}"].values
-        assert filterfun_all.shape == length.shape
-        product = np.prod(
-            [
-                dbs[k].values
-                for k in (
-                    "filterfun_p",
-                    "filterfun_r",
-                    "filterfun_b",
-                    "filterfun_m",
-                    f"delta_ne_sq_{power}",
-                )
-            ],
-            axis=0,
-        )
-        np.testing.assert_allclose(filterfun_all, product, rtol=1e-12)
-        np.testing.assert_allclose(
-            dbs[f"int_filterfun_all_{power}_dl"].values,
-            trapezoid(filterfun_all, length),
-            rtol=1e-12,
-        )
+    filterfun_all = dbs["filterfun_all"].values
+    assert filterfun_all.shape == length.shape
+    product = np.prod(
+        [
+            dbs[k].values
+            for k in ("filterfun_p", "filterfun_r", "filterfun_b", "filterfun_m")
+        ],
+        axis=0,
+    )
+    np.testing.assert_allclose(filterfun_all, product, rtol=1e-12)
+    np.testing.assert_allclose(
+        dbs["int_filterfun_all_dl"].values,
+        trapezoid(filterfun_all, length),
+        rtol=1e-12,
+    )
 
 
 def test_d_xhat_d_tau_keeps_vector_and_scalar(beam_run):
@@ -89,9 +83,9 @@ def test_filter_functions_are_real(beam_run):
     assert not np.iscomplexobj(beam_run["beam"]["g_magnitude_Cardano"].values)
     for k in (
         "filterfun_r",
-        "filterfun_all_-10_3",
+        "filterfun_all",
         "int_filterfun_r_dl",
-        "int_filterfun_all_-10_3_dl",
+        "int_filterfun_all_dl",
     ):
         assert not np.iscomplexobj(dbs[k].values), k
 
