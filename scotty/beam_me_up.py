@@ -161,9 +161,9 @@ def beam_me_up(
     delta_K_R: float = 1e-1,
     delta_K_zeta: float = 1e-1,
     delta_K_Z: float = 1e-1,  # in the same units as K_Z
-    len_tau: int = 102,
-    rtol: float = 1e-3,  # for solve_ivp of the ray/beam solvers
-    atol: float = 1e-6,  # for solve_ivp of the ray/beam solvers
+    len_tau: int = 4002,
+    rtol: float = 1e-4,  # for solve_ivp of the ray/beam solvers
+    atol: float = 1e-7,  # for solve_ivp of the ray/beam solvers
     poloidal_flux_enter: float = 1.0,
     poloidal_flux_zero_density: float = 1.0,  # When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
     poloidal_flux_zero_temperature: Optional[
@@ -196,10 +196,9 @@ def beam_me_up(
         Union[str, int]
     ] = None,  # For returning log messages on a log file
     # Plotting flags
-    figure_flag: bool = True,
+    figure_flag: bool = False,
     further_analysis_flag: bool = False,
     detailed_analysis_flag: bool = True,
-    # TODO -- need to put individual flags for each plot
     # Additional flags
     benchmarking_flag: bool = False,
     ray_tracing_flag: bool = False,
@@ -296,11 +295,17 @@ def beam_me_up(
     delta_K_X, delta_K_Y, delta_K_R, delta_K_zeta, delta_K_Z : float, default 0.1
         Wavevector finite-difference steps, in m⁻¹ (``delta_K_zeta`` is a
         step in the toroidal mode number)
-    len_tau : int, default 102
-        Number of points along the ray in the output
-    rtol, atol : float, default 1e-3, 1e-6
+    len_tau : int, default 4002
+        Number of points along the ray in the output. The filter function is
+        integrated on these points. Where the beam focuses sharply at the
+        cut-off, its peak can be narrower than their spacing if there are far
+        fewer of them. v3's default was 102
+    rtol, atol : float, default 1e-4, 1e-7
         Relative and absolute tolerances of the ray and beam solvers
-        (`scipy.integrate.solve_ivp`)
+        (`scipy.integrate.solve_ivp`). Use tighter ones (e.g. 1e-6, 1e-9) for
+        anything read close to the cut-off, where :math:`\Psi` is steep, and
+        when :math:`K` at the cut-off is below about a tenth of its vacuum
+        value. v3's defaults were 1e-3, 1e-6
     poloidal_flux_enter : float, default 1.0
         Normalised poloidal flux of the plasma boundary: where the beam
         enters the plasma, and where the ray is stopped when it leaves
@@ -354,9 +359,9 @@ def beam_me_up(
     file_log_level : str or int, optional
         Level of the log messages written to a log file in ``output_path``;
         ``None`` for no log file
-    figure_flag : bool, default True
-        Stored in the output's inputs; v4 does not make figures here (see
-        `scotty.plotting`)
+    figure_flag : bool, default False
+        Stored in the output's inputs. v4 does not make figures here, so
+        ``True`` only logs a warning; see `scotty.plotting`
     further_analysis_flag : bool, default False
         Stored in the output's inputs
     detailed_analysis_flag : bool, default True
@@ -456,6 +461,10 @@ def beam_me_up(
     log = logging.getLogger(__name__)
     log.debug(f"Saved and validated launch parameters")
     log.debug(f"Initialised logger")
+    if figure_flag:
+        log.warning(
+            "figure_flag=True makes no figures in v4: use scotty.plotting instead"
+        )
 
     log.info(f"""\n
     ##################################################

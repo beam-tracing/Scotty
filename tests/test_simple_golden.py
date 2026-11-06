@@ -270,7 +270,7 @@ PSI_START_EXPECTED_NEG1 = np.array(
     ]
 )
 # Psi at the cut-off is steep (Psi_RR ~ -2.6e5, dPsi_RR/dtau ~ 6e3), and at
-# the default rtol = 1e-3 v3 is 0.35% and v4 0.9% from the converged value,
+# v3's default rtol = 1e-3 v3 is 0.35% and v4 0.9% from the converged value,
 # so it is checked on its own at rtol = 1e-6 (test_X_mode_cutoff_Psi), against
 # v3 (upstream/master feb9499, find_B_method="analytical") at rtol = 1e-6,
 # len_tau = 10; v3's Te = 0 relativistic run gives the same values
@@ -492,7 +492,7 @@ PSI_CUTOFF_EXPECTED_REL_1 = np.array(
         ],
     ]
 )
-# The final point sits at tau_leave, which at the default rtol = 1e-3 is
+# The final point sits at tau_leave, which at v3's default rtol = 1e-3 is
 # 2.5e-3 from v3's, so Psi there is 2.95% from v3 (check_Psi allows 1.8%);
 # at rtol = 1e-6 in both codes they are 0.26% apart. So it is checked on its
 # own at rtol = 1e-6 (test_relativistic_O_mode_final_Psi), against v3
@@ -1207,13 +1207,13 @@ def assert_ray_matches_golden(output, expected: dict, rtol=1e-2, atol=1e-2):
     """Compare the ray with the golden values at matched tau.
 
     The output grid is spaced tau_leave / (len_tau - 1), and tau_leave comes
-    from the ray solver's exit event, which at the default tolerance differs
+    from the ray solver's exit event, which at rtol = 1e-3 differs
     between v3 and v4 by about 0.1%. Comparing the arrays index by index
     therefore compares slightly different points, which near a zero crossing
     of K_R (dK_R/dtau ~ 7 m^-1 here) gives differences of ~2 on values of
     ~10. So tau is compared on its own, and every other array is interpolated
     onto the golden tau first. On the same field, v3 and v4 at tight tolerance
-    agree to 3e-4 in K_R; at matched tau the default-tolerance run is within
+    agree to 3e-4 in K_R; at matched tau an rtol = 1e-3 run is within
     0.1% of the golden values.
     """
     tau_key = "solver/tau"
@@ -1335,6 +1335,9 @@ def test_relativistic_O_mode(tmp_path, generator_rel):
     kwargs_dict["output_path"] = tmp_path
     kwargs_dict["relativistic_flag"] = True
     kwargs_dict["temperature_fit_method"] = Te_fit
+    # The tolerances the expected values were made with (v3's defaults)
+    kwargs_dict["rtol"] = 1e-3
+    kwargs_dict["atol"] = 1e-6
 
     output = beam_me_up(**kwargs_dict)
 
@@ -1367,7 +1370,7 @@ def test_relativistic_O_mode(tmp_path, generator_rel):
 def test_relativistic_O_mode_final_Psi(tmp_path, generator_relfinal):
     """Psi at the final point for test_relativistic_O_mode, at rtol = 1e-6
     against v3 at rtol = 1e-6. The final point sits at tau_leave, which at
-    the default rtol = 1e-3 differs from v3's by 2.5e-3 (Psi 2.95% apart);
+    rtol = 1e-3 differs from v3's by 2.5e-3 (Psi 2.95% apart);
     at rtol = 1e-6 in both codes, 2.4e-7 (Psi 0.26% apart)"""
     kwargs_dict = generator_relfinal(tmp_path)
     kwargs_dict["output_filename_suffix"] = "_Bpa1.12"
@@ -1542,7 +1545,7 @@ def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
 def test_X_mode_cutoff_Psi(tmp_path, generator_cutoff, temperature):
     """Psi at the cut-off for test_integrated_X_mode and
     test_null_relativistic_X_mode, at rtol = 1e-6 against v3 at rtol = 1e-6.
-    It is steep there, and at the default rtol = 1e-3 both codes are further
+    It is steep there, and at v3's default rtol = 1e-3 both codes are further
     from the converged value (v3 0.35%, v4 0.9%) than from each other at
     rtol = 1e-6 (0.2%)"""
     kwargs_dict = generator_cutoff(tmp_path)

@@ -72,6 +72,20 @@ Defaults
 - The default spatial finite-difference steps ``delta_X``, ``delta_Y``,
   ``delta_R`` and ``delta_Z`` are 1e-5 (v3: 1e-4). The wavevector steps are
   unchanged (0.1).
+- The default solver tolerances are ``rtol=1e-4`` and ``atol=1e-7`` (v3: 1e-3,
+  1e-6). Use tighter ones (e.g. 1e-6, 1e-9) for anything read close to the
+  cut-off, and when :math:`K` at the cut-off is below about a tenth of its
+  vacuum value: at about a twentieth, the integrated filter function at the
+  default settings was 1% and 22% off on the two launches tried.
+- The default number of output points ``len_tau`` is 4002 (v3: 102). The filter
+  function is integrated on these points, and where the beam focuses sharply at
+  the cut-off its peak can be narrower than their spacing: on one case tried,
+  the integral was 62% off at 102 and up to 5% off near 1000. An output file is
+  about 10 MB at this ``len_tau``.
+- So a run at the default settings can give a noticeably different integrated
+  filter function from one at v3's defaults.
+- ``from_v3_kwargs`` keeps v3's tolerances, spatial steps and ``len_tau``, so a
+  v3 script gives v3's accuracy.
 - ``interp_smoothing=0``, ``find_B_method="torbeam"`` and
   ``detailed_analysis_flag=True``, as in v3.
 - ``poloidal_flux_zero_temperature`` defaults to ``None``, which is
@@ -79,6 +93,12 @@ Defaults
 
 Other interface changes
 ~~~~~~~~~~~~~~~~~~~~~~~
+
+- The ``DBS_SWIP_MAST-U`` launch beam: its width and curvature were wrong
+  (-12.4 m and 24.4 m⁻¹ at 52 GHz, from swapped arguments), and are now
+  0.0420 m and -0.331 m⁻¹. They are still estimates, assuming a waist at the
+  window and the UCLA DBS's distance to the steering mirror, so give
+  ``launch_beam_width`` and ``launch_beam_curvature`` for anything quantitative.
 
 - ``output_path``, ``magnetic_data_path``, ``ne_data_path`` and
   ``Te_data_path`` accept a ``str`` or a ``pathlib.Path``. The output folder is
@@ -127,7 +147,10 @@ Removed
 - v3's other matplotlib plots (beam widths, filter functions, 3D beam profile,
   Psi).
 - The figures v3 saved with ``figure_flag=True`` (``Ray1_*.png``, ``H_*.png``):
-  v4 only stores the flag. Call ``scotty.plotting`` directly.
+  v4 only stores the flag, which now defaults to ``False`` and is no longer set
+  by the presets, and ``True`` logs a warning. Call ``scotty.plotting`` directly.
+- The dependency on ``freeqdsk``. Topfiles are now written by ``scotty.torbeam``
+  itself, in the same format.
 - ``CurvySlabField`` (``find_B_method="curvy_slab"``).
 - The analytical fields ``CircularCrossSectionField`` and
   ``ConstantCurrentDensityField``, and ``find_B_method="unit-tests"``; use
