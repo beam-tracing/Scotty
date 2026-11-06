@@ -84,17 +84,11 @@ Numerical choices:
   stencils never sample the vacuum, where the density has its kink. With
   the X step pointing out of the plasma instead, the launch point (~1e-6 m
   inside the edge) samples the vacuum and Psi is wrong by ~100%.
-- :math:`\Omega_{ce} / \Omega = 0.3`, except at 10°, which uses 0.1. Scotty's
-  O-mode root, :math:`(\beta - \sqrt{\beta^2 - 4\alpha\gamma}) / 2\alpha`, is
-  0/0 where Booker's :math:`\alpha = \epsilon_\perp = 0` (the X-mode's upper
-  hybrid layer, :math:`\Omega_{pe}^2 / \Omega^2 = 1 - (\Omega_{ce} / \Omega)^2`).
-  At 10° the O-mode reaches :math:`\Omega_{pe}^2 / \Omega^2 = 0.97` before its
-  cut-off, beyond :math:`1 - 0.3^2 = 0.91`, and the beam solver fails there;
-  with 0.1 the layer is at 0.99. Values where the ratio is exactly 0.5 or 1
-  also stop the ray at the start (the resonance event is zero everywhere in a
+- :math:`\Omega_{ce} / \Omega = 0.3`. Values where the ratio is exactly 0.5 or
+  1 stop the ray at the start (the resonance event is zero everywhere in a
   uniform field).
-- Run time: nearly all of it is the beam solve, about 60 ms per evaluation and
-  about 2600-3000 evaluations per run at ``rtol=1e-7``, ``atol=1e-8``, driven
+- Run time: nearly all of it is the beam solve, about 30 ms per evaluation and
+  about 2600-2900 evaluations per run at ``rtol=1e-7``, ``atol=1e-8``, driven
   by finite-difference noise in components of :math:`\Psi` that symmetry makes
   zero (see beam-tracing/Scotty#175).
 """
@@ -126,7 +120,7 @@ N_CUTOFF = constants.epsilon_0 * constants.m_e * OMEGA**2 / constants.e**2 / 1e1
 TAU_LAUNCH = 1e-3
 LEN_TAU = 200
 # rtol = 1e-8 takes ~20 min per run, as the rounding noise in d^2H/dq^2 then
-# limits the steps; at 1e-7 a run takes ~3 min
+# limits the steps; at 1e-7 a run takes 1-2 min
 SOLVER = {"rtol": 1e-7, "atol": 1e-8}
 DELTA_Q = 1e-3
 
@@ -136,12 +130,12 @@ TOL = {
     "q": 1e-11,  # (1.8e-12)
     "K": 2e-11,  # (9.0e-14)
     # The in-plane block, real and imaginary parts. This limit is rounding noise
-    # and moves between machines; a scan in rtol shows the floor (4.5e-7, at 10 deg)
+    # and moves between machines; a scan in rtol shows the floor (1.1e-6, at 10 deg)
     "Psi": 5e-6,
     "Psi_off_plane": 3e-6,  # Psi_XZ, Psi_YZ, exactly zero (7.0e-7, at 10 deg)
-    "Psi_ZZ": 1e-7,  # (1.7e-8)
-    "W": 3e-6,  # (5.4e-7, at 10 deg)
-    "focus": 3e-6,  # fraction of the output step (4.5e-7)
+    "Psi_ZZ": 1e-7,  # (9.4e-9)
+    "W": 3e-6,  # (1.1e-6, at 10 deg)
+    "focus": 3e-6,  # fraction of the output step (9.1e-7)
     "tau_leave": 1e-8,  # (5.5e-12)
     "tau_cutoff": 1e-7,  # (4.7e-9)
     "B0_tau": 1e-9,  # (3.3e-12)
@@ -273,7 +267,7 @@ R_Y_CURVED = -2 * L * np.cos(np.deg2rad(30)) / np.sin(np.deg2rad(30)) ** 2
 
 # (launch angle in degrees, R_y = R_x at the edge, Omega_ce / Omega)
 CASES = {
-    "a10": (10.0, np.inf, 0.1),
+    "a10": (10.0, np.inf, 0.3),
     "a30-curved": (30.0, R_Y_CURVED, 0.3),
     # The a30-curved case at another |B|, for the B0 independence of the O-mode
     "a30-curved-B0": (30.0, R_Y_CURVED, 0.1),

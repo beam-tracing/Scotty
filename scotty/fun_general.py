@@ -901,6 +901,55 @@ def find_Booker_discriminant(
     ) + 4 * epsilon_para**2 * epsilon_g**2 * sin_theta_m_sq
 
 
+def find_Booker_root(
+    alpha: ArrayLike,
+    beta: ArrayLike,
+    gamma: ArrayLike,
+    discriminant: ArrayLike,
+    mode_flag: Literal[1, -1],
+) -> ArrayLike:
+    r"""
+    The root of the Booker quadratic that appears in the Hamiltonian,
+    :math:`H = N^2 + (\beta - s \sqrt{\beta^2 - 4 \alpha \gamma}) / 2 \alpha`,
+    with :math:`s` = `mode_flag`.
+
+    This is 0/0 for one root at :math:`\alpha = \epsilon_\perp = 0` (the X-mode's
+    upper hybrid layer, for K perpendicular to B), although that root is regular
+    there. So, element by element, where :math:`\beta - s \sqrt{\cdot}` is the
+    smaller of :math:`\beta \mp s \sqrt{\cdot}` in magnitude, this uses the
+    rationalised form, which is equal to it algebraically and has no cancellation:
+
+    .. math::
+
+        \frac{\beta - s \sqrt{\beta^2 - 4\alpha\gamma}}{2\alpha}
+        = \frac{2\gamma}{\beta + s \sqrt{\beta^2 - 4\alpha\gamma}}
+
+    Elsewhere the form is unchanged, including the other root's resonance at
+    :math:`\alpha = 0`. Terms that are NaN, as from a NaN density, give NaN.
+
+    Parameters
+    ----------
+    alpha, beta, gamma : ArrayLike
+        From `find_Booker_terms`
+    discriminant : ArrayLike
+        From `find_Booker_discriminant`
+    mode_flag : 1 or -1
+        Which root
+
+    Returns
+    ----------
+    ArrayLike
+        The root, :math:`H - N^2`
+    """
+    sqrt_discriminant = np.sqrt(discriminant)
+    numerator = beta - mode_flag * sqrt_discriminant
+    conjugate = beta + mode_flag * sqrt_discriminant
+    rationalise = np.abs(numerator) < np.abs(conjugate)
+    return np.where(rationalise, 2 * gamma, numerator) / np.where(
+        rationalise, conjugate, 2 * alpha
+    )
+
+
 def find_Booker_alpha(
     launch_angular_freq: float,
     B_total: ArrayLike,
