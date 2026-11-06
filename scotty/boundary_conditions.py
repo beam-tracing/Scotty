@@ -31,6 +31,33 @@ from typing import Tuple, Literal, Optional, cast
 
 log = logging.getLogger(__name__)
 
+
+def flux_surface_tangents(
+    grad_psi: FloatArray,
+) -> Tuple[FloatArray, FloatArray, FloatArray]:
+    """Three unit tangents of the flux surface, no two of them parallel.
+
+    ``e1`` and ``e2`` are orthonormal and perpendicular to ``grad_psi``, and
+    the third is ``(e1 + e2) / sqrt(2)``. ``e1`` is ``grad_psi`` crossed with
+    the coordinate axis least aligned with it, so it never vanishes, whatever
+    the direction of ``grad_psi``.
+
+    Matching ``t . Psi . t`` along these three tangents fixes the whole 2x2
+    tangential block of Psi, which needs the three ``t t^T`` to be linearly
+    independent, that is, no two of the tangents parallel.
+    """
+    norm = np.linalg.norm(grad_psi)
+    if norm == 0:
+        raise ValueError("grad psi vanishes at the plasma entry point")
+    normal = grad_psi / norm
+    axis = np.zeros(3)
+    axis[np.argmin(np.abs(normal))] = 1.0
+    e1 = np.cross(normal, axis)
+    e1 = e1 / np.linalg.norm(e1)
+    e2 = np.cross(normal, e1)
+    return e1, e2, (e1 + e2) / np.sqrt(2)
+
+
 ##################################################
 #
 # BOUNDARY CONDITION CHECKS
@@ -537,24 +564,35 @@ def find_Psi_3D_plasma(
 
         # Now we set up the interface matrix using 6 linearly
         # independent equations to obtain a relation between the
-        # entries of "Psi_v" and "Psi_p". Note that this matrix
-        # differs slightly, even after applying toroidal symmetry
-        # arguments, from the original interface matrix for
-        # cylindrical Scotty. However, these differences, in
-        # essence, disappear when one applies row operations
-        # (like partial Gaussian elimination)
+        # entries of "Psi_v" and "Psi_p". The first three match t.Psi.t
+        # across the boundary for three tangents t of the flux surface,
+        # and the last three are Psi_p . dH/dK = -dH/dq in the plasma.
+        #
+        # Three tangential quadratic forms fix the 2x2 tangential block of
+        # Psi only if no two of the tangents are parallel. The tangents are
+        # therefore built from grad psi (`flux_surface_tangents`). The
+        # coordinate-plane tangents used before, (-psi_Y, psi_X, 0),
+        # (-psi_Z, 0, psi_X) and (-psi_Z, -psi_Z, psi_X + psi_Y), become
+        # parallel when psi_Z = 0 (a slab with grad psi along X, or an entry
+        # at the midplane of an up-down symmetric equilibrium), psi_X = 0, or
+        # psi_X = -psi_Y, which made this matrix singular, and ill-conditioned
+        # near those directions. Wherever the old matrix was not singular,
+        # the solution is the same.
+        grad_psi = np.array([dp_dX, dp_dY, dp_dZ], dtype=np.float64)
+        tangents = flux_surface_tangents(grad_psi)
         interface_matrix = np.array(
             [
-                [dp_dY**2, -2 * dp_dX * dp_dY, 0, dp_dX**2, 0, 0],
-                [dp_dZ**2, 0, -2 * dp_dX * dp_dZ, 0, 0, dp_dX**2],
-                [
-                    dp_dZ**2,
-                    2 * dp_dZ**2,
-                    -2 * dp_dZ * (dp_dX + dp_dY),
-                    dp_dZ**2,
-                    -2 * dp_dZ * (dp_dX + dp_dY),
-                    (dp_dX + dp_dY) ** 2,
-                ],
+                *(
+                    [
+                        t[0] ** 2,
+                        2 * t[0] * t[1],
+                        2 * t[0] * t[2],
+                        t[1] ** 2,
+                        2 * t[1] * t[2],
+                        t[2] ** 2,
+                    ]
+                    for t in tangents
+                ),
                 [dH_dKx, dH_dKy, dH_dKz, 0, 0, 0],
                 [0, dH_dKx, 0, dH_dKy, dH_dKz, 0],
                 [0, 0, dH_dKx, 0, dH_dKy, dH_dKz],
@@ -575,71 +613,38 @@ def find_Psi_3D_plasma(
         #   - np.linalg.cond(interface matrix) = {np.linalg.cond(interface_matrix)}
         #""")
 
-        # For discontinuous boundary conditions, we have that
-        # K_vacuum =/= K_plasma in general, and this introduces
-        # an `eta` term for each case delta_X, delta_Y, delta_Z = 0
-        # corresponding to displacements in the YZ, XZ, and XY-planes
-        # respectively, which also corresponds to `eta_YZ` (not used),
-        # `eta_XZ`, and `eta_XY` respectively. The `eta_YZ` term is
-        # unused because the decomposing the interface matrix in this
-        # way leads to a singular matrix (because the resultant columns
-        # somehow become linearly dependent). To circumvent this, we
-        # elect to use `eta_XYZ` instead, which represents a general
-        # displacement in any direction
-
-        # On the other hand, for continuous boundary conditions,
-        # K_vacuum = K_plasma and so this simplifies the calculation
-        # quite a bit since no `eta`s are necessary since the `K`
-        # terms cancel out nicely. We set these to `0` just to
-        # (double) enforce the fact that the terms should cancel out
-
-        # Each eta is the second-order displacement along grad(psi) that keeps
-        # a point on the flux surface for a first-order step along the
-        # tangent t used in the matching row of the interface matrix:
-        #   eta = -(1/2) t.(grad grad psi).t / (grad psi . displacement direction).
-        # The cross terms therefore carry the signs of t's components, e.g.
-        # -2 psi_XY psi_X psi_Y for t = (-psi_Y, psi_X, 0). (Hall-Chen, Parra &
-        # Hillesheim 2022, eq. (C.6), prints +2: an erratum.)
+        # For discontinuous boundary conditions, K jumps along grad psi at
+        # the boundary: delta_K = K_vacuum - K_plasma. A point a first-order
+        # distance s along a tangent t stays on the flux surface only with a
+        # second-order step s^2 eta along grad psi, where
+        #   eta = -(1/2) t.(grad grad psi).t / |grad psi|^2,
+        # and the phase is continuous to second order in s if
+        #   t.Psi_p.t = t.Psi_v.t + 2 eta delta_K . grad psi.
+        # The cross terms of eta carry the signs of t's components
+        # (Hall-Chen, Parra & Hillesheim 2022, eq. (C.6), prints +2 for the
+        # cross term in its coordinate-plane form: an erratum).
+        #
+        # For continuous boundary conditions, K_vacuum = K_plasma and the
+        # eta terms drop out. We set them to 0 to enforce this.
         delta_K = K_vacuum - K_plasma
         if Psi_BC_flag == "continuous":
-            eta_XY = eta_XZ = eta_XYZ = 0
+            etas = np.zeros(3)
         else:  # Psi_BC_flag == "discontinuous"
-            eta_XY = (
-                -0.5
-                * (
-                    d2p_dX2 * dp_dY**2
-                    - 2 * d2p_dXdY * dp_dX * dp_dY
-                    + d2p_dY2 * dp_dX**2
-                )
-                / (dp_dX**2 + dp_dY**2)
+            hess_psi = np.array(
+                [
+                    [d2p_dX2, d2p_dXdY, d2p_dXdZ],
+                    [d2p_dXdY, d2p_dY2, d2p_dYdZ],
+                    [d2p_dXdZ, d2p_dYdZ, d2p_dZ2],
+                ],
+                dtype=np.float64,
             )
-            eta_XZ = (
-                -0.5
-                * (
-                    d2p_dX2 * dp_dZ**2
-                    - 2 * d2p_dXdZ * dp_dX * dp_dZ
-                    + d2p_dZ2 * dp_dX**2
-                )
-                / (dp_dX**2 + dp_dZ**2)
-            )
-            eta_XYZ = (
-                -0.5
-                * (
-                    d2p_dX2 * dp_dZ**2
-                    + d2p_dY2 * dp_dZ**2
-                    + d2p_dZ2 * (dp_dX + dp_dY) ** 2
-                    + 2 * d2p_dXdY * dp_dZ**2
-                    - 2 * d2p_dXdZ * dp_dZ * (dp_dX + dp_dY)
-                    - 2 * d2p_dYdZ * dp_dZ * (dp_dX + dp_dY)
-                )
-                / (dp_dX**2 + dp_dY**2 + dp_dZ**2)
+            etas = np.array(
+                [-0.5 * (t @ hess_psi @ t) / (grad_psi @ grad_psi) for t in tangents]
             )
 
             log.debug(f"""
         #
-        #   - eta_XY  = {eta_XY}
-        #   - eta_XZ  = {eta_XZ}
-        #   - eta_XYZ = {eta_XYZ}
+        #   - eta (one per tangent) = {etas}
         #""")
 
         Psi_v_vector = np.array(
@@ -647,12 +652,11 @@ def find_Psi_3D_plasma(
         )
         RHS_vector = np.array(
             [
-                np.dot(Psi_v_vector, interface_matrix[0])
-                + 2 * eta_XY * np.dot(delta_K, np.array([dp_dX, dp_dY, 0])),
-                np.dot(Psi_v_vector, interface_matrix[1])
-                + 2 * eta_XZ * np.dot(delta_K, np.array([dp_dX, 0, dp_dZ])),
-                np.dot(Psi_v_vector, interface_matrix[2])
-                + 2 * eta_XYZ * np.dot(delta_K, np.array([dp_dX, dp_dY, dp_dZ])),
+                *(
+                    np.dot(Psi_v_vector, interface_matrix[i])
+                    + 2 * etas[i] * np.dot(delta_K, grad_psi)
+                    for i in range(3)
+                ),
                 -dH_dX,
                 -dH_dY,
                 -dH_dZ,

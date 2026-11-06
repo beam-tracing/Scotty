@@ -4,7 +4,11 @@ import pytest
 from scipy import constants
 
 from scotty.boundary_conditions import find_K_plasma, find_Psi_3D_plasma
-from scotty.geometry import CircularFluxSurfaceField, MagneticField_Cylindrical
+from scotty.geometry import (
+    CircularFluxSurfaceField,
+    MagneticField_Cartesian,
+    MagneticField_Cylindrical,
+)
 from scotty.hamiltonian import Hamiltonian
 from scotty.launch import find_O_mode_flag
 
@@ -117,6 +121,118 @@ def test_find_Psi_3D_plasma_discontinuous():
         Pp @ g_K, -np.array([DH["dH_dR"], 0.0, DH["dH_dZ"]]), atol=1e-12
     )
     npt.assert_allclose(Pp, Pp.T)
+
+
+##################################################
+# Cartesian entry points where grad psi is along a coordinate axis
+##################################################
+
+
+# Hessian of psi at the entry point, and the Hamiltonian's derivatives there
+_HESS_PSI = np.array([[0.7, 0.2, -0.3], [0.2, 1.1, 0.4], [-0.3, 0.4, 2.3]])
+_DH_CART = {
+    "dH_dX": -2.3,
+    "dH_dY": 0.6,
+    "dH_dZ": 0.4,
+    "dH_dKX": -2.1e-3,
+    "dH_dKY": 3.0e-4,
+    "dH_dKZ": -4.4e-4,
+}
+
+
+class FluxDerivativesCartesian(MagneticField_Cartesian):
+    """Only the poloidal flux derivatives at the entry point"""
+
+    def __init__(self, grad_psi):
+        self.grad_psi = grad_psi
+
+    def B_X(self, X, Y, Z):
+        raise NotImplementedError
+
+    B_Y = B_Z = polflux = B_X
+
+    def d_polflux_dX(self, X, Y, Z, delta_X):
+        return self.grad_psi[0]
+
+    def d_polflux_dY(self, X, Y, Z, delta_Y):
+        return self.grad_psi[1]
+
+    def d_polflux_dZ(self, X, Y, Z, delta_Z):
+        return self.grad_psi[2]
+
+    def d2_polflux_dX2(self, X, Y, Z, delta_X):
+        return _HESS_PSI[0, 0]
+
+    def d2_polflux_dY2(self, X, Y, Z, delta_Y):
+        return _HESS_PSI[1, 1]
+
+    def d2_polflux_dZ2(self, X, Y, Z, delta_Z):
+        return _HESS_PSI[2, 2]
+
+    def d2_polflux_dXdY(self, X, Y, Z, delta_X, delta_Y):
+        return _HESS_PSI[0, 1]
+
+    def d2_polflux_dXdZ(self, X, Y, Z, delta_X, delta_Z):
+        return _HESS_PSI[0, 2]
+
+    def d2_polflux_dYdZ(self, X, Y, Z, delta_Y, delta_Z):
+        return _HESS_PSI[1, 2]
+
+
+class HamiltonianDerivativesCartesian:
+    spacings = {"q0": 1e-4, "q1": 1e-4, "q2": 1e-4}
+
+    def derivatives(self, q, K):
+        return dict(_DH_CART)
+
+
+@pytest.mark.parametrize("Psi_BC_flag", ["continuous", "discontinuous"])
+@pytest.mark.parametrize(
+    "grad_psi",
+    [
+        [1.9, 0.0, 0.0],
+        [0.0, 1.9, 0.0],
+        [0.0, 0.0, 1.9],
+        [1.9, -1.9, 0.5],
+        [1.9, 0.0, -0.4],
+        [1.9, 0.5, -0.4],
+    ],
+    ids=["along-X", "along-Y", "along-Z", "X-equals-minus-Y", "XZ-plane", "general"],
+)
+def test_find_Psi_3D_plasma_any_normal(Psi_BC_flag, grad_psi):
+    """The matching conditions hold whatever the direction of grad psi. The
+    first four (along a coordinate axis, as in a slab or at a midplane entry,
+    or with psi_X = -psi_Y) made the old coordinate-plane interface matrix
+    singular."""
+    grad_psi = np.array(grad_psi)
+    K_vacuum = np.array([-720.2, -213.2, -89.4])
+    if Psi_BC_flag == "continuous":
+        K_plasma = K_vacuum
+    else:  # K jumps along grad psi only
+        K_plasma = K_vacuum + 75.0 * grad_psi
+    Psi_v = PSI_VACUUM_3D
+    Psi_p = find_Psi_3D_plasma(
+        Psi_BC_flag,
+        np.array([1.0, 0.0, 0.0]),
+        K_vacuum,
+        K_plasma,
+        Psi_v,
+        FluxDerivativesCartesian(grad_psi),
+        HamiltonianDerivativesCartesian(),
+    )
+
+    # t.Psi.t jumps by -(t.(grad grad psi).t) (delta_K . grad psi) / |grad psi|^2
+    # along every tangent t, here 5 random ones
+    rng = np.random.default_rng(0)
+    for t in rng.normal(size=(5, 3)):
+        t = t - (t @ grad_psi) / (grad_psi @ grad_psi) * grad_psi
+        jump = -(t @ _HESS_PSI @ t) * ((K_vacuum - K_plasma) @ grad_psi)
+        jump /= grad_psi @ grad_psi
+        npt.assert_allclose(t @ Psi_p @ t, t @ Psi_v @ t + jump, rtol=1e-10)
+    g_K = np.array([_DH_CART["dH_dKX"], _DH_CART["dH_dKY"], _DH_CART["dH_dKZ"]])
+    g_q = np.array([_DH_CART["dH_dX"], _DH_CART["dH_dY"], _DH_CART["dH_dZ"]])
+    npt.assert_allclose(Psi_p @ g_K, -g_q, atol=1e-12)
+    npt.assert_allclose(Psi_p, Psi_p.T)
 
 
 ##################################################
