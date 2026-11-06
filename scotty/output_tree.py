@@ -45,7 +45,9 @@ def to_output_tree(
     """The output's groups, from what the analysis functions make"""
     from_dbs, dbs = _split(dbs_analysis, BEAM_FROM_DBS)
     # `analysis` has the path lengths as variables, `dbs_analysis` as coordinates
-    from_dbs = from_dbs.drop_vars([c for c in from_dbs.coords if c in analysis.data_vars])
+    from_dbs = from_dbs.drop_vars(
+        [c for c in from_dbs.coords if c in analysis.data_vars]
+    )
     return xr.DataTree.from_dict(
         {
             "inputs": inputs,

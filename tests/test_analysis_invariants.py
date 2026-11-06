@@ -213,16 +213,16 @@ def test_g_matches_dq_dtau(tight_run):
     size and sign as well as direction, and fails if the solver and the analysis
     disagree on H or on tau. The difference falls as rtol is tightened, so the
     run needs a tighter rtol than the default for the test to be sharp"""
-    solver_output = tight_run["solver_output"]
-    tau = solver_output["tau"].values
+    solver = tight_run["solver"]
+    tau = solver["tau"].values
     dq_dtau = np.stack(
         [
-            CubicSpline(tau, solver_output[name].values)(tau, 1)
+            CubicSpline(tau, solver[name].values)(tau, 1)
             for name in ("q_X_output", "q_Y_output", "q_Z_output")
         ],
         axis=-1,
     )
-    g = np.real(tight_run["analysis"]["g_vector_cartesian"].values)
+    g = np.real(tight_run["beam"]["g_vector_cartesian"].values)
 
     relative_difference = np.linalg.norm(dq_dtau - g, axis=-1) / np.linalg.norm(
         g, axis=-1
