@@ -5,8 +5,12 @@ zeta = 0 and errors in the cylindrical-to-Cartesian conversion of the field
 vanish. These cases steer the beam toroidally so that zeta changes along the ray.
 """
 
+from scotty.analysis import find_mode_index_Cardano
+from scotty.checks import check_H_output
 from scotty.beam_me_up import beam_me_up
 from scotty.init_bruv import get_parameters_for_Scotty
+
+import logging
 
 import numpy as np
 import pytest
@@ -74,7 +78,7 @@ def test_eigenvalue_of_D_consistent_with_Booker(steered_run):
 
 def test_dispersion_relation_satisfied_on_ray(steered_run):
     """The ray is traced on H = 0, so the Booker H must stay near zero, to within
-    the solver's step error. At the default rtol 1e-3, a steered X-mode ray drifts
+    the solver's step error. At rtol 1e-3, a steered X-mode ray drifts
     to |H| ~ 4e-3 in its last few points (step error on K ~ 1000 m^-1), so the
     bound scales with rtol rather than being fixed"""
     rtol = float(steered_run["inputs"]["rtol"])
@@ -107,6 +111,84 @@ def test_dispersion_drift_is_step_error(tmp_path):
 
     assert tight < 1e-5
     assert tight < loose / 100
+
+
+def test_mode_index_Cardano_consistent(caplog):
+    abs_H = np.array([np.ones(10), np.zeros(10), np.ones(10)])
+    with caplog.at_level(logging.WARNING):
+        assert find_mode_index_Cardano(abs_H) == 1
+    assert caplog.text == ""
+
+
+def test_mode_index_Cardano_some_points_near_another_root(caplog):
+    """As near the plasma edge, where two roots are close together: points nearer
+    the other one, from step error, don't stop the run or change the root"""
+    abs_H = np.array([np.ones(100), np.full(100, 1e-4), np.full(100, 0.1)])
+    abs_H[2, -10:] = 1e-5
+    with caplog.at_level(logging.WARNING):
+        assert find_mode_index_Cardano(abs_H) == 1
+    assert "10 of 100 points" in caplog.text
+    assert "up to 1.00e-04" in caplog.text
+    assert "`rtol`" in caplog.text
+
+
+def test_mode_index_Cardano_long_low_density_stretch():
+    """Most of the ray at low density, where two roots are both near zero and
+    which is the smaller is down to rounding: the root isn't chosen by a vote"""
+    abs_H = np.array([np.ones(100), np.full(100, 1e-4), np.full(100, 1e-4)])
+    abs_H[2, :70] = 0.9e-4
+    abs_H[2, 70:] = 0.5
+    assert find_mode_index_Cardano(abs_H) == 1
+
+
+def test_mode_index_Cardano_warns_if_the_ray_moves_to_another_root(caplog):
+    """The labels are the branches of the Cardano formula. Moving between them isn't
+    fatal here: `check_H_output` judges the size of |H| on the root chosen"""
+    abs_H = np.array(
+        [
+            np.ones(6),
+            [1e-4, 1e-4, 1e-4, 1e-4, 0.9, 0.9],
+            [0.9, 0.9, 0.9, 0.9, 1e-4, 1e-4],
+        ]
+    )
+    with caplog.at_level(logging.WARNING):
+        assert find_mode_index_Cardano(abs_H) == 1
+    assert "2 of 6 points" in caplog.text
+    assert "up to 9.00e-01" in caplog.text
+
+
+def test_mode_index_Cardano_nan_in_another_root_is_ignored():
+    abs_H = np.array([np.ones(6), np.full(6, 1e-4), np.full(6, 0.1)])
+    abs_H[2, 1] = np.nan
+    assert find_mode_index_Cardano(abs_H) == 1
+
+
+def test_mode_index_Cardano_does_not_favour_a_root_with_many_nans():
+    abs_H = np.array([np.ones(6), np.full(6, 1e-4), np.full(6, np.nan)])
+    abs_H[2, 0] = 1e-6
+    assert find_mode_index_Cardano(abs_H) == 1
+
+
+def test_mode_index_Cardano_nan_in_the_ray_root_leaves_it_to_the_check():
+    """A NaN on the ray's own root: another root is chosen, whose large |H| is then
+    for `check_H_output` to judge"""
+    abs_H = np.array([np.ones(6), np.full(6, 1e-4), np.full(6, 0.1)])
+    abs_H[1, 1] = np.nan
+    assert find_mode_index_Cardano(abs_H) == 2
+
+
+def test_mode_index_Cardano_nan_in_every_root_at_one_point():
+    abs_H = np.array([np.ones(6), np.full(6, 1e-4), np.full(6, 0.1)])
+    abs_H[:, 1] = np.nan
+    assert find_mode_index_Cardano(abs_H) == 1
+
+
+@pytest.mark.parametrize("sign", [1.0, -1.0])
+def test_check_H_output_sees_either_sign(sign):
+    H = np.zeros(10)
+    H[5] = sign * 2.0
+    with pytest.raises(ValueError, match="unphysically large"):
+        check_H_output(H)
 
 
 @pytest.fixture(
