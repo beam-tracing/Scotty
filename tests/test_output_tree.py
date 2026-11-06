@@ -1,7 +1,7 @@
 import numpy as np
 import xarray as xr
 
-from scotty.output_tree import (
+from scotty.data_io import (
     BEAM_FROM_DBS,
     from_output_tree,
     to_output_tree,

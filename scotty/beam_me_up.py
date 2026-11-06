@@ -115,8 +115,8 @@ from scotty.data_io import (
     dict_to_dataset,
     inputs_to_dicts,
     solver_output_to_dicts,
+    to_output_tree,
 )
-from scotty.output_tree import to_output_tree
 from scotty.geometry import (
     MagneticField_Cylindrical,
     MagneticField_Cartesian,

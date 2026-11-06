@@ -77,7 +77,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 import numpy as np
 import xarray as xr
 
-from scotty.output_tree import from_output_tree, to_output_tree
+from scotty.data_io import from_output_tree, to_output_tree
 from scotty.fun_general import find_K_labframe_cyl_to_cart
 
 log = logging.getLogger(__name__)
