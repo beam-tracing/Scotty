@@ -33,11 +33,11 @@ def ray_run(tmp_path_factory):
 
 
 def test_ray_tracing_only_analysis_completes(ray_run):
-    """filterfun_s needs the launch wavenumber, which used to be set only for beam
+    """delta_ne_sq needs the launch wavenumber, which used to be set only for beam
     tracing, so a ray-tracing-only run failed in dbs_analysis"""
     dbs = ray_run["diagnostics/dbs"]
     for power in ("-10_3", "-13_3"):
-        assert np.all(np.isfinite(dbs[f"filterfun_s_{power}"].values))
+        assert np.all(np.isfinite(dbs[f"delta_ne_sq_{power}"].values))
 
 
 def test_filterfun_all_is_an_array_with_its_own_integral(beam_run):
@@ -56,14 +56,14 @@ def test_filterfun_all_is_an_array_with_its_own_integral(beam_run):
                     "filterfun_r",
                     "filterfun_b",
                     "filterfun_m",
-                    f"filterfun_s_{power}",
+                    f"delta_ne_sq_{power}",
                 )
             ],
             axis=0,
         )
         np.testing.assert_allclose(filterfun_all, product, rtol=1e-12)
         np.testing.assert_allclose(
-            dbs[f"int_filterfun_all_{power}_dL"].values,
+            dbs[f"int_filterfun_all_{power}_dl"].values,
             trapezoid(filterfun_all, length),
             rtol=1e-12,
         )
@@ -90,8 +90,8 @@ def test_filter_functions_are_real(beam_run):
     for k in (
         "filterfun_r",
         "filterfun_all_-10_3",
-        "int_filterfun_r_dL",
-        "int_filterfun_all_-10_3_dL",
+        "int_filterfun_r_dl",
+        "int_filterfun_all_-10_3_dl",
     ):
         assert not np.iscomplexobj(dbs[k].values), k
 
@@ -129,3 +129,22 @@ def test_k_perp1_bs_splits_into_normal_and_binormal(beam_run):
     )
     cutoff = int(analysis["cutoff_index"])
     assert abs(k_normal[cutoff]) < 0.05 * abs(k_total[cutoff])
+
+
+def test_k_perp2_bs(beam_run):
+    """k_perp2_bs is along y_hat, which is perpendicular to b_hat, so its normal
+    and binormal components add in quadrature to it too. It is the k_perp2 at
+    which the k_perp2 integrand peaks, 2 K theta_m Im(M_xy^-1) / Im(M_yy^-1), so
+    it is zero at zero mismatch. On this unsteered case the mismatch is small, and
+    at the cut-off k_perp2_bs is well inside the k_perp2 resolution. (Away from
+    the cut-off the resolution changes quickly in X mode, so the ratio is only
+    checked there.)"""
+    dbs = beam_run["diagnostics/dbs"]
+    cutoff = int(beam_run["beam"]["cutoff_index"])
+    k_total = dbs["k_perp2_bs"].values
+    np.testing.assert_allclose(
+        np.hypot(dbs["k_perp2_bs_normal"].values, dbs["k_perp2_bs_binormal"].values),
+        np.abs(k_total),
+        rtol=1e-6,
+    )
+    assert abs(k_total[cutoff]) < 0.1 * dbs["delta_k_perp2"].values[cutoff]

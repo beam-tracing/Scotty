@@ -75,7 +75,9 @@ Abbreviations
 
 - ``bs`` - backscattered
 - ``filterfun`` - filter function (``filterfun_b``, ``filterfun_p``, ``filterfun_r``,
-  ``filterfun_m``, ``filterfun_s``)
+  ``filterfun_m``)
+- ``delta_ne_sq`` - model turbulence spectrum, the spectral density of the
+  density fluctuations at the backscattered wavenumber
 - ``ne`` - equilibrium electron density
 - ``dt`` - datatree (stores data)
 

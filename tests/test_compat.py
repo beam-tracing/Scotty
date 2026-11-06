@@ -287,7 +287,7 @@ def test_output_v4_to_v3_layout(v4_output):
         ("loc_m", "filterfun_m"),
         ("loc_p", "filterfun_p"),
         ("loc_r", "filterfun_r"),
-        ("loc_s", "filterfun_s_-13_3"),
+        ("loc_s", "delta_ne_sq_-13_3"),
     ):
         assert_allclose(v3["analysis"].ds[v3_name], v4["diagnostics/dbs"].ds[v4_name])
     # v3's initial position is the first point of the ray

@@ -474,7 +474,7 @@ for _v3, _v4 in (
     ("loc_m", "filterfun_m"),
     ("loc_p", "filterfun_p"),
     ("loc_r", "filterfun_r"),
-    ("loc_s", "filterfun_s_-13_3"),
+    ("loc_s", "delta_ne_sq_-13_3"),
     ("xhat_dot_grad_bhat_dot_xhat", "xhat_dot_grad_bhat_dot_xhat"),
     ("xhat_dot_grad_bhat_dot_yhat", "xhat_dot_grad_bhat_dot_yhat"),
     ("xhat_dot_grad_bhat_dot_ghat", "xhat_dot_grad_bhat_dot_ghat"),

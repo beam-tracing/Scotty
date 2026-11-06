@@ -115,10 +115,12 @@ Other interface changes
 - A keyword argument that ``beam_me_up`` does not take is logged as a warning,
   with the closest argument name (``did you mean ...?``).
 - The localisation is now called the filter function, in the outputs and the
-  code: v3's ``loc_p``, ``loc_r``, ``loc_b``, ``loc_m``, ``loc_s`` are
-  ``filterfun_p``, ``filterfun_r``, ``filterfun_b``, ``filterfun_m``,
-  ``filterfun_s_<power>``, and there are ``filterfun_all_<power>`` and their path
-  integrals ``int_filterfun_*_dL``.
+  code: v3's ``loc_p``, ``loc_r``, ``loc_b``, ``loc_m`` are ``filterfun_p``,
+  ``filterfun_r``, ``filterfun_b``, ``filterfun_m``, and there are
+  ``filterfun_all_<power>``. v3's ``loc_s`` is not a filter function but the
+  model turbulence spectrum, and is now ``delta_ne_sq_<power>``. Their path
+  integrals are ``int_<name>_dl`` (``l`` is the length along the ray; ``L`` is
+  kept for inhomogeneity lengths).
 - New argument: ``resonance_flag`` (#151). Temperature profiles are built when
   given.
 - ``convert_hessians`` takes a required ``K_start`` (Cartesian K).
@@ -127,7 +129,7 @@ Other interface changes
   analytical base class is ``CircularFieldBase``.
 - New in ``hamiltonian.py`` and ``fun_general.py``: ``FIRST_ORDER_KEYS``,
   ``find_Booker_discriminant``.
-- New outputs: ``int_filterfun_all_<power>_dL``, ``d_xhat_d_tau_dot_yhat``,
+- New outputs: ``int_filterfun_all_<power>_dl``, ``d_xhat_d_tau_dot_yhat``,
   ``g_hat_Cardano``, ``Psi_w`` on (``row_beam``, ``col_beam``) = (x, y), and
   the stacked ``H_Cardano``. ``filterfun_all_<power>`` is the array.
 - ``e_hat``, ``e_eigvecs`` and ``e_eigvec1``-``3`` are on ``col_field`` = (u1,

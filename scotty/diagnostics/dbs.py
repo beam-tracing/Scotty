@@ -148,6 +148,13 @@ def dbs_analysis(
         M_w_inv_xy = -M_xy / det_M_w
         M_w_inv_yy = M_xx / det_M_w
         delta_k_perp2 = 2 * np.sqrt(-1 / np.imag(M_w_inv_yy))
+        # The k_perp2 that is backscattered, where the exponent of the k_perp2
+        # integrand, -2 Im(M_xy^-1) K theta_m k_perp2 + Im(M_yy^-1) k_perp2^2 / 2,
+        # peaks; zero at zero mismatch. It's along u2 = b_hat x g_hat / |b_hat x
+        # g_hat|, which is y_hat, as k_perp1 is along k_perp1_hat (u1)
+        k_perp2_bs = 2 * K_mag * theta_m * np.imag(M_w_inv_xy) / np.imag(M_w_inv_yy)
+        k_perp2_bs_normal = k_perp2_bs * dot(y_hat_cart, normal_hat)
+        k_perp2_bs_binormal = k_perp2_bs * dot(y_hat_cart, binormal_hat)
 
         dbs_analysis_dict.update(
             {
@@ -159,6 +166,9 @@ def dbs_analysis(
                 "M_w_inv_xy": (["tau"], M_w_inv_xy),
                 "M_w_inv_yy": (["tau"], M_w_inv_yy),
                 "delta_k_perp2": (["tau"], delta_k_perp2),
+                "k_perp2_bs": (["tau"], k_perp2_bs),
+                "k_perp2_bs_normal": (["tau"], k_perp2_bs_normal),
+                "k_perp2_bs_binormal": (["tau"], k_perp2_bs_binormal),
             }
         )
 
@@ -210,7 +220,7 @@ def dbs_analysis(
     dbs_analysis_dict.update(
         {
             "filterfun_p": (["tau"], filterfun_p),
-            "int_filterfun_p_dL": ([], trapezoid(filterfun_p, beam_path_length)),
+            "int_filterfun_p_dl": ([], trapezoid(filterfun_p, beam_path_length)),
         }
     )
 
@@ -220,13 +230,13 @@ def dbs_analysis(
 
     g_mag_Cardano = np.array(analysis["g_magnitude_Cardano"][()])
     filterfun_r = (2 * const.c / w_launch) ** 2 / g_mag_Cardano**2
-    # needed by filterfun_b and filterfun_s; filterfun_s is also computed for ray tracing only
+    # needed by filterfun_b and delta_ne_sq; delta_ne_sq is also computed for ray tracing only
     launch_wavenumber = hamiltonian.wavenumber
 
     dbs_analysis_dict.update(
         {
             "filterfun_r": (["tau"], filterfun_r),
-            "int_filterfun_r_dL": ([], trapezoid(filterfun_r, beam_path_length)),
+            "int_filterfun_r_dl": ([], trapezoid(filterfun_r, beam_path_length)),
         }
     )
 
@@ -259,7 +269,7 @@ def dbs_analysis(
                 "det_Im_Psi_w": (["tau"], det_Im_Psi_w),
                 "beam_waist": beam_waist,
                 "filterfun_b": (["tau"], filterfun_b),
-                "int_filterfun_b_dL": ([], trapezoid(filterfun_b, beam_path_length)),
+                "int_filterfun_b_dl": ([], trapezoid(filterfun_b, beam_path_length)),
             }
         )
 
@@ -287,7 +297,7 @@ def dbs_analysis(
             {
                 "delta_theta_m": (["tau"], delta_theta_m),
                 "filterfun_m": (["tau"], filterfun_m),
-                "int_filterfun_m_dL": ([], trapezoid(filterfun_m, beam_path_length)),
+                "int_filterfun_m_dl": ([], trapezoid(filterfun_m, beam_path_length)),
             }
         )
 
@@ -295,12 +305,17 @@ def dbs_analysis(
         log.debug("No beam-tracing results; skipping mismatch piece (filterfun_m)")
 
     ##################################################
-    log.debug(f"Finding the spectrum piece (filterfun_s)")
+    log.debug(f"Finding the model turbulence spectrum (delta_ne_sq)")
     ##################################################
 
+    # Not a filter function: a model of the spectral density of the density
+    # fluctuations at the backscattered k_perp1, a power law normalised to 1 at
+    # k_perp1 = -2 K0. It multiplies the filter function in the integrand of the
+    # backscattered power
+
     spectrum_power_laws = ["-10/3", "-13/3"]
-    filterfun_s = {
-        f"filterfun_s_{power}": np.array(
+    delta_ne_sq = {
+        f"delta_ne_sq_{power}": np.array(
             (k_perp1_bs / (-2 * launch_wavenumber)) ** eval(power)
         )
         for power in spectrum_power_laws
@@ -309,10 +324,10 @@ def dbs_analysis(
     dbs_analysis_dict.update(
         {
             "spectrum_power_laws": spectrum_power_laws,
-            **{f"{k}": (["tau"], v) for k, v in filterfun_s.items()},
+            **{f"{k}": (["tau"], v) for k, v in delta_ne_sq.items()},
             **{
-                f"int_{k}_dL": ([], trapezoid(v, beam_path_length))
-                for k, v in filterfun_s.items()
+                f"int_{k}_dl": ([], trapezoid(v, beam_path_length))
+                for k, v in delta_ne_sq.items()
             },
         }
     )
@@ -320,7 +335,7 @@ def dbs_analysis(
     if btf:
         ##################################################
         log.debug(
-            f"Finding total filter function (filterfun_p * filterfun_r * filterfun_b * filterfun_m * filterfun_s) and backscattered power (p_r)"
+            f"Finding total filter function (filterfun_p * filterfun_r * filterfun_b * filterfun_m * delta_ne_sq) and backscattered power (p_r)"
         )
         ##################################################
 
@@ -329,7 +344,7 @@ def dbs_analysis(
             * filterfun_r
             * filterfun_b
             * filterfun_m
-            * filterfun_s[f"filterfun_s_{power}"]
+            * delta_ne_sq[f"delta_ne_sq_{power}"]
             for power in spectrum_power_laws
         }
 
@@ -337,7 +352,7 @@ def dbs_analysis(
             {
                 **{f"{k}": (["tau"], v) for k, v in filterfun_all.items()},
                 **{
-                    f"int_{k}_dL": ([], trapezoid(v, beam_path_length))
+                    f"int_{k}_dl": ([], trapezoid(v, beam_path_length))
                     for k, v in filterfun_all.items()
                 },
             }
@@ -345,7 +360,7 @@ def dbs_analysis(
 
     else:
         log.debug(
-            "No beam-tracing results; skipping total filter function (filterfun_p * filterfun_r * filterfun_b * filterfun_m * filterfun_s) and backscattered power (p_r)"
+            "No beam-tracing results; skipping total filter function (filterfun_p * filterfun_r * filterfun_b * filterfun_m * delta_ne_sq) and backscattered power (p_r)"
         )
 
     dbs_analysis_coords = {
