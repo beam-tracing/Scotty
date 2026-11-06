@@ -31,9 +31,28 @@ in-plane 2x2 block of :math:`\Psi`. On the ray :math:`K_z = 0`, and by symmetry
 and :math:`\Psi_{yz}` stay zero and :math:`\Psi_{zz}` does not affect the
 plane.
 
-:math:`\Psi_{zz}` (along :math:`B`) is outside the paper's 2D problem.
-Scotty's 3D beam still needs a launch value for it; it is given the same
-width and curvature as in the plane (a circular beam), and is not checked.
+Beyond the paper, :math:`\Psi_{zz}` (along :math:`B`). The paper's (2.4),
+:math:`H = K^2/K_0^2 - 1 + \omega_{pe}^2/\Omega^2`, is the magnetised O-mode
+for :math:`K \perp B`, which is all its 2D problem (no :math:`z` dependence)
+needs; the paper makes no prediction for :math:`\Psi_{zz}`. Scotty's 3D beam
+still needs a launch value for it, and Scotty evolves it with
+:math:`\partial^2 H / \partial K_z^2`, the curvature of :math:`H` as
+:math:`K` tilts towards :math:`B`. Expanding the cold-plasma (Appleton-Hartree)
+O-mode near :math:`K \perp B` gives
+:math:`N^2 \approx 1 - X + X (1 - X) K_\parallel^2 / K_\perp^2` for any
+:math:`B_0 \neq 0` (for :math:`|K_\parallel| / K \lesssim Y / 2(1 - X)`), so
+on the ray :math:`\partial^2 H / \partial K_z^2 = 2 (1 - X) / K_0^2` and
+
+.. math::
+    \Psi_{zz}^{-1}(\tau) = \Psi_{zz}^{-1}(0)
+    + \frac{2}{K_0^2} \int_0^\tau (1 - X) \, d\tau.
+
+`test_Psi_zz_magnetised_curvature` checks Scotty against this. It is a check
+of Scotty's :math:`K_\parallel` dependence of the O-mode, not of the paper.
+Taking (2.4) for every direction of :math:`K` instead (an isotropic model,
+exact only at :math:`B = 0`) would give :math:`2 / K_0^2`, and a
+:math:`\Psi_{zz}` up to 15% of :math:`\max|\Psi_{zz}|` different from Scotty's
+here (at 10°).
 
 Numerical choices:
 
@@ -62,6 +81,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 import pytest
 from scipy import constants
+from scipy.integrate import solve_ivp
 from scipy.optimize import minimize_scalar
 
 from scotty.beam_me_up import beam_me_up
@@ -95,6 +115,7 @@ TOL = {
     "K": 2e-11,  # (3.8e-12)
     "Psi": 2e-6,  # in-plane block, real and imaginary parts (4.6e-7, at 10 deg)
     "Psi_off_plane": 3e-6,  # Psi_xz, Psi_yz, exactly zero (7.0e-7, at 10 deg)
+    "Psi_zz": 1e-7,  # (1.7e-8)
     "W": 3e-6,  # (5.4e-7, at 10 deg)
     "focus": 3e-6,  # fraction of the output step (5.6e-7)
     "tau_leave": 1e-8,  # (2.0e-9)
@@ -153,12 +174,21 @@ def edge_Psi(a0, R_Y):
 
 def analytic_Psi_in_plane(tau, a0, R_Y):
     """Lab-frame Psi from Psi^-1(tau) = Psi^-1(0) + 2 tau / K0^2, shape (N, 3, 3).
-    Its zz entry (isotropic, 2 / K0^2) is only used as a launch value"""
+    Its zz entry is the isotropic 2 / K0^2 model, not Scotty's (see
+    `analytic_Psi_zz`)"""
     tau = np.atleast_1d(np.asarray(tau, dtype=float))
     inverse = np.linalg.inv(edge_Psi(a0, R_Y))
     return np.linalg.inv(
         inverse[None] + (2 * tau / K0**2)[:, None, None] * np.eye(3)[None]
     )
+
+
+def analytic_Psi_zz(tau, a0, R_Y):
+    """Psi_zz for the magnetised O-mode: d^2 H / dK_z^2 = 2 (1 - X) / K0^2"""
+    c, s = np.cos(a0), np.sin(a0)
+    tau = np.asarray(tau, dtype=float)
+    integral = tau * s**2 + K0 * L * (c**3 - (c - tau / (K0 * L)) ** 3) / 3
+    return 1 / (1 / edge_Psi_YY(R_Y) + 2 * integral / K0**2)
 
 
 def Psi_YY_from_lab(Psi, K):
@@ -242,6 +272,7 @@ def run_linear_layer(a0_deg, R_Y, gyro_ratio, output_path):
     a0 = np.deg2rad(a0_deg)
     q, K = analytic_ray(TAU_LAUNCH, a0)
     Psi = analytic_Psi_in_plane(TAU_LAUNCH, a0, R_Y)[0]
+    Psi[2, 2] = analytic_Psi_zz(TAU_LAUNCH, a0, R_Y)
     return beam_me_up(
         geometry="cartesian",
         poloidal_launch_angle_Torbeam=0.0,
@@ -338,6 +369,37 @@ def test_analytic_solution_is_consistent(name):
     )
 
 
+@pytest.mark.parametrize("name", MAIN_CASES)
+def test_analytic_Psi_zz_is_consistent(name):
+    """Beyond the paper: the closed form of Psi_zz for the magnetised O-mode
+    agrees with integrating dPsi_zz/dtau = -2 (1 - X) Psi_zz^2 / K0^2"""
+    a0_deg, R_Y, _ = CASES[name]
+    a0 = np.deg2rad(a0_deg)
+    tau_leave = 2 * K0 * L * np.cos(a0)
+    tau = np.linspace(0, tau_leave, 101)
+
+    def rhs(t, y):
+        Psi_zz = y[0] + 1j * y[1]
+        X = analytic_ray(t, a0)[0][0, 0] / L
+        d = -2 * (1 - X) * Psi_zz**2 / K0**2
+        return [d.real, d.imag]
+
+    Psi_zz_0 = edge_Psi_YY(R_Y)
+    solution = solve_ivp(
+        rhs,
+        (0, tau_leave),
+        [Psi_zz_0.real, Psi_zz_0.imag],
+        t_eval=tau,
+        rtol=1e-11,
+        atol=1e-9,
+    )
+    assert_allclose(
+        solution.y[0] + 1j * solution.y[1],
+        analytic_Psi_zz(tau, a0, R_Y),
+        rtol=1e-8,
+    )
+
+
 ##################################################
 # Scotty against the analytic solution
 ##################################################
@@ -374,6 +436,20 @@ def test_Psi_in_plane(runs, name):
     )
     assert np.abs(Psi[:, :2, 2]).max() < TOL["Psi_off_plane"] * scale
     assert np.abs(Psi[:, 2, :2]).max() < TOL["Psi_off_plane"] * scale
+
+
+@pytest.mark.parametrize("name", MAIN_CASES)
+def test_Psi_zz_magnetised_curvature(runs, name):
+    """Beyond the paper: Psi_zz, along B, with the magnetised O-mode's
+    d^2 H / dK_z^2 = 2 (1 - X) / K0^2 (module notes)"""
+    run = runs(name)
+    expected = analytic_Psi_zz(run["tau_edge"], run["a0"], run["R_Y"])
+    assert_allclose(
+        run["Psi"][:, 2, 2],
+        expected,
+        rtol=0,
+        atol=TOL["Psi_zz"] * np.abs(expected).max(),
+    )
 
 
 def parabola_minimum(tau, W, step):
