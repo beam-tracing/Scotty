@@ -92,3 +92,33 @@ def test_Psi_launch_cylindrical_matches_cartesian(steered_run):
         rtol=1e-9,
         atol=1e-9,
     )
+
+
+def test_Psi_entry_cartesian_is_the_launched_beam_at_the_entry(steered_run):
+    """The saved Cartesian entry Psi is the launched Psi propagated through
+    vacuum to the entry, Psi_w^-1 -> Psi_w^-1 + d / K0, with no component
+    along K. The launched Psi_w is the circular Gaussian of the inputs, the
+    same in any transverse basis. The cylindrical entry Psi has terms in K_R
+    and K_zeta at the entry, which differ from those at the launch point once
+    the beam is steered toroidally"""
+    _, dt = steered_run
+    so = dt["solver_output"]
+
+    K = so["K_launch_cartesian"].values
+    g_hat = K / np.linalg.norm(K)
+    a_hat = np.cross(g_hat, [0.0, 0.0, 1.0])
+    a_hat /= np.linalg.norm(a_hat)
+    basis = np.array([a_hat, np.cross(g_hat, a_hat)])
+    inputs = dt["inputs"]
+    K0 = float(inputs["launch_wavenumber"])
+    width = float(inputs["launch_beam_width"])
+    curvature = float(inputs["launch_beam_curvature"])
+    distance = float(so["distance_from_launch_to_entry"])
+
+    Psi_w_launch = (K0 * curvature + 2j / width**2) * np.eye(2)
+    expected = np.linalg.inv(np.linalg.inv(Psi_w_launch) + distance / K0 * np.eye(2))
+    Psi_entry = so["Psi_3D_entry_labframe_cartesian"].values
+
+    scale = np.abs(expected).max()
+    assert_allclose(basis @ Psi_entry @ basis.T, expected, rtol=0, atol=1e-9 * scale)
+    assert_allclose(Psi_entry @ g_hat, 0, atol=1e-9 * scale)
