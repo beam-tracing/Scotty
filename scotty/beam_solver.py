@@ -148,6 +148,9 @@ def beam_tracing(
 ]:
     """Returns solver status (1, 0, -1), duration taken by solver, number of evaluations,
     tau` of shape `(N,)`, `q` of shape `(3, N)`, `K` of shape `(3, N)`, `Psi` of shape `(N, 3, 3)`
+
+    Raises `RuntimeError` if the integration fails, rather than returning a
+    truncated output
     """
 
     # Packing the ray and beam parameters
@@ -178,6 +181,19 @@ def beam_tracing(
         Number of beam evolution evaluations: {solver_beam_output.nfev}
         Time per beam evolution evaluation: {duration_beam_solver / solver_beam_output.nfev}
     """)
+
+    if solver_beam_output.status == -1:
+        # With `t_eval`, the solver's `t` holds only the output points it reached,
+        # and is empty if it failed before the first of them
+        reached = (
+            f"last output point at tau = {solver_beam_output.t[-1]}"
+            if np.size(solver_beam_output.t) > 0
+            else "no output points"
+        )
+        raise RuntimeError(
+            f"The beam solver failed before reaching tau_leave = {tau_leave} "
+            f"({reached}): {solver_beam_output.message}"
+        )
 
     return (
         solver_beam_output.status,

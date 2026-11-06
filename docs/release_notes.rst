@@ -92,6 +92,10 @@ Fixes
   regular, so an O-mode beam crossing that density could stop the beam solver.
   ``find_Booker_root`` uses the rationalised form where it is the better
   conditioned. The same root in ``boundary_conditions`` and ``launch`` uses it too.
+- ``beam_solver.beam_tracing`` checks the solver's status: a failed integration
+  now raises a ``RuntimeError`` giving how far it got, tau_leave and the solver's
+  message. It used to return a truncated output with no error, or a ``TypeError``
+  if the output was empty. The ray solver already raised.
 
 Other interface changes
 ~~~~~~~~~~~~~~~~~~~~~~~
