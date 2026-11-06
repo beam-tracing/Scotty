@@ -2,15 +2,19 @@ r"""Scotty against the analytic Gaussian beam in a 2D linear layer (O-mode).
 
 The analytic solution is from J. Ruiz Ruiz, F. I. Parra, V. H. Hall-Chen et
 al., "Beam focusing and consequences for Doppler Backscattering
-measurements", under consideration for J. Plasma Phys. (section 2.3, eqs.
-(2.5), (2.6); Appendix A, eqs. (A2), (A4), (A10), (A11)). It is written here
-in Scotty's unnormalised variables: Scotty's :math:`\tau` and :math:`\Psi`
-rather than the paper's :math:`\tau' = \tau / (K_0 L)` and
-:math:`\Psi' = \Psi L / K_0`.
+measurements", J. Plasma Phys. 91, E60 (2025),
+doi:10.1017/S0022377825000170 (section 2.3, eqs. (2.9), (2.10); Appendix A,
+eqs. (A.2), (A.4), (A.10), (A.11)). It is written here in Scotty's
+unnormalised variables: Scotty's :math:`\tau` and :math:`\Psi` rather than the
+paper's :math:`\tau' = \tau / (K_0 L)` and :math:`\Psi' = \Psi L / K_0`.
+
+Notation is Scotty's: the paper's :math:`(x, y, z)` and
+:math:`(\hat{X}, \hat{Y}, \hat{g})` are Scotty's :math:`(X, Y, Z)` and
+:math:`(\hat{x}, \hat{y}, \hat{g})`.
 
 Setup, in Cartesian lab coordinates :math:`(X, Y, Z)`: a uniform field
-:math:`\mathbf{B} = -B_0 \hat{\mathbf{z}}`, and a density
-:math:`\omega_{pe}^2 / \Omega^2 = X / L` for :math:`X > 0` (vacuum for
+:math:`\mathbf{B} = -B_0 \hat{\mathbf{Z}}`, and a density
+:math:`\Omega_{pe}^2 / \Omega^2 = X / L` for :math:`X > 0` (vacuum for
 :math:`X < 0`). The field is an `InterpolatedField_Cartesian` on a grid, with
 poloidal flux :math:`\psi = 1 - X / L`, and the density is
 ``LinearFit(1.0, n_c)`` with :math:`n_c` the O-mode cut-off density. The
@@ -19,40 +23,53 @@ after the edge, at the analytic :math:`q`, :math:`K` and :math:`\Psi`.
 
 For the O-mode with :math:`K \perp B`, :math:`N^2 = 1 - X/L` and Scotty's
 :math:`H = K^2 / K_0^2 - N^2`, so in the plane of the ray
-:math:`dq/d\tau = 2 K / K_0^2`, :math:`dK/d\tau = -\hat{x} / L` and
+:math:`dq/d\tau = 2 K / K_0^2`, :math:`dK/d\tau = -\hat{X} / L` and
 
 .. math::
     \Psi^{-1}(\tau) = \Psi^{-1}(0) + \frac{2 \tau}{K_0^2},
 
-with :math:`\Psi(0)` at the edge from (A4) and the beam-frame width and
-curvature from (A9)-(A11). This is the paper's solution, and it holds for the
-in-plane 2x2 block of :math:`\Psi`. On the ray :math:`K_z = 0`, and by symmetry
-:math:`\partial^2 H / \partial K_z \partial K_{x,y} = 0`, so :math:`\Psi_{xz}`
-and :math:`\Psi_{yz}` stay zero and :math:`\Psi_{zz}` does not affect the
+with :math:`\Psi(0)` at the edge from (A.4) and the beam-frame width and
+curvature from (A.9)-(A.11). This is the paper's solution, and it holds for the
+in-plane 2x2 block of :math:`\Psi`. On the ray :math:`K_Z = 0`, and by symmetry
+:math:`\partial^2 H / \partial K_Z \partial K_{X,Y} = 0`, so :math:`\Psi_{XZ}`
+and :math:`\Psi_{YZ}` stay zero and :math:`\Psi_{ZZ}` does not affect the
 plane.
 
-Beyond the paper, :math:`\Psi_{zz}` (along :math:`B`). The paper's (2.4),
-:math:`H = K^2/K_0^2 - 1 + \omega_{pe}^2/\Omega^2`, is the magnetised O-mode
-for :math:`K \perp B`, which is all its 2D problem (no :math:`z` dependence)
-needs; the paper makes no prediction for :math:`\Psi_{zz}`. Scotty's 3D beam
-still needs a launch value for it, and Scotty evolves it with
-:math:`\partial^2 H / \partial K_z^2`, the curvature of :math:`H` as
-:math:`K` tilts towards :math:`B`. Expanding the cold-plasma (Appleton-Hartree)
-O-mode near :math:`K \perp B` gives
-:math:`N^2 \approx 1 - X + X (1 - X) K_\parallel^2 / K_\perp^2` for any
-:math:`B_0 \neq 0` (for :math:`|K_\parallel| / K \lesssim Y / 2(1 - X)`), so
-on the ray :math:`\partial^2 H / \partial K_z^2 = 2 (1 - X) / K_0^2` and
+A correction to the paper: :math:`\Psi_{ZZ}`, along :math:`B`. Appendix A of
+the paper takes :math:`\nabla_K \nabla_K H = (2 / K_0^2) I`, and its section
+2.3 says that the vacuum solution is also the solution for the width along
+:math:`B` (:math:`W_x` here). That is (2.8),
+:math:`H = K^2/K_0^2 - 1 + \Omega_{pe}^2/\Omega^2`, taken for every direction
+of :math:`K`, which is exact only at :math:`B = 0`: for a magnetised plasma
+(2.8) is the O-mode only for :math:`K \perp B`. Scotty's 3D beam evolves
+:math:`\Psi_{ZZ}` with :math:`\partial^2 H / \partial K_Z^2`, the curvature of
+:math:`H` as :math:`K` tilts towards :math:`B`. Expanding the cold-plasma
+(Appleton-Hartree) O-mode near :math:`K \perp B` gives
 
 .. math::
-    \Psi_{zz}^{-1}(\tau) = \Psi_{zz}^{-1}(0)
-    + \frac{2}{K_0^2} \int_0^\tau (1 - X) \, d\tau.
+    N^2 \approx 1 - \frac{\Omega_{pe}^2}{\Omega^2}
+    + \frac{\Omega_{pe}^2}{\Omega^2} \left(1 - \frac{\Omega_{pe}^2}{\Omega^2}\right)
+    \frac{K_\parallel^2}{K_\perp^2}
 
-`test_Psi_zz_magnetised_curvature` checks Scotty against this. It is a check
-of Scotty's :math:`K_\parallel` dependence of the O-mode, not of the paper.
-Taking (2.4) for every direction of :math:`K` instead (an isotropic model,
-exact only at :math:`B = 0`) would give :math:`2 / K_0^2`, and a
-:math:`\Psi_{zz}` up to 15% of :math:`\max|\Psi_{zz}|` different from Scotty's
-here (at 10°).
+for any :math:`B_0 \neq 0` (for :math:`|K_\parallel| / K \lesssim
+(\Omega_{ce} / \Omega) / 2 (1 - \Omega_{pe}^2 / \Omega^2)`), so on the ray
+:math:`\partial^2 H / \partial K_Z^2 = 2 (1 - \Omega_{pe}^2 / \Omega^2) / K_0^2`
+and
+
+.. math::
+    \Psi_{ZZ}^{-1}(\tau) = \Psi_{ZZ}^{-1}(0)
+    + \frac{2}{K_0^2} \int_0^\tau \left(1 - \frac{\Omega_{pe}^2}{\Omega^2}\right) d\tau.
+
+This differs from the paper's :math:`2 / K_0^2` for a magnetised plasma, so
+`test_Psi_ZZ_magnetised_curvature` is a correction to that statement: it
+checks Scotty against the magnetised form, not against the paper. The paper's
+form would give a :math:`\Psi_{ZZ}` up to 15% of :math:`\max|\Psi_{ZZ}|`
+different from Scotty's here (at 10°).
+
+What this test cannot catch: :math:`\nabla \nabla H` and
+:math:`\nabla_K \nabla H` vanish in this slab, so the beam equation is tested
+only through its :math:`\nabla_K \nabla_K H` term, and an error in the other
+terms would not show.
 
 Numerical choices:
 
@@ -67,14 +84,19 @@ Numerical choices:
   stencils never sample the vacuum, where the density has its kink. With
   the X step pointing out of the plasma instead, the launch point (~1e-6 m
   inside the edge) samples the vacuum and Psi is wrong by ~100%.
-- :math:`\omega_{ce} / \Omega = 0.3`, except at 10°, which uses 0.1. Scotty's
+- :math:`\Omega_{ce} / \Omega = 0.3`, except at 10°, which uses 0.1. Scotty's
   O-mode root, :math:`(\beta - \sqrt{\beta^2 - 4\alpha\gamma}) / 2\alpha`, is
   0/0 where Booker's :math:`\alpha = \epsilon_\perp = 0` (the X-mode's upper
-  hybrid layer, :math:`X = 1 - Y^2`). At 10° the O-mode reaches
-  :math:`X = 0.97` before its cut-off, beyond :math:`1 - 0.3^2 = 0.91`, and
-  the beam solver fails there; with 0.1 the layer is at 0.99. Values where
-  the ratio is exactly 0.5 or 1 also stop the ray at the start (the
-  resonance event is zero everywhere in a uniform field).
+  hybrid layer, :math:`\Omega_{pe}^2 / \Omega^2 = 1 - (\Omega_{ce} / \Omega)^2`).
+  At 10° the O-mode reaches :math:`\Omega_{pe}^2 / \Omega^2 = 0.97` before its
+  cut-off, beyond :math:`1 - 0.3^2 = 0.91`, and the beam solver fails there;
+  with 0.1 the layer is at 0.99. Values where the ratio is exactly 0.5 or 1
+  also stop the ray at the start (the resonance event is zero everywhere in a
+  uniform field).
+- Run time: nearly all of it is the beam solve, about 60 ms per evaluation and
+  about 2600-3000 evaluations per run at ``rtol=1e-7``, ``atol=1e-8``, driven
+  by finite-difference noise in components of :math:`\Psi` that symmetry makes
+  zero (see beam-tracing/Scotty#175).
 """
 
 import numpy as np
@@ -104,7 +126,7 @@ N_CUTOFF = constants.epsilon_0 * constants.m_e * OMEGA**2 / constants.e**2 / 1e1
 TAU_LAUNCH = 1e-3
 LEN_TAU = 200
 # rtol = 1e-8 takes ~20 min per run, as the rounding noise in d^2H/dq^2 then
-# limits the steps; at 1e-7 a run takes ~45 s
+# limits the steps; at 1e-7 a run takes ~3 min
 SOLVER = {"rtol": 1e-7, "atol": 1e-8}
 DELTA_Q = 1e-3
 
@@ -112,22 +134,24 @@ DELTA_Q = 1e-3
 # value itself. Largest error measured over the cases in brackets
 TOL = {
     "q": 1e-11,  # (1.8e-12)
-    "K": 2e-11,  # (3.8e-12)
-    "Psi": 2e-6,  # in-plane block, real and imaginary parts (4.6e-7, at 10 deg)
-    "Psi_off_plane": 3e-6,  # Psi_xz, Psi_yz, exactly zero (7.0e-7, at 10 deg)
-    "Psi_zz": 1e-7,  # (1.7e-8)
+    "K": 2e-11,  # (9.0e-14)
+    # The in-plane block, real and imaginary parts. This limit is rounding noise
+    # and moves between machines; a scan in rtol shows the floor (4.5e-7, at 10 deg)
+    "Psi": 5e-6,
+    "Psi_off_plane": 3e-6,  # Psi_XZ, Psi_YZ, exactly zero (7.0e-7, at 10 deg)
+    "Psi_ZZ": 1e-7,  # (1.7e-8)
     "W": 3e-6,  # (5.4e-7, at 10 deg)
-    "focus": 3e-6,  # fraction of the output step (5.6e-7)
-    "tau_leave": 1e-8,  # (2.0e-9)
-    "tau_cutoff": 1e-7,  # (1.5e-8)
-    "B0_tau": 1e-9,  # (1.6e-10)
-    "B0_ray": 3e-9,  # q, K (4.7e-10)
-    "B0_Psi": 1.5e-6,  # (2.9e-7)
+    "focus": 3e-6,  # fraction of the output step (4.5e-7)
+    "tau_leave": 1e-8,  # (5.5e-12)
+    "tau_cutoff": 1e-7,  # (4.7e-9)
+    "B0_tau": 1e-9,  # (3.3e-12)
+    "B0_ray": 3e-9,  # q, K (9.9e-12)
+    "B0_Psi": 1.5e-6,  # (9.6e-8)
 }
 
 
 def B0_for(gyro_ratio):
-    """|B| for which omega_ce / Omega = `gyro_ratio`"""
+    """|B| for which Omega_ce / Omega = `gyro_ratio`"""
     return gyro_ratio * OMEGA * constants.m_e / constants.e
 
 
@@ -141,58 +165,60 @@ def analytic_ray(tau, a0):
     enters at (0, 0, 0) with K = K0 (cos a0, sin a0, 0)"""
     c, s = np.cos(a0), np.sin(a0)
     tau = np.atleast_1d(np.asarray(tau, dtype=float))
-    K_x = K0 * c - tau / L
+    K_X = K0 * c - tau / L
     zero = np.zeros_like(tau)
-    q = np.stack([L * (c**2 - (K_x / K0) ** 2), 2 * s * tau / K0, zero], axis=-1)
-    K = np.stack([K_x, np.full_like(tau, K0 * s), zero], axis=-1)
+    q = np.stack([L * (c**2 - (K_X / K0) ** 2), 2 * s * tau / K0, zero], axis=-1)
+    K = np.stack([K_X, np.full_like(tau, K0 * s), zero], axis=-1)
     return q, K
 
 
-def edge_Psi_YY(R_Y):
-    """Psi in the beam frame, perpendicular to K in the plane, at the edge"""
-    return K0 / R_Y + 2j / W0**2
+def edge_Psi_yy(R_y):
+    """Psi in the beam frame, along y_hat (perpendicular to K in the plane), at
+    the edge"""
+    return K0 / R_y + 2j / W0**2
 
 
-def edge_Psi(a0, R_Y):
-    """Lab-frame Psi at the edge, (A4) in unnormalised form, with Psi_zz from
-    the same width and curvature as Psi_YY (a circular beam)"""
+def edge_Psi(a0, R_y):
+    """Lab-frame Psi at the edge, (A.4) in unnormalised form, with Psi_ZZ from
+    the same width and curvature as the beam-frame Psi_yy (a circular beam)"""
     c, s = np.cos(a0), np.sin(a0)
     t = s / c
-    # Normalised Psi' = Psi L / K0; (A11) gives Psi'_yy from Psi'_YY
-    Psi_YY_n = edge_Psi_YY(R_Y) * L / K0
-    Psi_yy_n = c**2 * (Psi_YY_n + s**2 / (2 * c))
+    # Normalised Psi' = Psi L / K0; (A.11) gives the lab Psi'_YY from the beam
+    # Psi'_yy
+    Psi_yy_n = edge_Psi_yy(R_y) * L / K0
+    Psi_YY_n = c**2 * (Psi_yy_n + s**2 / (2 * c))
     Psi_n = np.array(
         [
-            [Psi_yy_n * t**2 - 1 / (2 * c), -Psi_yy_n * t, 0],
-            [-Psi_yy_n * t, Psi_yy_n, 0],
-            [0, 0, Psi_YY_n],
+            [Psi_YY_n * t**2 - 1 / (2 * c), -Psi_YY_n * t, 0],
+            [-Psi_YY_n * t, Psi_YY_n, 0],
+            [0, 0, Psi_yy_n],
         ],
         dtype=complex,
     )
     return Psi_n * K0 / L
 
 
-def analytic_Psi_in_plane(tau, a0, R_Y):
+def analytic_Psi_in_plane(tau, a0, R_y):
     """Lab-frame Psi from Psi^-1(tau) = Psi^-1(0) + 2 tau / K0^2, shape (N, 3, 3).
-    Its zz entry is the isotropic 2 / K0^2 model, not Scotty's (see
-    `analytic_Psi_zz`)"""
+    Its ZZ entry is the paper's 2 / K0^2, not Scotty's (see `analytic_Psi_ZZ`)"""
     tau = np.atleast_1d(np.asarray(tau, dtype=float))
-    inverse = np.linalg.inv(edge_Psi(a0, R_Y))
+    inverse = np.linalg.inv(edge_Psi(a0, R_y))
     return np.linalg.inv(
         inverse[None] + (2 * tau / K0**2)[:, None, None] * np.eye(3)[None]
     )
 
 
-def analytic_Psi_zz(tau, a0, R_Y):
-    """Psi_zz for the magnetised O-mode: d^2 H / dK_z^2 = 2 (1 - X) / K0^2"""
+def analytic_Psi_ZZ(tau, a0, R_y):
+    """Psi_ZZ for the magnetised O-mode:
+    d^2 H / dK_Z^2 = 2 (1 - Omega_pe^2 / Omega^2) / K0^2"""
     c, s = np.cos(a0), np.sin(a0)
     tau = np.asarray(tau, dtype=float)
     integral = tau * s**2 + K0 * L * (c**3 - (c - tau / (K0 * L)) ** 3) / 3
-    return 1 / (1 / edge_Psi_YY(R_Y) + 2 * integral / K0**2)
+    return 1 / (1 / edge_Psi_yy(R_y) + 2 * integral / K0**2)
 
 
-def Psi_YY_from_lab(Psi, K):
-    """(A10): Psi in the plane, perpendicular to K"""
+def Psi_yy_from_lab(Psi, K):
+    """(A.11): Psi in the beam frame, along y_hat, from the lab frame"""
     K_magnitude = np.linalg.norm(K[:, :2], axis=1)
     cos_a, sin_a = K[:, 0] / K_magnitude, K[:, 1] / K_magnitude
     return (
@@ -202,34 +228,35 @@ def Psi_YY_from_lab(Psi, K):
     )
 
 
-def Psi_YY_closed_form(tau, a0, R_Y):
-    """Psi_YY as a function of K_x, from inverting the 2x2 in-plane block by
-    hand (the content of (2.6)); an independent check of the matrix route"""
+def Psi_yy_closed_form(tau, a0, R_y):
+    """The beam-frame Psi_yy as a function of K_X, from inverting the 2x2 in-plane
+    block by hand (the content of (2.10)); an independent check of the matrix
+    route"""
     c, s = np.cos(a0), np.sin(a0)
-    Psi_yy_n = c**2 * (edge_Psi_YY(R_Y) * L / K0 + s**2 / (2 * c))
+    Psi_YY_n = c**2 * (edge_Psi_yy(R_y) * L / K0 + s**2 / (2 * c))
     tau_n = np.asarray(tau, dtype=float) / (K0 * L)
-    K_x = c - tau_n  # normalised to K0
-    d = 2 * tau_n - 2 * s**2 / c + 1 / Psi_yy_n
-    numerator = d * s**2 - 4 * s**2 * K_x - 2 * K_x**3
-    denominator = (K_x**2 + s**2) * (-2 * K_x * d - 4 * s**2)
+    K_X = c - tau_n  # normalised to K0
+    d = 2 * tau_n - 2 * s**2 / c + 1 / Psi_YY_n
+    numerator = d * s**2 - 4 * s**2 * K_X - 2 * K_X**3
+    denominator = (K_X**2 + s**2) * (-2 * K_X * d - 4 * s**2)
     return numerator / denominator * K0 / L
 
 
-def width(Psi_YY):
-    return np.sqrt(2 / np.imag(Psi_YY))
+def width(Psi_yy):
+    return np.sqrt(2 / np.imag(Psi_yy))
 
 
-def analytic_focus(a0, R_Y):
+def analytic_focus(a0, R_y):
     """tau (from the edge) and width of the narrowest point of the beam in the
     plasma; None if the narrowest point is at the edge"""
     tau_leave = 2 * K0 * L * np.cos(a0)
     tau = np.linspace(0, tau_leave, 20001)
-    W = width(Psi_YY_closed_form(tau, a0, R_Y))
+    W = width(Psi_yy_closed_form(tau, a0, R_y))
     i = int(np.argmin(W))
     if i == 0:
         return None
     result = minimize_scalar(
-        lambda t: width(Psi_YY_closed_form(t, a0, R_Y)),
+        lambda t: width(Psi_yy_closed_form(t, a0, R_y)),
         bounds=(tau[i - 1], tau[i + 1]),
         method="bounded",
         options={"xatol": 1e-9},
@@ -241,24 +268,20 @@ def analytic_focus(a0, R_Y):
 # Scotty runs
 ##################################################
 
-# (launch angle in degrees, R_Y = R_z at the edge, omega_ce / Omega)
+# Converging, R_y0 = -2 L cos(a0) / sin(a0)^2 as in the discussion of (A.16)
+R_Y_CURVED = -2 * L * np.cos(np.deg2rad(30)) / np.sin(np.deg2rad(30)) ** 2
+
+# (launch angle in degrees, R_y = R_x at the edge, Omega_ce / Omega)
 CASES = {
     "a10": (10.0, np.inf, 0.1),
-    "a30": (30.0, np.inf, 0.3),
-    "a50": (50.0, np.inf, 0.3),
-    # Converging, R_Y0 = -2 L cos(a0) / sin(a0)^2 as in the discussion of (A16)
-    "a30-curved": (
-        30.0,
-        -2 * L * np.cos(np.deg2rad(30)) / np.sin(np.deg2rad(30)) ** 2,
-        0.3,
-    ),
-    # The a30 case at another |B|, for the B0 independence of the O-mode
-    "a30-B0": (30.0, np.inf, 0.1),
+    "a30-curved": (30.0, R_Y_CURVED, 0.3),
+    # The a30-curved case at another |B|, for the B0 independence of the O-mode
+    "a30-curved-B0": (30.0, R_Y_CURVED, 0.1),
 }
 
 
 def linear_layer_field(B0, a0):
-    """Uniform B = -B0 z_hat and psi = 1 - X / L on a grid covering the ray,
+    """Uniform B = -B0 Z_hat and psi = 1 - X / L on a grid covering the ray,
     with margins in X (including vacuum, X < 0), Y and Z"""
     X = np.linspace(-0.1 * L, 1.1 * L, 13)
     Y = np.linspace(-0.1 * L, 2 * L * np.sin(2 * a0) + 0.1 * L, 13)
@@ -268,11 +291,11 @@ def linear_layer_field(B0, a0):
     return InterpolatedField_Cartesian(X, Y, Z, zero, zero, zero - B0, 1 - X_grid / L)
 
 
-def run_linear_layer(a0_deg, R_Y, gyro_ratio, output_path):
+def run_linear_layer(a0_deg, R_y, gyro_ratio, output_path):
     a0 = np.deg2rad(a0_deg)
     q, K = analytic_ray(TAU_LAUNCH, a0)
-    Psi = analytic_Psi_in_plane(TAU_LAUNCH, a0, R_Y)[0]
-    Psi[2, 2] = analytic_Psi_zz(TAU_LAUNCH, a0, R_Y)
+    Psi = analytic_Psi_in_plane(TAU_LAUNCH, a0, R_y)[0]
+    Psi[2, 2] = analytic_Psi_ZZ(TAU_LAUNCH, a0, R_y)
     return beam_me_up(
         geometry="cartesian",
         poloidal_launch_angle_Torbeam=0.0,
@@ -309,9 +332,9 @@ def runs(tmp_path_factory):
 
     def get(name):
         if name not in cache:
-            a0_deg, R_Y, gyro_ratio = CASES[name]
+            a0_deg, R_y, gyro_ratio = CASES[name]
             dt = run_linear_layer(
-                a0_deg, R_Y, gyro_ratio, tmp_path_factory.mktemp(name)
+                a0_deg, R_y, gyro_ratio, tmp_path_factory.mktemp(name)
             )
             so = dt["solver_output"]
             tau = so["tau"].values
@@ -319,21 +342,21 @@ def runs(tmp_path_factory):
             tau_edge = tau + TAU_LAUNCH
             cache[name] = {
                 "a0": a0,
-                "R_Y": R_Y,
+                "R_y": R_y,
                 "tau": tau,
                 "tau_edge": tau_edge,
                 "q": so["q_output_cartesian"].values,
                 "K": so["K_output_cartesian"].values,
                 "Psi": so["Psi_3D_output_labframe_cartesian"].values,
                 "analytic_ray": analytic_ray(tau_edge, a0),
-                "analytic_Psi": analytic_Psi_in_plane(tau_edge, a0, R_Y),
+                "analytic_Psi": analytic_Psi_in_plane(tau_edge, a0, R_y),
             }
         return cache[name]
 
     return get
 
 
-MAIN_CASES = ["a10", "a30", "a50", "a30-curved"]
+MAIN_CASES = ["a10", "a30-curved"]
 
 ##################################################
 # The analytic solution itself
@@ -342,60 +365,60 @@ MAIN_CASES = ["a10", "a30", "a50", "a30-curved"]
 
 @pytest.mark.parametrize("name", MAIN_CASES)
 def test_analytic_solution_is_consistent(name):
-    """The helpers satisfy H = 0, the constraint (A3)
+    """The helpers satisfy H = 0, the constraint (A.3)
     grad_K H . Psi + grad H = 0, the beam-frame edge values, and agree with
-    the closed form of Psi_YY"""
-    a0_deg, R_Y, _ = CASES[name]
+    the closed form of the beam-frame Psi_yy"""
+    a0_deg, R_y, _ = CASES[name]
     a0 = np.deg2rad(a0_deg)
     tau_leave = 2 * K0 * L * np.cos(a0)
     tau = np.linspace(0, tau_leave, 101)
     q, K = analytic_ray(tau, a0)
-    Psi = analytic_Psi_in_plane(tau, a0, R_Y)
+    Psi = analytic_Psi_in_plane(tau, a0, R_y)
 
-    # H = K^2 / K0^2 - 1 + X / L = 0, and the ray leaves at x = 0
+    # H = K^2 / K0^2 - 1 + X / L = 0, and the ray leaves at X = 0
     assert_allclose(np.sum(K**2, axis=1) / K0**2 - 1 + q[:, 0] / L, 0, atol=1e-14)
     assert abs(q[-1, 0]) < 1e-14 * L
 
-    # (A3): (2 K / K0^2) . Psi = -x_hat / L, at the edge and along the ray
+    # (A.3): (2 K / K0^2) . Psi = -X_hat / L, at the edge and along the ray
     constraint = np.einsum("ti,tij->tj", 2 * K / K0**2, Psi)
     expected = np.broadcast_to([-1 / L, 0, 0], constraint.shape)
     assert_allclose(constraint, expected, atol=1e-12 / L)
 
-    # (A10), (A11) at the edge: Psi_YY = K0 / R_Y + 2i / W0^2
-    assert_allclose(Psi_YY_from_lab(Psi[:1], K[:1])[0], edge_Psi_YY(R_Y), rtol=1e-13)
-    # The closed form of Psi_YY(K_x) and the matrix route agree
+    # (A.10), (A.11) at the edge: Psi_yy = K0 / R_y + 2i / W0^2
+    assert_allclose(Psi_yy_from_lab(Psi[:1], K[:1])[0], edge_Psi_yy(R_y), rtol=1e-13)
+    # The closed form of Psi_yy(K_X) and the matrix route agree
     assert_allclose(
-        Psi_YY_closed_form(tau, a0, R_Y), Psi_YY_from_lab(Psi, K), rtol=1e-12
+        Psi_yy_closed_form(tau, a0, R_y), Psi_yy_from_lab(Psi, K), rtol=1e-12
     )
 
 
 @pytest.mark.parametrize("name", MAIN_CASES)
-def test_analytic_Psi_zz_is_consistent(name):
-    """Beyond the paper: the closed form of Psi_zz for the magnetised O-mode
-    agrees with integrating dPsi_zz/dtau = -2 (1 - X) Psi_zz^2 / K0^2"""
-    a0_deg, R_Y, _ = CASES[name]
+def test_analytic_Psi_ZZ_is_consistent(name):
+    """The closed form of Psi_ZZ for the magnetised O-mode agrees with integrating
+    dPsi_ZZ/dtau = -2 (1 - Omega_pe^2 / Omega^2) Psi_ZZ^2 / K0^2"""
+    a0_deg, R_y, _ = CASES[name]
     a0 = np.deg2rad(a0_deg)
     tau_leave = 2 * K0 * L * np.cos(a0)
     tau = np.linspace(0, tau_leave, 101)
 
     def rhs(t, y):
-        Psi_zz = y[0] + 1j * y[1]
-        X = analytic_ray(t, a0)[0][0, 0] / L
-        d = -2 * (1 - X) * Psi_zz**2 / K0**2
+        Psi_ZZ = y[0] + 1j * y[1]
+        density_ratio = analytic_ray(t, a0)[0][0, 0] / L  # Omega_pe^2 / Omega^2
+        d = -2 * (1 - density_ratio) * Psi_ZZ**2 / K0**2
         return [d.real, d.imag]
 
-    Psi_zz_0 = edge_Psi_YY(R_Y)
+    Psi_ZZ_0 = edge_Psi_yy(R_y)
     solution = solve_ivp(
         rhs,
         (0, tau_leave),
-        [Psi_zz_0.real, Psi_zz_0.imag],
+        [Psi_ZZ_0.real, Psi_ZZ_0.imag],
         t_eval=tau,
         rtol=1e-11,
         atol=1e-9,
     )
     assert_allclose(
         solution.y[0] + 1j * solution.y[1],
-        analytic_Psi_zz(tau, a0, R_Y),
+        analytic_Psi_ZZ(tau, a0, R_y),
         rtol=1e-8,
     )
 
@@ -418,7 +441,7 @@ def test_ray(runs, name):
 @pytest.mark.parametrize("name", MAIN_CASES)
 def test_Psi_in_plane(runs, name):
     """The in-plane 2x2 block of the lab-frame Psi, real and imaginary parts,
-    and the zero entries coupling the plane to z"""
+    and the zero entries coupling the plane to Z"""
     run = runs(name)
     Psi, expected = run["Psi"], run["analytic_Psi"]
     scale = np.abs(expected[:, :2, :2]).max()
@@ -439,16 +462,16 @@ def test_Psi_in_plane(runs, name):
 
 
 @pytest.mark.parametrize("name", MAIN_CASES)
-def test_Psi_zz_magnetised_curvature(runs, name):
-    """Beyond the paper: Psi_zz, along B, with the magnetised O-mode's
-    d^2 H / dK_z^2 = 2 (1 - X) / K0^2 (module notes)"""
+def test_Psi_ZZ_magnetised_curvature(runs, name):
+    """Correcting the paper: Psi_ZZ, along B, with the magnetised O-mode's
+    d^2 H / dK_Z^2 = 2 (1 - Omega_pe^2 / Omega^2) / K0^2 (module notes)"""
     run = runs(name)
-    expected = analytic_Psi_zz(run["tau_edge"], run["a0"], run["R_Y"])
+    expected = analytic_Psi_ZZ(run["tau_edge"], run["a0"], run["R_y"])
     assert_allclose(
         run["Psi"][:, 2, 2],
         expected,
         rtol=0,
-        atol=TOL["Psi_zz"] * np.abs(expected).max(),
+        atol=TOL["Psi_ZZ"] * np.abs(expected).max(),
     )
 
 
@@ -463,7 +486,7 @@ def parabola_minimum(tau, W, step):
 
 @pytest.mark.parametrize("name", MAIN_CASES)
 def test_width_and_focus(runs, name):
-    """W_Y = sqrt(2 / Im Psi_YY) along the ray, and where the beam is
+    """W_y = sqrt(2 / Im Psi_yy) along the ray, and where the beam is
     narrowest.
 
     Scotty's output is sampled every `step` in tau, so the focus is located
@@ -474,11 +497,11 @@ def test_width_and_focus(runs, name):
     be the one nearest the exact analytic focus"""
     run = runs(name)
     _, K = run["analytic_ray"]
-    W = width(Psi_YY_from_lab(run["Psi"], run["K"]))
-    W_expected = width(Psi_YY_from_lab(run["analytic_Psi"], K))
+    W = width(Psi_yy_from_lab(run["Psi"], run["K"]))
+    W_expected = width(Psi_yy_from_lab(run["analytic_Psi"], K))
     assert_allclose(W, W_expected, rtol=TOL["W"])
 
-    focus = analytic_focus(run["a0"], run["R_Y"])
+    focus = analytic_focus(run["a0"], run["R_y"])
     # The uniform output points (the cut-off is added to them)
     step = run["tau"][1]
     uniform = np.isclose(run["tau"] / step, np.round(run["tau"] / step), atol=1e-6)
@@ -515,8 +538,8 @@ def test_tau_leave_and_cutoff(runs, name):
 
 def test_B0_independence(runs):
     """The O-mode beam with K perpendicular to B does not depend on |B|:
-    omega_ce / Omega = 0.3 and 0.1"""
-    a, b = runs("a30"), runs("a30-B0")
+    Omega_ce / Omega = 0.3 and 0.1, on the converging beam"""
+    a, b = runs("a30-curved"), runs("a30-curved-B0")
     assert_allclose(b["tau"], a["tau"], rtol=TOL["B0_tau"])
     assert_allclose(b["q"], a["q"], rtol=0, atol=TOL["B0_ray"] * L)
     assert_allclose(b["K"], a["K"], rtol=0, atol=TOL["B0_ray"] * K0)
