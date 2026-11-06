@@ -49,7 +49,7 @@ def synthetic(tmp_path, **changes):
 def plasma_launch_from(vacuum_run, kwargs, index=None, **changes):
     """Plasma-launch arguments that start where `vacuum_run`'s solvers do
     (`index` None), or at its `index`-th output point"""
-    so = vacuum_run["solver_output"]
+    so = vacuum_run["solver"]
     if index is None:
         q = so["q_initial_cylindrical"].values
         K = so["K_initial_cartesian"].values
@@ -95,8 +95,8 @@ def round_trip(request, tmp_path_factory):
 @pytest.mark.parametrize("name", BEAM)
 def test_plasma_launch_reproduces_the_vacuum_beam(round_trip, name):
     vacuum, plasma = round_trip
-    a = vacuum["solver_output"][name].values
-    b = plasma["solver_output"][name].values
+    a = vacuum["solver"][name].values
+    b = plasma["solver"][name].values
 
     assert_allclose(b, a, rtol=1e-5, atol=1e-5 * np.abs(a).max())
 
@@ -105,7 +105,7 @@ def test_plasma_launch_keeps_the_mode_and_tau(round_trip):
     """At the plasma edge the density is zero, so both runs save the mode's
     zero-density polarisation as e_hat_initial"""
     vacuum, plasma = round_trip
-    so_v, so_p = vacuum["solver_output"], plasma["solver_output"]
+    so_v, so_p = vacuum["solver"], plasma["solver"]
 
     assert int(so_p["mode_flag_initial"]) == int(so_v["mode_flag_initial"])
     assert_allclose(so_p["tau"].values, so_v["tau"].values, rtol=1e-6)
@@ -120,7 +120,7 @@ def test_plasma_launch_starts_at_the_launch_point(round_trip):
     """Launch, entry and initial values are the same, and the distance from
     launch to entry is zero"""
     _, plasma = round_trip
-    so = plasma["solver_output"]
+    so = plasma["solver"]
 
     assert float(so["distance_from_launch_to_entry"]) == 0.0
     assert_allclose(so["q_initial_cylindrical"], so["q_launch_cylindrical"])
@@ -133,7 +133,7 @@ def test_plasma_launch_starts_at_the_launch_point(round_trip):
 
 def test_plasma_launch_inputs_are_saved(round_trip):
     vacuum, plasma = round_trip
-    inputs, so_v = plasma["inputs"], vacuum["solver_output"]
+    inputs, so_v = plasma["inputs"], vacuum["solver"]
 
     assert str(inputs["launch_flag"].values) == "plasma"
     assert_allclose(inputs["plasmaLaunch_K_cartesian"], so_v["K_initial_cartesian"])
@@ -144,13 +144,13 @@ def test_plasma_launch_inputs_are_saved(round_trip):
 
 
 def test_plasma_launch_has_no_beam_waist(round_trip):
-    """filter_b is normalised by the launched beam's waist, which a plasma
+    """filterfun_b is normalised by the launched beam's waist, which a plasma
     launch doesn't have"""
     _, plasma = round_trip
-    dbs = plasma["dbs_analysis"]
+    dbs = plasma["diagnostics/dbs"]
 
-    assert np.isnan(float(dbs["beam_waist"]))
-    assert np.isnan(dbs["filter_b"].values).all()
+    assert np.isnan(float(plasma["beam"]["beam_waist"]))
+    assert np.isnan(dbs["filterfun_b"].values).all()
 
 
 @pytest.mark.parametrize(("named", "mode_flag"), [("O", 1), ("X", -1)])
@@ -162,7 +162,7 @@ def test_plasma_launch_at_zero_density_with_named_mode(tmp_path, named, mode_fla
     vacuum = beam_me_up(**kwargs)
     plasma = beam_me_up(**plasma_launch_from(vacuum, kwargs, mode_flag=named))
 
-    assert int(plasma["solver_output"]["mode_flag_initial"]) == mode_flag
+    assert int(plasma["solver"]["mode_flag_initial"]) == mode_flag
 
 
 ##################################################
@@ -198,7 +198,7 @@ def inside(request, tmp_path_factory):
 def test_vacuum_mode_flag_polarisation(inside):
     """Inside the plasma the O-mode's polarisation is along b (|e_b| near 1)"""
     mode_name, _, _, vacuum, _ = inside
-    e_b = np.abs(vacuum["analysis"]["e_hat"].values[INSIDE, -1])
+    e_b = np.abs(vacuum["beam"]["e_hat"].values[INSIDE, -1])
 
     assert (e_b > 0.75) == (mode_name == "O")
 
@@ -215,7 +215,7 @@ def test_vacuum_mode_flag_polarisation(inside):
 )
 def test_plasma_launch_from_inside_follows_the_vacuum_beam(inside, name, tolerance):
     _, _, _, vacuum, plasma = inside
-    so_v, so_p = vacuum["solver_output"], plasma["solver_output"]
+    so_v, so_p = vacuum["solver"], plasma["solver"]
     tau_v = so_v["tau"].values
     tau_p = so_p["tau"].values + tau_v[INSIDE]
     overlap = tau_p <= tau_v[-1]
@@ -238,7 +238,7 @@ def test_plasma_launch_from_inside_finds_the_named_mode(inside):
         **plasma_launch_from(vacuum, kwargs, index=INSIDE, mode_flag=mode_name)
     )
 
-    assert int(plasma["solver_output"]["mode_flag_initial"]) == mode_flag
+    assert int(plasma["solver"]["mode_flag_initial"]) == mode_flag
 
 
 def test_plasma_launch_from_inside_rejects_the_other_named_mode(inside):
@@ -269,7 +269,7 @@ def test_plasma_launch_ray_tracing_only(tmp_path):
     the input checks still require) is not used"""
     kwargs = synthetic(tmp_path, ray_tracing_flag=True, **TIGHT)
     vacuum = beam_me_up(**kwargs)
-    so = vacuum["solver_output"]
+    so = vacuum["solver"]
     plasma = beam_me_up(
         **dict(
             kwargs,
@@ -281,7 +281,7 @@ def test_plasma_launch_ray_tracing_only(tmp_path):
     )
 
     assert_allclose(
-        plasma["solver_output"]["q_output_cylindrical"],
+        plasma["solver"]["q_output_cylindrical"],
         so["q_output_cylindrical"],
         rtol=1e-6,
     )
@@ -292,7 +292,7 @@ def test_plasma_launch_through_compat(tmp_path):
     from_v3_kwargs and starts with that K"""
     kwargs = synthetic(tmp_path)
     vacuum = beam_me_up(**kwargs)
-    so = vacuum["solver_output"]
+    so = vacuum["solver"]
 
     v3 = dict(kwargs)
     for name in ("geometry", "launch_flag", "Psi_BC_flag"):
@@ -310,7 +310,7 @@ def test_plasma_launch_through_compat(tmp_path):
 
     assert str(plasma["inputs"]["launch_flag"].values) == "plasma"
     assert_allclose(
-        plasma["solver_output"]["K_initial_cylindrical"],
+        plasma["solver"]["K_initial_cylindrical"],
         so["K_initial_cylindrical"],
         rtol=1e-12,
     )
@@ -331,7 +331,7 @@ def test_plasma_launch_outside_the_plasma(tmp_path):
 def test_plasma_launch_K_off_the_dispersion_relation(tmp_path):
     kwargs = synthetic(tmp_path)
     vacuum = beam_me_up(**kwargs)
-    K = vacuum["solver_output"]["K_initial_cartesian"].values
+    K = vacuum["solver"]["K_initial_cartesian"].values
     plasma_kwargs = plasma_launch_from(vacuum, kwargs, plasmaLaunch_K_cartesian=1.1 * K)
 
     with pytest.raises(ValueError, match="does not satisfy the dispersion relation"):
@@ -374,7 +374,7 @@ def no_boundary_condition(tmp_path_factory):
 def test_no_boundary_condition_carries_K_and_Psi_over(no_boundary_condition):
     """K and Psi where the solvers start are the vacuum ones at the entry"""
     without, _ = no_boundary_condition
-    so = without["solver_output"]
+    so = without["solver"]
 
     assert str(without["inputs"]["Psi_BC_flag"].values) == "None"
     assert_allclose(so["K_initial_cartesian"], so["K_launch_cartesian"], rtol=1e-12)
@@ -391,8 +391,8 @@ def test_no_boundary_condition_matches_continuous_when_flat(
     """With density zero and flat at the edge, the continuous boundary
     condition has nothing to correct, so both give the same beam"""
     without, continuous = no_boundary_condition
-    a = continuous["solver_output"][name].values
-    b = without["solver_output"][name].values
+    a = continuous["solver"][name].values
+    b = without["solver"][name].values
 
     assert_allclose(b, a, rtol=1e-4, atol=1e-4 * np.abs(a).max())
 
@@ -406,7 +406,7 @@ def test_no_boundary_condition_with_named_mode(tmp_path, named, mode_flag):
     )
     dt = beam_me_up(**kwargs)
 
-    assert int(dt["solver_output"]["mode_flag_initial"]) == mode_flag
+    assert int(dt["solver"]["mode_flag_initial"]) == mode_flag
 
 
 def test_no_boundary_condition_rejects_a_kink(tmp_path):

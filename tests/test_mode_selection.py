@@ -94,7 +94,7 @@ def synthetic(tmp_path, **changes):
 
 def inside_e_b(dt):
     """|e_b| a quarter of the way along the beam, inside the plasma"""
-    e_hat = dt["analysis"]["e_hat"].values
+    e_hat = dt["beam"]["e_hat"].values
     return abs(e_hat[len(e_hat) // 4, -1])
 
 
@@ -118,17 +118,17 @@ def test_vacuum_named_modes_trace_the_right_root(vacuum_runs):
     other one (before this fix, both traced the X-mode)"""
     O_root = 1 if inside_e_b(vacuum_runs[1]) > inside_e_b(vacuum_runs[-1]) else -1
 
-    assert int(vacuum_runs["O"]["solver_output"]["mode_flag_initial"]) == O_root
-    assert int(vacuum_runs["X"]["solver_output"]["mode_flag_initial"]) == -O_root
+    assert int(vacuum_runs["O"]["solver"]["mode_flag_initial"]) == O_root
+    assert int(vacuum_runs["X"]["solver"]["mode_flag_initial"]) == -O_root
 
 
 def test_vacuum_named_mode_is_the_numeric_one(vacuum_runs):
     """ "O" and "X" give the same beam as their numeric mode_flag"""
     for named in ("O", "X"):
-        numeric = int(vacuum_runs[named]["solver_output"]["mode_flag_initial"])
+        numeric = int(vacuum_runs[named]["solver"]["mode_flag_initial"])
         assert_allclose(
-            vacuum_runs[named]["solver_output"]["q_output_cylindrical"],
-            vacuum_runs[numeric]["solver_output"]["q_output_cylindrical"],
+            vacuum_runs[named]["solver"]["q_output_cylindrical"],
+            vacuum_runs[numeric]["solver"]["q_output_cylindrical"],
         )
 
 
@@ -136,10 +136,10 @@ def test_e_hat_initial_is_the_zero_density_limit(vacuum_runs):
     """The beam enters where the density is zero; e_hat_initial is the mode's
     zero-density polarisation, not an arbitrary degenerate vector"""
     for mode_flag in (1, -1):
-        e_hat = vacuum_runs[mode_flag]["solver_output"]["e_hat_initial"].values
+        e_hat = vacuum_runs[mode_flag]["solver"]["e_hat_initial"].values
         assert np.isclose(np.linalg.norm(e_hat), 1.0)
-    e_b_O = abs(vacuum_runs[1]["solver_output"]["e_hat_initial"].values[-1])
-    e_b_X = abs(vacuum_runs[-1]["solver_output"]["e_hat_initial"].values[-1])
+    e_b_O = abs(vacuum_runs[1]["solver"]["e_hat_initial"].values[-1])
+    e_b_X = abs(vacuum_runs[-1]["solver"]["e_hat_initial"].values[-1])
     assert e_b_O > e_b_X + 0.1
 
 
@@ -175,7 +175,7 @@ def test_numeric_mode_flag_needs_no_label(tmp_path, mode_flag):
     dt = beam_me_up(
         **synthetic(tmp_path, mode_flag=mode_flag, toroidal_launch_angle_Torbeam=45.0)
     )
-    assert int(dt["solver_output"]["mode_flag_initial"]) == mode_flag
+    assert int(dt["solver"]["mode_flag_initial"]) == mode_flag
 
 
 def test_named_mode_raises_when_modes_cannot_be_labelled(tmp_path):
@@ -198,7 +198,7 @@ def test_e_hat_initial_is_the_traced_roots_at_low_density(
         )
     )
     assert_allclose(
-        np.abs(dt["solver_output"]["e_hat_initial"].values),
-        np.abs(dt["analysis"]["e_hat"].values[0]),
+        np.abs(dt["solver"]["e_hat_initial"].values),
+        np.abs(dt["beam"]["e_hat"].values[0]),
         atol=0.01,
     )

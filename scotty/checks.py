@@ -163,7 +163,6 @@ class Parameters:
         further_analysis_flag: bool,
         detailed_analysis_flag: bool,
         # Additional flags
-        benchmarking_flag: bool,
         ray_tracing_flag: bool,
         # return_dt_field: bool,
         # Extra kwargs for parsing
@@ -224,7 +223,6 @@ class Parameters:
         #
         ##################################################
 
-        self.benchmarking_flag = benchmarking_flag
         self.ray_tracing_flag = ray_tracing_flag
         self.launch_flag = self._check_launch_flag(launch_flag)
         self.Psi_BC_flag = self._check_Psi_BC_flag(Psi_BC_flag, self.launch_flag)

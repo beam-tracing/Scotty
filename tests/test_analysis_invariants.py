@@ -34,7 +34,7 @@ def steered_run(request, tmp_path_factory):
 
 def test_b_hat_matches_field_components(steered_run):
     """b_hat_cartesian is the unit vector of the stored (B_X, B_Y, B_Z)"""
-    analysis = steered_run["analysis"]
+    analysis = steered_run["beam"]
     B = np.stack(
         [analysis["B_X"].values, analysis["B_Y"].values, analysis["B_Z"].values],
         axis=-1,
@@ -53,7 +53,7 @@ def test_polarisation_matches_mode(steered_run, request):
     basis of eqs. 36-41 (despite its "col_cart" label) and the b-component
     is its third entry. Fails if e_hat is taken from the wrong eigenvector
     (the eigh ordering is not the Cardano ordering)"""
-    analysis = steered_run["analysis"]
+    analysis = steered_run["beam"]
     i = int(analysis["cutoff_index"])
     e_hat = analysis["e_hat"].values[i]
     e_b = np.abs(e_hat[2]) / np.linalg.norm(e_hat)
@@ -69,9 +69,8 @@ def test_eigenvalue_of_D_consistent_with_Booker(steered_run):
     surface, so on the ray the Cardano H can be no larger than the solver's
     drift off that surface. An inconsistent b_hat between the Hamiltonian and
     the analysis breaks this"""
-    analysis = steered_run["analysis"]
-    H_Cardano = np.real(analysis["H_Cardano_solution"].values)
-    H_Booker = np.real(analysis["H_Booker"].values)
+    H_Cardano = np.real(steered_run["beam"]["H_Cardano_solution"].values)
+    H_Booker = np.real(steered_run["beam"]["H_Booker"].values)
 
     assert np.max(np.abs(H_Cardano)) < 2 * np.max(np.abs(H_Booker)) + 1e-6
 
@@ -82,7 +81,7 @@ def test_dispersion_relation_satisfied_on_ray(steered_run):
     to |H| ~ 4e-3 in its last few points (step error on K ~ 1000 m^-1), so the
     bound scales with rtol rather than being fixed"""
     rtol = float(steered_run["inputs"]["rtol"])
-    H_Booker = np.real(steered_run["analysis"]["H_Booker"].values)
+    H_Booker = np.real(steered_run["beam"]["H_Booker"].values)
 
     assert np.max(np.abs(H_Booker)) < 10 * rtol
 
@@ -104,7 +103,7 @@ def test_dispersion_drift_is_step_error(tmp_path):
         )
         (tmp_path / folder).mkdir()
         output = beam_me_up(**kwargs_dict)
-        return np.max(np.abs(np.real(output["analysis"]["H_Booker"].values)))
+        return np.max(np.abs(np.real(output["beam"]["H_Booker"].values)))
 
     loose = max_drift(1e-3, 1e-6, "loose")
     tight = max_drift(1e-5, 1e-8, "tight")
@@ -214,16 +213,16 @@ def test_g_matches_dq_dtau(tight_run):
     size and sign as well as direction, and fails if the solver and the analysis
     disagree on H or on tau. The difference falls as rtol is tightened, so the
     run needs a tighter rtol than the default for the test to be sharp"""
-    solver_output = tight_run["solver_output"]
-    tau = solver_output["tau"].values
+    solver = tight_run["solver"]
+    tau = solver["tau"].values
     dq_dtau = np.stack(
         [
-            CubicSpline(tau, solver_output[name].values)(tau, 1)
+            CubicSpline(tau, solver[name].values)(tau, 1)
             for name in ("q_X_output", "q_Y_output", "q_Z_output")
         ],
         axis=-1,
     )
-    g = np.real(tight_run["analysis"]["g_vector_cartesian"].values)
+    g = np.real(tight_run["beam"]["g_vector_cartesian"].values)
 
     relative_difference = np.linalg.norm(dq_dtau - g, axis=-1) / np.linalg.norm(
         g, axis=-1
