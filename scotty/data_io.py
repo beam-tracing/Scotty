@@ -251,6 +251,7 @@ def solver_output_to_dicts(params: Parameters) -> Tuple[dict, dict]:
 
     return solver_output_dict, solver_output_coords
 
+
 # The output's groups. The analysis functions make `analysis` and `dbs_analysis`;
 # everything in `analysis` goes to `beam`, and everything in `dbs_analysis` goes
 # to `diagnostics/dbs` except BEAM_FROM_DBS, which describe the beam rather than
