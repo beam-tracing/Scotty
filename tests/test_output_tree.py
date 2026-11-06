@@ -3,7 +3,6 @@ import xarray as xr
 
 from scotty.output_tree import (
     BEAM_FROM_DBS,
-    CHECK_VARIABLES,
     from_output_tree,
     to_output_tree,
 )
@@ -19,7 +18,7 @@ def _flat():
             {"theta_m": along, "H_Booker": along, "e_hat": along}, coords=tau
         ),
         "dbs_analysis": xr.Dataset(
-            {"theta": along, "loc_m": along, "k_perp1_hat": along}, coords=tau
+            {"theta": along, "filterfun_m": along, "k_perp1_hat": along}, coords=tau
         ),
     }
 
@@ -27,9 +26,15 @@ def _flat():
 def test_groups():
     dt = to_output_tree(**_flat())
     assert set(dt["solver"].ds.data_vars) == {"q_R_output"}
-    assert set(dt["beam"].ds.data_vars) == {"theta_m", "e_hat", "theta"}
-    assert set(dt["checks"].ds.data_vars) == {"H_Booker"}
-    assert set(dt["diagnostics/dbs"].ds.data_vars) == {"loc_m", "k_perp1_hat"}
+    assert set(dt["beam"].ds.data_vars) == {
+        "theta_m",
+        "H_Booker",
+        "e_hat",
+        "theta",
+        "k_perp1_hat",
+    }
+    assert set(dt["diagnostics/dbs"].ds.data_vars) == {"filterfun_m"}
+    assert set(dt.children) == {"inputs", "solver", "beam", "diagnostics"}
 
 
 def test_round_trip_through_a_file(tmp_path):
@@ -41,5 +46,6 @@ def test_round_trip_through_a_file(tmp_path):
     assert back["dbs_analysis"]["theta"].dims == ("tau",)
 
 
-def test_lists_do_not_overlap():
-    assert not set(CHECK_VARIABLES) & set(BEAM_FROM_DBS)
+def test_beam_from_dbs_is_not_in_analysis():
+    """The DBS variables moved to `beam` don't clash with `analysis`'s"""
+    assert not set(BEAM_FROM_DBS) & set(_flat()["analysis"].data_vars)

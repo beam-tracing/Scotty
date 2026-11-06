@@ -8,35 +8,16 @@ from typing import Dict, Tuple
 import xarray as xr
 
 # The output's groups. The analysis functions make `analysis` and `dbs_analysis`;
-# these two lists say which of their variables are stored elsewhere: everything
-# in `analysis` goes to `beam` except CHECK_VARIABLES, and everything in
-# `dbs_analysis` goes to `diagnostics/dbs` except BEAM_FROM_DBS
-CHECK_VARIABLES = (
-    "H_Booker",
-    "H_Booker_other",
-    "H_Cardano",
-    "H_Cardano_1",
-    "H_Cardano_2",
-    "H_Cardano_3",
-    "H_Cardano_solution",
-    "H_eigval1",
-    "H_eigval2",
-    "H_eigval3",
-    "H_eigval_solution",
-    "H_eigvals",
-    "g_X_Cardano",
-    "g_Y_Cardano",
-    "g_Z_Cardano",
-    "g_hat_Cardano",
-    "g_magnitude_Cardano",
-    "mode_index_Cardano",
-)
+# everything in `analysis` goes to `beam`, and everything in `dbs_analysis` goes
+# to `diagnostics/dbs` except BEAM_FROM_DBS, which describe the beam rather than
+# DBS and go to `beam`
 BEAM_FROM_DBS = (
     "beam_waist",
     "binormal_hat",
     "cos_theta",
     "d_theta_d_tau",
     "det_Im_Psi_w",
+    "k_perp1_hat",
     "normal_hat",
     "sin_theta",
     "theta",
@@ -62,16 +43,14 @@ def to_output_tree(
     dbs_analysis: xr.Dataset,
 ) -> xr.DataTree:
     """The output's groups, from what the analysis functions make"""
-    checks, beam = _split(analysis, CHECK_VARIABLES)
     from_dbs, dbs = _split(dbs_analysis, BEAM_FROM_DBS)
     # `analysis` has the path lengths as variables, `dbs_analysis` as coordinates
-    from_dbs = from_dbs.drop_vars([c for c in from_dbs.coords if c in beam.data_vars])
+    from_dbs = from_dbs.drop_vars([c for c in from_dbs.coords if c in analysis.data_vars])
     return xr.DataTree.from_dict(
         {
             "inputs": inputs,
             "solver": solver_output,
-            "beam": xr.merge([beam, from_dbs], join="exact", compat="override"),
-            "checks": checks,
+            "beam": xr.merge([analysis, from_dbs], join="exact", compat="override"),
             "diagnostics/dbs": dbs,
         }
     )
@@ -79,10 +58,7 @@ def to_output_tree(
 
 def from_output_tree(dt: xr.DataTree) -> Dict[str, xr.Dataset]:
     """What `to_output_tree` was given, by name"""
-    from_dbs, beam = _split(dt["beam"].to_dataset(), BEAM_FROM_DBS)
-    analysis = xr.merge(
-        [beam, dt["checks"].to_dataset()], join="exact", compat="override"
-    )
+    from_dbs, analysis = _split(dt["beam"].to_dataset(), BEAM_FROM_DBS)
     dbs_analysis = xr.merge(
         [dt["diagnostics/dbs"].to_dataset(), from_dbs], join="exact", compat="override"
     )

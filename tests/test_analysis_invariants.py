@@ -69,8 +69,8 @@ def test_eigenvalue_of_D_consistent_with_Booker(steered_run):
     surface, so on the ray the Cardano H can be no larger than the solver's
     drift off that surface. An inconsistent b_hat between the Hamiltonian and
     the analysis breaks this"""
-    H_Cardano = np.real(steered_run["checks"]["H_Cardano_solution"].values)
-    H_Booker = np.real(steered_run["checks"]["H_Booker"].values)
+    H_Cardano = np.real(steered_run["beam"]["H_Cardano_solution"].values)
+    H_Booker = np.real(steered_run["beam"]["H_Booker"].values)
 
     assert np.max(np.abs(H_Cardano)) < 2 * np.max(np.abs(H_Booker)) + 1e-6
 
@@ -81,7 +81,7 @@ def test_dispersion_relation_satisfied_on_ray(steered_run):
     to |H| ~ 4e-3 in its last few points (step error on K ~ 1000 m^-1), so the
     bound scales with rtol rather than being fixed"""
     rtol = float(steered_run["inputs"]["rtol"])
-    H_Booker = np.real(steered_run["checks"]["H_Booker"].values)
+    H_Booker = np.real(steered_run["beam"]["H_Booker"].values)
 
     assert np.max(np.abs(H_Booker)) < 10 * rtol
 
@@ -103,7 +103,7 @@ def test_dispersion_drift_is_step_error(tmp_path):
         )
         (tmp_path / folder).mkdir()
         output = beam_me_up(**kwargs_dict)
-        return np.max(np.abs(np.real(output["checks"]["H_Booker"].values)))
+        return np.max(np.abs(np.real(output["beam"]["H_Booker"].values)))
 
     loose = max_drift(1e-3, 1e-6, "loose")
     tight = max_drift(1e-5, 1e-8, "tight")

@@ -144,13 +144,13 @@ def test_plasma_launch_inputs_are_saved(round_trip):
 
 
 def test_plasma_launch_has_no_beam_waist(round_trip):
-    """filter_b is normalised by the launched beam's waist, which a plasma
+    """filterfun_b is normalised by the launched beam's waist, which a plasma
     launch doesn't have"""
     _, plasma = round_trip
     dbs = plasma["diagnostics/dbs"]
 
     assert np.isnan(float(plasma["beam"]["beam_waist"]))
-    assert np.isnan(dbs["filter_b"].values).all()
+    assert np.isnan(dbs["filterfun_b"].values).all()
 
 
 @pytest.mark.parametrize(("named", "mode_flag"), [("O", 1), ("X", -1)])

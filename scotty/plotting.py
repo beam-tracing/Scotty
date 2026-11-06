@@ -199,7 +199,7 @@ def plot_dispersion_relation(
     for (name, linestyle), colours in zip(
         (("H_eigvals", "-"), ("H_Cardano", ":")), styles
     ):
-        values = np.abs(np.asarray(dt["checks"][name].values))
+        values = np.abs(np.asarray(dt["beam"][name].values))
         for i, colour in enumerate(colours):
             ax.plot(
                 l_lc,

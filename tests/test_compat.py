@@ -283,11 +283,11 @@ def test_output_v4_to_v3_layout(v4_output):
     assert_allclose(v3["solver_output"].ds["q_R"], v4["solver"].ds["q_R_output"])
     # v3's localisation pieces are v4's filter-function pieces
     for v3_name, v4_name in (
-        ("loc_b", "filter_b"),
-        ("loc_m", "filter_m"),
-        ("loc_p", "filter_p"),
-        ("loc_r", "filter_r"),
-        ("loc_s", "filter_s_-13_3"),
+        ("loc_b", "filterfun_b"),
+        ("loc_m", "filterfun_m"),
+        ("loc_p", "filterfun_p"),
+        ("loc_r", "filterfun_r"),
+        ("loc_s", "filterfun_s_-13_3"),
     ):
         assert_allclose(v3["analysis"].ds[v3_name], v4["diagnostics/dbs"].ds[v4_name])
     # v3's initial position is the first point of the ray

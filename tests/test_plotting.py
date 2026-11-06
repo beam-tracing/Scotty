@@ -127,7 +127,7 @@ def test_dispersion_relation(run):
     for l in lines:
         assert_allclose(l.get_xdata(), dt["beam"]["beam_path_length_wrt_cutoff"].values)
     assert_allclose(
-        lines[3].get_ydata(), np.abs(dt["checks"]["H_Cardano"].values[:, 0]), rtol=1e-12
+        lines[3].get_ydata(), np.abs(dt["beam"]["H_Cardano"].values[:, 0]), rtol=1e-12
     )
 
 

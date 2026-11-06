@@ -1,4 +1,4 @@
-"""Checks of the ray piece of the filter function, filter_r = g_ant^2 / g^2, and of the
+"""Checks of the ray piece of the filter function, filterfun_r = g_ant^2 / g^2, and of the
 group velocity g = grad_K H it uses (H the eigenvalue of D, from Cardano's formula).
 
 Both checks need a toroidally steered beam and finite mismatch: for an unsteered
@@ -29,17 +29,17 @@ def steered_run(request, tmp_path_factory):
     return beam_me_up(**kwargs_dict)
 
 
-def test_filter_r_vacuum_limit(steered_run):
+def test_filterfun_r_vacuum_limit(steered_run):
     """The beam enters the plasma where the density is zero, so the first point
-    is in vacuum, where g = g_ant = 2c/omega and filter_r = 1"""
+    is in vacuum, where g = g_ant = 2c/omega and filterfun_r = 1"""
     omega = float(steered_run["inputs"]["launch_angular_frequency"])
-    g_first = float(np.real(steered_run["checks"]["g_magnitude_Cardano"].values[0]))
-    filter_r_first = float(
-        np.real(steered_run["diagnostics/dbs"]["filter_r"].values[0])
+    g_first = float(np.real(steered_run["beam"]["g_magnitude_Cardano"].values[0]))
+    filterfun_r_first = float(
+        np.real(steered_run["diagnostics/dbs"]["filterfun_r"].values[0])
     )
 
     assert np.isclose(g_first * omega / (2 * constants.c), 1.0, rtol=1e-5, atol=0)
-    assert np.isclose(filter_r_first, 1.0, rtol=1e-5, atol=0)
+    assert np.isclose(filterfun_r_first, 1.0, rtol=1e-5, atol=0)
 
 
 def test_g_Cardano_parallel_to_g_Booker(steered_run):
@@ -50,7 +50,7 @@ def test_g_Cardano_parallel_to_g_Booker(steered_run):
     analysis = steered_run["beam"]
     cos_angle = np.abs(
         np.sum(
-            np.real(steered_run["checks"]["g_hat_Cardano"].values)
+            np.real(steered_run["beam"]["g_hat_Cardano"].values)
             * analysis["g_hat_cartesian"].values,
             axis=-1,
         )
@@ -101,7 +101,7 @@ def test_g_magnitude_matches_independent_gradient(steered_run):
         g_cart[:, j] = (H_plus - H_minus) / (2 * step)
 
     np.testing.assert_allclose(
-        np.real(steered_run["checks"]["g_magnitude_Cardano"].values),
+        np.real(steered_run["beam"]["g_magnitude_Cardano"].values),
         np.linalg.norm(g_cart, axis=-1),
         rtol=1e-3,
     )

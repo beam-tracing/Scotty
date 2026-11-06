@@ -246,12 +246,12 @@ def test_entry_quantities_are_nan(run):
 
 def test_reaches_the_plasma_and_is_analysed(run):
     """The ray crosses the boundary into the plasma (psi < 1) and the analysis
-    completes. The launched beam has a waist, so filter_b is finite"""
+    completes. The launched beam has a waist, so filterfun_b is finite"""
     assert run["beam"]["polflux"].values[0] > 1
     assert run["beam"]["polflux"].values.min() < 0.9
     dbs = run["diagnostics/dbs"]
     assert np.isfinite(float(run["beam"]["beam_waist"]))
-    assert np.isfinite(dbs["filter_b"].values).all()
+    assert np.isfinite(dbs["filterfun_b"].values).all()
 
 
 def test_ray_tracing_only(tmp_path):

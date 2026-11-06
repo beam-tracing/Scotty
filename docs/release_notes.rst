@@ -13,8 +13,10 @@ Output layout
 ~~~~~~~~~~~~~
 
 - The output's groups are ``inputs``, ``solver`` (was ``solver_output``), ``beam``
-  (most of ``analysis``), ``checks`` (the rest of ``analysis``) and
-  ``diagnostics/dbs`` (most of ``dbs_analysis``). Variables keep their names.
+  (``analysis``, including the consistency checks such as ``H_Booker``, and the
+  beam quantities of ``dbs_analysis``, such as ``theta`` and ``k_perp1_hat``) and
+  ``diagnostics/dbs`` (the rest of ``dbs_analysis``). Variables keep their names,
+  apart from the filter functions (below).
 
 Geometry, launch and boundary conditions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -64,7 +66,7 @@ Running v3 inputs and outputs
   ``ray_tracing_flag=True`` run.
 - ``scotty.compat.to_v4_output``, ``to_v3_output`` and ``convert_output_file``
   convert output files between the two layouts, including v3's ``loc_*`` and
-  v4's ``filter_*``.
+  v4's ``filterfun_*``.
 
 Defaults
 ~~~~~~~~
@@ -107,9 +109,9 @@ Other interface changes
   with the closest argument name (``did you mean ...?``).
 - The localisation is now called the filter function, in the outputs and the
   code: v3's ``loc_p``, ``loc_r``, ``loc_b``, ``loc_m``, ``loc_s`` are
-  ``filter_p``, ``filter_r``, ``filter_b``, ``filter_m``,
-  ``filter_s_<power>``, and there are ``filter_all_<power>`` and their path
-  integrals ``int_filter_*_dL``.
+  ``filterfun_p``, ``filterfun_r``, ``filterfun_b``, ``filterfun_m``,
+  ``filterfun_s_<power>``, and there are ``filterfun_all_<power>`` and their path
+  integrals ``int_filterfun_*_dL``.
 - New argument: ``resonance_flag`` (#151). Temperature profiles are built when
   given.
 - ``convert_hessians`` takes a required ``K_start`` (Cartesian K).
@@ -118,9 +120,9 @@ Other interface changes
   analytical base class is ``CircularFieldBase``.
 - New in ``hamiltonian.py`` and ``fun_general.py``: ``FIRST_ORDER_KEYS``,
   ``find_Booker_discriminant``.
-- New outputs: ``int_filter_all_<power>_dL``, ``d_xhat_d_tau_dot_yhat``,
+- New outputs: ``int_filterfun_all_<power>_dL``, ``d_xhat_d_tau_dot_yhat``,
   ``g_hat_Cardano``, ``Psi_w`` on (``row_beam``, ``col_beam``) = (x, y), and
-  the stacked ``H_Cardano``. ``filter_all_<power>`` is the array.
+  the stacked ``H_Cardano``. ``filterfun_all_<power>`` is the array.
 - ``e_hat``, ``e_eigvecs`` and ``e_eigvec1``-``3`` are on ``col_field`` = (u1,
   u2, b), the field-aligned frame D is written in, instead of ``col_cart``.
   Their values are unchanged.

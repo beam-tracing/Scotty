@@ -38,7 +38,7 @@ Notes
   ``launch_beam_width`` and ``launch_beam_curvature`` are ignored, and
   ``Psi_BC_flag`` has no effect. :math:`K` must satisfy the dispersion
   relation of the mode asked for (``mode_flag`` 1, -1, ``"O"`` or ``"X"``).
-  With no launched beam, ``beam_waist``, ``filter_b`` and ``filter_all`` are NaN.
+  With no launched beam, ``beam_waist``, ``filterfun_b`` and ``filterfun_all`` are NaN.
 - Positions along the way: *launch* is where the beam starts in vacuum,
   *entry* is where it reaches the plasma boundary, and *initial* is where the
   solvers start: the first point in the plasma, or the antenna for
@@ -59,8 +59,8 @@ Notes
 Output
 ~~~~~~
 
-An `xarray.DataTree` with the groups ``inputs``, ``solver``, ``beam``, ``checks``
-and ``diagnostics/dbs``, saved as ``scotty_output<suffix>.h5``.
+An `xarray.DataTree` with the groups ``inputs``, ``solver``, ``beam`` and
+``diagnostics/dbs``, saved as ``scotty_output<suffix>.h5``.
 
 Coordinates
 ~~~~~~~~~~~
@@ -74,8 +74,8 @@ Abbreviations
 ~~~~~~~~~~~~~
 
 - ``bs`` - backscattered
-- ``filter`` - filter function (``filter_b``, ``filter_p``, ``filter_r``,
-  ``filter_m``, ``filter_s``)
+- ``filterfun`` - filter function (``filterfun_b``, ``filterfun_p``, ``filterfun_r``,
+  ``filterfun_m``, ``filterfun_s``)
 - ``ne`` - equilibrium electron density
 - ``dt`` - datatree (stores data)
 
@@ -385,8 +385,8 @@ def beam_me_up(
     Returns
     -------
     xarray.DataTree, or tuple of (xarray.DataTree, field)
-        The output, with the groups ``inputs``, ``solver``, ``beam``, ``checks``
-        and ``diagnostics/dbs``, and the field if ``return_dt_field``
+        The output, with the groups ``inputs``, ``solver``, ``beam`` and
+        ``diagnostics/dbs``, and the field if ``return_dt_field``
     """
 
     ##################################################

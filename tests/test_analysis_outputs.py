@@ -33,38 +33,38 @@ def ray_run(tmp_path_factory):
 
 
 def test_ray_tracing_only_analysis_completes(ray_run):
-    """filter_s needs the launch wavenumber, which used to be set only for beam
+    """filterfun_s needs the launch wavenumber, which used to be set only for beam
     tracing, so a ray-tracing-only run failed in dbs_analysis"""
     dbs = ray_run["diagnostics/dbs"]
     for power in ("-10_3", "-13_3"):
-        assert np.all(np.isfinite(dbs[f"filter_s_{power}"].values))
+        assert np.all(np.isfinite(dbs[f"filterfun_s_{power}"].values))
 
 
-def test_filter_all_is_an_array_with_its_own_integral(beam_run):
-    """The array and its path integral used to share the key filter_all_<power>,
+def test_filterfun_all_is_an_array_with_its_own_integral(beam_run):
+    """The array and its path integral used to share the key filterfun_all_<power>,
     and the 0-d integral replaced the array"""
     dbs = beam_run["diagnostics/dbs"]
     length = dbs["beam_path_length"].values
     for power in ("-10_3", "-13_3"):
-        filter_all = dbs[f"filter_all_{power}"].values
-        assert filter_all.shape == length.shape
+        filterfun_all = dbs[f"filterfun_all_{power}"].values
+        assert filterfun_all.shape == length.shape
         product = np.prod(
             [
                 dbs[k].values
                 for k in (
-                    "filter_p",
-                    "filter_r",
-                    "filter_b",
-                    "filter_m",
-                    f"filter_s_{power}",
+                    "filterfun_p",
+                    "filterfun_r",
+                    "filterfun_b",
+                    "filterfun_m",
+                    f"filterfun_s_{power}",
                 )
             ],
             axis=0,
         )
-        np.testing.assert_allclose(filter_all, product, rtol=1e-12)
+        np.testing.assert_allclose(filterfun_all, product, rtol=1e-12)
         np.testing.assert_allclose(
-            dbs[f"int_filter_all_{power}_dL"].values,
-            trapezoid(filter_all, length),
+            dbs[f"int_filterfun_all_{power}_dL"].values,
+            trapezoid(filterfun_all, length),
             rtol=1e-12,
         )
 
@@ -83,15 +83,15 @@ def test_d_xhat_d_tau_keeps_vector_and_scalar(beam_run):
 
 
 def test_filter_functions_are_real(beam_run):
-    """Rounding in the complex Cardano formula used to make filter_r, filter_all and
+    """Rounding in the complex Cardano formula used to make filterfun_r, filterfun_all and
     their integrals complex-typed"""
     analysis, dbs = beam_run["beam"], beam_run["diagnostics/dbs"]
-    assert not np.iscomplexobj(beam_run["checks"]["g_magnitude_Cardano"].values)
+    assert not np.iscomplexobj(beam_run["beam"]["g_magnitude_Cardano"].values)
     for k in (
-        "filter_r",
-        "filter_all_-10_3",
-        "int_filter_r_dL",
-        "int_filter_all_-10_3_dL",
+        "filterfun_r",
+        "filterfun_all_-10_3",
+        "int_filterfun_r_dL",
+        "int_filterfun_all_-10_3_dL",
     ):
         assert not np.iscomplexobj(dbs[k].values), k
 
@@ -102,8 +102,8 @@ def test_e_hat_belongs_to_the_traced_mode(beam_run):
     used to pick it)"""
     analysis = beam_run["beam"]
     np.testing.assert_allclose(
-        beam_run["checks"]["H_eigval_solution"].values,
-        beam_run["checks"]["H_Cardano_solution"].values,
+        beam_run["beam"]["H_eigval_solution"].values,
+        beam_run["beam"]["H_Cardano_solution"].values,
         rtol=0,
         atol=1e-10,
     )

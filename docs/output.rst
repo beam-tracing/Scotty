@@ -5,9 +5,9 @@ Output parameters
 
 :func:`beam_me_up` returns a `datatree`_ instance which contains the
 simulation inputs under ``inputs``, the immediate results under ``solver``,
-quantities along the beam under ``beam``, consistency checks under ``checks``,
-and diagnostic-specific results under ``diagnostics``, such as
-``diagnostics/dbs``. This layout is a proposal and may change.
+quantities along the beam under ``beam`` (including the consistency checks
+such as ``H_Booker``), and diagnostic-specific results under ``diagnostics``,
+such as ``diagnostics/dbs``. This layout is a proposal and may change.
 
 Datatrees are collections of `xarray`_ ``Datasets``, which themselves
 are collections of N-dimensional variables with labelled coordinates.
