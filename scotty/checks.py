@@ -728,9 +728,14 @@ class Parameters:
                 self.Psi_3D_entry_labframe_cylindrical = (
                     self.Psi_3D_entry_labframe
                 )  # (3,3)
+                # The entry is still in vacuum, so K there is the launched K,
+                # but its cylindrical components are those at the entry, not
+                # at the launch point (they differ when zeta changes)
                 self.Psi_3D_entry_labframe_cartesian = find_Psi_3D_labframe_cyl_to_cart(
                     self.Psi_3D_entry_labframe_cylindrical,
-                    self.K_launch_cylindrical,
+                    find_K_labframe_cart_to_cyl(
+                        self.K_launch_cartesian, self.q_initial_cartesian
+                    ),
                     self.q_initial_cylindrical,
                 )
                 self.Psi_3D_initial_labframe_cylindrical = (
