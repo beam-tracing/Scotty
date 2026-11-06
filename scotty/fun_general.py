@@ -10,7 +10,7 @@ from scipy import constants
 # from scotty.checks import VALID_LAUNCH_MODE_FLAGS
 from scotty.logger import arr2str
 from scotty.typing import ArrayLike, Array, FloatArray, ComplexFloatArray
-from typing import Callable, Union, Tuple, Optional, List, Literal, TextIO, cast
+from typing import Callable, Union, Tuple, Optional, List, Literal, TextIO
 
 log = logging.getLogger(__name__)
 
@@ -1819,130 +1819,6 @@ def reshape_33N_to_N33(array: FloatArray):
 
 ##################################################
 #
-# GAUSSIAN BEAM FUNCTIONS
-#
-##################################################
-
-
-def find_Rayleigh_length(waist: float, wavenumber: float):
-    """
-    Finds the Rayleigh length (assumes vacuum propagation and circular beam)
-
-    Parameters
-    ----------
-    waist : float
-    wavenumber : float
-
-    Returns
-    ----------
-    rayleigh_length : float
-    """
-    return 0.5 * wavenumber * waist**2
-
-
-def find_waist(width: float, wavenumber: float, curvature: float):
-    """
-    Finds the size of the waist assuming vacuum propagation and circular beam
-
-    Parameters
-    ----------
-    width : float
-    wavenumber : float
-    curvature : float
-
-    Returns
-    ----------
-    beam_waist : float
-    """
-    return width / np.sqrt(1 + curvature**2 * width**4 * wavenumber**2 / 4)
-
-
-def find_distance_from_waist(width: float, wavenumber: float, curvature: float):
-    """
-    Finds how far (signed distance) you are from the waist (assumes vacuum propagation and circular beam)
-
-    Parameters
-    ----------
-    width : float
-    wavenumber : float
-    curvature : float
-
-    Returns
-    ----------
-    distance_from_waist : float
-        Signed distance from the waist; negative for distance to, positive for distance
-        after waist
-    """
-    waist_sq = find_waist(width, wavenumber, curvature) ** 2
-    return np.sign(curvature) * np.sqrt(
-        (width**2 - waist_sq) * waist_sq * wavenumber**2 / 4
-    )
-
-
-def propagate_beam(
-    Psi_w_cartesian: ComplexFloatArray, propagation_distance: float, freq_GHz: float
-) -> ComplexFloatArray:
-    """
-    Uses the vacuum solution of the beam tracing equations to propagate the beam
-    (works for arbitrary Gaussian beam in vacuum)
-
-    Parameters
-    ----------
-    Psi_w_cartesian : (2,2) ComplexFloatArray
-    propagation_distance : float
-    freq_GHz : float
-
-    Returns
-    ----------
-    Psi_w_cartesian_output : (2,2) ComplexFloatArray
-    """
-    wavenumber_K0 = freq_GHz_to_wavenumber(freq_GHz)
-
-    Psi_w_inv_cartesian = find_inverse_2D(Psi_w_cartesian)
-
-    Psi_w_inv_final_cartesian = (
-        propagation_distance / (wavenumber_K0) * np.eye(2) + Psi_w_inv_cartesian
-    )
-
-    Psi_w_final_cartesian = find_inverse_2D(Psi_w_inv_final_cartesian)
-
-    return cast(ComplexFloatArray, Psi_w_final_cartesian)
-
-
-def propagate_circular_beam(
-    width: float, curvature: float, propagation_distance: float, freq_GHz: float
-) -> Tuple[float, float]:
-    """
-    Directly uses the width and curvature formulae to calculate circular
-    beam propagation (assumes vacuum propagation and circular beam)
-
-    Parameters
-    ----------
-    width : float
-    curvature : float
-    propagation_distance : float
-    freq_GHZ : float
-
-    Returns
-    ----------
-    width : float
-    curvature : float
-    """
-    wavenumber = freq_GHz_to_wavenumber(freq_GHz)
-
-    w0 = find_waist(width, wavenumber, curvature)
-    z0 = find_distance_from_waist(width, wavenumber, curvature)
-    z_R = find_Rayleigh_length(w0, wavenumber)
-
-    z = z0 + propagation_distance
-
-    widths = w0 * np.sqrt(1 + (z / z_R) ** 2)
-    curvatures = z / (z**2 + z_R**2)
-    return widths, curvatures
-
-
-##################################################
-#
 # LAUNCH ANGLES FUNCTIONS
 #
 ##################################################
@@ -2147,3 +2023,23 @@ def genray_angles_from_mirror_angles(
     )
 
     return tor_ang_genray_deg, pol_ang_genray_deg
+
+
+# The Gaussian-beam functions moved to `scotty.antenna.gaussian`; these names
+# still work. Looked up when used, since `scotty.antenna.gaussian` imports this
+# module
+_MOVED_TO_ANTENNA_GAUSSIAN = (
+    "find_Rayleigh_length",
+    "find_waist",
+    "find_distance_from_waist",
+    "propagate_beam",
+    "propagate_circular_beam",
+)
+
+
+def __getattr__(name):
+    if name in _MOVED_TO_ANTENNA_GAUSSIAN:
+        from scotty.antenna import gaussian
+
+        return getattr(gaussian, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

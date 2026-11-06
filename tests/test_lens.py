@@ -2,7 +2,7 @@ import numpy as np
 import numpy.testing as nt
 import pytest
 from scipy.constants import c as speed_of_light
-from scotty.lensalot import make_my_lens
+from scotty.antenna.lenses import make_my_lens
 
 
 @pytest.mark.parametrize("name", ["MAST_V_band", "MAST_Q_band", "DBS_UCLA_MAST-U"])

@@ -99,7 +99,8 @@ import datetime
 import logging
 import numpy as np
 import pathlib
-from scotty.analysis import basic_analysis, dbs_analysis
+from scotty.analysis import basic_analysis
+from scotty.diagnostics.dbs import dbs_analysis
 from scotty.beam_solver import beam_tracing
 from scotty.checks import (
     VALID_GEOMETRIES,

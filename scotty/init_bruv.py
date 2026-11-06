@@ -17,11 +17,10 @@ import logging
 import math
 import numpy as np
 import pathlib
-from scotty.hornpy import make_my_horn
-from scotty.lensalot import make_my_lens
+from scotty.antenna.gaussian import propagate_beam, propagate_circular_beam
+from scotty.antenna.horns import make_my_horn
+from scotty.antenna.lenses import make_my_lens
 from scotty.fun_general import (
-    propagate_beam,
-    propagate_circular_beam,
     find_nearest,
     genray_angles_from_mirror_angles,
     freq_GHz_to_wavenumber,

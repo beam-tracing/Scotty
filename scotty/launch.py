@@ -6,6 +6,7 @@ import numpy as np
 from scipy import constants
 from scipy.interpolate import CubicSpline
 from scipy.optimize import minimize_scalar, root_scalar
+from scotty.antenna.gaussian import circular_gaussian_Psi_w
 from scotty.boundary_conditions import (
     apply_boundary_conditions,
     check_density_smooth_at_edge,
@@ -899,14 +900,11 @@ def find_plasma_entry_parameters(
             Psi_3D_entry_labframe_cartesian = None
         else:
             # Finding Psi_w_launch_beamframe_cartesian and Psi_3D_launch_beamframe_cartesian
-            # Entries on the off-diagonal = 0, because beamframe
-            # Entries on the diagonal = K_0/R + 2i/W^2, where:
-            #    R is beam radius of curvature (in metres); and
-            #    W is beam width (in metres)
             # First row/column is y-direction; second is x-direction; third is g-direction (beamframe)
             # Not to be confused with X-, Y-, Z-directions (labframe)
-            diag = K0 * launch_beam_curvature + 2j / launch_beam_width**2
-            Psi_w_launch_beamframe_cartesian = diag * np.eye(2)
+            Psi_w_launch_beamframe_cartesian = circular_gaussian_Psi_w(
+                K0, launch_beam_width, launch_beam_curvature
+            )
             Psi_3D_launch_beamframe_cartesian = make_array_3x3(
                 Psi_w_launch_beamframe_cartesian
             )

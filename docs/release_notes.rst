@@ -17,6 +17,13 @@ Output layout
   beam quantities of ``dbs_analysis``, such as ``theta`` and ``k_perp1_hat``) and
   ``diagnostics/dbs`` (the rest of ``dbs_analysis``). Variables keep their names,
   apart from the filter functions (below).
+- The code follows the same layout (:ref:`code-layout`). `scotty.antenna` holds
+  the beam before the plasma: `scotty.antenna.gaussian` (the launched Gaussian
+  beam, and the Gaussian-beam functions that were in ``fun_general``),
+  `scotty.antenna.horns` (was ``hornpy``) and `scotty.antenna.lenses` (was
+  ``lensalot``). `scotty.diagnostics` holds one module per diagnostic:
+  `scotty.diagnostics.dbs` has ``dbs_analysis``, which was in ``analysis``. The
+  old import paths still work.
 
 Geometry, launch and boundary conditions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
