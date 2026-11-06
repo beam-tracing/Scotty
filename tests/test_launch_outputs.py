@@ -102,7 +102,7 @@ def test_Psi_entry_cartesian_is_the_launched_beam_at_the_entry(steered_run):
     and K_zeta at the entry, which differ from those at the launch point once
     the beam is steered toroidally"""
     _, dt = steered_run
-    so = dt["solver_output"]
+    so = dt["solver"]
 
     K = so["K_launch_cartesian"].values
     g_hat = K / np.linalg.norm(K)
