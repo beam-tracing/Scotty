@@ -127,6 +127,12 @@ Other interface changes
 - New outputs: ``int_filter_all_<power>_dL``, ``d_xhat_d_tau_dot_yhat``,
   ``g_hat_Cardano``, ``Psi_w`` on (``row_beam``, ``col_beam``) = (x, y), and
   the stacked ``H_Cardano``. ``filter_all_<power>`` is the array.
+- The analysis checks that Psi is the gradient of K along the beam, i.e.
+  Psi . g = dK/dtau, and warns if this fails at more than 10% of the points
+  (``scotty.checks.check_Psi_g_output``), which happens when Psi drifts off the
+  beam, e.g. with a density that is not differentiable. New outputs:
+  ``dK_dtau_cartesian``, ``Psi_g_residual_imag`` and ``Psi_g_residual_real``.
+  It replaces v3's ``check_Psi_output``.
 - ``e_hat``, ``e_eigvecs`` and ``e_eigvec1``-``3`` are on ``col_field`` = (u1,
   u2, b), the field-aligned frame D is written in, instead of ``col_cart``.
   Their values are unchanged.
@@ -161,6 +167,7 @@ Removed
 - The analytical fields ``CircularCrossSectionField`` and
   ``ConstantCurrentDensityField``, and ``find_B_method="unit-tests"``; use
   ``"analytical"``.
-- ``check_Psi_output``, which warned on every run.
+- ``check_Psi_output``, which warned on every run (it was miscoded); see
+  ``check_Psi_g_output`` above.
 - ``open_*_npz``.
 - The GUI (``GUI/scottypygui.py``) has not been ported to v4.
