@@ -146,13 +146,25 @@ def beam_tracing(
     FloatArray,
     ComplexFloatArray,
 ]:
-    """Returns solver status (1, 0, -1), duration taken by solver, number of evaluations,
+    """`atol` applies to `q` as given, and to `K` and `Psi` scaled by `|K|` and
+    `max|Psi|` at the initial point.
+
+    Returns solver status (1, 0, -1), duration taken by solver, number of evaluations,
     tau` of shape `(N,)`, `q` of shape `(3, N)`, `K` of shape `(3, N)`, `Psi` of shape `(N, 3, 3)`
     """
 
     # Packing the ray and beam parameters
     beam_parameters_initial = pack_beam_parameters(
         q_initial, K_initial, Psi_3D_initial_labframe
+    )
+
+    # One absolute tolerance per block. With a single scalar atol, components
+    # that symmetry makes zero (e.g. Psi_XY) sit at finite-difference noise far
+    # above atol, and the step size follows the noise, or the step fails
+    K_scale = max(np.linalg.norm(K_initial), 1.0)
+    Psi_scale = max(np.max(np.abs(Psi_3D_initial_labframe)), 1.0)
+    atol_blocks = np.concatenate(
+        [np.full(3, atol), np.full(3, atol * K_scale), np.full(12, atol * Psi_scale)]
     )
 
     # Evolving Psi_3D by solving the beam-tracing equation
@@ -169,7 +181,7 @@ def beam_tracing(
         vectorized=False,
         args=(hamiltonian,),
         rtol=rtol,
-        atol=atol,
+        atol=atol_blocks,
     )
 
     log.info(f"""\n
