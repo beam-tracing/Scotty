@@ -87,7 +87,9 @@ def test_beam_reaches_the_end(boundary):
     """The midplane entry, unsteered, is symmetric under (Z, zeta) -> (-Z, -zeta),
     so K_Z, K_zeta, Psi_RZ and Psi_Rzeta are zero apart from finite-difference
     noise. With one scalar atol for every component, RK45 tried to resolve that
-    noise and the step failed after 8 of 52 points (Scotty issue #175)"""
+    noise and the step failed after 8 of 52 points (Scotty issue #175).
+    The beam passes close to K = 0 at the cut-off (normal incidence); at the
+    default rtol it reaches the end for len_tau from 52 to 1002, and at rtol 1e-5"""
     # Status 0: solve_ivp reached tau_leave, so every requested point came back
     assert boundary["solver_status"] == 0
 
