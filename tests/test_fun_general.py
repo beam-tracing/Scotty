@@ -312,7 +312,9 @@ def test_cylindrical_to_cylindrical(cylindrical, expected_cartesian):
 def _H_cartesian(X, Y, Z, K_X, K_Y, K_Z):
     """A made-up smooth Hamiltonian with no symmetry, so that every term of the
     cylindrical dK/dtau is exercised"""
-    return K_X**2 + 2 * K_Y**2 + K_Z**2 + X * K_Y + np.sin(Y) * K_X + Z * X + X * Y * K_Z
+    return (
+        K_X**2 + 2 * K_Y**2 + K_Z**2 + X * K_Y + np.sin(Y) * K_X + Z * X + X * Y * K_Z
+    )
 
 
 def _H_cylindrical(R, zeta, Z, K_R, K_zeta, K_Z):
