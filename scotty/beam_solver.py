@@ -149,7 +149,7 @@ def beam_tracing(
     """`atol` applies to `q` as given, and to `K` and `Psi` scaled by `|K|` and
     `max|Psi|` at the initial point.
 
-    Returns solver status (1, 0, -1), duration taken by solver, number of evaluations,
+    Returns solver status (always 0, since a failure raises), number of evaluations, duration taken by solver,
     tau` of shape `(N,)`, `q` of shape `(3, N)`, `K` of shape `(3, N)`, `Psi` of shape `(N, 3, 3)`
     """
 
@@ -190,6 +190,27 @@ def beam_tracing(
         Number of beam evolution evaluations: {solver_beam_output.nfev}
         Time per beam evolution evaluation: {duration_beam_solver / solver_beam_output.nfev}
     """)
+
+    # Without this, a failed step returns the points up to the failure as if
+    # the beam had been traced to `tau_leave`
+    if solver_beam_output.status == -1:
+        # If no point was reached, scipy returns `t` and `y` as empty lists
+        points_reached = len(solver_beam_output.t)
+        if points_reached:
+            tau_reached = solver_beam_output.t[-1]
+            q_last, K_last, _ = unpack_beam_parameters(solver_beam_output.y[:, -1])
+        else:
+            tau_reached, q_last, K_last = 0.0, q_initial, K_initial
+        raise RuntimeError(
+            f"Beam solver failed at tau = {tau_reached:.6g} of {tau_leave:.6g} "
+            f"({points_reached} of {len(tau_points)} points), "
+            f"last at q = {q_last}, K = {K_last}: "
+            f"{solver_beam_output.message.rstrip('.')}. "
+            "Check that (i) the beam does not leave the interpolation region; "
+            "(ii) the interpolated density is not negative; and (iii) the "
+            "Hamiltonian is finite along the beam (e.g. the mode's root near a "
+            "cut-off or resonance)"
+        )
 
     return (
         solver_beam_output.status,
