@@ -5,6 +5,8 @@ import pytest
 from scipy.constants import c as speed_of_light
 from scotty.fun_general import (
     dot,
+    find_dK_dtau_cartesian,
+    find_Psi_g_residuals,
     find_K_labframe_cyl_to_cart,
     freq_GHz_to_wavenumber,
     find_K_magnitude,
@@ -305,3 +307,97 @@ def test_cartesian_to_cylindrical(cartesian, expected_cylindrical):
 def test_cylindrical_to_cylindrical(cylindrical, expected_cartesian):
     cartesian = find_q_labframe_cyl_to_cart(np.array(cylindrical))
     npt.assert_allclose(cartesian, expected_cartesian, atol=1e-15)
+
+
+def _H_cartesian(X, Y, Z, K_X, K_Y, K_Z):
+    """A made-up smooth Hamiltonian with no symmetry, so that every term of the
+    cylindrical dK/dtau is exercised"""
+    return K_X**2 + 2 * K_Y**2 + K_Z**2 + X * K_Y + np.sin(Y) * K_X + Z * X + X * Y * K_Z
+
+
+def _H_cylindrical(R, zeta, Z, K_R, K_zeta, K_Z):
+    # K_zeta is the toroidal mode number, so the zeta-component of K is K_zeta / R
+    cos, sin = np.cos(zeta), np.sin(zeta)
+    return _H_cartesian(
+        R * cos,
+        R * sin,
+        Z,
+        K_R * cos - K_zeta / R * sin,
+        K_R * sin + K_zeta / R * cos,
+        K_Z,
+    )
+
+
+def _first_derivatives(H, q, K, names, step=1e-30):
+    """Complex-step derivatives, exact to rounding"""
+    args = list(q) + list(K)
+    dH = {}
+    for i, name in enumerate(names):
+        shifted = list(args)
+        shifted[i] = shifted[i] + 1j * step
+        dH[name] = np.imag(H(*shifted)) / step
+    return dH
+
+
+def test_find_dK_dtau_cartesian_cylindrical_matches_cartesian():
+    """dK/dtau from the cylindrical derivatives of H, converted to Cartesian
+    components, equals -grad H in Cartesian coordinates, at several points
+    including large zeta (where a wrong rotation shows)"""
+    R = np.array([1.0, 1.5, 2.0, 0.7])
+    zeta = np.array([0.0, 0.4, -1.2, 2.5])
+    Z = np.array([0.1, -0.3, 0.5, 0.0])
+    K_R = np.array([-200.0, 150.0, 30.0, -10.0])
+    K_zeta = np.array([50.0, -80.0, 120.0, 5.0])
+    K_Z = np.array([10.0, 40.0, -60.0, 90.0])
+
+    dH_cyl = _first_derivatives(
+        _H_cylindrical,
+        (R, zeta, Z),
+        (K_R, K_zeta, K_Z),
+        ["dH_dR", "dH_dzeta", "dH_dZ", "dH_dKR", "dH_dKzeta", "dH_dKZ"],
+    )
+    dK_dtau_from_cyl = find_dK_dtau_cartesian(False, R, zeta, K_R, K_zeta, dH_cyl)
+
+    q_X, q_Y = find_q_labframe_cyl_to_cart(np.array([R, zeta, Z]))[:2]
+    K_X, K_Y, _ = find_K_labframe_cyl_to_cart(
+        np.array([K_R, K_zeta, K_Z]), np.array([R, zeta, Z])
+    )
+    dH_cart = _first_derivatives(
+        _H_cartesian,
+        (q_X, q_Y, Z),
+        (K_X, K_Y, K_Z),
+        ["dH_dX", "dH_dY", "dH_dZ", "dH_dKX", "dH_dKY", "dH_dKZ"],
+    )
+    dK_dtau_from_cart = find_dK_dtau_cartesian(True, q_X, q_Y, K_X, K_Y, dH_cart)
+
+    npt.assert_allclose(dK_dtau_from_cart[:, 0], -dH_cart["dH_dX"])
+    npt.assert_allclose(dK_dtau_from_cyl, dK_dtau_from_cart, rtol=1e-12)
+
+
+def test_find_Psi_g_residuals():
+    """Zero when Psi . g = dK/dtau and Im(Psi) . g = 0; otherwise the size of
+    the misfit relative to |Psi| |g|"""
+    rng = np.random.default_rng(0)
+    g = rng.normal(size=(5, 3))
+    A, B = rng.normal(size=(2, 5, 3, 3))
+    # Symmetric matrices with Im(Psi) g = 0: project g out of B
+    P = np.eye(3) - np.einsum("ni,nj->nij", g, g) / np.sum(g**2, axis=1)[:, None, None]
+    Im_Psi = P @ (B + B.transpose(0, 2, 1)) @ P
+    Re_Psi = A + A.transpose(0, 2, 1)
+    Psi = Re_Psi + 1j * Im_Psi
+    dK_dtau = np.einsum("nij,nj->ni", Re_Psi, g)
+
+    e_imag, e_real = find_Psi_g_residuals(Psi, g, dK_dtau)
+    npt.assert_allclose(e_imag, 0, atol=1e-14)
+    npt.assert_allclose(e_real, 0, atol=1e-14)
+
+    # A misfit in dK/dtau of 10% of |Re Psi| |g|
+    misfit = rng.normal(size=(5, 3))
+    misfit *= (
+        0.1
+        * np.linalg.norm(Re_Psi, axis=(1, 2))
+        * np.linalg.norm(g, axis=1)
+        / np.linalg.norm(misfit, axis=1)
+    )[:, None]
+    _, e_real = find_Psi_g_residuals(Psi, g, dK_dtau + misfit)
+    npt.assert_allclose(e_real, 0.1)
