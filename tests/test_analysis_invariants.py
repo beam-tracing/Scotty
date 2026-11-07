@@ -6,7 +6,7 @@ vanish. These cases steer the beam toroidally so that zeta changes along the ray
 """
 
 from scotty.analysis import find_mode_index_Cardano
-from scotty.checks import check_H_output
+from scotty.checks import check_H_output, check_Psi_g_output
 from scotty.beam_me_up import beam_me_up
 from scotty.init_bruv import get_parameters_for_Scotty
 
@@ -85,6 +85,79 @@ def test_dispersion_relation_satisfied_on_ray(steered_run):
     H_Booker = np.real(steered_run["analysis"]["H_Booker"].values)
 
     assert np.max(np.abs(H_Booker)) < 10 * rtol
+
+
+def test_dK_dtau_matches_spline_of_K(steered_run):
+    """The analysis's dK/dtau, from the derivatives of H, is the derivative of
+    the solver's K. The toroidally steered beams test the cylindrical-to-Cartesian
+    conversion: its rotation is trivial at zeta = 0, and its other terms vanish
+    for an unsteered beam, where K_zeta = 0. Measured: at most 2e-4 of
+    max |dK/dtau| away from the ends, where the spline is poorer"""
+    solver_output = steered_run["solver_output"]
+    tau = solver_output["tau"].values
+    K = np.stack([solver_output[f"K_{c}_output"].values for c in "XYZ"], axis=-1)
+    spline = CubicSpline(tau, K)(tau, 1)
+    analytic = steered_run["analysis"]["dK_dtau_cartesian"].values
+
+    n = len(tau)
+    inner = slice(n // 100, n - n // 100)
+    misfit = np.linalg.norm(analytic[inner] - spline[inner], axis=-1)
+    assert np.max(misfit) < 1e-3 * np.max(np.linalg.norm(spline[inner], axis=-1))
+
+
+def test_Psi_g_relation_holds(steered_run):
+    """Psi is the gradient of K along the beam, so Psi . g = dK/dtau. Measured at
+    the default tolerances: 99% of points below 4e-4, and only the last point,
+    just outside the plasma, above 0.1 (see `check_Psi_g_output`)"""
+    analysis = steered_run["analysis"]
+    for name in ("Psi_g_residual_imag", "Psi_g_residual_real"):
+        residual = analysis[name].values
+        assert np.percentile(residual, 99) < 1e-2, name
+        assert np.count_nonzero(residual > 0.1) <= 1, name
+
+
+def test_Psi_g_check_warns_for_piecewise_linear_density(tmp_path):
+    """With the density given as a piecewise-linear table, H has kinks and Psi
+    drifts off the beam (about 0.5 relative at most points). `beam_me_up` clears
+    the root logger's handlers, caplog's among them, so the warning is read from
+    the run's log file"""
+    kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
+    smooth = kwargs_dict["density_fit_method"]
+    psi_table = np.linspace(0.0, 1.0, 12)
+    n_table = np.asarray(smooth(psi_table), dtype=float)
+    kwargs_dict.update(
+        toroidal_launch_angle_Torbeam=10.0,
+        figure_flag=False,
+        output_path=tmp_path,
+        density_fit_method=lambda psi: np.interp(psi, psi_table, n_table),
+        file_log_level="WARNING",
+    )
+    analysis = beam_me_up(**kwargs_dict)["analysis"]
+    assert np.median(analysis["Psi_g_residual_real"].values) > 0.1
+
+    (log_file,) = tmp_path.glob("scotty_log*.log")
+    assert "Psi . g differs from dK/dtau" in log_file.read_text(encoding="utf-8")
+
+
+def test_check_Psi_g_output_tolerates_a_few_points(caplog):
+    residual = np.full(100, 1e-4)
+    residual[[0, 50, 99]] = 0.8
+    residual[10] = np.nan
+    with caplog.at_level(logging.WARNING):
+        check_Psi_g_output(residual, residual)
+    assert caplog.text == ""
+
+
+def test_check_Psi_g_output_warns_for_either_part(caplog):
+    small, large = np.full(100, 1e-4), np.full(100, 1e-4)
+    large[:20] = 0.3
+    with caplog.at_level(logging.WARNING):
+        check_Psi_g_output(small, large)
+    assert "at 20% of the points" in caplog.text
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        check_Psi_g_output(large, small)
+    assert "at 20% of the points" in caplog.text
 
 
 def test_dispersion_drift_is_step_error(tmp_path):

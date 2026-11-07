@@ -796,3 +796,42 @@ def check_H_output(H_arr: ArrayLike, H_tol: float = 1e-2) -> None:
         log.warning(
             f"`H_output` is unphysically large! `max(|H_output|)` = {H_max} but `H_tol` = {H_tol}"
         )
+
+
+def check_Psi_g_output(
+    e_imag: ArrayLike,
+    e_real: ArrayLike,
+    tol: float = 0.1,
+    fraction_tol: float = 0.1,
+) -> None:
+    r"""Warns if :math:`\Psi \cdot \mathbf{g} = \mathrm{d}\mathbf{K}/\mathrm{d}\tau`
+    fails along much of the beam, i.e. if either residual of
+    `scotty.fun_general.find_Psi_g_residuals` is above `tol` at more than
+    `fraction_tol` of the points.
+
+    At the default solver tolerances the residuals are a few 1e-3 or less on
+    correct beams, and about 0.3 or more where Psi has drifted off the beam
+    (e.g. a density that isn't differentiable). This checks that Psi is
+    consistent with the ray, not that the beam model is valid: past a cut-off
+    at almost exactly normal incidence, for instance, the beam is meaningless
+    but the residuals are small again. A few points can exceed `tol`
+    on a correct beam, hence the fraction rather than the maximum: near a
+    cut-off at close to normal incidence, where K is small, and at the last
+    point if it is just outside the plasma, where the density gradient jumps
+    to zero."""
+    log.debug("Checking Psi . g = dK/dtau along the beam")
+
+    e_imag, e_real = np.asarray(e_imag), np.asarray(e_real)
+    # NaN where Psi or g vanish; such points can't be checked
+    failed = np.nan_to_num(np.maximum(e_imag, e_real), nan=0.0) > tol
+    fraction = np.count_nonzero(failed) / failed.size
+    if fraction > fraction_tol:
+        log.warning(
+            f"Psi . g differs from dK/dtau by more than {tol} (relative) at "
+            f"{fraction:.0%} of the points along the beam (median residuals: "
+            f"imaginary part {np.nanmedian(e_imag):.2e}, real part "
+            f"{np.nanmedian(e_real):.2e}). Psi is then not the gradient of K along "
+            "the beam, so the beam widths and curvatures can't be trusted. Likely "
+            "causes: a density or field that isn't smooth enough (e.g. piecewise "
+            "linear), or tolerances too loose for this case (`rtol`, `atol`)"
+        )

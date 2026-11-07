@@ -1826,6 +1826,84 @@ def find_g_cartesian(
     return g_vec_cart, g_magnitude, g_hat_cart
 
 
+def find_dK_dtau_cartesian(
+    cartesian: bool,
+    q0: ArrayLike,
+    q1: ArrayLike,
+    K0: ArrayLike,
+    K1: ArrayLike,
+    dH: dict,
+) -> FloatArray:
+    """
+    The rate of change of the wavevector along the ray, dK/dtau, in Cartesian
+    components, from the first derivatives of H. In cylindrical geometry
+    ``K1 = K_zeta`` is the toroidal mode number, so the Cartesian K is
+    ``K_R R_hat + (K_zeta / R) zeta_hat + K_Z Z_hat``, and the turning of
+    ``R_hat`` and ``zeta_hat`` along the ray adds terms to ``dK_R/dtau = -dH/dR``
+    and ``dK_zeta/dtau = -dH/dzeta``.
+
+    Parameters
+    ----------
+    cartesian : bool
+        `True` for Cartesian geometry and `False` for cylindrical
+    q0, q1 : ArrayLike
+        `q_X`, `q_Y` for Cartesian geometry and `q_R`, `q_zeta` for cylindrical
+    K0, K1 : ArrayLike
+        `K_X`, `K_Y` for Cartesian geometry and `K_R`, `K_zeta` for cylindrical
+    dH : dict
+        Dictionary of derivatives of the Hamiltonian, i.e. `dH = hamiltonian.derivatives(...)`
+
+    Returns
+    ----------
+    dK_dtau : FloatArray
+        Shape ``(N, 3)``, Cartesian components
+    """
+    if cartesian:
+        return -np.stack((dH["dH_dX"], dH["dH_dY"], dH["dH_dZ"]), axis=1)
+
+    q_R, q_zeta, K_R, K_zeta = q0, q1, K0, K1
+    dR_dtau, dzeta_dtau = dH["dH_dKR"], dH["dH_dKzeta"]
+    # Components along R_hat and zeta_hat
+    dK_dtau_R = -dH["dH_dR"] - K_zeta / q_R * dzeta_dtau
+    dK_dtau_zeta = -dH["dH_dzeta"] / q_R - K_zeta / q_R**2 * dR_dtau + K_R * dzeta_dtau
+    sin_zeta, cos_zeta = np.sin(q_zeta), np.cos(q_zeta)
+    return np.stack(
+        (
+            cos_zeta * dK_dtau_R - sin_zeta * dK_dtau_zeta,
+            sin_zeta * dK_dtau_R + cos_zeta * dK_dtau_zeta,
+            -dH["dH_dZ"],
+        ),
+        axis=1,
+    )
+
+
+def find_Psi_g_residuals(
+    Psi_cart: ComplexFloatArray, g_vec_cart: FloatArray, dK_dtau_cart: FloatArray
+) -> Tuple[FloatArray, FloatArray]:
+    """
+    How far the beam is from satisfying Psi . g = dK/dtau, which holds because
+    Psi is the gradient of K along the beam (Hall-Chen, Parra & Hillesheim 2022).
+    Its imaginary part must vanish, and its real part must equal the ray's
+    dK/dtau. Returns, at each point,
+
+    - ``e_imag = |Im(Psi . g)| / (||Im Psi|| |g|)``
+    - ``e_real = |Re(Psi . g) - dK/dtau| / (||Re Psi|| |g|)``
+
+    with Frobenius norms. Both are at the level of the solver tolerance when the
+    beam is right; they grow if Psi drifts off the beam, e.g. with a density
+    that isn't differentiable. They only test the components of Psi along g.
+    """
+    Psi_g = np.einsum("nij,nj->ni", Psi_cart, g_vec_cart)
+    g_magnitude = np.linalg.norm(g_vec_cart, axis=1)
+    e_imag = np.linalg.norm(Psi_g.imag, axis=1) / (
+        np.linalg.norm(Psi_cart.imag, axis=(1, 2)) * g_magnitude
+    )
+    e_real = np.linalg.norm(Psi_g.real - dK_dtau_cart, axis=1) / (
+        np.linalg.norm(Psi_cart.real, axis=(1, 2)) * g_magnitude
+    )
+    return e_imag, e_real
+
+
 def find_K_magnitude(
     cartesian: bool, K0: ArrayLike, K1: ArrayLike, K2: ArrayLike, q0: ArrayLike
 ) -> ArrayLike:
