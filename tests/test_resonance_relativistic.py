@@ -16,6 +16,10 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 from scotty.beam_me_up import beam_me_up
+from scotty.fun_general import (
+    find_normalised_gyro_ang_freq,
+    freq_GHz_to_angular_frequency,
+)
 
 # Print more of arrays in failed tests
 np.set_printoptions(linewidth=120, threshold=100)
@@ -544,8 +548,8 @@ def test_sec_harm_6_rel(tmp_path):
 # test_flag: tests whether resonance_Flag works
 
 
-def test_flag_true(tmp_path):
-    kwargs_dict = {
+def flag_true_kwargs():
+    return {
         "geometry": "cylindrical",
         "poloidal_launch_angle_Torbeam": 3,
         "toroidal_launch_angle_Torbeam": 0,
@@ -570,6 +574,10 @@ def test_flag_true(tmp_path):
         "R_axis": 1.5,
         "minor_radius_a": 0.5,
     }
+
+
+def test_flag_true(tmp_path):
+    kwargs_dict = flag_true_kwargs()
     kwargs_dict["output_path"] = tmp_path
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
@@ -584,10 +592,27 @@ def test_flag_true(tmp_path):
     )
 
 
-def test_flag_false(tmp_path):
-    # Regression check only: with resonance_flag=False the ray carries on past f_ce = f, but there the root
-    # selected by mode_flag switches from O to X, H jumps from 0 to -1 and stays there, so the rest of the ray is
-    # unphysical (the LCFS acts as a cutoff). This checks that Scotty says so.
+@pytest.mark.parametrize("rtol", [1e-3, 1e-4, 1e-6])
+def test_output_stops_short_of_the_fundamental(tmp_path, rtol):
+    """Within about 3e-5 of the fundamental, K can jump off the dispersion relation
+    in one output step, with |H| up to 0.48 and |K| 23% off"""
+    kwargs_dict = flag_true_kwargs()
+    kwargs_dict.update(output_path=tmp_path, rtol=rtol)
+    output = beam_me_up(**kwargs_dict)
+    Y = find_normalised_gyro_ang_freq(
+        freq_GHz_to_angular_frequency(kwargs_dict["launch_freq_GHz"]),
+        output["analysis"]["B_magnitude"].values,
+    )
+    H = np.abs(output["analysis"]["H_Booker"].values)
+    assert 1e-3 < 1 - Y[-1] < 2e-3
+    assert H.max() < 1e-4
+
+
+@pytest.mark.parametrize("rtol", [1e-3, 1e-5])
+def test_flag_false(tmp_path, rtol):
+    # With resonance_flag=False the ray isn't stopped at the second harmonic, but it can't go past f_ce = f: there
+    # the root selected by mode_flag switches from O to X. Depending on the tolerances, the ray then stays at
+    # H = -1 or K jumps onto the other root with H near 0 (beam-tracing/Scotty#169), so it raises at either
     kwargs_dict = {
         "geometry": "cylindrical",
         "poloidal_launch_angle_Torbeam": 3,
@@ -598,11 +623,8 @@ def test_flag_false(tmp_path):
         "launch_beam_curvature": -0.25,
         "launch_position": np.array([3, 0, 0]),
         "density_fit_parameters": np.array([1.0]),
-        # v3's defaults, for now: what this does past the resonance depends on the numerics
-        "rtol": 1e-3,
+        "rtol": rtol,
         "atol": 1e-6,
-        "delta_R": -1e-4,
-        "delta_Z": 1e-4,
         "len_tau": 102,
         "resonance_flag": False,
         "density_fit_method": "quadratic",
@@ -618,10 +640,5 @@ def test_flag_false(tmp_path):
         "minor_radius_a": 0.5,
     }
     kwargs_dict["output_path"] = tmp_path
-    # Past the resonance H is about -1 at these tolerances: the ray carried on,
-    # off the dispersion relation, where the same case with resonance_flag=True
-    # stops cleanly (test_flag_true). With tighter tolerances or wider steps, H
-    # stays near 0 instead, but only because K jumps onto the other root at the
-    # resonance, which is no more physical and which this check can't see
-    with pytest.raises(ValueError, match="unphysically large"):
+    with pytest.raises(RuntimeError, match="reached the fundamental"):
         beam_me_up(**kwargs_dict)

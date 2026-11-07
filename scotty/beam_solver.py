@@ -212,6 +212,14 @@ def beam_tracing(
             "cut-off or resonance)"
         )
 
+    # The solver reports success here, as with tau_leave = 0 when the ray stops at
+    # its first point
+    if len(solver_beam_output.t) == 0:
+        raise RuntimeError(
+            f"The beam solver returned no output points (tau_leave = {tau_leave}). "
+            "The ray may have stopped at its first point"
+        )
+
     return (
         solver_beam_output.status,
         solver_beam_output.nfev,

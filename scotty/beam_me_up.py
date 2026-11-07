@@ -279,7 +279,11 @@ def beam_me_up(
         temperature profile
     resonance_flag : bool, default True
         Stop the ray at the fundamental or second-harmonic electron cyclotron
-        resonance, and (for the X-mode) the upper hybrid resonance
+        resonance, and (for the X-mode) the upper hybrid resonance. At the
+        fundamental, the output stops 1e-3 short of it in the ratio of the cyclotron
+        frequency to the beam frequency. With ``False``,
+        the ray passes the second harmonic and the upper hybrid resonance, and
+        reaching the fundamental raises a ``RuntimeError``
     auto_delta_sign : bool, default True
         Flip the signs of the spatial steps so that the forward differences
         point into the plasma at the plasma entry point

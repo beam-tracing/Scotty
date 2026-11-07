@@ -788,7 +788,9 @@ def check_H_output(H_arr: ArrayLike, H_tol: float = 1e-2) -> None:
     log.debug("Checking `H` output along the ray (it should be zero)")
 
     H_max = np.max(np.abs(H_arr))
-    if H_max > 1.0:
+    # On-surface drift is about 10 rtol, so about 0.01 at the default. A ray on the
+    # wrong root is at about 1 (beam-tracing/Scotty#169)
+    if H_max > 0.1:
         raise ValueError(
             f"`H_output` is unphysically large! `max(|H_output|)` = {H_max}"
         )

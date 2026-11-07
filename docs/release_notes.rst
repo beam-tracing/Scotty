@@ -117,7 +117,19 @@ Other interface changes
   ``filter_s_<power>``, and there are ``filter_all_<power>`` and their path
   integrals ``int_filter_*_dL``.
 - New argument: ``resonance_flag`` (#151). Temperature profiles are built when
-  given.
+  given. With ``False`` the ray passes the second harmonic and the upper hybrid
+  resonance, and reaching the fundamental raises a ``RuntimeError``: the
+  cold-plasma Hamiltonian is singular there, and past it the root that
+  ``mode_flag`` selects swaps (#169). A ray that starts on the fundamental raises
+  with either value.
+- With ``resonance_flag=True``, the output now stops where
+  :math:`\omega_{ce} / \omega` is 1e-3 from 1, about 2 mm before the fundamental on
+  the cases tried. Closer, :math:`K` could jump off the dispersion relation at the
+  last few output points (:math:`|H|` up to 0.48, :math:`|K|` 23% off).
+- ``check_H_output`` raises above :math:`|H| = 0.1` (was 1) and warns above 0.01
+  (#169), so a run that used to finish with a warning may now raise.
+- An output with no points from the beam solver raises a ``RuntimeError``, even
+  when the solver reports success.
 - ``convert_hessians`` takes a required ``K_start`` (Cartesian K).
   ``analysis.py`` is its only caller.
 - ``find_B_method="analytical"`` is ``CircularFluxSurfaceField``, as in v3; the

@@ -4,7 +4,7 @@ The ported #151 trajectory tests never reach the upper-hybrid layer, so they pas
 its term in the event. Here the event is evaluated at points on either side of each resonance on a
 line through the plasma, and must change sign across exactly the layers it is meant to detect:
 the cyclotron fundamental and second harmonic in both modes, and the upper-hybrid layer in X-mode
-only. With resonance_flag=False it must never change sign.
+only. With resonance_flag=False it must change sign at the fundamental only.
 """
 
 import numpy as np
@@ -34,11 +34,11 @@ def trace_level(tmp_path_factory):
     config_logger("warning", None, tmp_path_factory.mktemp("log"), "")
 
 
-def event(mode_flag, resonance_flag, temperature_fit=None, X_mode=None):
+def event(mode_flag, resonance_flag, temperature_fit=None, X_mode=None, omega=OMEGA):
     """The resonance event for the Hamiltonian with `mode_flag`. Unless given,
     `X_mode` is True for mode_flag = -1, the X-mode in this geometry"""
     hamiltonian = Hamiltonian(
-        launch_angular_freq=OMEGA,
+        launch_angular_freq=omega,
         mode_flag=mode_flag,
         deltas=np.array([1e-4, 1e-4, 0.1, 0.1, 0.1]),
         field=FIELD,
@@ -47,7 +47,7 @@ def event(mode_flag, resonance_flag, temperature_fit=None, X_mode=None):
     )
     if X_mode is None:
         X_mode = mode_flag == -1
-    events = make_solver_events(1.0, OMEGA, FIELD, resonance_flag, X_mode=X_mode)
+    events = make_solver_events(1.0, omega, FIELD, resonance_flag, X_mode=X_mode)
     cross = events["cross_resonance"]
     return lambda R: cross(0.0, [R, 0.0, Z, 0.0, 0.0, 0.0], hamiltonian)
 
@@ -108,11 +108,25 @@ def test_upper_hybrid_follows_the_X_mode_not_mode_flag(mode_flag, X_mode, must_c
 
 
 @pytest.mark.parametrize("mode_flag", [1, -1])
-def test_resonance_flag_false_never_changes_sign(mode_flag):
+def test_resonance_flag_false_ignores_the_other_layers(mode_flag):
+    """The second harmonic and the upper-hybrid layer are on this line, and the
+    fundamental isn't. The event stays nonzero with one sign, including exactly
+    at the second harmonic, where the old event was zero"""
     f = event(mode_flag, resonance_flag=False)
     R = np.linspace(R_AXIS + 1e-3, R_AXIS + A - 1e-3, 401)
-    values = np.array([f(r) for r in R])
-    assert np.all(values >= 0)
+    values = np.array([f(r) for r in [*R, SECOND, UH]])
+    assert np.all(values < 0)
+
+
+@pytest.mark.parametrize("mode_flag", [1, -1])
+def test_resonance_flag_false_detects_the_fundamental(mode_flag):
+    """At 30 GHz the fundamental is inside the plasma, on the inboard side"""
+    omega = freq_GHz_to_angular_frequency(30.0)
+    f = event(mode_flag, resonance_flag=False, omega=omega)
+    R_layer = brentq(f, R_AXIS - A + 1e-3, R_AXIS - 1e-3)
+    B = float(FIELD.magnitude(R_layer, 0.0, Z))
+    assert float(find_normalised_gyro_ang_freq(omega, B)) == pytest.approx(1.0)
+    assert np.sign(f(R_layer - 1e-3)) != np.sign(f(R_layer + 1e-3))
 
 
 def test_relativistic_correction_moves_the_layer():

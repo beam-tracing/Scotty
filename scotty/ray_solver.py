@@ -5,7 +5,7 @@ import logging
 import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.integrate._ivp.ivp import OdeSolution
-from scipy.optimize import minimize_scalar
+from scipy.optimize import brentq, minimize_scalar
 from scotty.checks import VALID_SOLVER_STATUS
 from scotty.fun_general import (
     find_K_magnitude,
@@ -47,6 +47,27 @@ def _event(terminal: bool, direction: float):
         return func
 
     return decorator_event
+
+
+# How close to the fundamental, in omega_ce / omega, counts as starting on it
+_FUNDAMENTAL_TOL = 1e-10
+# How far from the fundamental, in omega_ce / omega, the output stops. Closer, K is
+# not resolved: it can jump off the dispersion relation in one output step
+_FUNDAMENTAL_MARGIN = 1e-3
+
+
+def _find_gyro_ratio(q, launch_angular_frequency, field, hamiltonian) -> float:
+    """The electron cyclotron frequency over the beam frequency at `q`, with the
+    relativistic mass correction if there is a temperature profile"""
+    q0, q1, q2 = q
+    temperature = (
+        hamiltonian.temperature(field.polflux(q0, q1, q2))
+        if hamiltonian.temperature
+        else None
+    )
+    return find_normalised_gyro_ang_freq(
+        launch_angular_frequency, field.magnitude(q0, q1, q2), temperature
+    )
 
 
 def make_solver_events(
@@ -106,24 +127,27 @@ def make_solver_events(
     # X-mode, the upper hybrid frequency (beam-tracing/Scotty#151). With a
     # temperature profile, the cyclotron and plasma frequencies include the
     # relativistic mass correction. The event is the product of the
-    # differences, so it changes sign at any of the resonances; with
-    # `resonance_flag = False` its absolute value is returned, so it never
-    # changes sign and the ray is not stopped.
+    # differences, so it changes sign at any of the resonances. With
+    # `resonance_flag = False` it detects the fundamental only, where the
+    # cold-plasma Hamiltonian is singular, and `ray_tracing` then raises
+    # (beam-tracing/Scotty#169).
     # ***Two resonances crossed within one solver step would cancel in the
     #    product and go unseen
     @_event(terminal=True, direction=0.0)
     def event_cross_resonance(tau, ray_parameters, hamiltonian: Hamiltonian):
         q0, q1, q2, _, _, _ = ray_parameters
-        B_magnitude = field.magnitude(q0, q1, q2)
         polflux = field.polflux(q0, q1, q2)
         temperature = (
             hamiltonian.temperature(polflux) if hamiltonian.temperature else None
         )
 
         # Ratio of the electron cyclotron frequency to the beam frequency
-        gyro_freq = find_normalised_gyro_ang_freq(
-            launch_angular_frequency, B_magnitude, temperature
+        gyro_freq = _find_gyro_ratio(
+            ray_parameters[:3], launch_angular_frequency, field, hamiltonian
         )
+        if not resonance_flag:
+            return gyro_freq - 1
+
         difference = (gyro_freq - 1) * (gyro_freq - 0.5)
 
         # The upper hybrid resonance is reached by the X-mode only, whichever
@@ -135,7 +159,7 @@ def make_solver_events(
             UH_freq = np.sqrt(gyro_freq**2 + plasma_freq**2)
             difference = difference * (UH_freq - 1)
 
-        return difference if resonance_flag else np.abs(difference)
+        return difference
 
     # Triggers when the cut-off location is reached (i.e. when the
     # wavenumber K is minimised)
@@ -290,6 +314,10 @@ def ray_tracing(
         (iii) ray reaches a resonance layer (i.e. when the beam frequency is equal to the
               fundamental or second harmonic of the electron gyrotron frequency).
 
+    With `resonance_flag == False`, the ray isn't stopped at the second harmonic or the
+    upper hybrid resonance, and reaching the fundamental raises a `RuntimeError`. Starting on
+    the fundamental raises whatever the flag, as the ray can't be integrated from there.
+
     In addition to the conditions above, the solver will also return the instances when
     any of the following non-terminating conditions occur:
         (a) ray leaves the LCFS (i.e. when the ray reaches `poloidal_flux` == 1.0); or
@@ -305,6 +333,18 @@ def ray_tracing(
 
     log.trace(f"Packing ray parameters: q = {q_initial}, K = {K_initial}")
     ray_parameters_initial = [*q_initial, *K_initial]
+
+    # In a uniform field, the Hamiltonian's 1 - Y^2 is then zero or rounding along
+    # the whole ray, and the solver never stops retrying its steps
+    gyro_ratio = _find_gyro_ratio(
+        q_initial, hamiltonian.angular_frequency, hamiltonian.field, hamiltonian
+    )
+    if abs(gyro_ratio - 1) < _FUNDAMENTAL_TOL:
+        raise RuntimeError(
+            f"The ray starts on the fundamental electron cyclotron resonance "
+            f"(omega_ce / omega = {gyro_ratio}) at q = {q_initial}, where the "
+            "cold-plasma Hamiltonian is singular"
+        )
 
     # Creating arguments and events to be passed to solver
     solver_ray_events = make_solver_events(
@@ -359,9 +399,39 @@ def ray_tracing(
     ray_parameters_events = dict(
         zip(solver_ray_events.keys(), solver_ray_output.y_events)
     )
+
+    # Past the fundamental, the root that `mode_flag` selects swaps, so the ray
+    # would land on the wrong surface or jump to the other mode (#169)
+    if not resonance_flag and len(tau_events["cross_resonance"]) != 0:
+        raise RuntimeError(
+            "The ray reached the fundamental electron cyclotron resonance at "
+            f"tau = {tau_events['cross_resonance'][0]}, "
+            f"q = {ray_parameters_events['cross_resonance'][0][:3]}, where the "
+            "cold-plasma Hamiltonian is singular. `resonance_flag=False` lets the "
+            "ray pass the second harmonic and the upper hybrid resonance only"
+        )
+
     tau_terminating_event = handle_terminating_event(
         tau_events=tau_events, ray_parameters_events=ray_parameters_events["leave_LCFS"]
     )
+
+    # Stop short of the fundamental, as the Hamiltonian is singular there
+    if len(tau_events["cross_resonance"]) != 0:
+
+        def distance_past_margin(tau):
+            gyro_ratio = _find_gyro_ratio(
+                soln_interp(tau)[:3],
+                hamiltonian.angular_frequency,
+                hamiltonian.field,
+                hamiltonian,
+            )
+            return abs(gyro_ratio - 1) - _FUNDAMENTAL_MARGIN
+
+        if distance_past_margin(tau_terminating_event) < 0 < distance_past_margin(0.0):
+            tau_terminating_event = brentq(
+                distance_past_margin, 0.0, tau_terminating_event
+            )
+
     tau_arr_resampled = np.linspace(
         start=0, stop=tau_terminating_event, num=len_tau - 1, endpoint=False
     )
