@@ -90,7 +90,8 @@ def test_dispersion_relation_satisfied_on_ray(steered_run):
 def test_dK_dtau_matches_spline_of_K(steered_run):
     """The analysis's dK/dtau, from the derivatives of H, is the derivative of
     the solver's K. The toroidally steered beams test the cylindrical-to-Cartesian
-    conversion, whose terms vanish at zeta = 0. Measured: at most 2e-4 of
+    conversion: its rotation is trivial at zeta = 0, and its other terms vanish
+    for an unsteered beam, where K_zeta = 0. Measured: at most 2e-4 of
     max |dK/dtau| away from the ends, where the spline is poorer"""
     solver_output = steered_run["solver_output"]
     tau = solver_output["tau"].values
@@ -115,11 +116,11 @@ def test_Psi_g_relation_holds(steered_run):
         assert np.count_nonzero(residual > 0.1) <= 1, name
 
 
-def test_Psi_g_check_warns_for_piecewise_linear_density(tmp_path, caplog):
+def test_Psi_g_check_warns_for_piecewise_linear_density(tmp_path):
     """With the density given as a piecewise-linear table, H has kinks and Psi
     drifts off the beam (about 0.5 relative at most points). `beam_me_up` clears
-    the root logger's handlers, caplog's among them, so the check is run again on
-    the saved residuals"""
+    the root logger's handlers, caplog's among them, so the warning is read from
+    the run's log file"""
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
     smooth = kwargs_dict["density_fit_method"]
     psi_table = np.linspace(0.0, 1.0, 12)
@@ -129,16 +130,13 @@ def test_Psi_g_check_warns_for_piecewise_linear_density(tmp_path, caplog):
         figure_flag=False,
         output_path=tmp_path,
         density_fit_method=lambda psi: np.interp(psi, psi_table, n_table),
+        file_log_level="WARNING",
     )
     analysis = beam_me_up(**kwargs_dict)["analysis"]
-    residual_imag = analysis["Psi_g_residual_imag"].values
-    residual_real = analysis["Psi_g_residual_real"].values
-    assert np.median(residual_real) > 0.1
+    assert np.median(analysis["Psi_g_residual_real"].values) > 0.1
 
-    logging.getLogger().addHandler(caplog.handler)
-    with caplog.at_level(logging.WARNING):
-        check_Psi_g_output(residual_imag, residual_real)
-    assert "Psi . g differs from dK/dtau" in caplog.text
+    (log_file,) = tmp_path.glob("scotty_log*.log")
+    assert "Psi . g differs from dK/dtau" in log_file.read_text(encoding="utf-8")
 
 
 def test_check_Psi_g_output_tolerates_a_few_points(caplog):

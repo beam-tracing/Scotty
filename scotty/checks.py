@@ -809,9 +809,12 @@ def check_Psi_g_output(
     `scotty.fun_general.find_Psi_g_residuals` is above `tol` at more than
     `fraction_tol` of the points.
 
-    At the default solver tolerances the residuals are below about 1e-3 on
+    At the default solver tolerances the residuals are a few 1e-3 or less on
     correct beams, and about 0.3 or more where Psi has drifted off the beam
-    (e.g. a density that isn't differentiable). A few points can exceed `tol`
+    (e.g. a density that isn't differentiable). This checks that Psi is
+    consistent with the ray, not that the beam model is valid: past a cut-off
+    at almost exactly normal incidence, for instance, the beam is meaningless
+    but the residuals are small again. A few points can exceed `tol`
     on a correct beam, hence the fraction rather than the maximum: near a
     cut-off at close to normal incidence, where K is small, and at the last
     point if it is just outside the plasma, where the density gradient jumps
