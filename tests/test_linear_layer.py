@@ -77,20 +77,16 @@ Numerical choices:
   1e-5 m. :math:`H` is linear in :math:`q` here, so the stencils have no
   truncation error at any step, and the larger step keeps the rounding noise
   in :math:`\partial^2 H / \partial q^2` (about :math:`10^{-16} / \delta^2`)
-  well below ``atol`` for the entries of :math:`\Psi` that are zero. With
-  1e-5 m that noise is about 1e-6 m⁻², and with ``atol`` = 1e-10 the beam
-  solver takes steps of about 1e-4 in :math:`\tau`.
+  well below the beam solver's absolute tolerance for :math:`\Psi`, about
+  2e-7 m⁻² here. With 1e-5 m that noise is about 1e-6 m⁻², above it.
 - The steps point into the plasma (``auto_delta_sign``), so the one-sided
   stencils never sample the vacuum, where the density has its kink. With
   the X step pointing out of the plasma instead, the launch point (~1e-6 m
   inside the edge) samples the vacuum and Psi is wrong by ~100%.
-- :math:`\Omega_{ce} / \Omega = 0.3`. Values where the ratio is exactly 0.5 or
-  1 stop the ray at the start (the resonance event is zero everywhere in a
-  uniform field).
-- Run time: nearly all of it is the beam solve, about 30 ms per evaluation and
-  about 2600-2900 evaluations per run at ``rtol=1e-7``, ``atol=1e-8``, driven
-  by finite-difference noise in components of :math:`\Psi` that symmetry makes
-  zero (see beam-tracing/Scotty#175).
+- :math:`\Omega_{ce} / \Omega = 0.3`. A ratio of exactly 0.5 or 1 in this
+  uniform field would put the whole ray on a resonance.
+- Run time: nearly all of it is the beam solve, about 16 ms per evaluation and
+  about 1100-1600 evaluations per run.
 """
 
 import numpy as np
@@ -119,28 +115,29 @@ N_CUTOFF = constants.epsilon_0 * constants.m_e * OMEGA**2 / constants.e**2 / 1e1
 # Scotty's tau where the beam is launched, counted from the plasma edge
 TAU_LAUNCH = 1e-3
 LEN_TAU = 200
-# rtol = 1e-8 takes ~20 min per run, as the rounding noise in d^2H/dq^2 then
-# limits the steps; at 1e-7 a run takes 1-2 min
-SOLVER = {"rtol": 1e-7, "atol": 1e-8}
+# The errors don't fall smoothly with these, as they depend on where the steps
+# land: at rtol = 1e-7, atol = 3e-11 misses the Psi_ZZ limit by 1%. At this atol,
+# rtol = 1e-7 and 1e-8 also pass, with errors up to 0.48 of the limits
+SOLVER = {"rtol": 3e-8, "atol": 1e-11}
 DELTA_Q = 1e-3
 
 # Tolerances, relative to L, K0, max |Psi|, the output step in tau, or the
 # value itself. Largest error measured over the cases in brackets
 TOL = {
-    "q": 1e-11,  # (1.8e-12)
-    "K": 2e-11,  # (9.0e-14)
-    # The in-plane block, real and imaginary parts. This limit is rounding noise
-    # and moves between machines; a scan in rtol shows the floor (1.1e-6, at 10 deg)
+    "q": 1e-11,  # (1.4e-12)
+    "K": 2e-11,  # (2.0e-13)
+    # The in-plane block, real and imaginary parts. The error moves between
+    # machines (8.0e-7, at 10 deg)
     "Psi": 5e-6,
     "Psi_off_plane": 3e-6,  # Psi_XZ, Psi_YZ, exactly zero (7.0e-7, at 10 deg)
-    "Psi_ZZ": 1e-7,  # (9.4e-9)
-    "W": 3e-6,  # (1.1e-6, at 10 deg)
-    "focus": 3e-6,  # fraction of the output step (9.1e-7)
-    "tau_leave": 1e-8,  # (5.5e-12)
+    "Psi_ZZ": 1e-7,  # (3.1e-8)
+    "W": 3e-6,  # (8.2e-7, at 10 deg)
+    "focus": 3e-6,  # fraction of the output step (7.0e-7)
+    "tau_leave": 1e-8,  # (3.0e-11)
     "tau_cutoff": 1e-7,  # (4.7e-9)
-    "B0_tau": 1e-9,  # (3.3e-12)
-    "B0_ray": 3e-9,  # q, K (9.9e-12)
-    "B0_Psi": 1.5e-6,  # (9.6e-8)
+    "B0_tau": 1e-9,  # (3.4e-11)
+    "B0_ray": 3e-9,  # q, K (1.0e-10)
+    "B0_Psi": 1.5e-6,  # (1.4e-7)
 }
 
 
