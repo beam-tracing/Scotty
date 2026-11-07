@@ -6,14 +6,16 @@ import logging
 import numpy as np
 from scipy import constants as const
 from scipy.integrate import trapezoid
-from scotty.checks import VALID_FIELDS, check_H_output
+from scotty.checks import VALID_FIELDS, check_H_output, check_Psi_g_output
 from scotty.data_io import CARTESIAN_VECTOR_COMPONENTS, SOLUTION_COMPONENTS
 from scotty.derivatives import derivative
 from scotty.fun_general import (
     find_H_Cardano_eigh,
     find_H_Cardano_formula,
     find_beam_widths_and_curvs,
+    find_dK_dtau_cartesian,
     find_g_cartesian,
+    find_Psi_g_residuals,
     find_normalised_angular_freqs,
     find_electron_mass,
     make_unit_vector_from_cross_product,
@@ -535,6 +537,15 @@ def basic_analysis(
             Psi_w_output_beamframe_cartesian, K_vec_cart, g_vec_cart
         )
 
+        # Psi is the gradient of K along the beam, so Psi . g = dK/dtau
+        dK_dtau_cart = find_dK_dtau_cartesian(
+            cart, q_vec_T[0], q_vec_T[1], K_vec_T[0], K_vec_T[1], dH
+        )
+        Psi_g_residual_imag, Psi_g_residual_real = find_Psi_g_residuals(
+            Psi_3D_output_labframe_cartesian, g_vec_cart, dK_dtau_cart
+        )
+        check_Psi_g_output(Psi_g_residual_imag, Psi_g_residual_real)
+
         analysis_dict.update(
             {
                 "grad_grad_H_cartesian": (
@@ -563,6 +574,9 @@ def basic_analysis(
                 "curvature_2": (["tau"], curv2),
                 "width_1": (["tau"], width1),
                 "width_2": (["tau"], width2),
+                "dK_dtau_cartesian": (["tau", "col_cart"], dK_dtau_cart),
+                "Psi_g_residual_imag": (["tau"], Psi_g_residual_imag),
+                "Psi_g_residual_real": (["tau"], Psi_g_residual_real),
             }
         )
 
