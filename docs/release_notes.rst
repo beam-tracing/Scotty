@@ -77,6 +77,13 @@ Defaults
   about 10 MB at this ``len_tau``.
 - So a run at the default settings can give a noticeably different integrated
   filter function from one at v3's defaults.
+- In the beam solver, ``atol`` applies to :math:`q` as given, and to :math:`K`
+  and :math:`\Psi` scaled by :math:`|K|` and :math:`\max|\Psi|` at the initial
+  point (v3: the same ``atol`` for every component). Components that symmetry
+  makes zero no longer force tiny steps to resolve finite-difference noise, which
+  made symmetric cases (slabs, cylinders, unsteered midplane entries) slow, and
+  could end the beam early. Such cases are now accurate to about ``rtol``; before,
+  some were more accurate than that by accident.
 - ``from_v3_kwargs`` keeps v3's tolerances, spatial steps and ``len_tau``, so a
   v3 script gives v3's accuracy.
 - ``interp_smoothing=0``, ``find_B_method="torbeam"`` and
