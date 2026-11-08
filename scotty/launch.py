@@ -27,6 +27,7 @@ from scotty.fun_general import (
     make_array_3x3,
     find_inverse_2D,
     find_Booker_discriminant,
+    find_Booker_root,
     find_Booker_terms,
     find_epsilon_terms,
     find_H_Cardano_eigh,
@@ -438,7 +439,7 @@ def _mode_polarisations(
     sin_theta_m_sq = np.sin(theta_m) ** 2
 
     def polarisations_at(n_e: float) -> Optional[dict]:
-        alpha, beta, _ = find_Booker_terms(
+        alpha, beta, gamma = find_Booker_terms(
             launch_angular_freq, B_magnitude, sin_theta_m_sq, n_e, temperature
         )
         discriminant = find_Booker_discriminant(
@@ -449,8 +450,8 @@ def _mode_polarisations(
         )
         result = {}
         for mode_flag in (1, -1):
-            # The root of H_Booker = N^2 + (beta - mode_flag sqrt(disc)) / (2 alpha)
-            N_sq = -(beta - mode_flag * np.sqrt(discriminant)) / (2 * alpha)
+            # The root of H_Booker = N^2 + find_Booker_root(...)
+            N_sq = -find_Booker_root(alpha, beta, gamma, discriminant, mode_flag)
             if not (np.isfinite(N_sq) and N_sq > 0):
                 return None
             eigvals, eigvecs = find_H_Cardano_eigh(
