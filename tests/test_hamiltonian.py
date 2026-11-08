@@ -305,7 +305,9 @@ def test_O_mode_perpendicular_at_upper_hybrid(trace_level, dR):
     point = (_upper_hybrid_R() + dR, 0.0, 0.0, 800.0, 0.0, 300.0)
     value = H(*point)
     assert np.isfinite(value)
-    assert np.isclose(value, _appleton_hartree_H(1, *point[:1], *point[2:]), rtol=0, atol=1e-12)
+    assert np.isclose(
+        value, _appleton_hartree_H(1, *point[:1], *point[2:]), rtol=0, atol=1e-12
+    )
 
 
 def test_O_mode_perpendicular_at_upper_hybrid_vectorised(trace_level):
