@@ -245,9 +245,21 @@ class Hamiltonian:
             temperature=temperature,
         )
 
-        H_Booker = (K_magnitude / self.wavenumber) ** 2 + (
-            Booker_beta - self.mode_flag * np.sqrt(H_discriminant)
-        ) / (2 * Booker_alpha)
+        # (beta - m sqrt(disc)) / (2 alpha) and 2 gamma / (beta + m sqrt(disc)) are
+        # the same root, since beta**2 - disc = 4 alpha gamma. Use the second where
+        # m * beta > 0: there its denominator can't cancel, while the first is 0/0
+        # wherever alpha = 0 on this branch. For exactly perpendicular
+        # propagation (sin_theta_m = 0) alpha = epsilon_perp, which vanishes at
+        # the upper-hybrid density X = 1 - Y**2, so the O-mode H was NaN there
+        # (and noisy next to it) although n**2 = 1 - X is smooth
+        sqrt_discriminant = self.mode_flag * np.sqrt(H_discriminant)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            Booker_root = np.where(
+                self.mode_flag * Booker_beta > 0,
+                2 * Booker_gamma / (Booker_beta + sqrt_discriminant),
+                (Booker_beta - sqrt_discriminant) / (2 * Booker_alpha),
+            )[()]
+        H_Booker = (K_magnitude / self.wavenumber) ** 2 + Booker_root
 
         log.trace(f"""
             ##################################################
