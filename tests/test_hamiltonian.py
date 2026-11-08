@@ -212,6 +212,9 @@ def _appleton_hartree_H(mode_flag, R, Z, K_R, K_zeta, K_Z):
     (
         (1.75, 0.0, 0.1, 1.0, 1.0, 1.0),
         (1.6, 0.0, -0.2, 500.0, 300.0, 250.0),
+        # low density (X ~ 0.2), where Booker_beta < 0, so each mode is also
+        # checked on the other form of the root (see `find_Booker_root`)
+        (1.95, 0.0, 0.0, 500.0, 300.0, 250.0),
     ),
 )
 def test_hamiltonian_matches_appleton_hartree(trace_level, mode_flag, point):
