@@ -12,6 +12,7 @@ from scotty.fun_general import (
     angular_frequency_to_wavenumber,
     dot,
     find_Booker_discriminant,
+    find_Booker_root,
     find_Booker_terms,
     reshape_33N_to_N33,
 )
@@ -245,9 +246,11 @@ class Hamiltonian:
             temperature=temperature,
         )
 
-        H_Booker = (K_magnitude / self.wavenumber) ** 2 + (
-            Booker_beta - self.mode_flag * np.sqrt(H_discriminant)
-        ) / (2 * Booker_alpha)
+        # Finite at alpha = 0 on the mode's own branch, e.g. the O-mode at the
+        # upper-hybrid layer for K perpendicular to B (see `find_Booker_root`)
+        H_Booker = (K_magnitude / self.wavenumber) ** 2 + find_Booker_root(
+            Booker_alpha, Booker_beta, Booker_gamma, H_discriminant, self.mode_flag
+        )
 
         log.trace(f"""
             ##################################################

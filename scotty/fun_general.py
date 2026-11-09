@@ -901,6 +901,59 @@ def find_Booker_discriminant(
     ) + 4 * epsilon_para**2 * epsilon_g**2 * sin_theta_m_sq
 
 
+def find_Booker_root(
+    Booker_alpha: ArrayLike,
+    Booker_beta: ArrayLike,
+    Booker_gamma: ArrayLike,
+    discriminant: ArrayLike,
+    mode_flag: int,
+) -> ArrayLike:
+    r"""
+    The root of the Booker quadratic in :math:`N^2` for the mode ``mode_flag``,
+    returned as :math:`-N^2`, so that :math:`H = K^2/K_0^2 + \text{root}`.
+
+    The two forms
+
+    .. math::
+
+        \frac{\beta - m\sqrt{\beta^2 - 4\alpha\gamma}}{2\alpha}
+        = \frac{2\gamma}{\beta + m\sqrt{\beta^2 - 4\alpha\gamma}}
+
+    are the same root. The second is used where :math:`m\beta > 0`, where its
+    denominator can't cancel; the first is 0/0 there wherever :math:`\alpha = 0`.
+    For exactly perpendicular propagation (``sin_theta_m = 0``)
+    :math:`\alpha = \epsilon_\perp`, which vanishes at the upper-hybrid density
+    :math:`X = 1 - Y^2`, so the O-mode root was NaN there (and noisy next to it)
+    although :math:`N^2 = 1 - X` is smooth. Where :math:`m\beta \le 0` the first
+    form is kept: it is singular only where :math:`\alpha = 0` on that branch,
+    which is a genuine resonance (e.g. the X-mode at the upper-hybrid layer).
+
+    Both forms are evaluated everywhere, so divide and invalid warnings are
+    silenced: a genuine resonance gives ``inf`` without a warning.
+
+    Parameters
+    ----------
+    Booker_alpha, Booker_beta, Booker_gamma : ArrayLike
+        From `find_Booker_terms`
+    discriminant : ArrayLike
+        :math:`\beta^2 - 4\alpha\gamma`, from `find_Booker_discriminant`
+    mode_flag : int
+        +1 or -1
+
+    Returns
+    -------
+    ArrayLike
+        :math:`-N^2`, a scalar for scalar input
+    """
+    sqrt_discriminant = mode_flag * np.sqrt(discriminant)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(
+            mode_flag * Booker_beta > 0,
+            2 * Booker_gamma / (Booker_beta + sqrt_discriminant),
+            (Booker_beta - sqrt_discriminant) / (2 * Booker_alpha),
+        )[()]
+
+
 def find_Booker_alpha(
     launch_angular_freq: float,
     B_total: ArrayLike,
