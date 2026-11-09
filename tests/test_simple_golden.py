@@ -1,4 +1,5 @@
 from scotty.beam_me_up import beam_me_up, create_magnetic_geometry, make_fit
+import scotty.derivatives as derivatives
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.torbeam import Torbeam
 from scotty.geometry import CircularFluxSurfaceField, MagneticField_Cylindrical
@@ -1255,6 +1256,8 @@ def test_integrated_O_mode(tmp_path, generator):
     kwargs_dict["output_path"] = tmp_path
 
     output = beam_me_up(**kwargs_dict)
+    # beam_me_up leaves no cached functions behind (they grow with every run)
+    assert derivatives._derivative_function_cache == {}
 
     for key, value in EXPECTED_1.items():
         assert_allclose(output[key], value, rtol=1e-2, atol=1e-2, err_msg=key)

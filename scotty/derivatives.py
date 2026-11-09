@@ -29,11 +29,11 @@ def cache(func):
     @functools.wraps(func)
     def wrapper_cache(*args, **kwargs):
         nonlocal hits, misses
-        cache_key = hash(
-            (
-                tuple(map(_maybe_bytes, args)),
-                tuple((k, _maybe_bytes(v)) for k, v in kwargs.items()),
-            )
+        # Keyed on the arguments themselves, not on their hash, so that two
+        # points whose hashes collide can't share a result
+        cache_key = (
+            tuple(map(_maybe_bytes, args)),
+            tuple((k, _maybe_bytes(v)) for k, v in kwargs.items()),
         )
 
         try:
@@ -110,6 +110,17 @@ second-order error overall
 """
 
 _derivative_function_cache: Dict[Callable, Callable] = {}
+
+
+def clear_derivative_cache() -> None:
+    """Forget every cached function and evaluation used by `derivative`.
+
+    The cache holds each wrapped function (e.g. a run's `Hamiltonian`, with its
+    field splines) and every point it was evaluated at, so without clearing it
+    grows with every run in the same process. `beam_me_up` clears it at the
+    start and end of each run.
+    """
+    _derivative_function_cache.clear()
 
 
 def derivative(

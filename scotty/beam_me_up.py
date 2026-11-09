@@ -109,6 +109,7 @@ from scotty.checks import (
     Parameters,
 )
 from scotty.data_io import inputs_to_dicts, solver_output_to_dicts, dict_to_dataset
+from scotty.derivatives import clear_derivative_cache
 from scotty.geometry import (
     MagneticField_Cylindrical,
     MagneticField_Cartesian,
@@ -387,6 +388,10 @@ def beam_me_up(
         ``analysis`` and ``dbs_analysis``, and the field if
         ``return_dt_field``
     """
+
+    # Start from an empty derivative cache: entries from an earlier run in the
+    # same process (e.g. one that raised) would otherwise stay in memory
+    clear_derivative_cache()
 
     ##################################################
     #
@@ -821,6 +826,7 @@ def beam_me_up(
         engine="h5netcdf",
         invalid_netcdf=True,
     )
+    clear_derivative_cache()
 
     if return_dt_field:
         return dt, field

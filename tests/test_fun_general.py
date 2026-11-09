@@ -271,6 +271,29 @@ def test_dot_vector_matrix():
     npt.assert_array_equal(result, expected)
 
 
+@pytest.mark.parametrize(
+    ("shape_a", "shape_b"),
+    (
+        ((7, 3), (7, 3)),
+        ((7, 3, 3), (7, 3)),
+        ((7, 3), (7, 3, 3)),
+        ((7, 2, 3), (7, 3)),
+        ((7, 3), (7, 3, 2)),
+        ((7, 3, 3), (7, 3, 3)),
+    ),
+)
+@pytest.mark.parametrize("complex_a", (False, True))
+def test_dot_matches_np_dot_per_slice(shape_a, shape_b, complex_a):
+    """`dot` is `np.dot` applied to each of the T slices"""
+    rng = np.random.default_rng(0)
+    a = rng.standard_normal(shape_a) + complex_a * 1j * rng.standard_normal(shape_a)
+    b = rng.standard_normal(shape_b)
+    expected = np.array([np.dot(x, y) for x, y in zip(a, b)])
+    result = dot(a, b)
+    assert result.shape == expected.shape
+    npt.assert_allclose(result, expected, rtol=1e-13, atol=1e-14)
+
+
 def test_K_magnitude():
     # Pythagorean quadruple (2, 10, 11, 15)
     K_R = 2
