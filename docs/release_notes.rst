@@ -23,7 +23,7 @@ Output layout
   `scotty.antenna.horns` (was ``hornpy``) and `scotty.antenna.lenses` (was
   ``lensalot``). `scotty.diagnostics` holds one module per diagnostic:
   `scotty.diagnostics.dbs` has ``dbs_analysis``, which was in ``analysis``. The
-  old import paths still work.
+  old import paths still work, apart from ``scotty.analysis.dbs_analysis``.
 
 Geometry, launch and boundary conditions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

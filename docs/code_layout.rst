@@ -99,8 +99,9 @@ Old import paths
 
 The code was moved, not changed, so the old import paths still work and give
 the same objects: ``scotty.hornpy`` is `scotty.antenna.horns`,
-``scotty.lensalot`` is `scotty.antenna.lenses`, the Gaussian-beam functions
+``scotty.lensalot`` is `scotty.antenna.lenses`, and the Gaussian-beam functions
 of ``scotty.fun_general`` (``find_waist``, ``find_Rayleigh_length``,
 ``find_distance_from_waist``, ``propagate_beam`` and
-``propagate_circular_beam``) are those of `scotty.antenna.gaussian`, and
-``scotty.analysis.dbs_analysis`` is `scotty.diagnostics.dbs.dbs_analysis`.
+``propagate_circular_beam``) are those of `scotty.antenna.gaussian`. The
+exception is ``scotty.analysis.dbs_analysis``: import it from
+`scotty.diagnostics.dbs`.

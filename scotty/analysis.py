@@ -576,13 +576,3 @@ def basic_analysis(
     }
 
     return analysis_dict, analysis_coords
-
-
-def __getattr__(name):
-    # `dbs_analysis` moved to `scotty.diagnostics.dbs`; this name still works.
-    # Looked up when used, since `scotty.diagnostics.dbs` imports this module
-    if name == "dbs_analysis":
-        from scotty.diagnostics.dbs import dbs_analysis
-
-        return dbs_analysis
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
