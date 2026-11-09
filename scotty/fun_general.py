@@ -1681,6 +1681,18 @@ def dot(arr_a: Array, arr_b: Array) -> Array:
         For each T, independently compute the dot product of the
         matrices/vectors
     """
+    arr_a, arr_b = np.asarray(arr_a), np.asarray(arr_b)
+    if arr_a.ndim in (2, 3) and arr_b.ndim in (2, 3) and len(arr_a) == len(arr_b):
+        # Batched matmul: the same products and sums as `np.dot` on each
+        # slice, without a Python loop over T
+        a = arr_a[:, None, :] if arr_a.ndim == 2 else arr_a
+        b = arr_b[:, :, None] if arr_b.ndim == 2 else arr_b
+        result = a @ b
+        if arr_b.ndim == 2:
+            result = result[..., 0]
+        if arr_a.ndim == 2:
+            result = result[:, 0, ...]
+        return result
     return np.array(list(map(np.dot, arr_a, arr_b)))
 
 
