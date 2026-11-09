@@ -5,6 +5,11 @@ alpha = epsilon_perp = 0, the X-mode's upper hybrid layer. For K perpendicular
 to B, that is where Omega_pe^2 / Omega^2 = 1 - (Omega_ce / Omega)^2. The O-mode
 is regular there (N^2 = 1 - Omega_pe^2 / Omega^2), so its H must stay zero
 through the layer, and the X-mode must keep its resonance.
+
+`find_Booker_root` is the one from beam-tracing/Scotty#181. These tests came with
+#173, whose own version used the rationalised form where it is the smaller in
+magnitude; for a positive discriminant that is the same condition as
+mode_flag * beta > 0, and the two gave identical values on every input tried.
 """
 
 import importlib

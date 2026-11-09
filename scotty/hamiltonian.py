@@ -246,6 +246,8 @@ class Hamiltonian:
             temperature=temperature,
         )
 
+        # Finite at alpha = 0 on the mode's own branch, e.g. the O-mode at the
+        # upper-hybrid layer for K perpendicular to B (see `find_Booker_root`)
         H_Booker = (K_magnitude / self.wavenumber) ** 2 + find_Booker_root(
             Booker_alpha, Booker_beta, Booker_gamma, H_discriminant, self.mode_flag
         )

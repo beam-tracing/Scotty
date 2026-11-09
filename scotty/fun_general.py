@@ -902,52 +902,56 @@ def find_Booker_discriminant(
 
 
 def find_Booker_root(
-    alpha: ArrayLike,
-    beta: ArrayLike,
-    gamma: ArrayLike,
+    Booker_alpha: ArrayLike,
+    Booker_beta: ArrayLike,
+    Booker_gamma: ArrayLike,
     discriminant: ArrayLike,
-    mode_flag: Literal[1, -1],
+    mode_flag: int,
 ) -> ArrayLike:
     r"""
-    The root of the Booker quadratic that appears in the Hamiltonian,
-    :math:`H = N^2 + (\beta - s \sqrt{\beta^2 - 4 \alpha \gamma}) / 2 \alpha`,
-    with :math:`s` = `mode_flag`.
+    The root of the Booker quadratic in :math:`N^2` for the mode ``mode_flag``,
+    returned as :math:`-N^2`, so that :math:`H = K^2/K_0^2 + \text{root}`.
 
-    This is 0/0 for one root at :math:`\alpha = \epsilon_\perp = 0` (the X-mode's
-    upper hybrid layer, for K perpendicular to B), although that root is regular
-    there. So, element by element, where :math:`\beta - s \sqrt{\cdot}` is the
-    smaller of :math:`\beta \mp s \sqrt{\cdot}` in magnitude, this uses the
-    rationalised form, which is equal to it algebraically and has no cancellation:
+    The two forms
 
     .. math::
 
-        \frac{\beta - s \sqrt{\beta^2 - 4\alpha\gamma}}{2\alpha}
-        = \frac{2\gamma}{\beta + s \sqrt{\beta^2 - 4\alpha\gamma}}
+        \frac{\beta - m\sqrt{\beta^2 - 4\alpha\gamma}}{2\alpha}
+        = \frac{2\gamma}{\beta + m\sqrt{\beta^2 - 4\alpha\gamma}}
 
-    Elsewhere the form is unchanged, including the other root's resonance at
-    :math:`\alpha = 0`. Terms that are NaN, as from a NaN density, give NaN.
+    are the same root. The second is used where :math:`m\beta > 0`, where its
+    denominator can't cancel; the first is 0/0 there wherever :math:`\alpha = 0`.
+    For exactly perpendicular propagation (``sin_theta_m = 0``)
+    :math:`\alpha = \epsilon_\perp`, which vanishes at the upper-hybrid density
+    :math:`X = 1 - Y^2`, so the O-mode root was NaN there (and noisy next to it)
+    although :math:`N^2 = 1 - X` is smooth. Where :math:`m\beta \le 0` the first
+    form is kept: it is singular only where :math:`\alpha = 0` on that branch,
+    which is a genuine resonance (e.g. the X-mode at the upper-hybrid layer).
+
+    Both forms are evaluated everywhere, so divide and invalid warnings are
+    silenced: a genuine resonance gives ``inf`` without a warning.
 
     Parameters
     ----------
-    alpha, beta, gamma : ArrayLike
+    Booker_alpha, Booker_beta, Booker_gamma : ArrayLike
         From `find_Booker_terms`
     discriminant : ArrayLike
-        From `find_Booker_discriminant`
-    mode_flag : 1 or -1
-        Which root
+        :math:`\beta^2 - 4\alpha\gamma`, from `find_Booker_discriminant`
+    mode_flag : int
+        +1 or -1
 
     Returns
-    ----------
+    -------
     ArrayLike
-        The root, :math:`H - N^2`
+        :math:`-N^2`, a scalar for scalar input
     """
-    sqrt_discriminant = np.sqrt(discriminant)
-    numerator = beta - mode_flag * sqrt_discriminant
-    conjugate = beta + mode_flag * sqrt_discriminant
-    rationalise = np.abs(numerator) < np.abs(conjugate)
-    return np.where(rationalise, 2 * gamma, numerator) / np.where(
-        rationalise, conjugate, 2 * alpha
-    )
+    sqrt_discriminant = mode_flag * np.sqrt(discriminant)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(
+            mode_flag * Booker_beta > 0,
+            2 * Booker_gamma / (Booker_beta + sqrt_discriminant),
+            (Booker_beta - sqrt_discriminant) / (2 * Booker_alpha),
+        )[()]
 
 
 def find_Booker_alpha(

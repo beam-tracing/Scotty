@@ -450,7 +450,7 @@ def _mode_polarisations(
         )
         result = {}
         for mode_flag in (1, -1):
-            # The root of H_Booker = N^2 + (beta - mode_flag sqrt(disc)) / (2 alpha)
+            # The root of H_Booker = N^2 + find_Booker_root(...)
             N_sq = -find_Booker_root(alpha, beta, gamma, discriminant, mode_flag)
             if not (np.isfinite(N_sq) and N_sq > 0):
                 return None
