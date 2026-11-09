@@ -1399,7 +1399,7 @@ def test_relativistic_O_mode_final_Psi(tmp_path, generator_relfinal):
     # which is 0.05% from converged in Psi_RZ; tighter than check_Psi_cutoff, so
     # that the check can still see a change
     assert_allclose(
-        output["solver_output/Psi_3D_output_labframe_cylindrical"][CUTOFF_INDEX_REL_1],
+        output["solver/Psi_3D_output_labframe_cylindrical"][CUTOFF_INDEX_REL_1],
         PSI_CUTOFF_EXPECTED_REL_1,
         rtol=2e-3,
         atol=0.1,

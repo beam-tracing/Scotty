@@ -92,11 +92,11 @@ def test_dK_dtau_matches_spline_of_K(steered_run):
     conversion: its rotation is trivial at zeta = 0, and its other terms vanish
     for an unsteered beam, where K_zeta = 0. Measured: at most 2e-4 of
     max |dK/dtau| away from the ends, where the spline is poorer"""
-    solver_output = steered_run["solver_output"]
+    solver_output = steered_run["solver"]
     tau = solver_output["tau"].values
     K = np.stack([solver_output[f"K_{c}_output"].values for c in "XYZ"], axis=-1)
     spline = CubicSpline(tau, K)(tau, 1)
-    analytic = steered_run["analysis"]["dK_dtau_cartesian"].values
+    analytic = steered_run["beam"]["dK_dtau_cartesian"].values
 
     n = len(tau)
     inner = slice(n // 100, n - n // 100)
@@ -108,7 +108,7 @@ def test_Psi_g_relation_holds(steered_run):
     """Psi is the gradient of K along the beam, so Psi . g = dK/dtau. Measured at
     the default tolerances: 99% of points below 4e-4, and only the last point,
     just outside the plasma, above 0.1 (see `check_Psi_g_output`)"""
-    analysis = steered_run["analysis"]
+    analysis = steered_run["beam"]
     for name in ("Psi_g_residual_imag", "Psi_g_residual_real"):
         residual = analysis[name].values
         assert np.percentile(residual, 99) < 1e-2, name
@@ -131,7 +131,7 @@ def test_Psi_g_check_warns_for_piecewise_linear_density(tmp_path):
         density_fit_method=lambda psi: np.interp(psi, psi_table, n_table),
         file_log_level="WARNING",
     )
-    analysis = beam_me_up(**kwargs_dict)["analysis"]
+    analysis = beam_me_up(**kwargs_dict)["beam"]
     assert np.median(analysis["Psi_g_residual_real"].values) > 0.1
 
     (log_file,) = tmp_path.glob("scotty_log*.log")

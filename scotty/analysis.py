@@ -4,7 +4,7 @@
 
 import logging
 import numpy as np
-from scotty.checks import VALID_FIELDS, check_H_output
+from scotty.checks import VALID_FIELDS, check_H_output, check_Psi_g_output
 from scotty.data_io import CARTESIAN_VECTOR_COMPONENTS, SOLUTION_COMPONENTS
 from scotty.derivatives import derivative
 from scotty.fun_general import (
