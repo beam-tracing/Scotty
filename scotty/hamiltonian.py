@@ -216,8 +216,8 @@ class Hamiltonian:
         electron_density = self.density(polflux)
         temperature = self.temperature(polflux) if self.temperature else None
 
-        B_magnitude = self.field.magnitude(q0, q1, q2)  # type: ignore
-        b_hat = self.field.unitvector(q0, q1, q2)  # type: ignore
+        # One evaluation of the field components for both |B| and b_hat
+        _, b_hat, B_magnitude = self.field.all(q0, q1, q2)  # type: ignore
         K_vec = self._K_vec(K0, K1, K2, q_R=q0)  # type: ignore
         K_magnitude = np.linalg.norm(K_vec, axis=0)
         K_hat = K_vec / K_magnitude
@@ -251,6 +251,11 @@ class Hamiltonian:
         H_Booker = (K_magnitude / self.wavenumber) ** 2 + find_Booker_root(
             Booker_alpha, Booker_beta, Booker_gamma, H_discriminant, self.mode_flag
         )
+
+        # Return before building the trace message unless trace logging is on:
+        # formatting these arrays took about a quarter of a run's time
+        if not log.isEnabledFor(5):
+            return H_Booker
 
         log.trace(f"""
             ##################################################
