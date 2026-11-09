@@ -146,13 +146,25 @@ def beam_tracing(
     FloatArray,
     ComplexFloatArray,
 ]:
-    """Returns solver status (1, 0, -1), duration taken by solver, number of evaluations,
+    """`atol` applies to `q` as given, and to `K` and `Psi` scaled by `|K|` and
+    `max|Psi|` at the initial point.
+
+    Returns solver status (always 0, since a failure raises), number of evaluations, duration taken by solver,
     tau` of shape `(N,)`, `q` of shape `(3, N)`, `K` of shape `(3, N)`, `Psi` of shape `(N, 3, 3)`
     """
 
     # Packing the ray and beam parameters
     beam_parameters_initial = pack_beam_parameters(
         q_initial, K_initial, Psi_3D_initial_labframe
+    )
+
+    # One absolute tolerance per block. With a single scalar atol, components
+    # that symmetry makes zero (e.g. Psi_XY) sit at finite-difference noise far
+    # above atol, and the step size follows the noise, or the step fails
+    K_scale = max(np.linalg.norm(K_initial), 1.0)
+    Psi_scale = max(np.max(np.abs(Psi_3D_initial_labframe)), 1.0)
+    atol_blocks = np.concatenate(
+        [np.full(3, atol), np.full(3, atol * K_scale), np.full(12, atol * Psi_scale)]
     )
 
     # Evolving Psi_3D by solving the beam-tracing equation
@@ -169,7 +181,7 @@ def beam_tracing(
         vectorized=False,
         args=(hamiltonian,),
         rtol=rtol,
-        atol=atol,
+        atol=atol_blocks,
     )
 
     log.info(f"""\n
@@ -178,6 +190,27 @@ def beam_tracing(
         Number of beam evolution evaluations: {solver_beam_output.nfev}
         Time per beam evolution evaluation: {duration_beam_solver / solver_beam_output.nfev}
     """)
+
+    # Without this, a failed step returns the points up to the failure as if
+    # the beam had been traced to `tau_leave`
+    if solver_beam_output.status == -1:
+        # If no point was reached, scipy returns `t` and `y` as empty lists
+        points_reached = len(solver_beam_output.t)
+        if points_reached:
+            tau_reached = solver_beam_output.t[-1]
+            q_last, K_last, _ = unpack_beam_parameters(solver_beam_output.y[:, -1])
+        else:
+            tau_reached, q_last, K_last = 0.0, q_initial, K_initial
+        raise RuntimeError(
+            f"Beam solver failed at tau = {tau_reached:.6g} of {tau_leave:.6g} "
+            f"({points_reached} of {len(tau_points)} points), "
+            f"last at q = {q_last}, K = {K_last}: "
+            f"{solver_beam_output.message.rstrip('.')}. "
+            "Check that (i) the beam does not leave the interpolation region; "
+            "(ii) the interpolated density is not negative; and (iii) the "
+            "Hamiltonian is finite along the beam (e.g. the mode's root near a "
+            "cut-off or resonance)"
+        )
 
     return (
         solver_beam_output.status,

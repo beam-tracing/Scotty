@@ -1348,12 +1348,14 @@ def test_relativistic_O_mode(tmp_path, generator_rel):
     K_magnitude = np.hypot(output["solver/K_R_output"], output["solver/K_Z_output"])
     assert K_magnitude.argmin("tau") == CUTOFF_INDEX_REL_1
 
-    # Psi at the final point: test_relativistic_O_mode_final_Psi, at rtol = 1e-6
+    # Psi at the cut-off and the final point: test_relativistic_O_mode_final_Psi,
+    # at rtol = 1e-6. At rtol = 1e-3, Psi_RZ at the cut-off is about 1.05% from
+    # converged, against a tolerance of 1%
     check_Psi(
         output["solver/Psi_3D_output_labframe_cylindrical"],
         PSI_START_EXPECTED_REL_1,
         CUTOFF_INDEX_REL_1,
-        PSI_CUTOFF_EXPECTED_REL_1,
+        None,
         None,
     )
 
@@ -1392,6 +1394,15 @@ def test_relativistic_O_mode_final_Psi(tmp_path, generator_relfinal):
     check_Psi_final(
         output["solver/Psi_3D_output_labframe_cylindrical"][-1],
         PSI_FINAL_EXPECTED_REL_1_RTOL_1E_6,
+    )
+    # Psi at the point inserted at the cut-off, against v3's value at rtol = 1e-3,
+    # which is 0.05% from converged in Psi_RZ; tighter than check_Psi_cutoff, so
+    # that the check can still see a change
+    assert_allclose(
+        output["solver_output/Psi_3D_output_labframe_cylindrical"][CUTOFF_INDEX_REL_1],
+        PSI_CUTOFF_EXPECTED_REL_1,
+        rtol=2e-3,
+        atol=0.1,
     )
 
 

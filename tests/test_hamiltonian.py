@@ -212,6 +212,9 @@ def _appleton_hartree_H(mode_flag, R, Z, K_R, K_zeta, K_Z):
     (
         (1.75, 0.0, 0.1, 1.0, 1.0, 1.0),
         (1.6, 0.0, -0.2, 500.0, 300.0, 250.0),
+        # low density (X ~ 0.2), where Booker_beta < 0, so each mode is also
+        # checked on the other form of the root (see `find_Booker_root`)
+        (1.95, 0.0, 0.0, 500.0, 300.0, 250.0),
     ),
 )
 def test_hamiltonian_matches_appleton_hartree(trace_level, mode_flag, point):
@@ -274,3 +277,45 @@ def test_wrong_number_of_arguments_raises(trace_level):
     H = _make_hamiltonian(1)
     with pytest.raises(RuntimeError):
         H(1.75, 0.0, 0.1, 1.0)
+
+
+def _upper_hybrid_R():
+    """Major radius on the midplane of `ToroidalField` with `QuadraticFit(1.0, 4.0)`
+    at 55 GHz where X = 1 - Y**2 (the upper-hybrid density)"""
+    from scipy.optimize import brentq
+
+    w = freq_GHz_to_angular_frequency(55.0)
+
+    def f(R):
+        psi = abs(R - 1.5) / 0.5
+        ne = 4.0 * (1 - psi**2)
+        X = constants.e**2 * ne * 1e19 / (constants.epsilon_0 * constants.m_e) / w**2
+        Y = constants.e * (1.5 / R) / constants.m_e / w
+        return X - (1 - Y**2)
+
+    return brentq(f, 1.5, 1.99, xtol=1e-15)
+
+
+@pytest.mark.parametrize("dR", (0.0, 1e-9, -1e-9, 1e-6, -1e-6, 1e-3))
+def test_O_mode_perpendicular_at_upper_hybrid(trace_level, dR):
+    """O-mode with K exactly perpendicular to B (K_zeta = 0) through the
+    upper-hybrid layer, where the Booker alpha is zero: H must be finite and
+    equal to the analytic K^2/K_0^2 - (1 - X)"""
+    H = _make_hamiltonian(1)
+    point = (_upper_hybrid_R() + dR, 0.0, 0.0, 800.0, 0.0, 300.0)
+    value = H(*point)
+    assert np.isfinite(value)
+    assert np.isclose(
+        value, _appleton_hartree_H(1, *point[:1], *point[2:]), rtol=0, atol=1e-12
+    )
+
+
+def test_O_mode_perpendicular_at_upper_hybrid_vectorised(trace_level):
+    """As above, for several points in one call"""
+    H = _make_hamiltonian(1)
+    R = _upper_hybrid_R() + np.array([-1e-6, 0.0, 1e-6])
+    zeros = np.zeros_like(R)
+    values = H(R, zeros, zeros, np.full_like(R, 800.0), zeros, np.full_like(R, 300.0))
+    expected = [_appleton_hartree_H(1, r, 0.0, 800.0, 0.0, 300.0) for r in R]
+    assert np.all(np.isfinite(values))
+    assert_allclose(values, expected, rtol=0, atol=1e-12)

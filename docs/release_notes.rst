@@ -93,6 +93,19 @@ Defaults
   about 10 MB at this ``len_tau``.
 - So a run at the default settings can give a noticeably different integrated
   filter function from one at v3's defaults.
+- In the beam solver, ``atol`` applies to :math:`q` as given, and to :math:`K`
+  and :math:`\Psi` scaled by :math:`|K|` and :math:`\max|\Psi|` at the initial
+  point (v3: the same ``atol`` for every component). Components that symmetry
+  makes zero no longer force tiny steps to resolve finite-difference noise, which
+  made symmetric cases (slabs, cylinders, unsteered midplane entries) slow, and
+  could end the beam early. Such cases are now accurate to about ``rtol``; before,
+  some were more accurate than that by accident.
+- If the beam solver fails (a step can't be taken, e.g. where the beam leaves the
+  interpolation region, the density goes negative or the Hamiltonian isn't
+  finite), ``beam_me_up`` now raises a ``RuntimeError`` giving how far the beam
+  got. Before, it returned the points up to the failure as if the beam had been
+  traced to the end, with ``solver_status`` -1 in the output. Runs that passed
+  silently with a partial beam, for example at v3's tolerances, may now raise.
 - ``from_v3_kwargs`` keeps v3's tolerances, spatial steps and ``len_tau``, so a
   v3 script gives v3's accuracy.
 - ``interp_smoothing=0``, ``find_B_method="torbeam"`` and
@@ -169,6 +182,7 @@ Removed
 - The analytical fields ``CircularCrossSectionField`` and
   ``ConstantCurrentDensityField``, and ``find_B_method="unit-tests"``; use
   ``"analytical"``.
-- ``check_Psi_output``, which warned on every run.
+- ``check_Psi_output``, which warned on every run (it was miscoded); see
+  ``check_Psi_g_output`` above.
 - ``open_*_npz``.
 - The GUI (``GUI/scottypygui.py``) has not been ported to v4.
