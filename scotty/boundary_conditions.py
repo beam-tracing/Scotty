@@ -22,6 +22,7 @@ from scotty.fun_general import (
     find_Psi_3D_labframe_cart_to_cyl,
     find_Psi_3D_labframe_cyl_to_cart,
     find_Booker_discriminant,
+    find_Booker_root,
     find_Booker_terms,
 )
 from scotty.hamiltonian import Hamiltonian
@@ -148,8 +149,8 @@ def find_H_bar(
         temperature=temperature,
     )
 
-    return K_magnitude**2 + K_0**2 * (
-        (Booker_beta - mode_flag * np.sqrt(H_discriminant)) / (2 * Booker_alpha)
+    return K_magnitude**2 + K_0**2 * find_Booker_root(
+        Booker_alpha, Booker_beta, Booker_gamma, H_discriminant, mode_flag
     )
 
 
@@ -360,9 +361,8 @@ def find_K_plasma(
                 K_parallel_actual**2
                 + K_binormal_actual**2
                 + K0**2
-                * (
-                    (Booker_beta - mode_flag * np.sqrt(H_discriminant))
-                    / (2 * Booker_alpha)
+                * find_Booker_root(
+                    Booker_alpha, Booker_beta, Booker_gamma, H_discriminant, mode_flag
                 )
             )
         )

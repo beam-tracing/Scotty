@@ -109,6 +109,7 @@ from scotty.checks import (
     Parameters,
 )
 from scotty.data_io import inputs_to_dicts, solver_output_to_dicts, dict_to_dataset
+from scotty.derivatives import clear_derivative_cache
 from scotty.geometry import (
     MagneticField_Cylindrical,
     MagneticField_Cartesian,
@@ -300,7 +301,10 @@ def beam_me_up(
         (`scipy.integrate.solve_ivp`). Use tighter ones (e.g. 1e-6, 1e-9) for
         anything read close to the cut-off, where :math:`\Psi` is steep, and
         when :math:`K` at the cut-off is below about a tenth of its vacuum
-        value. v3's defaults were 1e-3, 1e-6
+        value. v3's defaults were 1e-3, 1e-6. In the beam solver, ``atol``
+        applies to :math:`q` as given, and to :math:`K` and :math:`\Psi` scaled
+        by :math:`|K|` and :math:`\max|\Psi|` at the initial point (the first
+        point in the plasma)
     poloidal_flux_enter : float, default 1.0
         Normalised poloidal flux of the plasma boundary: where the beam
         enters the plasma, and where the ray is stopped when it leaves
@@ -384,6 +388,10 @@ def beam_me_up(
         ``analysis`` and ``dbs_analysis``, and the field if
         ``return_dt_field``
     """
+
+    # Start from an empty derivative cache: entries from an earlier run in the
+    # same process (e.g. one that raised) would otherwise stay in memory
+    clear_derivative_cache()
 
     ##################################################
     #
@@ -818,6 +826,7 @@ def beam_me_up(
         engine="h5netcdf",
         invalid_netcdf=True,
     )
+    clear_derivative_cache()
 
     if return_dt_field:
         return dt, field

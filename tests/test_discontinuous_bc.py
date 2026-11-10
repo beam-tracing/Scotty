@@ -79,7 +79,19 @@ def boundary(request, tmp_path_factory):
         dK=so["K_initial_cylindrical"].values - K_v,
         dPsi=so["Psi_3D_initial_labframe_cylindrical"].values
         - so["Psi_3D_entry_labframe_cylindrical"].values,
+        solver_status=int(so["solver_status"].values),
     )
+
+
+def test_beam_reaches_the_end(boundary):
+    """The midplane entry, unsteered, is symmetric under (Z, zeta) -> (-Z, -zeta),
+    so K_Z, K_zeta, Psi_RZ and Psi_Rzeta are zero apart from finite-difference
+    noise. With one scalar atol for every component, RK45 tried to resolve that
+    noise and the step failed after 8 of 52 points (Scotty issue #175).
+    The beam passes close to K = 0 at the cut-off (normal incidence); it reaches
+    the end at rtol 1e-4 and 1e-5, whose steps land differently near K = 0"""
+    # Status 0: solve_ivp reached tau_leave, so every requested point came back
+    assert boundary["solver_status"] == 0
 
 
 @pytest.mark.parametrize(

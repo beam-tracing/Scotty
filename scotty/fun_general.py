@@ -901,6 +901,59 @@ def find_Booker_discriminant(
     ) + 4 * epsilon_para**2 * epsilon_g**2 * sin_theta_m_sq
 
 
+def find_Booker_root(
+    Booker_alpha: ArrayLike,
+    Booker_beta: ArrayLike,
+    Booker_gamma: ArrayLike,
+    discriminant: ArrayLike,
+    mode_flag: int,
+) -> ArrayLike:
+    r"""
+    The root of the Booker quadratic in :math:`N^2` for the mode ``mode_flag``,
+    returned as :math:`-N^2`, so that :math:`H = K^2/K_0^2 + \text{root}`.
+
+    The two forms
+
+    .. math::
+
+        \frac{\beta - m\sqrt{\beta^2 - 4\alpha\gamma}}{2\alpha}
+        = \frac{2\gamma}{\beta + m\sqrt{\beta^2 - 4\alpha\gamma}}
+
+    are the same root. The second is used where :math:`m\beta > 0`, where its
+    denominator can't cancel; the first is 0/0 there wherever :math:`\alpha = 0`.
+    For exactly perpendicular propagation (``sin_theta_m = 0``)
+    :math:`\alpha = \epsilon_\perp`, which vanishes at the upper-hybrid density
+    :math:`X = 1 - Y^2`, so the O-mode root was NaN there (and noisy next to it)
+    although :math:`N^2 = 1 - X` is smooth. Where :math:`m\beta \le 0` the first
+    form is kept: it is singular only where :math:`\alpha = 0` on that branch,
+    which is a genuine resonance (e.g. the X-mode at the upper-hybrid layer).
+
+    Both forms are evaluated everywhere, so divide and invalid warnings are
+    silenced: a genuine resonance gives ``inf`` without a warning.
+
+    Parameters
+    ----------
+    Booker_alpha, Booker_beta, Booker_gamma : ArrayLike
+        From `find_Booker_terms`
+    discriminant : ArrayLike
+        :math:`\beta^2 - 4\alpha\gamma`, from `find_Booker_discriminant`
+    mode_flag : int
+        +1 or -1
+
+    Returns
+    -------
+    ArrayLike
+        :math:`-N^2`, a scalar for scalar input
+    """
+    sqrt_discriminant = mode_flag * np.sqrt(discriminant)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(
+            mode_flag * Booker_beta > 0,
+            2 * Booker_gamma / (Booker_beta + sqrt_discriminant),
+            (Booker_beta - sqrt_discriminant) / (2 * Booker_alpha),
+        )[()]
+
+
 def find_Booker_alpha(
     launch_angular_freq: float,
     B_total: ArrayLike,
@@ -1628,6 +1681,18 @@ def dot(arr_a: Array, arr_b: Array) -> Array:
         For each T, independently compute the dot product of the
         matrices/vectors
     """
+    arr_a, arr_b = np.asarray(arr_a), np.asarray(arr_b)
+    if arr_a.ndim in (2, 3) and arr_b.ndim in (2, 3) and len(arr_a) == len(arr_b):
+        # Batched matmul: the same products and sums as `np.dot` on each
+        # slice, without a Python loop over T
+        a = arr_a[:, None, :] if arr_a.ndim == 2 else arr_a
+        b = arr_b[:, :, None] if arr_b.ndim == 2 else arr_b
+        result = a @ b
+        if arr_b.ndim == 2:
+            result = result[..., 0]
+        if arr_a.ndim == 2:
+            result = result[:, 0, ...]
+        return result
     return np.array(list(map(np.dot, arr_a, arr_b)))
 
 
@@ -1775,6 +1840,84 @@ def find_g_cartesian(
     g_hat_cart = g_vec_cart / g_magnitude[:, np.newaxis]
 
     return g_vec_cart, g_magnitude, g_hat_cart
+
+
+def find_dK_dtau_cartesian(
+    cartesian: bool,
+    q0: ArrayLike,
+    q1: ArrayLike,
+    K0: ArrayLike,
+    K1: ArrayLike,
+    dH: dict,
+) -> FloatArray:
+    """
+    The rate of change of the wavevector along the ray, dK/dtau, in Cartesian
+    components, from the first derivatives of H. In cylindrical geometry
+    ``K1 = K_zeta`` is the toroidal mode number, so the Cartesian K is
+    ``K_R R_hat + (K_zeta / R) zeta_hat + K_Z Z_hat``, and the turning of
+    ``R_hat`` and ``zeta_hat`` along the ray adds terms to ``dK_R/dtau = -dH/dR``
+    and ``dK_zeta/dtau = -dH/dzeta``.
+
+    Parameters
+    ----------
+    cartesian : bool
+        `True` for Cartesian geometry and `False` for cylindrical
+    q0, q1 : ArrayLike
+        `q_X`, `q_Y` for Cartesian geometry and `q_R`, `q_zeta` for cylindrical
+    K0, K1 : ArrayLike
+        `K_X`, `K_Y` for Cartesian geometry and `K_R`, `K_zeta` for cylindrical
+    dH : dict
+        Dictionary of derivatives of the Hamiltonian, i.e. `dH = hamiltonian.derivatives(...)`
+
+    Returns
+    ----------
+    dK_dtau : FloatArray
+        Shape ``(N, 3)``, Cartesian components
+    """
+    if cartesian:
+        return -np.stack((dH["dH_dX"], dH["dH_dY"], dH["dH_dZ"]), axis=1)
+
+    q_R, q_zeta, K_R, K_zeta = q0, q1, K0, K1
+    dR_dtau, dzeta_dtau = dH["dH_dKR"], dH["dH_dKzeta"]
+    # Components along R_hat and zeta_hat
+    dK_dtau_R = -dH["dH_dR"] - K_zeta / q_R * dzeta_dtau
+    dK_dtau_zeta = -dH["dH_dzeta"] / q_R - K_zeta / q_R**2 * dR_dtau + K_R * dzeta_dtau
+    sin_zeta, cos_zeta = np.sin(q_zeta), np.cos(q_zeta)
+    return np.stack(
+        (
+            cos_zeta * dK_dtau_R - sin_zeta * dK_dtau_zeta,
+            sin_zeta * dK_dtau_R + cos_zeta * dK_dtau_zeta,
+            -dH["dH_dZ"],
+        ),
+        axis=1,
+    )
+
+
+def find_Psi_g_residuals(
+    Psi_cart: ComplexFloatArray, g_vec_cart: FloatArray, dK_dtau_cart: FloatArray
+) -> Tuple[FloatArray, FloatArray]:
+    """
+    How far the beam is from satisfying Psi . g = dK/dtau, which holds because
+    Psi is the gradient of K along the beam (Hall-Chen, Parra & Hillesheim 2022).
+    Its imaginary part must vanish, and its real part must equal the ray's
+    dK/dtau. Returns, at each point,
+
+    - ``e_imag = |Im(Psi . g)| / (||Im Psi|| |g|)``
+    - ``e_real = |Re(Psi . g) - dK/dtau| / (||Re Psi|| |g|)``
+
+    with Frobenius norms. Both are at the level of the solver tolerance when the
+    beam is right; they grow if Psi drifts off the beam, e.g. with a density
+    that isn't differentiable. They only test the components of Psi along g.
+    """
+    Psi_g = np.einsum("nij,nj->ni", Psi_cart, g_vec_cart)
+    g_magnitude = np.linalg.norm(g_vec_cart, axis=1)
+    e_imag = np.linalg.norm(Psi_g.imag, axis=1) / (
+        np.linalg.norm(Psi_cart.imag, axis=(1, 2)) * g_magnitude
+    )
+    e_real = np.linalg.norm(Psi_g.real - dK_dtau_cart, axis=1) / (
+        np.linalg.norm(Psi_cart.real, axis=(1, 2)) * g_magnitude
+    )
+    return e_imag, e_real
 
 
 def find_K_magnitude(
