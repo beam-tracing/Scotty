@@ -65,6 +65,11 @@ def uniform_field():
     field.unitvector = lambda X, Y, Z: np.array(
         [0 * np.ones_like(X), 0 * np.ones_like(X), -np.ones_like(X)]
     ).T
+    field.all = lambda X, Y, Z: (
+        B0 * field.unitvector(X, Y, Z),
+        field.unitvector(X, Y, Z),
+        field.magnitude(X, Y, Z),
+    )
     return field
 
 
