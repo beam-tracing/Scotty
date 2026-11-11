@@ -33,45 +33,39 @@ def ray_run(tmp_path_factory):
 
 
 def test_ray_tracing_only_analysis_completes(ray_run):
-    """filter_s needs the launch wavenumber, which used to be set only for beam
+    """delta_ne_sq needs the launch wavenumber, which used to be set only for beam
     tracing, so a ray-tracing-only run failed in dbs_analysis"""
-    dbs = ray_run["dbs_analysis"]
+    dbs = ray_run["diagnostics/dbs"]
     for power in ("-10_3", "-13_3"):
-        assert np.all(np.isfinite(dbs[f"filter_s_{power}"].values))
+        assert np.all(np.isfinite(dbs[f"delta_ne_sq_{power}"].values))
 
 
-def test_filter_all_is_an_array_with_its_own_integral(beam_run):
-    """The array and its path integral used to share the key filter_all_<power>,
-    and the 0-d integral replaced the array"""
-    dbs = beam_run["dbs_analysis"]
+def test_filterfun_all_is_an_array_with_its_own_integral(beam_run):
+    """filterfun_all is the product of the four pieces of the filter function,
+    without the turbulence spectrum delta_ne_sq. The array and its path integral
+    used to share a key, and the 0-d integral replaced the array"""
+    dbs = beam_run["diagnostics/dbs"]
     length = dbs["beam_path_length"].values
-    for power in ("-10_3", "-13_3"):
-        filter_all = dbs[f"filter_all_{power}"].values
-        assert filter_all.shape == length.shape
-        product = np.prod(
-            [
-                dbs[k].values
-                for k in (
-                    "filter_p",
-                    "filter_r",
-                    "filter_b",
-                    "filter_m",
-                    f"filter_s_{power}",
-                )
-            ],
-            axis=0,
-        )
-        np.testing.assert_allclose(filter_all, product, rtol=1e-12)
-        np.testing.assert_allclose(
-            dbs[f"int_filter_all_{power}_dL"].values,
-            trapezoid(filter_all, length),
-            rtol=1e-12,
-        )
+    filterfun_all = dbs["filterfun_all"].values
+    assert filterfun_all.shape == length.shape
+    product = np.prod(
+        [
+            dbs[k].values
+            for k in ("filterfun_p", "filterfun_r", "filterfun_b", "filterfun_m")
+        ],
+        axis=0,
+    )
+    np.testing.assert_allclose(filterfun_all, product, rtol=1e-12)
+    np.testing.assert_allclose(
+        dbs["int_filterfun_all_dl"].values,
+        trapezoid(filterfun_all, length),
+        rtol=1e-12,
+    )
 
 
 def test_d_xhat_d_tau_keeps_vector_and_scalar(beam_run):
     """The scalar d_xhat_d_tau . y_hat used to overwrite the vector"""
-    analysis = beam_run["analysis"]
+    analysis = beam_run["beam"]
     vector = analysis["d_xhat_d_tau"].values
     assert vector.shape == analysis["x_hat_cartesian"].values.shape
     np.testing.assert_allclose(
@@ -83,15 +77,15 @@ def test_d_xhat_d_tau_keeps_vector_and_scalar(beam_run):
 
 
 def test_filter_functions_are_real(beam_run):
-    """Rounding in the complex Cardano formula used to make filter_r, filter_all and
+    """Rounding in the complex Cardano formula used to make filterfun_r, filterfun_all and
     their integrals complex-typed"""
-    analysis, dbs = beam_run["analysis"], beam_run["dbs_analysis"]
-    assert not np.iscomplexobj(analysis["g_magnitude_Cardano"].values)
+    analysis, dbs = beam_run["beam"], beam_run["diagnostics/dbs"]
+    assert not np.iscomplexobj(beam_run["beam"]["g_magnitude_Cardano"].values)
     for k in (
-        "filter_r",
-        "filter_all_-10_3",
-        "int_filter_r_dL",
-        "int_filter_all_-10_3_dL",
+        "filterfun_r",
+        "filterfun_all",
+        "int_filterfun_r_dl",
+        "int_filterfun_all_dl",
     ):
         assert not np.iscomplexobj(dbs[k].values), k
 
@@ -100,10 +94,10 @@ def test_e_hat_belongs_to_the_traced_mode(beam_run):
     """e_hat is the eigenvector whose eigenvalue is the Cardano root the beam
     follows (eigh sorts eigenvalues, so the solver's Cardano index cannot be
     used to pick it)"""
-    analysis = beam_run["analysis"]
+    analysis = beam_run["beam"]
     np.testing.assert_allclose(
-        analysis["H_eigval_solution"].values,
-        analysis["H_Cardano_solution"].values,
+        beam_run["beam"]["H_eigval_solution"].values,
+        beam_run["beam"]["H_Cardano_solution"].values,
         rtol=0,
         atol=1e-10,
     )
@@ -115,9 +109,9 @@ def test_k_perp1_bs_splits_into_normal_and_binormal(beam_run):
     plane of k_perp1_hat: the two components add in quadrature to k_perp1_bs.
     At the cut-off K is tangent to the flux surface, so the backscattered
     wavevector is almost purely binormal (the usual DBS picture)"""
-    analysis, dbs = beam_run["analysis"], beam_run["dbs_analysis"]
+    analysis, dbs = beam_run["beam"], beam_run["diagnostics/dbs"]
     b_hat = analysis["b_hat_cartesian"].values
-    normal_hat = dbs["normal_hat"].values
+    normal_hat = analysis["normal_hat"].values
     np.testing.assert_allclose(
         np.einsum("ti,ti->t", normal_hat, b_hat), 0, rtol=0, atol=1e-6
     )
@@ -129,3 +123,22 @@ def test_k_perp1_bs_splits_into_normal_and_binormal(beam_run):
     )
     cutoff = int(analysis["cutoff_index"])
     assert abs(k_normal[cutoff]) < 0.05 * abs(k_total[cutoff])
+
+
+def test_k_perp2_bs(beam_run):
+    """k_perp2_bs is along y_hat, which is perpendicular to b_hat, so its normal
+    and binormal components add in quadrature to it too. It is the k_perp2 at
+    which the k_perp2 integrand peaks, 2 K theta_m Im(M_xy^-1) / Im(M_yy^-1), so
+    it is zero at zero mismatch. On this unsteered case the mismatch is small, and
+    at the cut-off k_perp2_bs is well inside the k_perp2 resolution. (Away from
+    the cut-off the resolution changes quickly in X mode, so the ratio is only
+    checked there.)"""
+    dbs = beam_run["diagnostics/dbs"]
+    cutoff = int(beam_run["beam"]["cutoff_index"])
+    k_total = dbs["k_perp2_bs"].values
+    np.testing.assert_allclose(
+        np.hypot(dbs["k_perp2_bs_normal"].values, dbs["k_perp2_bs_binormal"].values),
+        np.abs(k_total),
+        rtol=1e-6,
+    )
+    assert abs(k_total[cutoff]) < 0.1 * dbs["delta_k_perp2"].values[cutoff]

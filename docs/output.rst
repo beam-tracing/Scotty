@@ -4,9 +4,10 @@ Output parameters
 =================
 
 :func:`beam_me_up` returns a `datatree`_ instance which contains the
-simulation inputs under ``inputs``, the immediate results under
-``solver_output``, and some further processed results under
-``analysis``.
+simulation inputs under ``inputs``, the immediate results under ``solver``,
+quantities along the beam under ``beam`` (including the consistency checks
+such as ``H_Booker``), and diagnostic-specific results under ``diagnostics``,
+such as ``diagnostics/dbs``. This layout is a proposal and may change.
 
 Datatrees are collections of `xarray`_ ``Datasets``, which themselves
 are collections of N-dimensional variables with labelled coordinates.
@@ -17,7 +18,7 @@ description of input parameters.
 All the outputs are in cylindrical coordinates unless otherwise stated
 (``Cartesian`` or with the lower case ``x`` or ``y``).
 
-The ``solver_output`` group in the output datatree contains:
+The ``solver`` group in the output datatree contains:
 
 * ``q_R`` - beam trajectory, :math:`R` component
 * ``q_zeta`` - beam trajectory, :math:`\zeta` component
@@ -28,7 +29,7 @@ The ``solver_output`` group in the output datatree contains:
 
 These variables are all functions of the beam parameter :math:`\tau`.
 
-The ``analysis`` group in the output datatree contains lots of derived
+The ``beam`` group in the output datatree contains lots of derived
 parameters and quantities. Some of these are:
 
 * ``Psi_xx`` - :math:`xx` component of :math:`\Psi_w`

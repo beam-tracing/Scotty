@@ -37,6 +37,8 @@ VALID_GEOMETRIES = Literal["cylindrical", "cartesian"]
 VALID_LAUNCH_MODE_FLAGS = Literal[1, -1, "O", "X"]
 VALID_LAUNCH_FLAGS = Literal["vacuum_analytic", "vacuum_numerical", "plasma"]
 VALID_PSI_BC_FLAGS = Optional[Literal["continuous", "discontinuous"]]
+# What `resonance_flag` does at each layer (see `check_resonance_flag`)
+VALID_RESONANCE_FLAGS = Literal[0, 1, 2]
 VALID_FIELDS = Union[
     MagneticField_Cylindrical,
     MagneticField_Cartesian,
@@ -131,7 +133,7 @@ class Parameters:
         launch_flag: VALID_LAUNCH_FLAGS,
         Psi_BC_flag: VALID_PSI_BC_FLAGS,
         relativistic_flag: bool,
-        resonance_flag: bool,
+        resonance_flag: int,
         auto_delta_sign: bool,
         deltas_cylindrical: FloatArray,
         deltas_cartesian: FloatArray,
@@ -163,7 +165,6 @@ class Parameters:
         further_analysis_flag: bool,
         detailed_analysis_flag: bool,
         # Additional flags
-        benchmarking_flag: bool,
         ray_tracing_flag: bool,
         # return_dt_field: bool,
         # Extra kwargs for parsing
@@ -224,12 +225,11 @@ class Parameters:
         #
         ##################################################
 
-        self.benchmarking_flag = benchmarking_flag
         self.ray_tracing_flag = ray_tracing_flag
         self.launch_flag = self._check_launch_flag(launch_flag)
         self.Psi_BC_flag = self._check_Psi_BC_flag(Psi_BC_flag, self.launch_flag)
         self.relativistic_flag = relativistic_flag
-        self.resonance_flag = resonance_flag
+        self.resonance_flag = check_resonance_flag(resonance_flag)
         self.auto_delta_sign = auto_delta_sign
         self.len_tau = int(self._check_positive("len_tau", len_tau))
         self.rtol = rtol
@@ -782,6 +782,36 @@ class Parameters:
 # INPUT CHECK BEFORE RAY TRACING
 #
 ##################################################
+
+
+def check_resonance_flag(resonance_flag) -> VALID_RESONANCE_FLAGS:
+    """`resonance_flag` as 0, 1 or 2:
+
+    - 2: stop at the fundamental and second-harmonic cyclotron resonances, and, for
+      the X-mode, the upper hybrid resonance;
+    - 1: stop at the fundamental; pass the second harmonic and the upper hybrid;
+    - 0: raise at the fundamental; pass the second harmonic and the upper hybrid.
+
+    Stopping ends the output there (1e-3 short of the fundamental, in
+    omega_ce / omega) and returns it. The fundamental can't be passed: the
+    cold-plasma Hamiltonian is singular there, and past it the root that
+    `mode_flag` selects swaps (beam-tracing/Scotty#169).
+
+    `True` and `False`, the flag's old values, are 2 and 0. They are integers in
+    Python (`True == 1`), so they are converted first.
+    """
+    if isinstance(resonance_flag, (bool, np.bool_)):
+        return 2 if resonance_flag else 0
+    if isinstance(resonance_flag, (int, np.integer)) and int(
+        resonance_flag
+    ) in get_args(VALID_RESONANCE_FLAGS):
+        return cast(VALID_RESONANCE_FLAGS, int(resonance_flag))
+    raise ValueError(
+        f"`resonance_flag` must be 0, 1 or 2, but got {resonance_flag!r}. 2 stops "
+        "the ray at the fundamental and second-harmonic cyclotron resonances (and "
+        "the X-mode's upper hybrid resonance), 1 at the fundamental only, and 0 "
+        "passes the second harmonic and raises at the fundamental"
+    )
 
 
 def check_H_output(H_arr: ArrayLike, H_tol: float = 1e-2) -> None:

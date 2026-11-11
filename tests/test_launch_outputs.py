@@ -35,7 +35,7 @@ def steered_run(request, tmp_path_factory):
 def test_K_launch_is_the_launch_direction(steered_run):
     """K_launch_cartesian is |K| = K0 along the TORBEAM launch direction"""
     toroidal_angle, dt = steered_run
-    K_cart = dt["solver_output/K_launch_cartesian"].values
+    K_cart = dt["solver/K_launch_cartesian"].values
     K0 = float(dt["inputs/launch_wavenumber"])
     pol = np.deg2rad(float(dt["inputs/poloidal_launch_angle_Torbeam"]))
     tor = np.deg2rad(toroidal_angle)
@@ -49,7 +49,7 @@ def test_K_launch_is_the_launch_direction(steered_run):
 def test_K_launch_cylindrical_matches_cartesian(steered_run):
     """The two saved launch wavevectors are the same vector"""
     _, dt = steered_run
-    so = dt["solver_output"]
+    so = dt["solver"]
 
     assert_allclose(
         so["K_launch_cylindrical"].values,
@@ -65,7 +65,7 @@ def test_K_zeta_launch_is_the_conserved_mode_number(steered_run):
     """K_zeta at launch is the toroidal mode number the beam keeps along the
     ray, as in v3 (K_zeta_launch = -K0 sin(tor) cos(pol) R_launch)"""
     toroidal_angle, dt = steered_run
-    so = dt["solver_output"]
+    so = dt["solver"]
     K0 = float(dt["inputs/launch_wavenumber"])
     pol = np.deg2rad(float(dt["inputs/poloidal_launch_angle_Torbeam"]))
     R_launch = float(so["q_launch_cylindrical"].values[0])
@@ -80,7 +80,7 @@ def test_K_zeta_launch_is_the_conserved_mode_number(steered_run):
 def test_Psi_launch_cylindrical_matches_cartesian(steered_run):
     """The saved launch Psi in each geometry is the same beam"""
     _, dt = steered_run
-    so = dt["solver_output"]
+    so = dt["solver"]
 
     assert_allclose(
         find_Psi_3D_labframe_cyl_to_cart(
@@ -102,7 +102,7 @@ def test_Psi_entry_cartesian_is_the_launched_beam_at_the_entry(steered_run):
     and K_zeta at the entry, which differ from those at the launch point once
     the beam is steered toroidally"""
     _, dt = steered_run
-    so = dt["solver_output"]
+    so = dt["solver"]
 
     K = so["K_launch_cartesian"].values
     g_hat = K / np.linalg.norm(K)

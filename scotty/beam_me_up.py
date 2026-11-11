@@ -38,7 +38,7 @@ Notes
   ``launch_beam_width`` and ``launch_beam_curvature`` are ignored, and
   ``Psi_BC_flag`` has no effect. :math:`K` must satisfy the dispersion
   relation of the mode asked for (``mode_flag`` 1, -1, ``"O"`` or ``"X"``).
-  With no launched beam, ``beam_waist``, ``filter_b`` and ``filter_all`` are NaN.
+  With no launched beam, ``beam_waist``, ``filterfun_b`` and ``filterfun_all`` are NaN.
 - Positions along the way: *launch* is where the beam starts in vacuum,
   *entry* is where it reaches the plasma boundary, and *initial* is where the
   solvers start: the first point in the plasma, or the antenna for
@@ -59,8 +59,8 @@ Notes
 Output
 ~~~~~~
 
-An `xarray.DataTree` with the groups ``inputs``, ``solver_output``,
-``analysis`` and ``dbs_analysis``, saved as ``scotty_output<suffix>.h5``.
+An `xarray.DataTree` with the groups ``inputs``, ``solver``, ``beam`` and
+``diagnostics/dbs``, saved as ``scotty_output<suffix>.h5``.
 
 Coordinates
 ~~~~~~~~~~~
@@ -74,8 +74,10 @@ Abbreviations
 ~~~~~~~~~~~~~
 
 - ``bs`` - backscattered
-- ``filter`` - filter function (``filter_b``, ``filter_p``, ``filter_r``,
-  ``filter_m``, ``filter_s``)
+- ``filterfun`` - filter function (``filterfun_b``, ``filterfun_p``, ``filterfun_r``,
+  ``filterfun_m``)
+- ``delta_ne_sq`` - model turbulence spectrum, the spectral density of the
+  density fluctuations at the backscattered wavenumber
 - ``ne`` - equilibrium electron density
 - ``dt`` - datatree (stores data)
 
@@ -99,7 +101,8 @@ import datetime
 import logging
 import numpy as np
 import pathlib
-from scotty.analysis import basic_analysis, dbs_analysis
+from scotty.analysis import basic_analysis
+from scotty.diagnostics.dbs import dbs_analysis
 from scotty.beam_solver import beam_tracing
 from scotty.checks import (
     VALID_GEOMETRIES,
@@ -108,7 +111,13 @@ from scotty.checks import (
     VALID_PSI_BC_FLAGS,
     Parameters,
 )
-from scotty.data_io import inputs_to_dicts, solver_output_to_dicts, dict_to_dataset
+from scotty.data_io import (
+    dict_to_dataset,
+    inputs_to_dicts,
+    solver_output_to_dicts,
+    to_output_tree,
+)
+from scotty.derivatives import clear_derivative_cache
 from scotty.geometry import (
     MagneticField_Cylindrical,
     MagneticField_Cartesian,
@@ -145,7 +154,7 @@ def beam_me_up(
     launch_flag: VALID_LAUNCH_FLAGS,
     Psi_BC_flag: VALID_PSI_BC_FLAGS,
     relativistic_flag: bool = False,  # includes relativistic corrections to electron mass when set to True
-    resonance_flag: bool = True,  # stop the ray at a cyclotron (or, in X-mode, upper-hybrid) resonance
+    resonance_flag: int = 2,  # 2: stop at both cyclotron harmonics (and the X-mode's upper hybrid); 1: the fundamental only; 0: raise there
     auto_delta_sign: bool = True,  # For flipping signs to maintain forward difference
     delta_X: float = 1e-5,  # in the same units as data_X_coord
     delta_Y: float = 1e-5,  # in the same units as data_Y_coord
@@ -195,7 +204,6 @@ def beam_me_up(
     further_analysis_flag: bool = False,
     detailed_analysis_flag: bool = True,
     # Additional flags
-    benchmarking_flag: bool = False,
     ray_tracing_flag: bool = False,
     return_dt_field: bool = False,  # For returning the datatree, field class
     # Keeping the extra kwargs for parsing later
@@ -277,13 +285,20 @@ def beam_me_up(
     relativistic_flag : bool, default False
         Include the relativistic correction to the electron mass, from the
         temperature profile
-    resonance_flag : bool, default True
-        Stop the ray at the fundamental or second-harmonic electron cyclotron
-        resonance, and (for the X-mode) the upper hybrid resonance. At the
-        fundamental, the output stops 1e-3 short of it in the ratio of the cyclotron
-        frequency to the beam frequency. With ``False``,
-        the ray passes the second harmonic and the upper hybrid resonance, and
-        reaching the fundamental raises a ``RuntimeError``
+    resonance_flag : {0, 1, 2}, default 2
+        Which electron cyclotron resonances stop the ray:
+
+        - ``2``: the fundamental and the second harmonic, and, for the X-mode, the
+          upper hybrid resonance;
+        - ``1``: the fundamental only; the ray passes the second harmonic and the
+          upper hybrid resonance;
+        - ``0``: none; the ray passes the second harmonic and the upper hybrid
+          resonance, and reaching the fundamental raises a ``RuntimeError``.
+
+        At the fundamental, the output stops 1e-3 short of it, in the ratio of the
+        cyclotron frequency to the beam frequency. The ray can't be traced past the
+        fundamental: the cold-plasma Hamiltonian is singular there. ``True`` and
+        ``False``, the old values, mean 2 and 0
     auto_delta_sign : bool, default True
         Flip the signs of the spatial steps so that the forward differences
         point into the plasma at the plasma entry point
@@ -368,8 +383,6 @@ def beam_me_up(
         Stored in the output's inputs
     detailed_analysis_flag : bool, default True
         Stored in the output's inputs
-    benchmarking_flag : bool, default False
-        Stored in the output's inputs
     ray_tracing_flag : bool, default False
         Trace only the ray, with no beam (v3's ``quick_run``; see
         `scotty.compat.quick_cutoff`)
@@ -387,10 +400,13 @@ def beam_me_up(
     Returns
     -------
     xarray.DataTree, or tuple of (xarray.DataTree, field)
-        The output, with the groups ``inputs``, ``solver_output``,
-        ``analysis`` and ``dbs_analysis``, and the field if
-        ``return_dt_field``
+        The output, with the groups ``inputs``, ``solver``, ``beam`` and
+        ``diagnostics/dbs``, and the field if ``return_dt_field``
     """
+
+    # Start from an empty derivative cache: entries from an earlier run in the
+    # same process (e.g. one that raised) would otherwise stay in memory
+    clear_derivative_cache()
 
     ##################################################
     #
@@ -447,7 +463,6 @@ def beam_me_up(
         further_analysis_flag=further_analysis_flag,
         detailed_analysis_flag=detailed_analysis_flag,
         # Additional flags
-        benchmarking_flag=benchmarking_flag,
         ray_tracing_flag=ray_tracing_flag,
         # return_dt_field = return_dt_field,
         # Extra kwargs for parsing
@@ -805,14 +820,7 @@ def beam_me_up(
         )
     )
 
-    dt = xr.DataTree.from_dict(
-        {
-            "inputs": inputs_ds,
-            "solver_output": solver_output_ds,
-            "analysis": analysis_ds,
-            "dbs_analysis": dbs_analysis_ds,
-        }
-    )
+    dt = to_output_tree(inputs_ds, solver_output_ds, analysis_ds, dbs_analysis_ds)
     dt.attrs = {
         "title": output_filename_suffix,
         "software_name": "scotty-beam-tracing",
@@ -825,6 +833,7 @@ def beam_me_up(
         engine="h5netcdf",
         invalid_netcdf=True,
     )
+    clear_derivative_cache()
 
     if return_dt_field:
         return dt, field

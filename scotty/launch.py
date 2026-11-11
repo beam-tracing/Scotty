@@ -6,6 +6,7 @@ import numpy as np
 from scipy import constants
 from scipy.interpolate import CubicSpline
 from scipy.optimize import minimize_scalar, root_scalar
+from scotty.antenna.gaussian import circular_gaussian_Psi_w
 from scotty.boundary_conditions import (
     apply_boundary_conditions,
     check_density_smooth_at_edge,
@@ -27,6 +28,7 @@ from scotty.fun_general import (
     make_array_3x3,
     find_inverse_2D,
     find_Booker_discriminant,
+    find_Booker_root,
     find_Booker_terms,
     find_epsilon_terms,
     find_H_Cardano_eigh,
@@ -438,7 +440,7 @@ def _mode_polarisations(
     sin_theta_m_sq = np.sin(theta_m) ** 2
 
     def polarisations_at(n_e: float) -> Optional[dict]:
-        alpha, beta, _ = find_Booker_terms(
+        alpha, beta, gamma = find_Booker_terms(
             launch_angular_freq, B_magnitude, sin_theta_m_sq, n_e, temperature
         )
         discriminant = find_Booker_discriminant(
@@ -449,8 +451,8 @@ def _mode_polarisations(
         )
         result = {}
         for mode_flag in (1, -1):
-            # The root of H_Booker = N^2 + (beta - mode_flag sqrt(disc)) / (2 alpha)
-            N_sq = -(beta - mode_flag * np.sqrt(discriminant)) / (2 * alpha)
+            # The root of H_Booker = N^2 + find_Booker_root(...)
+            N_sq = -find_Booker_root(alpha, beta, gamma, discriminant, mode_flag)
             if not (np.isfinite(N_sq) and N_sq > 0):
                 return None
             eigvals, eigvecs = find_H_Cardano_eigh(
@@ -899,14 +901,11 @@ def find_plasma_entry_parameters(
             Psi_3D_entry_labframe_cartesian = None
         else:
             # Finding Psi_w_launch_beamframe_cartesian and Psi_3D_launch_beamframe_cartesian
-            # Entries on the off-diagonal = 0, because beamframe
-            # Entries on the diagonal = K_0/R + 2i/W^2, where:
-            #    R is beam radius of curvature (in metres); and
-            #    W is beam width (in metres)
             # First row/column is y-direction; second is x-direction; third is g-direction (beamframe)
             # Not to be confused with X-, Y-, Z-directions (labframe)
-            diag = K0 * launch_beam_curvature + 2j / launch_beam_width**2
-            Psi_w_launch_beamframe_cartesian = diag * np.eye(2)
+            Psi_w_launch_beamframe_cartesian = circular_gaussian_Psi_w(
+                K0, launch_beam_width, launch_beam_curvature
+            )
             Psi_3D_launch_beamframe_cartesian = make_array_3x3(
                 Psi_w_launch_beamframe_cartesian
             )

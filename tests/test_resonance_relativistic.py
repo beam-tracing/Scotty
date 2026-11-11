@@ -9,7 +9,7 @@ is plotted on this same plot. If the trajectory stops at the curve, it means tha
 working. These tests are for circular flux surfaces. The *_rel tests repeat the six fundamental and six
 second-harmonic cases of tests/test_resonance.py with a temperature profile, so that the resonances
 include the relativistic mass correction; both low (< 5 keV) and high (> 5 keV) temperatures are used.
-test_flag_true and test_flag_false check resonance_flag.
+test_flag_2, test_flag_1 and test_flag_0 check resonance_flag.
 """
 
 import numpy as np
@@ -58,9 +58,9 @@ def test_fund_1_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.9103564491962086, -0.05809777044206722, -8.882382142451245e-05],
         rtol=1e-2,
@@ -102,9 +102,9 @@ def test_fund_2_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.9514969586482378, 0.10535069088939782, 3.9809690264897525e-05],
         rtol=1e-2,
@@ -144,9 +144,9 @@ def test_fund_3_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.8345510858149414, 0.17316950433821163, 0.0023098532726736633],
         rtol=1e-2,
@@ -186,9 +186,9 @@ def test_fund_4_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.7307657759972634, 0.015302520233810981, 1.7185443880748966e-05],
         rtol=1e-2,
@@ -228,9 +228,9 @@ def test_fund_5_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.8841856569285043, -0.4082171370330961, -0.000483268825027544],
         rtol=1e-2,
@@ -270,9 +270,9 @@ def test_fund_6_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.0957854232564677, 0.26627001769942255, 3.1415811409120136],
         rtol=1e-2,
@@ -324,9 +324,9 @@ def test_sec_harm_1_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.8631895522670991, -0.016173229853573817, -4.274971098350256e-05],
         rtol=1e-2,
@@ -366,9 +366,9 @@ def test_sec_harm_2_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.8373067418891855, -0.15175779104290016, -0.0004711781281609329],
         rtol=1e-2,
@@ -408,9 +408,9 @@ def test_sec_harm_3_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.7142201582176726, -0.19048766599900008, 0.03326574032585646],
         rtol=1e-2,
@@ -450,9 +450,9 @@ def test_sec_harm_4_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.393558370046402, -0.3443703253176513, -2.9533975261126915],
         rtol=1e-2,
@@ -493,9 +493,9 @@ def test_sec_harm_5_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.7165072858256694, -0.03699963289704433, 3.1427380476219575],
         rtol=1e-2,
@@ -535,9 +535,9 @@ def test_sec_harm_6_rel(tmp_path):
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.8134002015544437, -0.16923651161742756, 0.0012300719829534358],
         rtol=1e-2,
@@ -545,10 +545,10 @@ def test_sec_harm_6_rel(tmp_path):
     )
 
 
-# test_flag: tests whether resonance_Flag works
+# test_flag: tests whether resonance_flag works
 
 
-def flag_true_kwargs():
+def flag_2_kwargs():
     return {
         "geometry": "cylindrical",
         "poloidal_launch_angle_Torbeam": 3,
@@ -561,7 +561,7 @@ def flag_true_kwargs():
         "density_fit_parameters": np.array([1.0]),
         "delta_R": -0.00001,
         "delta_Z": 0.00001,
-        "resonance_flag": True,
+        "resonance_flag": 2,
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",
         "launch_flag": "vacuum_analytic",
@@ -576,15 +576,15 @@ def flag_true_kwargs():
     }
 
 
-def test_flag_true(tmp_path):
-    kwargs_dict = flag_true_kwargs()
+def test_flag_2(tmp_path):
+    kwargs_dict = flag_2_kwargs()
     kwargs_dict["output_path"] = tmp_path
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
         [
-            float(output["solver_output/q_R_output"][-1]),
-            float(output["solver_output/q_Z_output"][-1]),
-            float(output["solver_output/q_zeta_output"][-1]),
+            float(output["solver/q_R_output"][-1]),
+            float(output["solver/q_Z_output"][-1]),
+            float(output["solver/q_zeta_output"][-1]),
         ],
         [1.9162396978780787, -0.05765344712076549, -7.654831340237264e-05],
         rtol=1e-2,
@@ -596,24 +596,21 @@ def test_flag_true(tmp_path):
 def test_output_stops_short_of_the_fundamental(tmp_path, rtol):
     """Within about 3e-5 of the fundamental, K can jump off the dispersion relation
     in one output step, with |H| up to 0.48 and |K| 23% off"""
-    kwargs_dict = flag_true_kwargs()
+    kwargs_dict = flag_2_kwargs()
     kwargs_dict.update(output_path=tmp_path, rtol=rtol)
     output = beam_me_up(**kwargs_dict)
     Y = find_normalised_gyro_ang_freq(
         freq_GHz_to_angular_frequency(kwargs_dict["launch_freq_GHz"]),
-        output["analysis"]["B_magnitude"].values,
+        output["beam"]["B_magnitude"].values,
     )
-    H = np.abs(output["analysis"]["H_Booker"].values)
+    H = np.abs(output["beam"]["H_Booker"].values)
     assert 1e-3 < 1 - Y[-1] < 2e-3
     assert H.max() < 1e-4
 
 
-@pytest.mark.parametrize("rtol", [1e-3, 1e-5])
-def test_flag_false(tmp_path, rtol):
-    # With resonance_flag=False the ray isn't stopped at the second harmonic, but it can't go past f_ce = f: there
-    # the root selected by mode_flag switches from O to X. Depending on the tolerances, the ray then stays at
-    # H = -1 or K jumps onto the other root with H near 0 (beam-tracing/Scotty#169), so it raises at either
-    kwargs_dict = {
+def flag_0_kwargs(rtol):
+    """As `flag_2_kwargs`, but with resonance_flag=0 and coarser output"""
+    return {
         "geometry": "cylindrical",
         "poloidal_launch_angle_Torbeam": 3,
         "toroidal_launch_angle_Torbeam": 0,
@@ -626,7 +623,7 @@ def test_flag_false(tmp_path, rtol):
         "rtol": rtol,
         "atol": 1e-6,
         "len_tau": 102,
-        "resonance_flag": False,
+        "resonance_flag": 0,
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",
         "launch_flag": "vacuum_analytic",
@@ -639,6 +636,31 @@ def test_flag_false(tmp_path, rtol):
         "R_axis": 1.5,
         "minor_radius_a": 0.5,
     }
+
+
+@pytest.mark.parametrize("rtol", [1e-3, 1e-5])
+def test_flag_0(tmp_path, rtol):
+    # With resonance_flag=0 the ray isn't stopped at the second harmonic, but it can't go past f_ce = f: there
+    # the root selected by mode_flag switches from O to X. Depending on the tolerances, the ray then stays at
+    # H = -1 or K jumps onto the other root with H near 0 (beam-tracing/Scotty#169), so it raises at either.
+    # The error points to resonance_flag=1
+    kwargs_dict = flag_0_kwargs(rtol)
     kwargs_dict["output_path"] = tmp_path
-    with pytest.raises(RuntimeError, match="reached the fundamental"):
+    with pytest.raises(RuntimeError, match="reached the fundamental") as error:
         beam_me_up(**kwargs_dict)
+    assert "resonance_flag=1" in str(error.value)
+
+
+@pytest.mark.parametrize("rtol", [1e-3, 1e-5])
+def test_flag_1(tmp_path, rtol):
+    """The same ray with resonance_flag=1 is traced up to 1e-3 short of the
+    fundamental and returned, as for a two-stage run that restarts past the layer"""
+    kwargs_dict = flag_0_kwargs(rtol)
+    kwargs_dict.update(output_path=tmp_path, resonance_flag=1)
+    output = beam_me_up(**kwargs_dict)
+    Y = find_normalised_gyro_ang_freq(
+        freq_GHz_to_angular_frequency(kwargs_dict["launch_freq_GHz"]),
+        output["beam"]["B_magnitude"].values,
+    )
+    assert 1e-3 < 1 - Y[-1] < 3e-3
+    assert np.abs(output["beam"]["H_Booker"].values).max() < 1e-2

@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.testing as npt
-from scotty.derivatives import derivative, cache
+import scotty.derivatives as derivatives_module
+from scotty.derivatives import derivative, cache, clear_derivative_cache
 from time import sleep, time_ns
 
 
@@ -103,3 +104,18 @@ def test_cache_functor():
     # First call should be slow, second much faster
     assert time1 >= 5e8
     assert time2 < 1e6
+
+
+def test_clear_derivative_cache():
+    """The cache keeps every wrapped function and its evaluations until cleared"""
+
+    def f(x):
+        return x**2
+
+    derivative(f, "x", {"x": np.array([1.0, 2.0])})
+    assert f in derivatives_module._derivative_function_cache
+    clear_derivative_cache()
+    assert derivatives_module._derivative_function_cache == {}
+    # Still works, and gives the same answer, after clearing
+    npt.assert_allclose(derivative(f, "x", {"x": 3.0}), 6.0, rtol=1e-6)
+    clear_derivative_cache()

@@ -13,7 +13,7 @@ def test_initial_position_is_the_start_of_the_ray(tmp_path):
     systems"""
     kwargs = get_parameters_for_Scotty("DBS_synthetic")
     kwargs.update(len_tau=52, interp_smoothing=0)
-    so = beam_me_up(**kwargs, output_path=tmp_path)["solver_output"]
+    so = beam_me_up(**kwargs, output_path=tmp_path)["solver"]
 
     first = [so["q_R_output"][0], so["q_zeta_output"][0], so["q_Z_output"][0]]
     assert_allclose(so["q_initial_cylindrical"], first)

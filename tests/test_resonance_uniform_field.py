@@ -1,4 +1,4 @@
-"""A ray in a uniform field exactly at a resonance, with `resonance_flag=False`.
+"""A ray in a uniform field exactly at a resonance.
 
 The field is B = -B0 Z_hat with psi = 1 - X / L, and the density is linear, so
 Omega_pe^2 / Omega^2 = X / L. For an O-mode with K perpendicular to B, the ray is
@@ -81,8 +81,9 @@ def run(gyro_ratio, resonance_flag, output_path):
     )
 
 
-def test_second_harmonic_doesnt_stop_the_ray(tmp_path):
-    so = run(0.5, False, tmp_path)["solver_output"]
+@pytest.mark.parametrize("resonance_flag", [1, 0])
+def test_second_harmonic_doesnt_stop_the_ray(tmp_path, resonance_flag):
+    so = run(0.5, resonance_flag, tmp_path)["solver"]
     tau = so["tau"].values
     step = tau[1] - tau[0]
     assert abs(tau[-1] + step + TAU_LAUNCH - TAU_EXIT) < 2 * step
@@ -94,7 +95,14 @@ def test_second_harmonic_doesnt_stop_the_ray(tmp_path):
     )
 
 
-@pytest.mark.parametrize("resonance_flag", [True, False])
+@pytest.mark.parametrize("resonance_flag", [2, 1, 0])
 def test_fundamental_raises_rather_than_hangs(tmp_path, resonance_flag):
     with pytest.raises(RuntimeError, match="starts on the fundamental"):
         run(1.0, resonance_flag, tmp_path)
+
+
+def test_starting_on_the_second_harmonic_raises_with_2(tmp_path):
+    """With 2, the ray would stop at its first point, and the beam solver would
+    report no output points. The error says what happened instead"""
+    with pytest.raises(RuntimeError, match="starts on the second-harmonic"):
+        run(0.5, 2, tmp_path)

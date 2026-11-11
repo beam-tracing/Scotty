@@ -50,7 +50,10 @@ What it converts:
   tolerances ``rtol`` = 1e-3 and ``atol`` = 1e-6 (v4's are 1e-4, 1e-7); and the
   number of output points ``len_tau`` = 102 (v4's is 4002).
 
-``resonance_flag`` is passed through unchanged (v4 has it since #151 was ported).
+``resonance_flag``, a bool in v3, becomes v4's integer: ``True`` is 2 (stop at the
+fundamental and the second harmonic) and ``False`` is 0. v3's ``False`` let the ray
+carry on past the fundamental; v4 raises there instead, as the cold-plasma
+Hamiltonian is singular and the rest of the ray would be wrong (#169).
 
 Output files
 ------------
@@ -77,6 +80,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 import numpy as np
 import xarray as xr
 
+from scotty.data_io import from_output_tree, to_output_tree
 from scotty.fun_general import find_K_labframe_cyl_to_cart
 
 log = logging.getLogger(__name__)
@@ -184,6 +188,20 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
             kw["ray_tracing_flag"] = quick_run
             _warn(f"`quick_run` -> `ray_tracing_flag` = {quick_run}")
 
+    # v3's bool -> v4's integer. v3's False carried on past the fundamental, which
+    # v4 refuses (#169), so say so
+    if isinstance(kw.get("resonance_flag"), (bool, np.bool_)):
+        resonance_flag = bool(kw["resonance_flag"])
+        kw["resonance_flag"] = 2 if resonance_flag else 0
+        _warn(
+            f"`resonance_flag` = {resonance_flag} -> {kw['resonance_flag']}"
+            + (
+                ""
+                if resonance_flag
+                else " (v4 raises at the fundamental, where v3 carried on)"
+            )
+        )
+
     # v3 built output file names by string concatenation; v4 joins Paths
     if isinstance(kw.get("output_path"), str):
         output_path = kw["output_path"]
@@ -236,7 +254,7 @@ def quick_cutoff(dt: xr.DataTree) -> CutoffData:
 
         q_R, q_Z, K_norm, polflux, theta_m = quick_cutoff(beam_me_up(**from_v3_kwargs(kwargs)))
     """
-    so, an = dt["solver_output"].ds, dt["analysis"].ds
+    so, an = dt["solver"].ds, dt["beam"].ds
     K = np.asarray(so["K_output_magnitude"])
     i = int(np.argmin(K))
     return CutoffData(
@@ -469,11 +487,11 @@ for _v3, _v4 in (
     ("k_perp_1_bs_normal", "k_perp1_bs_normal"),
     ("k_perp_1_bs_binormal", "k_perp1_bs_binormal"),
     ("theta", "theta"),
-    ("loc_b", "filter_b"),
-    ("loc_m", "filter_m"),
-    ("loc_p", "filter_p"),
-    ("loc_r", "filter_r"),
-    ("loc_s", "filter_s_-13_3"),
+    ("loc_b", "filterfun_b"),
+    ("loc_m", "filterfun_m"),
+    ("loc_p", "filterfun_p"),
+    ("loc_r", "filterfun_r"),
+    ("loc_s", "delta_ne_sq_-13_3"),
     ("xhat_dot_grad_bhat_dot_xhat", "xhat_dot_grad_bhat_dot_xhat"),
     ("xhat_dot_grad_bhat_dot_yhat", "xhat_dot_grad_bhat_dot_yhat"),
     ("xhat_dot_grad_bhat_dot_ghat", "xhat_dot_grad_bhat_dot_ghat"),
@@ -486,7 +504,10 @@ for _v3, _v4 in (
 
 def detect_version(dt: xr.DataTree) -> str:
     """'v3' or 'v4', from the layout"""
-    if "dbs_analysis" in dt.children or "q_R_output" in dt["solver_output"].ds:
+    # "dbs_analysis": files from v4.0.0.dev0, before the output had its groups
+    if "beam" in dt.children or "dbs_analysis" in dt.children:
+        return "v4"
+    if "q_R_output" in dt["solver_output"].ds:
         return "v4"
     if "q_R" in dt["solver_output"].ds:
         return "v3"
@@ -640,13 +661,27 @@ def to_v4_output(dt: xr.DataTree) -> xr.DataTree:
     """A v3 output tree in the v4 layout"""
     if detect_version(dt) != "v3":
         raise ValueError("Expected a v3 output tree")
-    return _convert(dt, "v3")
+    out = _convert(dt, "v3")
+    flat = {name: out[name].to_dataset() for name in out.children}
+    empty = xr.Dataset()
+    tree = to_output_tree(
+        flat.get("inputs", empty),
+        flat.get("solver_output", empty),
+        flat.get("analysis", empty),
+        flat.get("dbs_analysis", empty),
+    )
+    tree.attrs = out.attrs
+    return tree
 
 
 def to_v3_output(dt: xr.DataTree) -> xr.DataTree:
     """A v4 output tree in the v3 layout"""
     if detect_version(dt) != "v4":
         raise ValueError("Expected a v4 output tree")
+    if "beam" in dt.children:
+        attrs = dt.attrs
+        dt = xr.DataTree.from_dict(from_output_tree(dt))
+        dt.attrs = attrs
     return _convert(dt, "v4")
 
 
