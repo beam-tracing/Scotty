@@ -5,9 +5,9 @@ Omega_pe^2 / Omega^2 = X / L. For an O-mode with K perpendicular to B, the ray i
 then known exactly and doesn't depend on B0. It enters at 45 deg, so it turns at
 X / L = 0.5, before the X-mode's upper hybrid layer at X / L = 1 - Y^2 = 0.75.
 
-Exactly at the second harmonic, the old resonance event was zero all along the ray,
-so the ray stopped early with no error. Exactly at the fundamental, the solver
-never returned.
+Exactly at the second harmonic, the old resonance event (one for all the layers)
+was zero all along the ray, so the ray stopped early with no error. Exactly at the
+first harmonic (the fundamental), the solver never returned.
 """
 
 import numpy as np
@@ -33,7 +33,7 @@ def analytic_K_X(tau):
     return K0 * np.cos(A0) - tau / L
 
 
-def run(gyro_ratio, resonance_flag, output_path):
+def run(gyro_ratio, output_path, **flags):
     B0 = gyro_ratio * OMEGA * constants.m_e / constants.e
     X = np.linspace(-0.1 * L, 1.1 * L, 13)
     Y = np.linspace(-0.1 * L, 2.1 * L, 13)
@@ -67,7 +67,7 @@ def run(gyro_ratio, resonance_flag, output_path):
         ),
         density_fit_method=LinearFit(1.0, N_CUTOFF),
         poloidal_flux_zero_density=1.0,
-        resonance_flag=resonance_flag,
+        **flags,
         ray_tracing_flag=True,
         delta_X=1e-3,
         delta_Y=1e-3,
@@ -81,9 +81,16 @@ def run(gyro_ratio, resonance_flag, output_path):
     )
 
 
-@pytest.mark.parametrize("resonance_flag", [1, 0])
-def test_second_harmonic_doesnt_stop_the_ray(tmp_path, resonance_flag):
-    so = run(0.5, resonance_flag, tmp_path)["solver"]
+@pytest.mark.parametrize("first_harmonic_flag", ["stop", "raise"])
+def test_second_harmonic_passed(tmp_path, first_harmonic_flag):
+    """With `second_harmonic_flag="pass"` the ray goes through the plasma on the
+    second harmonic, and K is the analytic one"""
+    so = run(
+        0.5,
+        tmp_path,
+        first_harmonic_flag=first_harmonic_flag,
+        second_harmonic_flag="pass",
+    )["solver"]
     tau = so["tau"].values
     step = tau[1] - tau[0]
     assert abs(tau[-1] + step + TAU_LAUNCH - TAU_EXIT) < 2 * step
@@ -95,14 +102,16 @@ def test_second_harmonic_doesnt_stop_the_ray(tmp_path, resonance_flag):
     )
 
 
-@pytest.mark.parametrize("resonance_flag", [2, 1, 0])
-def test_fundamental_raises_rather_than_hangs(tmp_path, resonance_flag):
-    with pytest.raises(RuntimeError, match="starts on the fundamental"):
-        run(1.0, resonance_flag, tmp_path)
+@pytest.mark.parametrize("first_harmonic_flag", ["stop", "raise"])
+def test_first_harmonic_raises_rather_than_hangs(tmp_path, first_harmonic_flag):
+    with pytest.raises(RuntimeError, match="starts on the first harmonic"):
+        run(1.0, tmp_path, first_harmonic_flag=first_harmonic_flag)
 
 
-def test_starting_on_the_second_harmonic_raises_with_2(tmp_path):
-    """With 2, the ray would stop at its first point, and the beam solver would
-    report no output points. The error says what happened instead"""
-    with pytest.raises(RuntimeError, match="starts on the second-harmonic"):
-        run(0.5, 2, tmp_path)
+@pytest.mark.parametrize("second_harmonic_flag", ["stop", "raise"])
+def test_starting_on_the_second_harmonic_raises(tmp_path, second_harmonic_flag):
+    """Unless passed, the ray would stop at its first point, and the beam solver
+    would report no output points. The error says what happened instead"""
+    with pytest.raises(RuntimeError, match="starts on the second harmonic") as error:
+        run(0.5, tmp_path, second_harmonic_flag=second_harmonic_flag)
+    assert '`second_harmonic_flag="pass"`' in str(error.value)

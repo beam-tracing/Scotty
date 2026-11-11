@@ -6,7 +6,7 @@ import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.integrate._ivp.ivp import OdeSolution
 from scipy.optimize import brentq, minimize_scalar
-from scotty.checks import VALID_SOLVER_STATUS
+from scotty.checks import VALID_RESONANCE_FLAGS, VALID_SOLVER_STATUS
 from scotty.fun_general import (
     find_K_magnitude,
     find_normalised_gyro_ang_freq,
@@ -18,7 +18,17 @@ from scotty.logger import timer
 from scotty.typing import FloatArray
 
 # from sklearn.utils import Bunch
-from typing import Any, Callable, Dict, Literal, Protocol, Union, Tuple, cast
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Literal,
+    Optional,
+    Protocol,
+    Union,
+    Tuple,
+    cast,
+)
 
 log = logging.getLogger(__name__)
 
@@ -49,17 +59,26 @@ def _event(terminal: bool, direction: float):
     return decorator_event
 
 
-# How close to a cyclotron layer, in omega_ce / omega, counts as starting on it
+# How close to a resonance layer, in omega_ce / omega (or omega_UH / omega),
+# counts as starting on it
 _ON_LAYER_TOL = 1e-10
-# How far from the fundamental, in omega_ce / omega, the output stops. Closer, K is
-# not resolved: it can jump off the dispersion relation in one output step
-_FUNDAMENTAL_MARGIN = 1e-3
+# How far from the first harmonic (the fundamental), in omega_ce / omega, the output
+# stops. Closer, K is not resolved: it can jump off the dispersion relation in one
+# output step
+_FIRST_HARMONIC_MARGIN = 1e-3
+
+# The resonance events, in `make_solver_events`, and the layers they are at
+RESONANCE_EVENTS = {
+    "first_harmonic": "the first harmonic of the electron cyclotron resonance (the fundamental)",
+    "second_harmonic": "the second harmonic of the electron cyclotron resonance",
+    "upper_hybrid": "the upper hybrid resonance",
+}
 
 
-def _tau_short_of_fundamental(
+def _tau_short_of_first_harmonic(
     tau_steps: FloatArray, tau_end: float, distance_past_margin: Callable
 ) -> float:
-    """Where the output stops before the fundamental: the last point before
+    """Where the output stops before the first harmonic: the last point before
     `tau_end` where `distance_past_margin` is zero. The search starts from the last
     solver step that is still outside the margin, so a ray that came within the
     margin earlier and turned away isn't cut there. `tau_end` is returned unchanged
@@ -70,6 +89,19 @@ def _tau_short_of_fundamental(
         if tau < tau_end and distance_past_margin(tau) > 0:
             return brentq(distance_past_margin, tau, tau_end)
     return tau_end
+
+
+def _find_UH_ratio(q, launch_angular_frequency, field, hamiltonian) -> float:
+    """The upper hybrid frequency over the beam frequency at `q`, with the
+    relativistic mass correction if there is a temperature profile"""
+    q0, q1, q2 = q
+    polflux = field.polflux(q0, q1, q2)
+    temperature = hamiltonian.temperature(polflux) if hamiltonian.temperature else None
+    gyro_ratio = _find_gyro_ratio(q, launch_angular_frequency, field, hamiltonian)
+    plasma_ratio = find_normalised_plasma_ang_freq(
+        launch_angular_frequency, hamiltonian.density(polflux), temperature
+    )
+    return np.sqrt(gyro_ratio**2 + plasma_ratio**2)
 
 
 def _find_gyro_ratio(q, launch_angular_frequency, field, hamiltonian) -> float:
@@ -90,14 +122,28 @@ def make_solver_events(
     poloidal_flux_enter: float,
     launch_angular_frequency: float,
     field: Union[MagneticField_Cartesian, MagneticField_Cylindrical],
-    resonance_flag: int = 2,
     *,
     X_mode: bool,
+    first_harmonic_flag: VALID_RESONANCE_FLAGS = "stop",
+    second_harmonic_flag: VALID_RESONANCE_FLAGS = "stop",
+    upper_hybrid_flag: VALID_RESONANCE_FLAGS = "stop",
 ) -> Dict[str, Callable]:
     r"""The ray's solver events. `X_mode` says whether the ray is the X-mode,
     for the upper-hybrid resonance; which `mode_flag` that is depends on the
     plasma and K (see `scotty.launch.find_O_mode_flag`), so it is given
-    explicitly rather than assumed from the Hamiltonian's `mode_flag`."""
+    explicitly rather than assumed from the Hamiltonian's `mode_flag`.
+
+    There is one terminal event per resonance layer (see `RESONANCE_EVENTS`):
+    ``"first_harmonic"`` (the fundamental) always, ``"second_harmonic"``
+    unless `second_harmonic_flag` is ``"pass"``, and ``"upper_hybrid"`` for
+    the X-mode unless `upper_hybrid_flag` is ``"pass"``. `first_harmonic_flag`
+    can't be ``"pass"``; with ``"stop"`` and ``"raise"`` the events are the
+    same, and `ray_tracing` acts on them."""
+    if first_harmonic_flag == "pass":
+        raise ValueError(
+            "`first_harmonic_flag` can't be 'pass': the ray can't be traced past "
+            "the first harmonic (the fundamental)"
+        )
 
     cart = True if isinstance(field, MagneticField_Cartesian) else False
 
@@ -138,44 +184,35 @@ def make_solver_events(
         )
         return +1 if is_inside else -1
 
-    # Triggers when the beam frequency crosses a resonance: the fundamental
-    # or the second harmonic of the electron cyclotron frequency, and, for
-    # X-mode, the upper hybrid frequency (beam-tracing/Scotty#151). With a
+    # Trigger when the beam frequency crosses a resonance (beam-tracing/Scotty#151):
+    # the first harmonic (the fundamental) or the second harmonic of the electron
+    # cyclotron frequency, or, for the X-mode, the upper hybrid frequency. With a
     # temperature profile, the cyclotron and plasma frequencies include the
-    # relativistic mass correction. The event is the product of the
-    # differences, so it changes sign at any of the resonances. With
-    # `resonance_flag` 1 or 0 it detects the fundamental only, where the
-    # cold-plasma Hamiltonian is singular; `ray_tracing` then stops (1) or
-    # raises (0) there (beam-tracing/Scotty#169).
-    # ***Two resonances crossed within one solver step would cancel in the
-    #    product and go unseen
+    # relativistic mass correction. Each layer has its own event, so that each
+    # can be stopped at, raised at or passed (beam-tracing/Scotty#169), and two
+    # layers crossed in one solver step are both seen
     @_event(terminal=True, direction=0.0)
-    def event_cross_resonance(tau, ray_parameters, hamiltonian: Hamiltonian):
-        q0, q1, q2, _, _, _ = ray_parameters
-        polflux = field.polflux(q0, q1, q2)
-        temperature = (
-            hamiltonian.temperature(polflux) if hamiltonian.temperature else None
-        )
-
-        # Ratio of the electron cyclotron frequency to the beam frequency
-        gyro_freq = _find_gyro_ratio(
+    def event_first_harmonic(tau, ray_parameters, hamiltonian: Hamiltonian):
+        gyro_ratio = _find_gyro_ratio(
             ray_parameters[:3], launch_angular_frequency, field, hamiltonian
         )
-        if resonance_flag < 2:
-            return gyro_freq - 1
+        return gyro_ratio - 1
 
-        difference = (gyro_freq - 1) * (gyro_freq - 0.5)
+    @_event(terminal=True, direction=0.0)
+    def event_second_harmonic(tau, ray_parameters, hamiltonian: Hamiltonian):
+        gyro_ratio = _find_gyro_ratio(
+            ray_parameters[:3], launch_angular_frequency, field, hamiltonian
+        )
+        return gyro_ratio - 0.5
 
-        # The upper hybrid resonance is reached by the X-mode only, whichever
-        # `mode_flag` (or "X") it was launched as
-        if X_mode:
-            plasma_freq = find_normalised_plasma_ang_freq(
-                launch_angular_frequency, hamiltonian.density(polflux), temperature
-            )
-            UH_freq = np.sqrt(gyro_freq**2 + plasma_freq**2)
-            difference = difference * (UH_freq - 1)
-
-        return difference
+    # The upper hybrid resonance is reached by the X-mode only, whichever
+    # `mode_flag` (or "X") it was launched as
+    @_event(terminal=True, direction=0.0)
+    def event_upper_hybrid(tau, ray_parameters, hamiltonian: Hamiltonian):
+        UH_ratio = _find_UH_ratio(
+            ray_parameters[:3], launch_angular_frequency, field, hamiltonian
+        )
+        return UH_ratio - 1
 
     # Triggers when the cut-off location is reached (i.e. when the
     # wavenumber K is minimised)
@@ -208,9 +245,29 @@ def make_solver_events(
         "leave_plasma": event_leave_plasma,
         "leave_LCFS": event_leave_LCFS,
         "leave_simulation": event_leave_simulation,
-        "cross_resonance": event_cross_resonance,
+        "first_harmonic": event_first_harmonic,
+        **(
+            {"second_harmonic": event_second_harmonic}
+            if second_harmonic_flag != "pass"
+            else {}
+        ),
+        **(
+            {"upper_hybrid": event_upper_hybrid}
+            if X_mode and upper_hybrid_flag != "pass"
+            else {}
+        ),
         "reach_K_min": event_reach_K_min,
     }
+
+
+def _first_resonance(tau_events: Dict[str, FloatArray]) -> Optional[str]:
+    """The resonance event that fired first, or None if none did"""
+    fired = [
+        name
+        for name in RESONANCE_EVENTS
+        if name in tau_events and len(tau_events[name]) != 0
+    ]
+    return min(fired, key=lambda name: tau_events[name][0]) if fired else None
 
 
 def handle_terminating_event(
@@ -230,7 +287,8 @@ def handle_terminating_event(
       leaving the plasma
     - ``"leave_simulation"``: the ray has left the simulated area
       (essentially the bounding box of the plasma)
-    - ``"cross_resonance"``: the ray has crossed a resonance
+    - ``"first_harmonic"``, ``"second_harmonic"``, ``"upper_hybrid"``: the ray
+      has reached a resonance layer (the first one reached, if several fired)
 
     Parameters
     ----------
@@ -254,9 +312,10 @@ def handle_terminating_event(
     #     log.info(f"Ray has left plasma")
     #     return tau_events["leave_plasma"][0]
 
-    if detected("cross_resonance"):
-        log.info(f"Ray has crossed resonance")
-        return tau_events["cross_resonance"][0]
+    resonance = _first_resonance(tau_events)
+    if resonance is not None:
+        log.info(f"Ray has reached {RESONANCE_EVENTS[resonance]}")
+        return tau_events[resonance][0]
 
     if detected("leave_plasma") and detected("leave_LCFS"):
         log.info(f"Ray has left plasma")
@@ -318,7 +377,9 @@ def ray_tracing(
     atol: float,
     len_tau: int,
     tau_max: float = 1e5,
-    resonance_flag: int = 2,
+    first_harmonic_flag: VALID_RESONANCE_FLAGS = "stop",
+    second_harmonic_flag: VALID_RESONANCE_FLAGS = "stop",
+    upper_hybrid_flag: VALID_RESONANCE_FLAGS = "stop",
     *,
     X_mode: bool,
 ) -> Tuple[VALID_SOLVER_STATUS, int, float, FloatArray, Union[float, FloatArray]]:
@@ -327,15 +388,26 @@ def ray_tracing(
     encountered:
         (i) ray leaves the plasma (at the same `poloidal_flux_enter`);
         (ii) ray leaves the simulation region (i.e. exits the bounds of the magnetic profile); or
-        (iii) ray reaches a resonance layer (i.e. when the beam frequency is equal to the
-              fundamental or second harmonic of the electron gyrotron frequency).
+        (iii) ray reaches a resonance layer: the first harmonic of the electron cyclotron
+              frequency (the fundamental), its second harmonic, or, for the X-mode, the
+              upper hybrid frequency.
 
-    `resonance_flag` (0, 1 or 2, see `VALID_RESONANCE_FLAGS`) decides which resonance layers
-    stop the ray. Stopping at the fundamental ends the output 1e-3 short of it, in
-    omega_ce / omega. With 1 or 0 the ray passes the second harmonic and the upper hybrid
-    resonance, and with 0 reaching the fundamental raises a `RuntimeError`. Starting on the
-    fundamental raises whatever the flag, as the ray can't be integrated from there, and so
-    does starting on the second harmonic with 2, where the ray would stop at once.
+    `first_harmonic_flag`, `second_harmonic_flag` and `upper_hybrid_flag` (each "stop",
+    "raise" or "pass", see `VALID_RESONANCE_FLAGS`) decide what the ray does at each
+    layer: "stop" ends the ray there and returns the output, "raise" raises a
+    `RuntimeError`, and "pass" carries on through the layer. Stopping at the first
+    harmonic ends the output 1e-3 short of it, in omega_ce / omega. The first harmonic
+    can't be passed, as the cold-plasma Hamiltonian is singular there.
+    `upper_hybrid_flag` applies to the X-mode only (`X_mode`), and is ignored for the
+    O-mode. At the upper hybrid layer the X-mode's refractive index goes to infinity,
+    so an X-mode ray heading into it can stall (with K perpendicular to B, it never
+    reaches the layer, and the solver doesn't return) or fail before the event
+    fires, whatever the flag; "pass" hasn't given a usable ray in any case tried.
+    If several layers are reached in one solver step, the first one reached decides.
+
+    Starting on the first harmonic raises whatever the flag, as the ray can't be
+    integrated from there, and so does starting on the second harmonic, or (X-mode)
+    on the upper hybrid layer, unless its flag is "pass": the ray would stop at once.
 
     In addition to the conditions above, the solver will also return the instances when
     any of the following non-terminating conditions occur:
@@ -360,27 +432,40 @@ def ray_tracing(
     )
     if abs(gyro_ratio - 1) < _ON_LAYER_TOL:
         raise RuntimeError(
-            f"The ray starts on the fundamental electron cyclotron resonance "
+            f"The ray starts on {RESONANCE_EVENTS['first_harmonic']} "
             f"(omega_ce / omega = {gyro_ratio}) at q = {q_initial}, where the "
             "cold-plasma Hamiltonian is singular"
         )
     # The resonance event would be zero at the first point, so the ray would stop
     # there, and the beam solver would have no output points
-    if resonance_flag == 2 and abs(gyro_ratio - 0.5) < _ON_LAYER_TOL:
+    if second_harmonic_flag != "pass" and abs(gyro_ratio - 0.5) < _ON_LAYER_TOL:
         raise RuntimeError(
-            f"The ray starts on the second-harmonic electron cyclotron resonance "
+            f"The ray starts on {RESONANCE_EVENTS['second_harmonic']} "
             f"(omega_ce / omega = {gyro_ratio}) at q = {q_initial}, where "
-            "`resonance_flag=2` stops it. Use `resonance_flag=1` or 0 to pass the "
-            "second harmonic"
+            f'`second_harmonic_flag="{second_harmonic_flag}"` stops it at once. '
+            '`second_harmonic_flag="pass"` passes the second harmonic'
         )
+    if X_mode and upper_hybrid_flag != "pass":
+        UH_ratio = _find_UH_ratio(
+            q_initial, hamiltonian.angular_frequency, hamiltonian.field, hamiltonian
+        )
+        if abs(UH_ratio - 1) < _ON_LAYER_TOL:
+            raise RuntimeError(
+                f"The ray starts on {RESONANCE_EVENTS['upper_hybrid']} "
+                f"(omega_UH / omega = {UH_ratio}) at q = {q_initial}, where "
+                f'`upper_hybrid_flag="{upper_hybrid_flag}"` stops it at once. '
+                '`upper_hybrid_flag="pass"` passes the upper hybrid resonance'
+            )
 
     # Creating arguments and events to be passed to solver
     solver_ray_events = make_solver_events(
         poloidal_flux_enter,
         hamiltonian.angular_frequency,
         hamiltonian.field,
-        resonance_flag,
         X_mode=X_mode,
+        first_harmonic_flag=first_harmonic_flag,
+        second_harmonic_flag=second_harmonic_flag,
+        upper_hybrid_flag=upper_hybrid_flag,
     )
     solver_arguments = (hamiltonian,)
 
@@ -428,26 +513,39 @@ def ray_tracing(
         zip(solver_ray_events.keys(), solver_ray_output.y_events)
     )
 
-    # Past the fundamental, the root that `mode_flag` selects swaps, so the ray
-    # would land on the wrong surface or jump to the other mode (#169)
-    if resonance_flag == 0 and len(tau_events["cross_resonance"]) != 0:
+    # The resonance layer that stopped the ray, if any: the first one reached
+    resonance = _first_resonance(tau_events)
+    flags = {
+        "first_harmonic": first_harmonic_flag,
+        "second_harmonic": second_harmonic_flag,
+        "upper_hybrid": upper_hybrid_flag,
+    }
+    if resonance is not None and flags[resonance] == "raise":
+        where = (
+            f"The ray reached {RESONANCE_EVENTS[resonance]} at "
+            f"tau = {tau_events[resonance][0]}, "
+            f"q = {ray_parameters_events[resonance][0][:3]}"
+        )
+        # Past the first harmonic, the root that `mode_flag` selects swaps, so the
+        # ray would land on the wrong surface or jump to the other mode (#169)
+        if resonance == "first_harmonic":
+            raise RuntimeError(
+                f"{where}, where the cold-plasma Hamiltonian is singular, so it can't "
+                'be traced past it. `first_harmonic_flag="stop"` returns the ray up '
+                "to 1e-3 short of the layer, in omega_ce / omega"
+            )
         raise RuntimeError(
-            "The ray reached the fundamental electron cyclotron resonance at "
-            f"tau = {tau_events['cross_resonance'][0]}, "
-            f"q = {ray_parameters_events['cross_resonance'][0][:3]}, where the "
-            "cold-plasma Hamiltonian is singular, so it can't be traced past it. "
-            "`resonance_flag=0` lets the ray pass the second harmonic and the upper "
-            "hybrid resonance only. To get the ray up to the fundamental instead, use "
-            "`resonance_flag=1`: it traces the ray up to 1e-3 short of the layer, in "
-            "omega_ce / omega, and returns the output"
+            f'{where}, and `{resonance}_flag="raise"`. `{resonance}_flag="stop"` '
+            f'returns the output up to the layer, and `{resonance}_flag="pass"` '
+            "carries on through it"
         )
 
     tau_terminating_event = handle_terminating_event(
         tau_events=tau_events, ray_parameters_events=ray_parameters_events["leave_LCFS"]
     )
 
-    # Stop short of the fundamental, as the Hamiltonian is singular there
-    if len(tau_events["cross_resonance"]) != 0:
+    # Stop short of the first harmonic, as the Hamiltonian is singular there
+    if resonance == "first_harmonic":
 
         def distance_past_margin(tau):
             gyro_ratio = _find_gyro_ratio(
@@ -456,9 +554,9 @@ def ray_tracing(
                 hamiltonian.field,
                 hamiltonian,
             )
-            return abs(gyro_ratio - 1) - _FUNDAMENTAL_MARGIN
+            return abs(gyro_ratio - 1) - _FIRST_HARMONIC_MARGIN
 
-        tau_terminating_event = _tau_short_of_fundamental(
+        tau_terminating_event = _tau_short_of_first_harmonic(
             solver_ray_output.t, tau_terminating_event, distance_past_margin
         )
 
@@ -467,7 +565,7 @@ def ray_tracing(
     )
 
     # Find the cut-off (i.e. `tau` where K_magnitude is minimised) if no resonance is reached
-    if len(tau_events["cross_resonance"]) == 0:
+    if resonance is None:
 
         def K_magnitude(tau):
             q0, _, _, K0, K1, K2 = soln_interp(tau)

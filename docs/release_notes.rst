@@ -135,31 +135,42 @@ Other interface changes
   ``filterfun_all``. Their path
   integrals are ``int_<name>_dl`` (``l`` is the length along the ray; ``L`` is
   kept for inhomogeneity lengths).
-- New argument: ``resonance_flag`` (#151), now an integer, which decides which
-  electron cyclotron resonances stop the ray. Temperature profiles are built when
-  given.
+- New arguments (#151, #169): ``first_harmonic_flag``, ``second_harmonic_flag``
+  and ``upper_hybrid_flag`` decide what the ray does at each resonance layer: the
+  first harmonic of the electron cyclotron resonance (the fundamental), its second
+  harmonic, and the upper hybrid resonance. Each is ``"stop"`` (the default: the
+  ray stops there and the output is returned), ``"raise"`` (a ``RuntimeError``) or
+  ``"pass"`` (the ray carries on through the layer). Each layer has its own solver
+  event, so two layers crossed in one solver step are both seen. Temperature
+  profiles are built when given, and the layers then include the relativistic
+  mass correction.
 
-  - ``2`` (the default): stop at the fundamental and the second harmonic, and, for
-    the X-mode, the upper hybrid resonance.
-  - ``1``: stop at the fundamental only; pass the second harmonic and the upper
-    hybrid resonance.
-  - ``0``: pass the second harmonic and the upper hybrid resonance, and raise a
-    ``RuntimeError`` at the fundamental.
+  - ``first_harmonic_flag`` can't be ``"pass"``: the cold-plasma Hamiltonian is
+    singular there, and past it the root that ``mode_flag`` selects swaps (#169).
+  - ``upper_hybrid_flag`` applies to the X-mode only (whichever ``mode_flag``
+    that is) and is ignored for the O-mode. The X-mode's refractive index goes to
+    infinity at the layer, so an X-mode ray heading into it can stall or fail
+    before reaching it, whatever the flag: with :math:`K` perpendicular to
+    :math:`B` it never reaches the layer, and the run doesn't return. ``"pass"``
+    hasn't given a usable ray in any case tried.
+  - A ray that starts on the first harmonic raises whatever the flag, and so does
+    one that starts on the second harmonic or (X-mode) the upper hybrid layer,
+    unless its flag is ``"pass"``.
 
-  The ray can't be traced past the fundamental: the cold-plasma Hamiltonian is
-  singular there, and past it the root that ``mode_flag`` selects swaps (#169), so
-  no value passes it. ``True`` and ``False``, its earlier values, still work and
-  mean 2 and 0, and ``from_v3_kwargs`` converts them. v3's ``False`` let the ray
-  carry on past the fundamental. A ray that starts on the fundamental raises
-  whatever the value, and so does one that starts on the second harmonic with 2.
-- Where the ray stops at the fundamental, the output now ends where
+  They replace ``resonance_flag``, which is removed: passing it raises a
+  ``ValueError`` rather than being ignored. ``from_v3_kwargs`` converts v3's
+  ``resonance_flag``: ``True`` sets all three flags to ``"stop"``, and ``False``
+  sets ``first_harmonic_flag="raise"``, ``second_harmonic_flag="pass"`` and
+  ``upper_hybrid_flag="pass"``. v3's ``False`` let the ray carry on past the first
+  harmonic; v4 raises there.
+- Where the ray stops at the first harmonic, the output now ends where
   :math:`\omega_{ce} / \omega` is 1e-3 from 1, about 2 mm before the layer on the
   cases tried. Closer, :math:`K` could jump off the dispersion relation at the
   last few output points (:math:`|H|` up to 0.48, :math:`|K|` 23% off).
 - ``check_H_output`` raises above :math:`|H| = 0.1` (was 1) and warns above 0.01
   (#169), so a run that used to finish with a warning may now raise. This
-  includes rays that approach the fundamental from above and stall just short of
-  it without crossing it.
+  includes rays that approach the first harmonic from above and stall just short
+  of it without crossing it.
 - An output with no points from the beam solver raises a ``RuntimeError``, even
   when the solver reports success.
 - ``convert_hessians`` takes a required ``K_start`` (Cartesian K).

@@ -225,6 +225,87 @@ def test_unused_keyword_columns_fit_the_longest_name(caplog):
     assert long_line.index(" 1") > long_line.index(long_name) + len(long_name)
 
 
+##################################################
+# Resonance flags (#169, replacing resonance_flag)
+##################################################
+
+RESONANCE_FLAG_NAMES = (
+    "first_harmonic_flag",
+    "second_harmonic_flag",
+    "upper_hybrid_flag",
+)
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("first_harmonic_flag", "stop"),
+        ("first_harmonic_flag", "raise"),
+        *[
+            (name, value)
+            for name in RESONANCE_FLAG_NAMES[1:]
+            for value in ("stop", "raise", "pass")
+        ],
+    ],
+)
+def test_resonance_flags_accept_their_values(name, value):
+    params = Parameters.__new__(Parameters)
+    assert params._check_resonance_flag(name, value) == value
+
+
+@pytest.mark.parametrize("value", ["Stop", "", True, False, 2, 0, None])
+@pytest.mark.parametrize("name", RESONANCE_FLAG_NAMES)
+def test_resonance_flags_refuse_other_values(name, value):
+    """Including the old resonance_flag's booleans and integers. The error names
+    the flag, lists the values and shows the one given"""
+    params = Parameters.__new__(Parameters)
+    with pytest.raises(ValueError, match=f"`{name}` must be one of") as error:
+        params._check_resonance_flag(name, value)
+    for valid in ("'stop'", "'raise'", "'pass'"):
+        assert valid in str(error.value)
+    assert repr(value) in str(error.value)
+
+
+def test_first_harmonic_flag_refuses_pass():
+    """The cold-plasma Hamiltonian is singular there"""
+    params = Parameters.__new__(Parameters)
+    with pytest.raises(ValueError, match="can't be 'pass'") as error:
+        params._check_resonance_flag("first_harmonic_flag", "pass")
+    assert "singular" in str(error.value)
+
+
+@pytest.mark.parametrize("name", RESONANCE_FLAG_NAMES)
+def test_resonance_flags_default_to_stop(name):
+    assert inspect.signature(beam_me_up).parameters[name].default == "stop"
+
+
+def test_resonance_flag_checked_in_a_run(tmp_path):
+    with pytest.raises(ValueError, match="`second_harmonic_flag` must be one of"):
+        beam_me_up(**_synthetic(tmp_path, second_harmonic_flag="Stop"))
+    with pytest.raises(ValueError, match="`first_harmonic_flag` can't be 'pass'"):
+        beam_me_up(**_synthetic(tmp_path, first_harmonic_flag="pass"))
+
+
+@pytest.mark.parametrize("value", [True, False, 0, 2, "stop"])
+def test_resonance_flag_raises_that_it_is_replaced(tmp_path, monkeypatch, value):
+    """Rather than being ignored as an unused keyword, which would change where
+    the ray stops. Raised before anything is traced"""
+    import importlib
+
+    def no_tracing(**kwargs):
+        raise AssertionError("traced the ray")
+
+    monkeypatch.setattr(
+        importlib.import_module("scotty.beam_me_up"), "ray_tracing", no_tracing
+    )
+    with pytest.raises(ValueError, match="`resonance_flag`") as error:
+        beam_me_up(**_synthetic(tmp_path, resonance_flag=value))
+    message = str(error.value)
+    assert "has been replaced" in message
+    for name in (*RESONANCE_FLAG_NAMES, "from_v3_kwargs"):
+        assert name in message
+
+
 def test_check_Psi_output_removed():
     """C13: it warned on every run"""
     import scotty.checks
