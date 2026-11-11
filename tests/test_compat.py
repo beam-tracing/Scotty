@@ -219,9 +219,9 @@ def test_v3_script_gives_same_result_as_v4(tmp_path):
     out_v3 = beam_me_up(**v3, output_path=tmp_path, output_filename_suffix="_v3")
 
     for group, name in (
-        ("solver_output", "q_R_output"),
-        ("solver_output", "K_R_output"),
-        ("analysis", "theta_m"),
+        ("solver", "q_R_output"),
+        ("solver", "K_R_output"),
+        ("beam", "theta_m"),
     ):
         assert_allclose(out_v3[group][name], out_v4[group][name])
 
@@ -280,18 +280,18 @@ def test_output_v4_to_v3_layout(v4_output):
     # DBS_synthetic is a "vacuum_analytic" launch
     assert bool(v3["inputs"].ds["vacuum_propagation_flag"].values)
     assert str(v3["inputs"].ds["Psi_BC_flag"].values) == "continuous"
-    assert_allclose(v3["solver_output"].ds["q_R"], v4["solver_output"].ds["q_R_output"])
+    assert_allclose(v3["solver_output"].ds["q_R"], v4["solver"].ds["q_R_output"])
     # v3's localisation pieces are v4's filter-function pieces
     for v3_name, v4_name in (
-        ("loc_b", "filter_b"),
-        ("loc_m", "filter_m"),
-        ("loc_p", "filter_p"),
-        ("loc_r", "filter_r"),
-        ("loc_s", "filter_s_-13_3"),
+        ("loc_b", "filterfun_b"),
+        ("loc_m", "filterfun_m"),
+        ("loc_p", "filterfun_p"),
+        ("loc_r", "filterfun_r"),
+        ("loc_s", "delta_ne_sq_-13_3"),
     ):
-        assert_allclose(v3["analysis"].ds[v3_name], v4["dbs_analysis"].ds[v4_name])
+        assert_allclose(v3["analysis"].ds[v3_name], v4["diagnostics/dbs"].ds[v4_name])
     # v3's initial position is the first point of the ray
-    so = v4["solver_output"].ds
+    so = v4["solver"].ds
     assert_allclose(
         v3["inputs"].ds["initial_position"],
         [so["q_R_output"][0], so["q_zeta_output"][0], so["q_Z_output"][0]],
@@ -302,9 +302,9 @@ def test_output_v4_to_v3_layout(v4_output):
 def test_output_cylindrical_vectors(v4_output):
     v4 = xr.open_datatree(v4_output, engine="h5netcdf").load()
     v3 = to_v3_output(v4)
-    zeta = v4["solver_output"].ds["q_zeta_output"].values
+    zeta = v4["solver"].ds["q_zeta_output"].values
     b_cyl = v3["analysis"].ds["b_hat"].values
-    b_cart = v4["analysis"].ds["b_hat_cartesian"].values
+    b_cart = v4["beam"].ds["b_hat_cartesian"].values
     # unit vector, and b_X = b_R cos(zeta) - b_zeta sin(zeta)
     assert_allclose(np.linalg.norm(b_cyl, axis=1), 1.0)
     assert_allclose(

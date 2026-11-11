@@ -327,7 +327,7 @@ def runs(tmp_path_factory):
             dt = run_linear_layer(
                 a0_deg, R_y, gyro_ratio, tmp_path_factory.mktemp(name)
             )
-            so = dt["solver_output"]
+            so = dt["solver"]
             tau = so["tau"].values
             a0 = np.deg2rad(a0_deg)
             tau_edge = tau + TAU_LAUNCH

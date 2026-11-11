@@ -9,6 +9,22 @@ outputs may still change, and some of v3's features have not been ported. v3
 (latest release 3.2.0) is the stable line; use it for published work, or
 anything you need to reproduce later.
 
+Output layout
+~~~~~~~~~~~~~
+
+- The output's groups are ``inputs``, ``solver`` (was ``solver_output``), ``beam``
+  (``analysis``, including the consistency checks such as ``H_Booker``, and the
+  beam quantities of ``dbs_analysis``, such as ``theta`` and ``k_perp1_hat``) and
+  ``diagnostics/dbs`` (the rest of ``dbs_analysis``). Variables keep their names,
+  apart from the filter functions (below).
+- The code follows the same layout (:ref:`code-layout`). `scotty.antenna` holds
+  the beam before the plasma: `scotty.antenna.gaussian` (the launched Gaussian
+  beam, and the Gaussian-beam functions that were in ``fun_general``),
+  `scotty.antenna.horns` (was ``hornpy``) and `scotty.antenna.lenses` (was
+  ``lensalot``). `scotty.diagnostics` holds one module per diagnostic:
+  `scotty.diagnostics.dbs` has ``dbs_analysis``, which was in ``analysis``. The
+  old import paths still work, apart from ``scotty.analysis.dbs_analysis``.
+
 Geometry, launch and boundary conditions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -57,7 +73,7 @@ Running v3 inputs and outputs
   ``ray_tracing_flag=True`` run.
 - ``scotty.compat.to_v4_output``, ``to_v3_output`` and ``convert_output_file``
   convert output files between the two layouts, including v3's ``loc_*`` and
-  v4's ``filter_*``.
+  v4's ``filterfun_*``.
 
 Defaults
 ~~~~~~~~
@@ -122,10 +138,13 @@ Other interface changes
 - A keyword argument that ``beam_me_up`` does not take is logged as a warning,
   with the closest argument name (``did you mean ...?``).
 - The localisation is now called the filter function, in the outputs and the
-  code: v3's ``loc_p``, ``loc_r``, ``loc_b``, ``loc_m``, ``loc_s`` are
-  ``filter_p``, ``filter_r``, ``filter_b``, ``filter_m``,
-  ``filter_s_<power>``, and there are ``filter_all_<power>`` and their path
-  integrals ``int_filter_*_dL``.
+  code: v3's ``loc_p``, ``loc_r``, ``loc_b``, ``loc_m`` are ``filterfun_p``,
+  ``filterfun_r``, ``filterfun_b``, ``filterfun_m``, and their product is
+  ``filterfun_all``. v3's ``loc_s`` is not a filter function but the model
+  turbulence spectrum, and is now ``delta_ne_sq_<power>``; it is not included in
+  ``filterfun_all``. Their path
+  integrals are ``int_<name>_dl`` (``l`` is the length along the ray; ``L`` is
+  kept for inhomogeneity lengths).
 - New argument: ``resonance_flag`` (#151). Temperature profiles are built when
   given.
 - ``convert_hessians`` takes a required ``K_start`` (Cartesian K).
@@ -134,15 +153,11 @@ Other interface changes
   analytical base class is ``CircularFieldBase``.
 - New in ``hamiltonian.py`` and ``fun_general.py``: ``FIRST_ORDER_KEYS``,
   ``find_Booker_discriminant``.
-- New outputs: ``int_filter_all_<power>_dL``, ``d_xhat_d_tau_dot_yhat``,
-  ``g_hat_Cardano``, ``Psi_w`` on (``row_beam``, ``col_beam``) = (x, y), and
-  the stacked ``H_Cardano``. ``filter_all_<power>`` is the array.
-- The analysis checks that Psi is the gradient of K along the beam, i.e.
-  Psi . g = dK/dtau, and warns if this fails at more than 10% of the points
-  (``scotty.checks.check_Psi_g_output``), which happens when Psi drifts off the
-  beam, e.g. with a density that is not differentiable. New outputs:
-  ``dK_dtau_cartesian``, ``Psi_g_residual_imag`` and ``Psi_g_residual_real``.
-  It replaces v3's ``check_Psi_output``.
+- New outputs: ``filterfun_all`` and ``int_filterfun_all_dl``,
+  ``d_xhat_d_tau_dot_yhat``, ``g_hat_Cardano``, ``Psi_w`` on (``row_beam``,
+  ``col_beam``) = (x, y), the stacked ``H_Cardano``, and in ``diagnostics/dbs``
+  ``k_perp2_bs``, ``k_perp2_bs_normal`` and ``k_perp2_bs_binormal``.
+- ``benchmarking_flag`` is removed: it no longer did anything.
 - ``e_hat``, ``e_eigvecs`` and ``e_eigvec1``-``3`` are on ``col_field`` = (u1,
   u2, b), the field-aligned frame D is written in, instead of ``col_cart``.
   Their values are unchanged.
