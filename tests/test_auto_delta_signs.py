@@ -64,5 +64,5 @@ def test_boundary_condition_independent_of_step_sign(tmp_path):
         out = beam_me_up(
             **kwargs, output_path=tmp_path, output_filename_suffix=f"_{sign}"
         )
-        psi[sign] = out["solver_output"]["Psi_3D_initial_labframe_cylindrical"].values
+        psi[sign] = out["solver"]["Psi_3D_initial_labframe_cylindrical"].values
     assert_allclose(psi[-1], psi[1], rtol=1e-6)

@@ -42,7 +42,7 @@ else:
         **kwargs, output_path=tempfile.mkdtemp(), return_dt_field=True
     )
 
-plot_dispersion_relation(dt["analysis"])
+plot_dispersion_relation(dt)
 plot_poloidal_beam_path(dt, zoom=True, field=field)
 plot_toroidal_beam_path(dt, field=field)
 

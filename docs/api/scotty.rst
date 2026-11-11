@@ -6,6 +6,15 @@ scotty package
    :undoc-members:
    :show-inheritance:
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   scotty.antenna
+   scotty.diagnostics
+
 Submodules
 ----------
 
@@ -17,10 +26,8 @@ Submodules
    scotty.fun_general
    scotty.geometry
    scotty.hamiltonian
-   scotty.hornpy
    scotty.init_bruv
    scotty.launch
-   scotty.lensalot
    scotty.ray_solver
    scotty.torbeam
    scotty.typing
