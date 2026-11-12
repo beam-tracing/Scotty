@@ -273,38 +273,19 @@ def find_K_plasma(
                 f"Cut-off freq higher than beam freq on plasma side of plasma-vacuum boundary for the X-mode (`mode_flag` = {mode_flag}): w_R / w_launch = {normalised_RH_cutoff_freq} >= 1 and w_UH / w_launch = {normalised_UH_freq} <= 1"
             )
 
-        # In our derivations, we find three vectors which are parallel to
-        # the flux surface by considering three displacements in X, Y, and Z
-        # to be zero, respectively. Selecting two of these vectors yields a
-        # linearly independent (but not necessarily orthogonal) basis which
-        # locally parametrises the surface. Thus, what we do is to calculate
-        # the vector normal to these two vectors, and then calculate the
-        # binormal vector (by using one of the original vectors and the
-        # normal vector). This allows us to calculate K_plasma from K_vacuum
-        # by projecting K_vacuum onto the two parallel vectors. The last
-        # component (normal to the surface) can then be found by solving
-        # the dispersion relation H = 0
-
-        # parallel_unitvector1 corresponds to delta_X = 0 and is equal to
-        # np.array([-dp_dY, dp_dX, 0]) / np.sqrt( dp_dX**2 + dp_dY**2 )
-        # this is essentially equivalent to the toroidal unit vector
-        # parallel_unitvector2 corresponds to delta_Z = 0 and is equal to
-        # np.array([-dp_dZ, 0, dp_dX]) / np.sqrt( dp_dX**2 + dp_dZ**2 )
-        # this is essentially equivalent to the poloidal unit vector
-        # normal_unitvector = parallel_vector1 x parallel_vector2
-        # binormal_unitvector = parallel_vector1 x normal_vector
-        # this must reduce to parallel_unitvector2/the poloidal unit
-        # vector when dH/dY = dH/dzeta = 0
-        parallel_unitvector1 = np.array([-dp_dY, dp_dX, 0]) / np.sqrt(
-            dp_dX**2 + dp_dY**2
-        )
-        parallel_unitvector2 = np.array([-dp_dZ, 0, dp_dX]) / np.sqrt(
-            dp_dX**2 + dp_dZ**2
-        )
-        normal_vector = np.cross(parallel_unitvector1, parallel_unitvector2)
-        normal_unitvector = normal_vector / np.linalg.norm(normal_vector)
-        binormal_vector = np.cross(parallel_unitvector1, normal_unitvector)
-        binormal_unitvector = binormal_vector / np.linalg.norm(binormal_vector)
+        # K_plasma keeps K_vacuum's two components along the flux surface,
+        # and its component normal to the surface is found from the
+        # dispersion relation H = 0. The two tangents and the normal are an
+        # orthonormal basis built from grad psi (`flux_surface_tangents`). The
+        # coordinate-plane tangents used before, (-psi_Y, psi_X, 0) and
+        # (-psi_Z, 0, psi_X), are parallel (or zero) when psi_X = 0, for
+        # example where grad psi is vertical, which made the normal NaN. The
+        # tangential part of K, and so K_plasma, doesn't depend on which two
+        # tangents are used. In the cylindrical geometry (psi_zeta = 0) the
+        # tangents are the poloidal and toroidal directions
+        grad_psi = np.array([dp_dX, dp_dY, dp_dZ], dtype=np.float64)
+        parallel_unitvector1, binormal_unitvector, _ = flux_surface_tangents(grad_psi)
+        normal_unitvector = grad_psi / np.linalg.norm(grad_psi)
 
         # Checking to see if the normal vector points into or out of the plasma
         # and flipping the sign (if necessary) to ensure it always points
@@ -346,8 +327,8 @@ def find_K_plasma(
         # done using the dispersion relation H = 0. We first guess what it could be,
         # and then use that to numerically compute what it actually is. This guess will
         # be exact if theta_m = 0
-        K_parallel_actual = np.dot(K_vacuum_actual, parallel_unitvector1)  # toroidal
-        K_binormal_actual = np.dot(K_vacuum_actual, binormal_unitvector)  # poloidal
+        K_parallel_actual = np.dot(K_vacuum_actual, parallel_unitvector1)
+        K_binormal_actual = np.dot(K_vacuum_actual, binormal_unitvector)
 
         H_discriminant = find_Booker_discriminant(
             launch_angular_freq=angular_freq,
