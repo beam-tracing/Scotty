@@ -219,7 +219,7 @@ def run(request, tmp_path_factory):
 
 def test_starts_at_the_antenna(run):
     """q, K and Psi where the solvers start are the launched ones"""
-    so = run["solver_output"]
+    so = run["solver"]
     q_launch = so["q_launch_cylindrical"].values
     assert_allclose(so["q_initial_cylindrical"].values, q_launch, rtol=0, atol=0)
     assert_allclose(so["q_output_cylindrical"].values[0], q_launch, atol=1e-12)
@@ -238,7 +238,7 @@ def test_starts_at_the_antenna(run):
 
 
 def test_entry_quantities_are_nan(run):
-    so = run["solver_output"]
+    so = run["solver"]
     assert np.isnan(float(so["distance_from_launch_to_entry"]))
     for frame in ("cartesian", "cylindrical"):
         assert np.isnan(so[f"Psi_3D_entry_labframe_{frame}"].values).all()
@@ -246,21 +246,21 @@ def test_entry_quantities_are_nan(run):
 
 def test_reaches_the_plasma_and_is_analysed(run):
     """The ray crosses the boundary into the plasma (psi < 1) and the analysis
-    completes. The launched beam has a waist, so filter_b is finite"""
-    assert run["analysis"]["polflux"].values[0] > 1
-    assert run["analysis"]["polflux"].values.min() < 0.9
-    dbs = run["dbs_analysis"]
-    assert np.isfinite(float(dbs["beam_waist"]))
-    assert np.isfinite(dbs["filter_b"].values).all()
+    completes. The launched beam has a waist, so filterfun_b is finite"""
+    assert run["beam"]["polflux"].values[0] > 1
+    assert run["beam"]["polflux"].values.min() < 0.9
+    dbs = run["diagnostics/dbs"]
+    assert np.isfinite(float(run["beam"]["beam_waist"]))
+    assert np.isfinite(dbs["filterfun_b"].values).all()
 
 
 def test_ray_tracing_only(tmp_path):
     dt = numerical(tmp_path, ray_tracing_flag=True, len_tau=12)
-    so = dt["solver_output"]
+    so = dt["solver"]
     assert_allclose(
         so["q_initial_cylindrical"].values, so["q_launch_cylindrical"].values, atol=0
     )
-    assert dt["analysis"]["polflux"].values.min() < 0.9
+    assert dt["beam"]["polflux"].values.min() < 0.9
 
 
 def test_delta_signs_set_at_the_entry_point(tmp_path):
@@ -283,7 +283,7 @@ def test_matches_v3(tmp_path):
         delta_R=-1e-4,
         delta_Z=1e-4,
     )
-    so = dt["solver_output"]
+    so = dt["solver"]
     tau = so["tau"].values
     assert_allclose(tau[-1], V3_TAU_LAST, rtol=1e-6)
 

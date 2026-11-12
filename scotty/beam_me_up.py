@@ -38,7 +38,7 @@ Notes
   ``launch_beam_width`` and ``launch_beam_curvature`` are ignored, and
   ``Psi_BC_flag`` has no effect. :math:`K` must satisfy the dispersion
   relation of the mode asked for (``mode_flag`` 1, -1, ``"O"`` or ``"X"``).
-  With no launched beam, ``beam_waist``, ``filter_b`` and ``filter_all`` are NaN.
+  With no launched beam, ``beam_waist``, ``filterfun_b`` and ``filterfun_all`` are NaN.
 - Positions along the way: *launch* is where the beam starts in vacuum,
   *entry* is where it reaches the plasma boundary, and *initial* is where the
   solvers start: the first point in the plasma, or the antenna for
@@ -59,8 +59,8 @@ Notes
 Output
 ~~~~~~
 
-An `xarray.DataTree` with the groups ``inputs``, ``solver_output``,
-``analysis`` and ``dbs_analysis``, saved as ``scotty_output<suffix>.h5``.
+An `xarray.DataTree` with the groups ``inputs``, ``solver``, ``beam`` and
+``diagnostics/dbs``, saved as ``scotty_output<suffix>.h5``.
 
 Coordinates
 ~~~~~~~~~~~
@@ -74,8 +74,10 @@ Abbreviations
 ~~~~~~~~~~~~~
 
 - ``bs`` - backscattered
-- ``filter`` - filter function (``filter_b``, ``filter_p``, ``filter_r``,
-  ``filter_m``, ``filter_s``)
+- ``filterfun`` - filter function (``filterfun_b``, ``filterfun_p``, ``filterfun_r``,
+  ``filterfun_m``)
+- ``delta_ne_sq`` - model turbulence spectrum, the spectral density of the
+  density fluctuations at the backscattered wavenumber
 - ``ne`` - equilibrium electron density
 - ``dt`` - datatree (stores data)
 
@@ -99,7 +101,8 @@ import datetime
 import logging
 import numpy as np
 import pathlib
-from scotty.analysis import basic_analysis, dbs_analysis
+from scotty.analysis import basic_analysis
+from scotty.diagnostics.dbs import dbs_analysis
 from scotty.beam_solver import beam_tracing
 from scotty.checks import (
     VALID_GEOMETRIES,
@@ -108,7 +111,12 @@ from scotty.checks import (
     VALID_PSI_BC_FLAGS,
     Parameters,
 )
-from scotty.data_io import inputs_to_dicts, solver_output_to_dicts, dict_to_dataset
+from scotty.data_io import (
+    dict_to_dataset,
+    inputs_to_dicts,
+    solver_output_to_dicts,
+    to_output_tree,
+)
 from scotty.derivatives import clear_derivative_cache
 from scotty.geometry import (
     MagneticField_Cylindrical,
@@ -196,7 +204,6 @@ def beam_me_up(
     further_analysis_flag: bool = False,
     detailed_analysis_flag: bool = True,
     # Additional flags
-    benchmarking_flag: bool = False,
     ray_tracing_flag: bool = False,
     return_dt_field: bool = False,  # For returning the datatree, field class
     # Keeping the extra kwargs for parsing later
@@ -365,8 +372,6 @@ def beam_me_up(
         Stored in the output's inputs
     detailed_analysis_flag : bool, default True
         Stored in the output's inputs
-    benchmarking_flag : bool, default False
-        Stored in the output's inputs
     ray_tracing_flag : bool, default False
         Trace only the ray, with no beam (v3's ``quick_run``; see
         `scotty.compat.quick_cutoff`)
@@ -384,9 +389,8 @@ def beam_me_up(
     Returns
     -------
     xarray.DataTree, or tuple of (xarray.DataTree, field)
-        The output, with the groups ``inputs``, ``solver_output``,
-        ``analysis`` and ``dbs_analysis``, and the field if
-        ``return_dt_field``
+        The output, with the groups ``inputs``, ``solver``, ``beam`` and
+        ``diagnostics/dbs``, and the field if ``return_dt_field``
     """
 
     # Start from an empty derivative cache: entries from an earlier run in the
@@ -448,7 +452,6 @@ def beam_me_up(
         further_analysis_flag=further_analysis_flag,
         detailed_analysis_flag=detailed_analysis_flag,
         # Additional flags
-        benchmarking_flag=benchmarking_flag,
         ray_tracing_flag=ray_tracing_flag,
         # return_dt_field = return_dt_field,
         # Extra kwargs for parsing
@@ -806,14 +809,7 @@ def beam_me_up(
         )
     )
 
-    dt = xr.DataTree.from_dict(
-        {
-            "inputs": inputs_ds,
-            "solver_output": solver_output_ds,
-            "analysis": analysis_ds,
-            "dbs_analysis": dbs_analysis_ds,
-        }
-    )
+    dt = to_output_tree(inputs_ds, solver_output_ds, analysis_ds, dbs_analysis_ds)
     dt.attrs = {
         "title": output_filename_suffix,
         "software_name": "scotty-beam-tracing",

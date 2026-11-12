@@ -67,7 +67,7 @@ def test_beam_path_in_both_geometries(run, geometry):
     dt, _ = run
     if geometry == "cartesian":
         dt = as_cartesian(dt)
-    so = dt["solver_output"]
+    so = dt["solver"]
     R, zeta, Z = beam_path_cylindrical(dt)
     assert_allclose(R, so["q_R_output"].values, rtol=1e-12)
     assert_allclose(zeta, so["q_zeta_output"].values, atol=1e-12)
@@ -83,7 +83,7 @@ def test_poloidal_beam_path(run, geometry, with_field):
     dt, field = run
     if geometry == "cartesian":
         dt = as_cartesian(dt)
-    so = dt["solver_output"]
+    so = dt["solver"]
     ax = plot_poloidal_beam_path(dt, zoom=True, field=field if with_field else None)
 
     ray = line(ax, "Central (reference) ray")
@@ -106,7 +106,7 @@ def test_toroidal_beam_path(run, geometry):
     dt, field = run
     if geometry == "cartesian":
         dt = as_cartesian(dt)
-    so = dt["solver_output"]
+    so = dt["solver"]
     ax = plot_toroidal_beam_path(dt, field=field)
     ray = line(ax, "Central (reference) ray")
     # From the launch position, then the beam path
@@ -121,14 +121,13 @@ def test_toroidal_beam_path(run, geometry):
 
 def test_dispersion_relation(run):
     dt, _ = run
-    analysis = dt["analysis"]
-    ax = plot_dispersion_relation(analysis)
+    ax = plot_dispersion_relation(dt)
     lines = ax.get_lines()
     assert len(lines) == 6
     for l in lines:
-        assert_allclose(l.get_xdata(), analysis["beam_path_length_wrt_cutoff"].values)
+        assert_allclose(l.get_xdata(), dt["beam"]["beam_path_length_wrt_cutoff"].values)
     assert_allclose(
-        lines[3].get_ydata(), np.abs(analysis["H_Cardano"].values[:, 0]), rtol=1e-12
+        lines[3].get_ydata(), np.abs(dt["beam"]["H_Cardano"].values[:, 0]), rtol=1e-12
     )
 
 
@@ -150,7 +149,7 @@ def test_ray_tracing_only_has_no_width(tmp_path):
     assert not [l for l in ax.get_lines() if l.get_linestyle() == "--"]
     assert_allclose(
         line(ax, "Central (reference) ray").get_xdata(),
-        dt["solver_output"]["q_R_output"].values,
+        dt["solver"]["q_R_output"].values,
     )
 
 

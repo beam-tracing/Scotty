@@ -67,7 +67,7 @@ def boundary(request, tmp_path_factory):
         poloidal_launch_angle_Torbeam=poloidal_angle,
         output_path=tmp_path_factory.mktemp("bc"),
     )
-    so = beam_me_up(**kwargs)["solver_output"]
+    so = beam_me_up(**kwargs)["solver"]
     q = so["q_initial_cylindrical"].values
     K_v = find_K_labframe_cart_to_cyl(
         so["K_launch_cartesian"].values, find_q_labframe_cyl_to_cart(q)
