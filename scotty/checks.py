@@ -211,16 +211,6 @@ class Parameters:
         self.launch_wavenumber = angular_frequency_to_wavenumber(
             self.launch_angular_frequency
         )
-        (
-            self.launch_beam_width,
-            self.launch_beam_curvature,
-            self.launch_beam_Psi_w,
-        ) = self._check_launch_beam(
-            launch_beam_width,
-            launch_beam_curvature,
-            launch_beam_Psi_w,
-            needs_beam=(launch_flag != "plasma" and not ray_tracing_flag),
-        )
         self.q_launch = q_launch
         self.mode_flag_launch = self._check_mode_flag(mode_flag_launch)
 
@@ -233,6 +223,17 @@ class Parameters:
         self.ray_tracing_flag = ray_tracing_flag
         self.launch_flag = self._check_launch_flag(launch_flag)
         self.Psi_BC_flag = self._check_Psi_BC_flag(Psi_BC_flag, self.launch_flag)
+        # The launched beam, after `launch_flag` has been checked
+        (
+            self.launch_beam_width,
+            self.launch_beam_curvature,
+            self.launch_beam_Psi_w,
+        ) = self._check_launch_beam(
+            launch_beam_width,
+            launch_beam_curvature,
+            launch_beam_Psi_w,
+            needs_beam=(self.launch_flag != "plasma" and not ray_tracing_flag),
+        )
         self.relativistic_flag = relativistic_flag
         self.resonance_flag = resonance_flag
         self.auto_delta_sign = auto_delta_sign
@@ -389,7 +390,21 @@ class Parameters:
                     "Give either `launch_beam_width` and `launch_beam_curvature` "
                     "(a circular beam) or `launch_beam_Psi_w`, not both"
                 )
-            return None, None, check_launch_Psi_w(launch_beam_Psi_w)
+            from scotty.launch import launch_beam_frame_is_defined
+
+            Psi_w = check_launch_Psi_w(launch_beam_Psi_w)
+            circular = np.allclose(
+                Psi_w, Psi_w[0, 0] * np.eye(2), rtol=0, atol=1e-12 * np.abs(Psi_w).max()
+            )
+            if not circular and not launch_beam_frame_is_defined(
+                self.poloidal_launch_angle_deg_Torbeam
+            ):
+                raise ValueError(
+                    "`launch_beam_Psi_w` is given in the launch beam frame, which "
+                    "is not defined for a vertical launch (poloidal angle +-90 deg); "
+                    "a circular beam can still be launched there"
+                )
+            return None, None, Psi_w
 
         if not all(circular_given):
             if needs_beam:
@@ -413,6 +428,9 @@ class Parameters:
                 )
         width = self._check_positive("launch_beam_width", launch_beam_width)
         curvature = launch_beam_curvature
+        if not needs_beam:
+            # e.g. a preset's beam with a plasma launch: kept, but not used
+            return width, curvature, None
         Psi_w = circular_gaussian_Psi_w(self.launch_wavenumber, width, curvature)
         return width, curvature, Psi_w
 

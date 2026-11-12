@@ -84,8 +84,11 @@ def check_launch_Psi_w(Psi_w) -> ComplexFloatArray:
         raise ValueError(
             f"`launch_beam_Psi_w` must have shape (2, 2), but has {Psi_w.shape}"
         )
+    if not np.isfinite(Psi_w).all():
+        raise ValueError(f"`launch_beam_Psi_w` must be finite, but got {Psi_w}")
     scale = np.abs(Psi_w).max()
-    if abs(Psi_w[0, 1] - Psi_w[1, 0]) > 1e-12 * scale:
+    # Loose enough for a Psi_w propagated through several optical elements
+    if abs(Psi_w[0, 1] - Psi_w[1, 0]) > 1e-10 * scale:
         raise ValueError(
             "`launch_beam_Psi_w` must be symmetric (Psi_xy = Psi_yx, with no "
             f"complex conjugate), but got {Psi_w}"

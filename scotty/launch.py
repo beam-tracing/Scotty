@@ -736,7 +736,9 @@ def launch_beam_frame(
     - :math:`\hat{y}` is perpendicular to :math:`\hat{g}`, in the plane of
       :math:`\hat{g}` and :math:`\hat{Z}`, with :math:`\hat{y} \cdot \hat{Z} > 0`
       (upwards; the plane is vertical, so for a horizontal launch
-      :math:`\hat{y} = \hat{Z}`);
+      :math:`\hat{y} = \hat{Z}`). Undefined for a vertical launch (poloidal
+      angle :math:`\pm 90°`), where a non-circular beam is refused (see
+      :func:`launch_beam_frame_is_defined`);
     - :math:`\hat{x} = \hat{y} \times \hat{g}`, horizontal, so that
       :math:`\hat{x} \times \hat{y} = \hat{g}` as in the analysis's beam frame.
 
@@ -752,8 +754,19 @@ def launch_beam_frame(
         [np.cos(pol) * np.cos(tor), np.cos(pol) * np.sin(tor), np.sin(pol)]
     )
     y_hat = np.array([-np.sin(pol) * np.cos(tor), -np.sin(pol) * np.sin(tor), np.cos(pol)])
+    # Past the vertical (|poloidal angle| > 90 deg) this points down: turn the
+    # frame by 180 deg about g_hat, so y_hat points up and the handedness stays
+    if np.cos(pol) < 0:
+        y_hat = -y_hat
     x_hat = np.cross(y_hat, g_hat)
     return x_hat, y_hat, g_hat
+
+
+def launch_beam_frame_is_defined(poloidal_launch_angle_deg_Torbeam: float) -> bool:
+    """Whether :func:`launch_beam_frame` is defined: not for a vertical launch
+    (poloidal angle +-90 deg), where no vertical plane through g_hat is singled
+    out. A circular beam doesn't need the frame"""
+    return abs(np.cos(np.deg2rad(poloidal_launch_angle_deg_Torbeam))) > 1e-6
 
 
 def find_plasma_entry_parameters(
@@ -934,9 +947,26 @@ def find_plasma_entry_parameters(
             # lab frame is B Psi_w B^T, with B = [x_hat, y_hat] as columns, and
             # has no components along g_hat in vacuum
             Psi_w_launch_beamframe = launch_beam_Psi_w
-            x_hat_launch, y_hat_launch, _ = launch_beam_frame(
+            x_hat_launch, y_hat_launch, g_hat_launch = launch_beam_frame(
                 poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam
             )
+            if not np.allclose(g_hat_launch, K_launch_cartesian / K0, atol=1e-12):
+                raise RuntimeError("The launch beam frame's g_hat is not along K")
+            Psi_w_is_circular = np.allclose(
+                Psi_w_launch_beamframe,
+                Psi_w_launch_beamframe[0, 0] * np.eye(2),
+                rtol=0,
+                atol=1e-12 * np.abs(Psi_w_launch_beamframe).max(),
+            )
+            if not (
+                Psi_w_is_circular
+                or launch_beam_frame_is_defined(poloidal_launch_angle_deg_Torbeam)
+            ):
+                raise ValueError(
+                    "`launch_beam_Psi_w` is given in the launch beam frame, which "
+                    "is not defined for a vertical launch (poloidal angle +-90 deg); "
+                    "a circular beam can still be launched there"
+                )
             beam_basis = np.column_stack([x_hat_launch, y_hat_launch])  # (3, 2)
 
             def _Psi_3D_lab_cartesian(Psi_w):
