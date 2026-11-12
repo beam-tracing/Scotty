@@ -241,16 +241,26 @@ RESONANCE_FLAG_NAMES = (
     [
         ("first_harmonic_flag", "stop"),
         ("first_harmonic_flag", "raise"),
-        *[
-            (name, value)
-            for name in RESONANCE_FLAG_NAMES[1:]
-            for value in ("stop", "raise", "pass")
-        ],
+        ("second_harmonic_flag", "stop"),
+        ("second_harmonic_flag", "raise"),
+        ("second_harmonic_flag", "pass"),
+        ("upper_hybrid_flag", "stop"),
+        ("upper_hybrid_flag", "raise"),
     ],
 )
 def test_resonance_flags_accept_their_values(name, value):
     params = Parameters.__new__(Parameters)
     assert params._check_resonance_flag(name, value) == value
+
+
+def test_upper_hybrid_flag_pass_is_refused():
+    """The X-mode's refractive index goes to infinity at the layer, which the ray
+    approaches only asymptotically"""
+    params = Parameters.__new__(Parameters)
+    with pytest.raises(ValueError, match="`upper_hybrid_flag` can't be 'pass'") as e:
+        params._check_resonance_flag("upper_hybrid_flag", "pass")
+    assert "'stop'" in str(e.value)
+    assert "1e-2 short of the layer" in str(e.value)
 
 
 @pytest.mark.parametrize("value", ["Stop", "", True, False, 2, 0, None])

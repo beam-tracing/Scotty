@@ -158,7 +158,7 @@ def beam_me_up(
     relativistic_flag: bool = False,  # includes relativistic corrections to electron mass when set to True
     first_harmonic_flag: VALID_RESONANCE_FLAGS = "stop",  # at the fundamental: "stop" (1e-3 short of it) or "raise"
     second_harmonic_flag: VALID_RESONANCE_FLAGS = "stop",  # at the second cyclotron harmonic: "stop", "raise" or "pass"
-    upper_hybrid_flag: VALID_RESONANCE_FLAGS = "stop",  # at the upper hybrid layer (X-mode only): "stop", "raise" or "pass"
+    upper_hybrid_flag: VALID_RESONANCE_FLAGS = "stop",  # at the upper hybrid layer (X-mode only): "stop" (1e-2 short of it) or "raise"
     auto_delta_sign: bool = True,  # For flipping signs to maintain forward difference
     delta_X: float = 1e-5,  # in the same units as data_X_coord
     delta_Y: float = 1e-5,  # in the same units as data_Y_coord
@@ -308,17 +308,22 @@ def beam_me_up(
         ``"pass"`` carries on through it (the cold-plasma Hamiltonian is
         regular there). A ray that starts on it raises unless the flag is
         ``"pass"``
-    upper_hybrid_flag : {"stop", "raise", "pass"}, default "stop"
-        As ``second_harmonic_flag``, at the upper hybrid resonance,
-        :math:`\omega_{UH} = \omega`. It applies to the X-mode only
-        (whichever ``mode_flag`` that is), and is ignored for the O-mode. The
-        X-mode's refractive index goes to infinity at the layer, so an X-mode
-        ray heading into it can stall or fail before it gets there, whatever
-        the flag. With :math:`K` perpendicular to :math:`B`, the ray slows
-        down short of the layer and never reaches it, and the run doesn't
-        return. At other angles it may reach the layer, or the solver may
-        fail first. ``"pass"`` hasn't given a usable ray in any case tried:
-        the ray goes a little past the layer, then stalls
+    upper_hybrid_flag : {"stop", "raise"}, default "stop"
+        What the X-mode does at the upper hybrid resonance,
+        :math:`\omega_{UH} = \omega`. It applies to the X-mode only (whichever
+        ``mode_flag`` that is), and is ignored for the O-mode. The X-mode's
+        refractive index goes to infinity at the layer, and the ray only
+        approaches it asymptotically, so:
+
+        - ``"stop"``: the ray stops, and the output ends, 1e-2 short of the
+          layer, in :math:`\omega_{UH} / \omega`. Closer, the output points
+          are off the dispersion relation, and with :math:`K` perpendicular to
+          :math:`B` the solver stalls;
+        - ``"raise"``: a ``RuntimeError`` is raised there.
+
+        ``"pass"`` is refused, as the ray can't be traced through the layer. An
+        X-mode ray that starts within 1e-2 of the layer raises whatever the
+        flag
 
         With a temperature profile (``relativistic_flag``), the three layers
         include the relativistic mass correction. They replace

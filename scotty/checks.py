@@ -479,6 +479,15 @@ class Parameters:
                 "get the ray up to 1e-3 short of the layer, in omega_ce / omega, or "
                 "'raise'"
             )
+        # The X-mode's refractive index goes to infinity at the upper hybrid layer,
+        # which a ray only approaches asymptotically
+        if name == "upper_hybrid_flag" and value == "pass":
+            raise ValueError(
+                "`upper_hybrid_flag` can't be 'pass': the X-mode's refractive index "
+                "goes to infinity at the upper hybrid resonance, so the ray can't be "
+                "traced past it. Use 'stop' to get the ray up to 1e-2 short of the "
+                "layer, in omega_UH / omega, or 'raise'"
+            )
         return cast(VALID_RESONANCE_FLAGS, value)
 
     def _check_replaced_kwargs(self, **extras):

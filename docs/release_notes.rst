@@ -148,25 +148,29 @@ Other interface changes
   - ``first_harmonic_flag`` can't be ``"pass"``: the cold-plasma Hamiltonian is
     singular there, and past it the root that ``mode_flag`` selects swaps (#169).
   - ``upper_hybrid_flag`` applies to the X-mode only (whichever ``mode_flag``
-    that is) and is ignored for the O-mode. The X-mode's refractive index goes to
-    infinity at the layer, so an X-mode ray heading into it can stall or fail
-    before reaching it, whatever the flag: with :math:`K` perpendicular to
-    :math:`B` it never reaches the layer, and the run doesn't return. ``"pass"``
-    hasn't given a usable ray in any case tried.
+    that is) and is ignored for the O-mode. It can't be ``"pass"``: the X-mode's
+    refractive index goes to infinity at the layer, which the ray approaches only
+    asymptotically. ``"stop"`` ends the output 1e-2 short of the layer, in
+    :math:`\omega_{UH} / \omega`, and ``"raise"`` raises there. Closer, the
+    output points are off the dispersion relation (:math:`|H|` up to 1.4 at the
+    default ``len_tau``), and with :math:`K` perpendicular to :math:`B` the solver
+    stalled and the run didn't return.
   - A ray that starts on the first harmonic raises whatever the flag, and so does
-    one that starts on the second harmonic or (X-mode) the upper hybrid layer,
-    unless its flag is ``"pass"``.
+    one that starts on the second harmonic unless its flag is ``"pass"``, or an
+    X-mode ray that starts within 1e-2 of the upper hybrid layer.
 
   They replace ``resonance_flag``, which is removed: passing it raises a
   ``ValueError`` rather than being ignored. ``from_v3_kwargs`` converts v3's
   ``resonance_flag``: ``True`` sets all three flags to ``"stop"``, and ``False``
   sets ``first_harmonic_flag="raise"``, ``second_harmonic_flag="pass"`` and
-  ``upper_hybrid_flag="pass"``. v3's ``False`` let the ray carry on past the first
-  harmonic; v4 raises there.
+  ``upper_hybrid_flag="raise"``. v3's ``False`` let the ray carry on past the first
+  harmonic and the upper hybrid layer; v4 raises at both.
 - Where the ray stops at the first harmonic, the output now ends where
   :math:`\omega_{ce} / \omega` is 1e-3 from 1, about 2 mm before the layer on the
   cases tried. Closer, :math:`K` could jump off the dispersion relation at the
-  last few output points (:math:`|H|` up to 0.48, :math:`|K|` 23% off).
+  last few output points (:math:`|H|` up to 0.48, :math:`|K|` 23% off). A ray
+  launched within 1e-3 of the layer still ends with such points, and raises from
+  ``check_H_output`` with a message about :math:`H`, not the resonance.
 - ``check_H_output`` raises above :math:`|H| = 0.1` (was 1) and warns above 0.01
   (#169), so a run that used to finish with a warning may now raise. This
   includes rays that approach the first harmonic from above and stall just short

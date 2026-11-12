@@ -191,8 +191,8 @@ def test_resonance_flag_True_is_stop_everywhere(value):
 
 @pytest.mark.parametrize("value", [False, np.bool_(False)])
 def test_resonance_flag_False_raises_at_the_first_harmonic(value, monkeypatch, caplog):
-    """v3's False carried on past the first harmonic; v4 can't, so it raises
-    there, and the warning says so"""
+    """v3's False carried on past the first harmonic and the upper hybrid
+    resonance; v4 can't, so it raises there, and the warning says so"""
     import scotty.compat
 
     # Each message is warned about once per process
@@ -200,17 +200,18 @@ def test_resonance_flag_False_raises_at_the_first_harmonic(value, monkeypatch, c
     with caplog.at_level("WARNING", logger="scotty.compat"):
         kw = from_v3_kwargs({"resonance_flag": value})
     assert "resonance_flag" not in kw
-    assert [kw[name] for name in RESONANCE_FLAG_NAMES] == ["raise", "pass", "pass"]
+    assert [kw[name] for name in RESONANCE_FLAG_NAMES] == ["raise", "pass", "raise"]
     assert "`resonance_flag` = False" in caplog.text
     assert "`first_harmonic_flag` = 'raise'" in caplog.text
-    assert "where v3 carried on past it" in caplog.text
+    assert "`upper_hybrid_flag` = 'raise'" in caplog.text
+    assert "where v3 carried on past them" in caplog.text
 
 
 def test_resonance_flag_keeps_flags_given():
     kw = from_v3_kwargs({"resonance_flag": False, "second_harmonic_flag": "stop"})
-    assert [kw[name] for name in RESONANCE_FLAG_NAMES] == ["raise", "stop", "pass"]
-    kw = from_v3_kwargs({"resonance_flag": True, "upper_hybrid_flag": "pass"})
-    assert [kw[name] for name in RESONANCE_FLAG_NAMES] == ["stop", "stop", "pass"]
+    assert [kw[name] for name in RESONANCE_FLAG_NAMES] == ["raise", "stop", "raise"]
+    kw = from_v3_kwargs({"resonance_flag": True, "upper_hybrid_flag": "raise"})
+    assert [kw[name] for name in RESONANCE_FLAG_NAMES] == ["stop", "stop", "raise"]
 
 
 @pytest.mark.parametrize("value", [2, 0, "stop", None])

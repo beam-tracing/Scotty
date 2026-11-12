@@ -52,10 +52,13 @@ What it converts:
 
 ``resonance_flag``, a bool in v3, becomes v4's ``first_harmonic_flag``,
 ``second_harmonic_flag`` and ``upper_hybrid_flag``: ``True`` sets all three to
-``"stop"``, and ``False`` sets ``first_harmonic_flag="raise"`` and the other two to
-``"pass"``. Any of the three given explicitly is kept. v3's ``False`` let the ray
-carry on past the first harmonic (the fundamental); v4 raises there instead, as the
-cold-plasma Hamiltonian is singular and the rest of the ray would be wrong (#169).
+``"stop"``, and ``False`` sets ``first_harmonic_flag="raise"``,
+``second_harmonic_flag="pass"`` and ``upper_hybrid_flag="raise"``. Any of the three
+given explicitly is kept. v3's ``False`` let the ray carry on past the first
+harmonic (the fundamental) and the upper hybrid resonance; v4 raises there instead,
+as the rest of the ray would be wrong: the cold-plasma Hamiltonian is singular at
+the first harmonic (#169), and the X-mode's refractive index goes to infinity at
+the upper hybrid resonance.
 A ``resonance_flag`` that isn't a bool is left in place, and v4 refuses it.
 
 Output files
@@ -208,7 +211,7 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
             else {
                 "first_harmonic_flag": "raise",
                 "second_harmonic_flag": "pass",
-                "upper_hybrid_flag": "pass",
+                "upper_hybrid_flag": "raise",
             }
         )
         for name, value in flags.items():
@@ -219,8 +222,8 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
             + (
                 ""
                 if resonance_flag
-                else " (v4 raises at the first harmonic, the fundamental, where v3 "
-                "carried on past it)"
+                else " (v4 raises at the first harmonic, the fundamental, and at the "
+                "upper hybrid resonance, where v3 carried on past them)"
             )
         )
 

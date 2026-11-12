@@ -611,7 +611,7 @@ def test_output_stops_short_of_the_fundamental(tmp_path, rtol):
 
 def first_harmonic_raise_kwargs(rtol):
     """As `default_flags_kwargs`, but raising at the first harmonic, passing the
-    second harmonic and the upper hybrid layer, and with coarser output"""
+    second harmonic, and with coarser output"""
     return {
         "geometry": "cylindrical",
         "poloidal_launch_angle_Torbeam": 3,
@@ -627,7 +627,6 @@ def first_harmonic_raise_kwargs(rtol):
         "len_tau": 102,
         "first_harmonic_flag": "raise",
         "second_harmonic_flag": "pass",
-        "upper_hybrid_flag": "pass",
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",
         "launch_flag": "vacuum_analytic",

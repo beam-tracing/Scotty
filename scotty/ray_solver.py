@@ -66,6 +66,11 @@ _ON_LAYER_TOL = 1e-10
 # stops. Closer, K is not resolved: it can jump off the dispersion relation in one
 # output step
 _FIRST_HARMONIC_MARGIN = 1e-3
+# How far from the upper hybrid resonance, in omega_UH / omega, the X-mode stops.
+# Its refractive index goes to infinity at the layer, so closer, the output points
+# are off the dispersion relation, and with K perpendicular to B the ray never
+# reaches the layer (it approaches it asymptotically) and the solver stalls
+_UPPER_HYBRID_MARGIN = 1e-2
 
 # The resonance events, in `make_solver_events`, and the layers they are at
 RESONANCE_EVENTS = {
@@ -127,6 +132,7 @@ def make_solver_events(
     first_harmonic_flag: VALID_RESONANCE_FLAGS = "stop",
     second_harmonic_flag: VALID_RESONANCE_FLAGS = "stop",
     upper_hybrid_flag: VALID_RESONANCE_FLAGS = "stop",
+    upper_hybrid_side: Optional[float] = None,
 ) -> Dict[str, Callable]:
     r"""The ray's solver events. `X_mode` says whether the ray is the X-mode,
     for the upper-hybrid resonance; which `mode_flag` that is depends on the
@@ -136,13 +142,30 @@ def make_solver_events(
     There is one terminal event per resonance layer (see `RESONANCE_EVENTS`):
     ``"first_harmonic"`` (the fundamental) always, ``"second_harmonic"``
     unless `second_harmonic_flag` is ``"pass"``, and ``"upper_hybrid"`` for
-    the X-mode unless `upper_hybrid_flag` is ``"pass"``. `first_harmonic_flag`
-    can't be ``"pass"``; with ``"stop"`` and ``"raise"`` the events are the
-    same, and `ray_tracing` acts on them."""
+    the X-mode. `first_harmonic_flag` and `upper_hybrid_flag` can't be
+    ``"pass"``; with ``"stop"`` and ``"raise"`` the events are the same, and
+    `ray_tracing` acts on them.
+
+    The upper hybrid event fires `_UPPER_HYBRID_MARGIN` short of the layer, in
+    omega_UH / omega, on the side the ray starts on: `upper_hybrid_side` is +1
+    if it starts where omega_UH > omega, and -1 where omega_UH < omega (needed
+    for the X-mode). The event is then monotonic in omega_UH / omega, so a
+    solver step that crosses the whole band around the layer is seen too."""
     if first_harmonic_flag == "pass":
         raise ValueError(
             "`first_harmonic_flag` can't be 'pass': the ray can't be traced past "
             "the first harmonic (the fundamental)"
+        )
+    if upper_hybrid_flag == "pass":
+        raise ValueError(
+            "`upper_hybrid_flag` can't be 'pass': the X-mode's refractive index goes "
+            "to infinity at the upper hybrid resonance, so the ray can't be traced "
+            "past it"
+        )
+    if X_mode and upper_hybrid_side not in (1, -1):
+        raise ValueError(
+            "`upper_hybrid_side` must be 1 or -1 for the X-mode, the side of the "
+            f"upper hybrid resonance the ray starts on, but got {upper_hybrid_side!r}"
         )
 
     cart = True if isinstance(field, MagneticField_Cartesian) else False
@@ -206,13 +229,14 @@ def make_solver_events(
         return gyro_ratio - 0.5
 
     # The upper hybrid resonance is reached by the X-mode only, whichever
-    # `mode_flag` (or "X") it was launched as
+    # `mode_flag` (or "X") it was launched as. Positive on the side the ray starts
+    # on, until it comes within `_UPPER_HYBRID_MARGIN` of the layer
     @_event(terminal=True, direction=0.0)
     def event_upper_hybrid(tau, ray_parameters, hamiltonian: Hamiltonian):
         UH_ratio = _find_UH_ratio(
             ray_parameters[:3], launch_angular_frequency, field, hamiltonian
         )
-        return UH_ratio - 1
+        return upper_hybrid_side * (UH_ratio - 1) - _UPPER_HYBRID_MARGIN
 
     # Triggers when the cut-off location is reached (i.e. when the
     # wavenumber K is minimised)
@@ -251,11 +275,7 @@ def make_solver_events(
             if second_harmonic_flag != "pass"
             else {}
         ),
-        **(
-            {"upper_hybrid": event_upper_hybrid}
-            if X_mode and upper_hybrid_flag != "pass"
-            else {}
-        ),
+        **({"upper_hybrid": event_upper_hybrid} if X_mode else {}),
         "reach_K_min": event_reach_K_min,
     }
 
@@ -400,14 +420,14 @@ def ray_tracing(
     can't be passed, as the cold-plasma Hamiltonian is singular there.
     `upper_hybrid_flag` applies to the X-mode only (`X_mode`), and is ignored for the
     O-mode. At the upper hybrid layer the X-mode's refractive index goes to infinity,
-    so an X-mode ray heading into it can stall (with K perpendicular to B, it never
-    reaches the layer, and the solver doesn't return) or fail before the event
-    fires, whatever the flag; "pass" hasn't given a usable ray in any case tried.
-    If several layers are reached in one solver step, the first one reached decides.
+    so the ray stops (or raises) 1e-2 short of it, in omega_UH / omega, and it can't
+    be passed. If several layers are reached in one solver step, the first one
+    reached decides.
 
     Starting on the first harmonic raises whatever the flag, as the ray can't be
-    integrated from there, and so does starting on the second harmonic, or (X-mode)
-    on the upper hybrid layer, unless its flag is "pass": the ray would stop at once.
+    integrated from there, and so does starting on the second harmonic unless its
+    flag is "pass", or (X-mode) within 1e-2 of the upper hybrid layer: the ray would
+    stop at once.
 
     In addition to the conditions above, the solver will also return the instances when
     any of the following non-terminating conditions occur:
@@ -445,17 +465,19 @@ def ray_tracing(
             f'`second_harmonic_flag="{second_harmonic_flag}"` stops it at once. '
             '`second_harmonic_flag="pass"` passes the second harmonic'
         )
-    if X_mode and upper_hybrid_flag != "pass":
+    upper_hybrid_side = None
+    if X_mode:
         UH_ratio = _find_UH_ratio(
             q_initial, hamiltonian.angular_frequency, hamiltonian.field, hamiltonian
         )
-        if abs(UH_ratio - 1) < _ON_LAYER_TOL:
+        if abs(UH_ratio - 1) < _UPPER_HYBRID_MARGIN:
             raise RuntimeError(
-                f"The ray starts on {RESONANCE_EVENTS['upper_hybrid']} "
-                f"(omega_UH / omega = {UH_ratio}) at q = {q_initial}, where "
-                f'`upper_hybrid_flag="{upper_hybrid_flag}"` stops it at once. '
-                '`upper_hybrid_flag="pass"` passes the upper hybrid resonance'
+                f"The ray starts within {_UPPER_HYBRID_MARGIN} of "
+                f"{RESONANCE_EVENTS['upper_hybrid']}, in omega_UH / omega "
+                f"(omega_UH / omega = {UH_ratio}) at q = {q_initial}, where the "
+                "X-mode stops at once, whatever `upper_hybrid_flag`"
             )
+        upper_hybrid_side = 1.0 if UH_ratio > 1 else -1.0
 
     # Creating arguments and events to be passed to solver
     solver_ray_events = make_solver_events(
@@ -466,6 +488,7 @@ def ray_tracing(
         first_harmonic_flag=first_harmonic_flag,
         second_harmonic_flag=second_harmonic_flag,
         upper_hybrid_flag=upper_hybrid_flag,
+        upper_hybrid_side=upper_hybrid_side,
     )
     solver_arguments = (hamiltonian,)
 
@@ -533,6 +556,15 @@ def ray_tracing(
                 f"{where}, where the cold-plasma Hamiltonian is singular, so it can't "
                 'be traced past it. `first_harmonic_flag="stop"` returns the ray up '
                 "to 1e-3 short of the layer, in omega_ce / omega"
+            )
+        if resonance == "upper_hybrid":
+            raise RuntimeError(
+                f"The ray came within {_UPPER_HYBRID_MARGIN} of "
+                f"{RESONANCE_EVENTS[resonance]}, in omega_UH / omega, at "
+                f"tau = {tau_events[resonance][0]}, "
+                f"q = {ray_parameters_events[resonance][0][:3]}, and "
+                '`upper_hybrid_flag="raise"`. `upper_hybrid_flag="stop"` returns the '
+                "output up to there. The X-mode can't be traced through the layer"
             )
         raise RuntimeError(
             f'{where}, and `{resonance}_flag="raise"`. `{resonance}_flag="stop"` '

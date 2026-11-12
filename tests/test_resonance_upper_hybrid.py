@@ -1,4 +1,4 @@
-"""An X-mode ray that reaches the upper hybrid layer, and `upper_hybrid_flag`.
+"""An X-mode ray that heads into the upper hybrid layer, and `upper_hybrid_flag`.
 
 The field is uniform, B = -B0 Z_hat with omega_ce / omega = 0.6, psi = 1 - X / L, and
 the density is linear, so Omega_pe^2 / Omega^2 = X / L (as in
@@ -8,13 +8,15 @@ its R cut-off (X / L = 1 - 0.6 = 0.4) before the upper hybrid layer (X / L = 1 -
 layer and the L cut-off (X / L = 1.6), and heads down the density gradient. Its
 refractive index then grows without bound as it nears the layer.
 
-Whether the solver gets to the layer depends on the case. With K perpendicular to B
-the ray stalls just short of it: |K| grows, the steps shrink, and tau stops advancing
-(about 3.6e-7 short of omega_UH / omega = 1, with |H| ~ 1e5, measured 12 Nov 2026). With
-K at 30 deg to the perpendicular, as here, a solver step at rtol = 1e-4 lands past the
-layer, so the event is seen. At other angles and tolerances the solver can instead fail
-("Integration step failed"). "pass" isn't tested: the ray goes a little past the layer
-and then stalls.
+The ray only approaches the layer asymptotically: K_par is conserved while |K| grows,
+so K turns perpendicular to B. Without a margin, the solver reached the layer only when
+a step overshot it (at 30 deg to the perpendicular and rtol = 1e-4, but not at 45 deg),
+and with K perpendicular to B it stalled about 3.6e-7 short of omega_UH / omega = 1 and
+never returned. At the default len_tau, the last output points were off the dispersion
+relation, with |H| up to 1.4 (Bakso's review of #184, 12 Nov 2026). So the ray stops
+`_UPPER_HYBRID_MARGIN` = 1e-2 short of the layer, in omega_UH / omega. Measured at the
+default tolerances and len_tau (12 Nov 2026), max |H| is then 3e-4 to 2.8e-3 at 0 to 45
+deg (1.2e-2 at 45 deg with a 5e-3 margin, and the solver raised from the H check at 3e-3).
 """
 
 import importlib
@@ -28,7 +30,7 @@ from scotty.beam_me_up import beam_me_up
 from scotty.geometry import InterpolatedField_Cartesian
 from scotty.hamiltonian import Hamiltonian
 from scotty.profile_fit import LinearFit
-from scotty.ray_solver import _ON_LAYER_TOL, _find_UH_ratio, ray_tracing
+from scotty.ray_solver import _UPPER_HYBRID_MARGIN, _find_UH_ratio, ray_tracing
 
 K0 = 2200.0
 OMEGA = K0 * constants.c
@@ -42,9 +44,13 @@ Y = np.linspace(-1.0 * L, 2.0 * L, 13)
 Z = np.linspace(-0.1 * L, 0.1 * L, 7)
 X_GRID, _, _ = np.meshgrid(X, Y, Z, indexing="ij")
 LAUNCH = np.array([L, 0.0, 0.0])  # X / L = 1
-# Along -X and +Y, with 30 deg towards B
-_A, _B = np.deg2rad(30.0), np.deg2rad(30.0)
-K_HAT = np.array([-np.cos(_A) * np.cos(_B), np.sin(_A) * np.cos(_B), np.sin(_B)])
+ANGLES = [0.0, 10.0, 20.0, 30.0, 45.0]
+
+
+def K_hat(angle_deg=30.0):
+    """Along -X and +Y, at `angle_deg` from the perpendicular towards B"""
+    a, b = np.deg2rad(30.0), np.deg2rad(angle_deg)
+    return np.array([-np.cos(a) * np.cos(b), np.sin(a) * np.cos(b), np.sin(b)])
 
 
 def field():
@@ -62,15 +68,17 @@ def hamiltonian(mode_flag=-1):
     )
 
 
-def X_mode_K():
-    """K along `K_HAT` on the X-mode's dispersion relation at the launch point
-    (mode_flag = -1 is the X-mode here; +1 has no root along this direction)"""
+def X_mode_K(angle_deg=30.0):
+    """K along `K_hat` on the X-mode's dispersion relation at the launch point
+    (mode_flag = -1 is the X-mode here; +1 has no root along these directions)"""
     h = hamiltonian(-1)
-    K = brentq(lambda k: h(LAUNCH, k * K_HAT), 0.05 * K0, 5 * K0)
-    return K * K_HAT
+    direction = K_hat(angle_deg)
+    K = brentq(lambda k: h(LAUNCH, k * direction), 0.05 * K0, 5 * K0)
+    return K * direction
 
 
-def run(output_path, upper_hybrid_flag):
+def run(output_path, upper_hybrid_flag, angle_deg=30.0, **solver):
+    """The ray only, with the default tolerances and len_tau unless given"""
     return beam_me_up(
         geometry="cartesian",
         poloidal_launch_angle_Torbeam=0.0,
@@ -82,7 +90,7 @@ def run(output_path, upper_hybrid_flag):
         mode_flag=-1,
         launch_flag="plasma",
         Psi_BC_flag=None,
-        plasmaLaunch_K_cartesian=X_mode_K(),
+        plasmaLaunch_K_cartesian=X_mode_K(angle_deg),
         # Needed by the launch's checks, though only the ray is traced
         plasmaLaunch_Psi_3D_lab_cartesian=(1.0 + 1.0j) * np.eye(3),
         find_B_method=field(),
@@ -93,71 +101,91 @@ def run(output_path, upper_hybrid_flag):
         delta_X=1e-4,
         delta_Y=1e-4,
         delta_Z=1e-4,
-        len_tau=200,
-        rtol=1e-4,
-        atol=1e-5,
         figure_flag=False,
         output_path=output_path,
         console_log_level="ERROR",
+        **solver,
     )
 
 
+def UH_ratio_and_H(dt):
+    beam = dt["beam"]
+    UH = np.hypot(
+        beam["normalised_omega_ce"].values, beam["normalised_omega_pe"].values
+    )
+    return UH, np.abs(beam["H_Booker"].values)
+
+
 def test_launch_is_X_mode_between_the_layer_and_the_L_cutoff():
-    assert np.linalg.norm(X_mode_K()) == pytest.approx(K0, rel=1e-5)
+    for angle in ANGLES:
+        assert np.linalg.norm(X_mode_K(angle)) == pytest.approx(K0, rel=1e-5)
     UH = _find_UH_ratio(LAUNCH, OMEGA, field(), hamiltonian())
     assert UH == pytest.approx(np.sqrt(GYRO**2 + 1), rel=1e-5)
 
 
 @pytest.mark.timeout(60)
-def test_X_mode_stops_at_the_upper_hybrid_layer(tmp_path):
-    """The default: the output ends at the layer, one output step short of it,
-    still on the dispersion relation"""
-    dt = run(tmp_path, "stop")
-    beam = dt["beam"]
-    UH = np.hypot(
-        beam["normalised_omega_ce"].values, beam["normalised_omega_pe"].values
-    )
-    # Measured 5.9e-3, the last output step
-    assert 0 < UH[-1] - 1 < 1e-2
-    assert np.all(UH > 1)
-    # |K| grows towards the layer: 5.0 K0 at the last point
+@pytest.mark.parametrize("angle", ANGLES)
+def test_X_mode_stops_short_of_the_upper_hybrid_layer(tmp_path, angle):
+    """The default flag, tolerances and len_tau: the output ends 1e-2 short of the
+    layer, on the dispersion relation. At 0 deg (K perpendicular to B) the run
+    used not to return"""
+    dt = run(tmp_path, "stop", angle)
+    UH, H = UH_ratio_and_H(dt)
+    # Measured 1.01e-2 to 1.02e-2: the last output step before the event
+    assert _UPPER_HYBRID_MARGIN < UH[-1] - 1 < _UPPER_HYBRID_MARGIN + 1e-3
+    assert np.all(UH - 1 > _UPPER_HYBRID_MARGIN)
+    # |K| grows towards the layer: 3.5 to 4.2 K0 at the last point
     K = np.linalg.norm(dt["solver"]["K_output_cartesian"].values, axis=1)
-    assert K[-1] > 4 * K0
-    # Measured 3.9e-3, at the last point
-    assert np.abs(beam["H_Booker"].values).max() < 1e-2
+    assert K[-1] > 3 * K0
+    assert len(H) == 4001
+    # Measured 3.2e-4 (0 deg) to 2.8e-3 (45 deg)
+    assert H.max() < 1e-2
 
 
 @pytest.mark.timeout(60)
-def test_X_mode_raises_at_the_upper_hybrid_layer(tmp_path):
+@pytest.mark.parametrize("angle", ANGLES)
+def test_X_mode_stops_short_of_the_upper_hybrid_layer_at_v3_tolerances(tmp_path, angle):
+    """At v3's rtol = 1e-3 and atol = 1e-6, |H| is already up to 5e-3 far from the
+    layer, and the ray stops without raising from the H check (at 0.1)"""
+    dt = run(tmp_path, "stop", angle, rtol=1e-3, atol=1e-6)
+    UH, H = UH_ratio_and_H(dt)
+    assert _UPPER_HYBRID_MARGIN < UH[-1] - 1 < _UPPER_HYBRID_MARGIN + 1e-3
+    # Measured 3.3e-3 (10 deg) to 3.1e-2 (45 deg)
+    assert H.max() < 5e-2
+
+
+@pytest.mark.timeout(60)
+def test_X_mode_raises_short_of_the_upper_hybrid_layer(tmp_path):
     with pytest.raises(
-        RuntimeError, match="reached the upper hybrid resonance"
+        RuntimeError, match=f"came within {_UPPER_HYBRID_MARGIN} of the upper hybrid"
     ) as error:
         run(tmp_path, "raise")
     message = str(error.value)
     assert '`upper_hybrid_flag="stop"`' in message
-    assert '`upper_hybrid_flag="pass"`' in message
-    # The layer is at X / L = 0.64 (to the interpolation of psi)
+    assert "can't be traced through the layer" in message
+    # omega_UH / omega = 1 + margin is at X / L = (1 + margin)^2 - 0.6^2 (to the
+    # interpolation of psi)
     q_X = float(message.split("q = [")[1].split()[0])
-    assert q_X / L == pytest.approx(1 - GYRO**2, abs=1e-4)
+    assert q_X / L == pytest.approx((1 + _UPPER_HYBRID_MARGIN) ** 2 - GYRO**2, abs=1e-4)
 
 
 class _ReachedTheSolver(Exception):
     pass
 
 
-def _start(monkeypatch, X_mode, upper_hybrid_flag):
-    """Run `ray_tracing`'s start checks for a ray starting on the upper hybrid
-    layer, stopping where the solver would start"""
+def _start(monkeypatch, X_mode, upper_hybrid_flag, offset):
+    """Run `ray_tracing`'s start checks for a ray starting where omega_UH / omega
+    = 1 + `offset`, stopping where the solver would start"""
     h = hamiltonian()
     f = h.field
-    X_layer = brentq(
-        lambda x: _find_UH_ratio(np.array([x, 0.0, 0.0]), OMEGA, f, h) - 1,
+    X_start = brentq(
+        lambda x: _find_UH_ratio(np.array([x, 0.0, 0.0]), OMEGA, f, h) - 1 - offset,
         0.6 * L,
         0.7 * L,
         xtol=1e-14,
     )
-    q = np.array([X_layer, 0.0, 0.0])
-    assert abs(_find_UH_ratio(q, OMEGA, f, h) - 1) < _ON_LAYER_TOL
+    q = np.array([X_start, 0.0, 0.0])
+    assert _find_UH_ratio(q, OMEGA, f, h) - 1 == pytest.approx(offset, abs=1e-10)
 
     def solver(*args, **kwargs):
         raise _ReachedTheSolver
@@ -167,7 +195,7 @@ def _start(monkeypatch, X_mode, upper_hybrid_flag):
     )
     ray_tracing(
         q_initial=q,
-        K_initial=K0 * K_HAT,
+        K_initial=K0 * K_hat(),
         poloidal_flux_enter=1.0,
         hamiltonian=h,
         ray_tracing_flag=True,
@@ -179,22 +207,32 @@ def _start(monkeypatch, X_mode, upper_hybrid_flag):
     )
 
 
+@pytest.mark.parametrize("offset", [0.0, 0.5, -0.5, 0.99, -0.99])
 @pytest.mark.parametrize("upper_hybrid_flag", ["stop", "raise"])
-def test_X_mode_starting_on_the_upper_hybrid_layer_raises(
-    monkeypatch, upper_hybrid_flag
+def test_X_mode_starting_within_the_margin_raises(
+    monkeypatch, upper_hybrid_flag, offset
 ):
-    with pytest.raises(RuntimeError, match="starts on the upper hybrid") as error:
-        _start(monkeypatch, True, upper_hybrid_flag)
-    assert '`upper_hybrid_flag="pass"`' in str(error.value)
+    with pytest.raises(
+        RuntimeError, match=f"starts within {_UPPER_HYBRID_MARGIN} of the upper hybrid"
+    ):
+        _start(monkeypatch, True, upper_hybrid_flag, offset * _UPPER_HYBRID_MARGIN)
 
 
 @pytest.mark.parametrize(
-    ("X_mode", "upper_hybrid_flag"),
-    [(True, "pass"), (False, "stop"), (False, "raise")],
+    ("X_mode", "offset"),
+    [(True, 1.5), (True, -1.5), (False, 0.0), (False, 0.5)],
 )
-def test_starting_on_the_upper_hybrid_layer_allowed(
-    monkeypatch, X_mode, upper_hybrid_flag
+@pytest.mark.parametrize("upper_hybrid_flag", ["stop", "raise"])
+def test_starting_outside_the_margin_allowed(
+    monkeypatch, X_mode, offset, upper_hybrid_flag
 ):
-    """When passed, or for the O-mode, which has no upper hybrid resonance"""
+    """Outside the margin on either side, or for the O-mode, which has no upper
+    hybrid resonance"""
     with pytest.raises(_ReachedTheSolver):
-        _start(monkeypatch, X_mode, upper_hybrid_flag)
+        _start(monkeypatch, X_mode, upper_hybrid_flag, offset * _UPPER_HYBRID_MARGIN)
+
+
+@pytest.mark.parametrize("X_mode", [True, False])
+def test_upper_hybrid_flag_pass_is_refused(monkeypatch, X_mode):
+    with pytest.raises(ValueError, match="`upper_hybrid_flag` can't be 'pass'"):
+        _start(monkeypatch, X_mode, "pass", 2 * _UPPER_HYBRID_MARGIN)
