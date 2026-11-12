@@ -13,6 +13,7 @@ mode_flag * beta > 0, and the two gave identical values on every input tried.
 """
 
 import importlib
+import os
 import time
 from unittest.mock import MagicMock
 
@@ -237,11 +238,16 @@ def test_polarisations_at_the_layer():
         assert abs(polarisations[1][-1]) > 0.999
 
 
+@pytest.mark.skipif(
+    not os.environ.get("SCOTTY_BENCHMARK"),
+    reason="a benchmark, not a test: set SCOTTY_BENCHMARK=1 to run it",
+)
 def test_benchmark_Hamiltonian_call(monkeypatch, record_property):
     """Times a Hamiltonian call with the old form of the root against the new, in
     turn, as this machine's speed drifts over seconds. Only reports the timings
     (shown with ``pytest -s``, and in the JUnit XML), as timings depend on the
-    machine"""
+    machine. Opt-in: runs only when the environment variable
+    ``SCOTTY_BENCHMARK`` is set"""
     module = importlib.import_module("scotty.hamiltonian")
     roots = {"old": old_root, "new": module.find_Booker_root}
     n_points, repeats = 10_000, 15

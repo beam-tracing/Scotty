@@ -51,8 +51,19 @@ of :math:`K`, which is exact only at :math:`B = 0`: for a magnetised plasma
     + \frac{\Omega_{pe}^2}{\Omega^2} \left(1 - \frac{\Omega_{pe}^2}{\Omega^2}\right)
     \frac{K_\parallel^2}{K_\perp^2}
 
-for any :math:`B_0 \neq 0` (for :math:`|K_\parallel| / K \lesssim
-(\Omega_{ce} / \Omega) / 2 (1 - \Omega_{pe}^2 / \Omega^2)`), so on the ray
+for any :math:`B_0 \neq 0`, while :math:`K_\parallel` stays in the region
+where :math:`H` is quadratic in it,
+
+.. math::
+    \frac{|K_\parallel|}{K_\perp} \ll \frac{Y}{2 (1 - X)},
+    \qquad X = \frac{\Omega_{pe}^2}{\Omega^2}, \quad
+    Y = \frac{\Omega_{ce}}{\Omega}.
+
+Scotty takes :math:`\partial^2 H / \partial K_Z^2` by finite differences, so
+its step :math:`\delta K_Z` has to sit inside this region. Here
+:math:`\delta K_Z / K_\perp \le 2.6 \times 10^{-4}` (the smallest
+:math:`K_\perp` is at the 10° turning point), against
+:math:`Y / [2 (1 - X)] \ge 0.05`. So on the ray
 :math:`\partial^2 H / \partial K_Z^2 = 2 (1 - \Omega_{pe}^2 / \Omega^2) / K_0^2`
 and
 
@@ -60,7 +71,10 @@ and
     \Psi_{ZZ}^{-1}(\tau) = \Psi_{ZZ}^{-1}(0)
     + \frac{2}{K_0^2} \int_0^\tau \left(1 - \frac{\Omega_{pe}^2}{\Omega^2}\right) d\tau.
 
-This differs from the paper's :math:`2 / K_0^2` for a magnetised plasma, so
+This differs from the paper's :math:`2 / K_0^2` for a magnetised plasma. The
+limit :math:`B_0 \to 0` is not uniform: the region above shrinks with
+:math:`Y`, and at :math:`Y = 0` exactly the paper's :math:`2 / K_0^2` is
+right. So
 `test_Psi_ZZ_magnetised_curvature` is a correction to that statement: it
 checks Scotty against the magnetised form, not against the paper. The paper's
 form would give a :math:`\Psi_{ZZ}` up to 15% of :math:`\max|\Psi_{ZZ}|`
@@ -174,7 +188,7 @@ def edge_Psi(a0, R_y):
     the same width and curvature as the beam-frame Psi_yy (a circular beam)"""
     c, s = np.cos(a0), np.sin(a0)
     t = s / c
-    # Normalised Psi' = Psi L / K0; (A.11) gives the lab Psi'_YY from the beam
+    # Normalised Psi' = Psi L / K0; (A.10) gives the lab Psi'_YY from the beam
     # Psi'_yy
     Psi_yy_n = edge_Psi_yy(R_y) * L / K0
     Psi_YY_n = c**2 * (Psi_yy_n + s**2 / (2 * c))
@@ -209,7 +223,7 @@ def analytic_Psi_ZZ(tau, a0, R_y):
 
 
 def Psi_yy_from_lab(Psi, K):
-    """(A.11): Psi in the beam frame, along y_hat, from the lab frame"""
+    """(A.10): Psi in the beam frame, along y_hat, from the lab frame"""
     K_magnitude = np.linalg.norm(K[:, :2], axis=1)
     cos_a, sin_a = K[:, 0] / K_magnitude, K[:, 1] / K_magnitude
     return (
@@ -259,7 +273,7 @@ def analytic_focus(a0, R_y):
 # Scotty runs
 ##################################################
 
-# Converging, R_y0 = -2 L cos(a0) / sin(a0)^2 as in the discussion of (A.16)
+# Converging, R_y0 = -2 L cos(a0) / sin(a0)^2 as in the text after (A.15)
 R_Y_CURVED = -2 * L * np.cos(np.deg2rad(30)) / np.sin(np.deg2rad(30)) ** 2
 
 # (launch angle in degrees, R_y = R_x at the edge, Omega_ce / Omega)
