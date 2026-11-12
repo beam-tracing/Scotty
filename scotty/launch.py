@@ -753,7 +753,9 @@ def launch_beam_frame(
     g_hat = -np.array(
         [np.cos(pol) * np.cos(tor), np.cos(pol) * np.sin(tor), np.sin(pol)]
     )
-    y_hat = np.array([-np.sin(pol) * np.cos(tor), -np.sin(pol) * np.sin(tor), np.cos(pol)])
+    y_hat = np.array(
+        [-np.sin(pol) * np.cos(tor), -np.sin(pol) * np.sin(tor), np.cos(pol)]
+    )
     # Past the vertical (|poloidal angle| > 90 deg) this points down: turn the
     # frame by 180 deg about g_hat, so y_hat points up and the handedness stays
     if np.cos(pol) < 0:
@@ -1000,10 +1002,9 @@ def find_plasma_entry_parameters(
             # beam enters the plasma
             # In vacuum, Psi_w^-1(s) = Psi_w^-1(0) + s / K0, in the fixed launch
             # beam frame (the ray is straight and g_hat constant)
-            Psi_w_inverse_entry_beamframe = (
-                distance_from_launch_to_entry / K0 * np.eye(2)
-                + find_inverse_2D(Psi_w_launch_beamframe)
-            )
+            Psi_w_inverse_entry_beamframe = distance_from_launch_to_entry / K0 * np.eye(
+                2
+            ) + find_inverse_2D(Psi_w_launch_beamframe)
             Psi_3D_entry_labframe_cartesian = _Psi_3D_lab_cartesian(
                 find_inverse_2D(Psi_w_inverse_entry_beamframe)
             )
