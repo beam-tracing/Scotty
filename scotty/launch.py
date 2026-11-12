@@ -6,7 +6,6 @@ import numpy as np
 from scipy import constants
 from scipy.interpolate import CubicSpline
 from scipy.optimize import minimize_scalar, root_scalar
-from scotty.antenna.gaussian import circular_gaussian_Psi_w
 from scotty.boundary_conditions import (
     apply_boundary_conditions,
     check_density_smooth_at_edge,
@@ -726,6 +725,37 @@ def _mode_from_K(
     return soln
 
 
+def launch_beam_frame(
+    poloidal_launch_angle_deg_Torbeam: float, toroidal_launch_angle_deg_Torbeam: float
+) -> Tuple[FloatArray, FloatArray, FloatArray]:
+    r"""The launch beam frame :math:`(\hat{x}, \hat{y}, \hat{g})`, in Cartesian
+    lab coordinates at the antenna (:math:`\zeta = 0`, so :math:`Y = 0`), in
+    which ``launch_beam_Psi_w`` is given.
+
+    - :math:`\hat{g}` is along the launched :math:`\mathbf{K}`;
+    - :math:`\hat{y}` is perpendicular to :math:`\hat{g}`, in the plane of
+      :math:`\hat{g}` and :math:`\hat{Z}`, with :math:`\hat{y} \cdot \hat{Z} > 0`
+      (upwards; the plane is vertical, so for a horizontal launch
+      :math:`\hat{y} = \hat{Z}`);
+    - :math:`\hat{x} = \hat{y} \times \hat{g}`, horizontal, so that
+      :math:`\hat{x} \times \hat{y} = \hat{g}` as in the analysis's beam frame.
+
+    For a launch with no toroidal angle, :math:`\hat{x} = -\hat{Y}`. The
+    analysis's beam frame (:math:`\hat{y} \propto \hat{b} \times \hat{g}`)
+    differs from this one by a rotation about :math:`\hat{g}` that depends on
+    :math:`\hat{b}`. The two coincide when :math:`\hat{b}` lies in the plane of
+    :math:`\hat{x}` and :math:`\hat{g}` with :math:`\hat{b} \cdot \hat{x} < 0`,
+    e.g. :math:`\hat{b} = \hat{Y}` at an unsteered launch."""
+    pol = np.deg2rad(poloidal_launch_angle_deg_Torbeam)
+    tor = np.deg2rad(toroidal_launch_angle_deg_Torbeam)
+    g_hat = -np.array(
+        [np.cos(pol) * np.cos(tor), np.cos(pol) * np.sin(tor), np.sin(pol)]
+    )
+    y_hat = np.array([-np.sin(pol) * np.cos(tor), -np.sin(pol) * np.sin(tor), np.cos(pol)])
+    x_hat = np.cross(y_hat, g_hat)
+    return x_hat, y_hat, g_hat
+
+
 def find_plasma_entry_parameters(
     ray_tracing_flag: bool,
     launch_flag: VALID_LAUNCH_FLAGS,
@@ -735,8 +765,7 @@ def find_plasma_entry_parameters(
     toroidal_launch_angle_deg_Torbeam: float,
     q_launch: FloatArray,
     q_initial: FloatArray,
-    launch_beam_width: float,
-    launch_beam_curvature: float,
+    launch_beam_Psi_w: Optional[ComplexFloatArray],
     field: VALID_FIELDS,
     K_plasmaLaunch_cartesian: Optional[FloatArray] = None,
     Psi_3D_plasmaLaunch_labframe_cartesian: Optional[FloatArray] = None,
@@ -900,43 +929,21 @@ def find_plasma_entry_parameters(
             Psi_3D_entry_labframe = None
             Psi_3D_entry_labframe_cartesian = None
         else:
-            # Finding Psi_w_launch_beamframe_cartesian and Psi_3D_launch_beamframe_cartesian
-            # First row/column is y-direction; second is x-direction; third is g-direction (beamframe)
-            # Not to be confused with X-, Y-, Z-directions (labframe)
-            Psi_w_launch_beamframe_cartesian = circular_gaussian_Psi_w(
-                K0, launch_beam_width, launch_beam_curvature
+            # The launch beam frame: x_hat and y_hat perpendicular to g_hat (along
+            # K_launch), in that order, as in `launch_beam_Psi_w`. Psi_3D in the
+            # lab frame is B Psi_w B^T, with B = [x_hat, y_hat] as columns, and
+            # has no components along g_hat in vacuum
+            Psi_w_launch_beamframe = launch_beam_Psi_w
+            x_hat_launch, y_hat_launch, _ = launch_beam_frame(
+                poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam
             )
-            Psi_3D_launch_beamframe_cartesian = make_array_3x3(
-                Psi_w_launch_beamframe_cartesian
-            )
+            beam_basis = np.column_stack([x_hat_launch, y_hat_launch])  # (3, 2)
 
-            # Setting up the rotation matrices, so that we can convert
-            # Psi_3D_launch_beamframe_cartesian into Psi_3D_launch_labframe_cartesian
-            poloidal_rotation_angle = poloidal_launch_angle + np.pi / 2
-            toroidal_rotation_angle = toroidal_launch_angle
-            sin_pol, cos_pol = np.sin(poloidal_rotation_angle), np.cos(
-                poloidal_rotation_angle
-            )
-            sin_tor, cos_tor = np.sin(toroidal_rotation_angle), np.cos(
-                toroidal_rotation_angle
-            )
-            poloidal_rotation_matrix = np.array(
-                [[cos_pol, 0, sin_pol], [0, 1, 0], [-sin_pol, 0, cos_pol]]
-            )
-            toroidal_rotation_matrix = np.array(
-                [[cos_tor, sin_tor, 0], [-sin_tor, cos_tor, 0], [0, 0, 1]]
-            )
-            rotation_matrix = np.matmul(
-                poloidal_rotation_matrix, toroidal_rotation_matrix
-            )
-            rotation_matrix_inverse = np.transpose(rotation_matrix)
+            def _Psi_3D_lab_cartesian(Psi_w):
+                return beam_basis @ Psi_w @ beam_basis.T
 
-            # Finding Psi_3D_launch_labframe_cartesian using:
-            # Psi_labframe = R^-1 * Psi_beamframe * R, where
-            #    R is the rotation matrix to convert a vector from beamframe to labframe
-            Psi_3D_launch_labframe_cartesian = np.matmul(
-                rotation_matrix_inverse,
-                np.matmul(Psi_3D_launch_beamframe_cartesian, rotation_matrix),
+            Psi_3D_launch_labframe_cartesian = _Psi_3D_lab_cartesian(
+                Psi_w_launch_beamframe
             )
             Psi_3D_launch_labframe = (
                 Psi_3D_launch_labframe_cartesian
@@ -961,22 +968,14 @@ def find_plasma_entry_parameters(
             # and then apply either the continuous or discontinuous or no
             # boundary conditions to find K_entry and Psi_entry when the
             # beam enters the plasma
-            Psi_w_inverse_launch_beamframe_cartesian = find_inverse_2D(
-                Psi_w_launch_beamframe_cartesian
-            )
-            Psi_w_inverse_entry_beamframe_cartesian = (
+            # In vacuum, Psi_w^-1(s) = Psi_w^-1(0) + s / K0, in the fixed launch
+            # beam frame (the ray is straight and g_hat constant)
+            Psi_w_inverse_entry_beamframe = (
                 distance_from_launch_to_entry / K0 * np.eye(2)
-                + Psi_w_inverse_launch_beamframe_cartesian
+                + find_inverse_2D(Psi_w_launch_beamframe)
             )
-
-            # 'Psi_3D_entry' is still in vacuum, so the components of Psi in the
-            # beam frame along g are all zero (since grad_H = 0)
-            Psi_3D_entry_beamframe_cartesian = make_array_3x3(
-                find_inverse_2D(Psi_w_inverse_entry_beamframe_cartesian)
-            )
-            Psi_3D_entry_labframe_cartesian = np.matmul(
-                rotation_matrix_inverse,
-                np.matmul(Psi_3D_entry_beamframe_cartesian, rotation_matrix),
+            Psi_3D_entry_labframe_cartesian = _Psi_3D_lab_cartesian(
+                find_inverse_2D(Psi_w_inverse_entry_beamframe)
             )
             Psi_3D_entry_labframe = (
                 Psi_3D_entry_labframe_cartesian

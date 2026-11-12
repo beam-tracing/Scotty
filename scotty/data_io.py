@@ -27,6 +27,10 @@ def dict_to_dataset(data_dict: dict, data_coords: dict) -> xr.Dataset:
     return xr.Dataset(data_dict, data_coords)
 
 
+def _float_or_nan(value) -> float:
+    return np.nan if value is None else float(value)
+
+
 def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict]:
 
     cart = params.cartesian_flag
@@ -39,8 +43,10 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "launch_freq_GHz": params.launch_frequency_GHz,
         "launch_angular_frequency": params.launch_angular_frequency,
         "launch_wavenumber": params.launch_wavenumber,
-        "launch_beam_width": params.launch_beam_width,
-        "launch_beam_curvature": params.launch_beam_curvature,
+        # NaN for a beam given by `launch_beam_Psi_w`, since netCDF cannot
+        # store `None`
+        "launch_beam_width": _float_or_nan(params.launch_beam_width),
+        "launch_beam_curvature": _float_or_nan(params.launch_beam_curvature),
         "launch_position": params.q_launch,
         "mode_flag": params.mode_flag_launch,
         # Solver settings and finite-difference parameters
@@ -94,6 +100,13 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "further_analysis_flag": params.further_analysis_flag,
         "detailed_analysis_flag": params.detailed_analysis_flag,
     }
+    # The launched beam's Psi_w, in the launch beam frame (x, y); also for a
+    # circular beam, so that the analysis needs only this
+    if params.launch_beam_Psi_w is not None:
+        inputs_dict["launch_beam_Psi_w"] = (
+            ["row_beam", "col_beam"],
+            np.asarray(params.launch_beam_Psi_w, dtype=complex),
+        )
     # A plasma launch starts from the user's K and Psi (Cartesian, lab
     # frame), so keep them to make the run reproducible from its output
     if params.launch_flag == "plasma":
@@ -112,6 +125,11 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "Z": field.Z_coord,
         "row": ["X", "Y", "Z"] if cart else ["R", "zeta", "Z"],
         "col": ["X", "Y", "Z"] if cart else ["R", "zeta", "Z"],
+        **(
+            {"row_beam": ["x", "y"], "col_beam": ["x", "y"]}
+            if params.launch_beam_Psi_w is not None
+            else {}
+        ),
     }
 
     return inputs_dict, inputs_coords

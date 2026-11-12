@@ -135,6 +135,7 @@ from scotty.profile_fit import ProfileFitLike, profile_fit
 from scotty.ray_solver import ray_tracing
 from scotty.typing import FloatArray, PathLike
 from scotty._version import __version__
+from numpy.typing import ArrayLike
 from typing import Optional, Sequence, Tuple, Union, Literal, cast
 import uuid
 import xarray as xr
@@ -146,13 +147,15 @@ def beam_me_up(
     poloidal_launch_angle_Torbeam: float,
     toroidal_launch_angle_Torbeam: float,
     launch_freq_GHz: float,
-    launch_beam_width: float,
-    launch_beam_curvature: float,
     launch_position: FloatArray,
     mode_flag: VALID_LAUNCH_MODE_FLAGS,
     # Solver settings and finite-difference parameters
     launch_flag: VALID_LAUNCH_FLAGS,
     Psi_BC_flag: VALID_PSI_BC_FLAGS,
+    # The launched beam: circular (width and curvature), or a general Psi_w
+    launch_beam_width: Optional[float] = None,
+    launch_beam_curvature: Optional[float] = None,
+    launch_beam_Psi_w: Optional[ArrayLike] = None,
     relativistic_flag: bool = False,  # includes relativistic corrections to electron mass when set to True
     resonance_flag: bool = True,  # stop the ray at a cyclotron (or, in X-mode, upper-hybrid) resonance
     auto_delta_sign: bool = True,  # For flipping signs to maintain forward difference
@@ -236,11 +239,26 @@ def beam_me_up(
         antenna is at :math:`\zeta = 0` (:math:`Y = 0`)
     launch_freq_GHz : float
         Beam frequency in GHz
-    launch_beam_width : float
-        Beam width :math:`W` at the antenna, in m
-    launch_beam_curvature : float
-        Curvature of the beam's wavefronts at the antenna, :math:`1/R_c`, in
-        m⁻¹ (negative for a converging beam)
+    launch_beam_width : float, optional
+        Width :math:`W` of a circular beam at the antenna, in m. Give it with
+        ``launch_beam_curvature``, or give ``launch_beam_Psi_w`` instead
+    launch_beam_curvature : float, optional
+        Curvature of a circular beam's wavefronts at the antenna,
+        :math:`1/R_c`, in m⁻¹ (negative for a converging beam)
+    launch_beam_Psi_w : array_like, shape (2, 2), complex, optional
+        :math:`\Psi_w` of the beam at the antenna, for an elliptical or
+        astigmatic beam, in m⁻²: ``[[Psi_xx, Psi_xy], [Psi_xy, Psi_yy]]`` in
+        the launch beam frame (:func:`scotty.launch.launch_beam_frame`:
+        :math:`\hat{y}` upwards in the vertical plane through the launched
+        :math:`\mathbf{K}`, :math:`\hat{x} = \hat{y} \times \hat{g}`).
+        :math:`\mathrm{Re}\,\Psi_w = K_0` times the curvature matrix, and
+        :math:`\mathrm{Im}\,\Psi_w`, positive definite, holds the widths
+        (:math:`2/W^2` along each principal axis).
+        :func:`scotty.antenna.gaussian.astigmatic_gaussian_Psi_w` makes it from
+        two widths, two curvatures and their angles. A circular beam has
+        :math:`\Psi_w = (K_0/R_c + 2i/W^2)\,\mathbb{1}`. Not used with
+        ``launch_flag="plasma"`` or ``ray_tracing_flag=True``, which need no
+        launch beam
     launch_position : array_like, shape (3,)
         Antenna position: :math:`(R, \zeta, Z)` for ``geometry="cylindrical"``
         (with :math:`\zeta = 0`), :math:`(X, Y, Z)` for ``"cartesian"``. For
@@ -410,6 +428,7 @@ def beam_me_up(
         launch_freq_GHz=launch_freq_GHz,
         launch_beam_width=launch_beam_width,
         launch_beam_curvature=launch_beam_curvature,
+        launch_beam_Psi_w=launch_beam_Psi_w,
         q_launch=launch_position,
         mode_flag_launch=mode_flag,
         # Solver settings and finite-difference parameters
@@ -493,6 +512,7 @@ def beam_me_up(
     #   - Launch frequency = {params.launch_frequency_GHz} GHz
     #   - Launch beam width = {params.launch_beam_width} m
     #   - Launch beam curvature = {params.launch_beam_curvature} m^-1
+    #   - Launch beam Psi_w (x, y) = {params.launch_beam_Psi_w} m^-2
     #   - Launch position {"[R,zeta,Z]" if params.geometry == "cylindrical" else "[X,Y,Z]"} = {arr2str(params.q_launch)}
     #   - Mode flag = {params.mode_flag_launch}
     #
@@ -657,8 +677,7 @@ def beam_me_up(
         toroidal_launch_angle_deg_Torbeam=params.toroidal_launch_angle_deg_Torbeam,
         q_launch=params.q_launch,
         q_initial=params.q_initial,
-        launch_beam_width=params.launch_beam_width,
-        launch_beam_curvature=params.launch_beam_curvature,
+        launch_beam_Psi_w=params.launch_beam_Psi_w,
         field=field,
         K_plasmaLaunch_cartesian=params.K_plasmaLaunch_cartesian,
         Psi_3D_plasmaLaunch_labframe_cartesian=params.Psi_3D_plasmaLaunch_labframe_cartesian,
