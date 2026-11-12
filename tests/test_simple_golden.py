@@ -6,6 +6,7 @@ from scotty.geometry import CircularFluxSurfaceField, MagneticField_Cylindrical
 from scotty.fun_general import freq_GHz_to_angular_frequency
 from scotty.profile_fit import QuadraticFit
 from scotty.hamiltonian import initialise_hamiltonians
+from scotty.antenna.gaussian import circular_gaussian_Psi_w
 from scotty.launch import (
     find_auto_delta_signs,
     find_plasma_entry_position,
@@ -1751,8 +1752,11 @@ def test_launch_golden_answer(tmp_path, generator):
         toroidal_launch_angle_deg_Torbeam=args["toroidal_launch_angle_Torbeam"],
         q_launch=args["launch_position"],
         q_initial=q_initial,
-        launch_beam_width=args["launch_beam_width"],
-        launch_beam_curvature=args["launch_beam_curvature"],
+        launch_beam_Psi_w=circular_gaussian_Psi_w(
+            hamiltonian_pos1.wavenumber,
+            args["launch_beam_width"],
+            args["launch_beam_curvature"],
+        ),
         field=field,
         hamiltonian_pos1=hamiltonian_pos1,
         hamiltonian_neg1=hamiltonian_neg1,
