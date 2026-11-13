@@ -68,6 +68,28 @@ EXTRA_ARGUMENTS = (
 )
 
 
+LaunchBeamArgument = Union[float, Tuple[float, float], Tuple[float, float, float]]
+"""`launch_beam_width` and `launch_beam_curvature`: a number for a circular beam.
+A 2-tuple and a 3-tuple are reserved for elliptical and astigmatic beams, and
+are not implemented yet"""
+
+
+def _circular_launch_beam(name: str, value: LaunchBeamArgument) -> float:
+    """`value` as a number, for a circular beam. A 2-tuple or 3-tuple (an
+    elliptical or astigmatic beam) raises `NotImplementedError`: these forms
+    are reserved until the launch beam frame and their meaning are decided"""
+    array = np.asarray(value) if value is not None else np.asarray(np.nan, dtype=object)
+    if array.ndim == 0 and array.dtype.kind in "iuf":
+        return float(array)
+    if array.ndim == 1 and len(array) in (2, 3) and array.dtype.kind in "iuf":
+        raise NotImplementedError(
+            f"`{name}` = {value}: a {len(array)}-tuple (an elliptical or "
+            "astigmatic beam) is reserved, but not implemented yet. Give a "
+            "number, for a circular beam"
+        )
+    raise ValueError(f"`{name}` must be a number (a circular beam), but got {value!r}")
+
+
 def _known_argument_names() -> list:
     """The names of `beam_me_up`'s arguments, to suggest the intended name of
     a misspelt keyword argument"""
@@ -126,9 +148,8 @@ class Parameters:
         poloidal_launch_angle_Torbeam: float,
         toroidal_launch_angle_Torbeam: float,
         launch_freq_GHz: float,
-        launch_beam_width: Optional[float],
-        launch_beam_curvature: Optional[float],
-        launch_beam_Psi_w: Optional[ArrayLike],
+        launch_beam_width: LaunchBeamArgument,
+        launch_beam_curvature: LaunchBeamArgument,
         q_launch: FloatArray,
         mode_flag_launch: VALID_LAUNCH_MODE_FLAGS,
         # Solver settings and finite-difference parameters
@@ -216,6 +237,13 @@ class Parameters:
         self.launch_wavenumber = angular_frequency_to_wavenumber(
             self.launch_angular_frequency
         )
+        self.launch_beam_width = self._check_positive(
+            "launch_beam_width",
+            _circular_launch_beam("launch_beam_width", launch_beam_width),
+        )
+        self.launch_beam_curvature = _circular_launch_beam(
+            "launch_beam_curvature", launch_beam_curvature
+        )
         self.q_launch = q_launch
         self.mode_flag_launch = self._check_mode_flag(mode_flag_launch)
 
@@ -228,17 +256,6 @@ class Parameters:
         self.ray_tracing_flag = ray_tracing_flag
         self.launch_flag = self._check_launch_flag(launch_flag)
         self.Psi_BC_flag = self._check_Psi_BC_flag(Psi_BC_flag, self.launch_flag)
-        # The launched beam, after `launch_flag` has been checked
-        (
-            self.launch_beam_width,
-            self.launch_beam_curvature,
-            self.launch_beam_Psi_w,
-        ) = self._check_launch_beam(
-            launch_beam_width,
-            launch_beam_curvature,
-            launch_beam_Psi_w,
-            needs_beam=(self.launch_flag != "plasma" and not ray_tracing_flag),
-        )
         self.relativistic_flag = relativistic_flag
         self._check_replaced_kwargs(extras=kwargs)
         self.first_harmonic_flag = self._check_resonance_flag(
@@ -378,75 +395,6 @@ class Parameters:
             raise ValueError(f"`{name}` must be positive, but got {value}")
         else:
             return value
-
-    def _check_launch_beam(
-        self,
-        launch_beam_width: Optional[float],
-        launch_beam_curvature: Optional[float],
-        launch_beam_Psi_w: Optional[ArrayLike],
-        needs_beam: bool,
-    ) -> Tuple[Optional[float], Optional[float], Optional[ComplexFloatArray]]:
-        """The launched beam: a circular one from `launch_beam_width` and
-        `launch_beam_curvature`, or a general one from `launch_beam_Psi_w`
-        (not both). Returns the width, the curvature and the 2x2 Psi_w in the
-        launch beam frame; the Psi_w is None only if no beam is needed"""
-        from scotty.antenna.gaussian import (
-            check_launch_Psi_w,
-            circular_gaussian_Psi_w,
-        )
-
-        circular_given = [
-            v is not None for v in (launch_beam_width, launch_beam_curvature)
-        ]
-        if launch_beam_Psi_w is not None:
-            if any(circular_given):
-                raise ValueError(
-                    "Give either `launch_beam_width` and `launch_beam_curvature` "
-                    "(a circular beam) or `launch_beam_Psi_w`, not both"
-                )
-            from scotty.launch import launch_beam_frame_is_defined
-
-            Psi_w = check_launch_Psi_w(launch_beam_Psi_w)
-            circular = np.allclose(
-                Psi_w, Psi_w[0, 0] * np.eye(2), rtol=0, atol=1e-12 * np.abs(Psi_w).max()
-            )
-            if not circular and not launch_beam_frame_is_defined(
-                self.poloidal_launch_angle_deg_Torbeam
-            ):
-                raise ValueError(
-                    "`launch_beam_Psi_w` is given in the launch beam frame, which "
-                    "is not defined for a vertical launch (poloidal angle +-90 deg); "
-                    "a circular beam can still be launched there"
-                )
-            return None, None, Psi_w
-
-        if not all(circular_given):
-            if needs_beam:
-                raise ValueError(
-                    "The launched beam is needed: give `launch_beam_width` and "
-                    "`launch_beam_curvature` (a circular beam), or "
-                    "`launch_beam_Psi_w` (an elliptical or astigmatic beam)"
-                )
-            return launch_beam_width, launch_beam_curvature, None
-
-        for name, value in (
-            ("launch_beam_width", launch_beam_width),
-            ("launch_beam_curvature", launch_beam_curvature),
-        ):
-            if np.ndim(value) != 0:
-                raise ValueError(
-                    f"`{name}` is for a circular beam and must be a scalar, but "
-                    f"got {value}. For an elliptical or astigmatic beam, give "
-                    "`launch_beam_Psi_w`, e.g. from "
-                    "`scotty.antenna.gaussian.astigmatic_gaussian_Psi_w`"
-                )
-        width = self._check_positive("launch_beam_width", launch_beam_width)
-        curvature = launch_beam_curvature
-        if not needs_beam:
-            # e.g. a preset's beam with a plasma launch: kept, but not used
-            return width, curvature, None
-        Psi_w = circular_gaussian_Psi_w(self.launch_wavenumber, width, curvature)
-        return width, curvature, Psi_w
 
     def _check_mode_flag(
         self, mode_flag_launch: Union[str, int]

@@ -14,7 +14,7 @@ from scipy import constants as const
 from scipy.integrate import trapezoid
 import xarray as xr
 
-from scotty.antenna.gaussian import find_waist, launch_beam_waist_matrix
+from scotty.antenna.gaussian import find_waist
 from scotty.checks import VALID_FIELDS
 from scotty.data_io import CARTESIAN_VECTOR_COMPONENTS
 from scotty.fun_general import (
@@ -254,31 +254,12 @@ def dbs_analysis(
                 "`beam_waist`, and with it filterfun_b and filterfun_all, are NaN"
             )
             beam_waist = np.nan
-        elif np.isfinite(float(inputs["launch_beam_width"][()])):
+        else:
             launch_beam_width = float(inputs["launch_beam_width"][()])
             launch_beam_curv = float(inputs["launch_beam_curvature"][()])
             beam_waist = find_waist(
                 launch_beam_width, launch_wavenumber, launch_beam_curv
             )
-        else:
-            # A beam given by its Psi_w. The waist matrix -2 Im(Psi_w^-1) is
-            # W_0^2 times the identity for a circular beam
-            waist_matrix = launch_beam_waist_matrix(
-                np.asarray(inputs["launch_beam_Psi_w"].values)
-            )
-            eigenvalues = np.linalg.eigvalsh(waist_matrix)
-            if np.ptp(eigenvalues) <= 1e-12 * np.abs(eigenvalues).max():
-                beam_waist = float(np.sqrt(eigenvalues.mean()))
-            else:
-                # TODO (4.1): which width normalises filterfun_b for a beam
-                # that is not circular, e.g. [-2 Im(Psi_w^-1)_yy]^(1/2) along the
-                # analysis's y_hat
-                log.warning(
-                    "The launched beam is not circular: filterfun_b's "
-                    "normalisation by the waist is not defined for it yet, so "
-                    "`beam_waist`, filterfun_b and filterfun_all are NaN"
-                )
-                beam_waist = np.nan
         filterfun_b = (beam_waist * det_Im_Psi_w) / (
             np.sqrt(2) * np.abs(det_M_w) * np.sqrt(-np.imag(M_w_inv_yy))
         )

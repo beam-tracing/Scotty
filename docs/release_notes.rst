@@ -58,18 +58,11 @@ Geometry, launch and boundary conditions
   polarisations where the solvers start. Which of 1 and -1 is the O-mode
   depends on the plasma and K; the cut-off check at the plasma boundary
   (``Psi_BC_flag="discontinuous"``) now uses the same test.
-- Elliptical and astigmatic launch beams (draft, under review):
-  ``launch_beam_Psi_w`` takes the launched beam's 2×2 complex
-  :math:`\Psi_w`, in the launch beam frame of
-  `scotty.launch.launch_beam_frame`, ordered ``[[Psi_xx, Psi_xy], [Psi_xy,
-  Psi_yy]]``. `scotty.antenna.gaussian.astigmatic_gaussian_Psi_w` builds it
-  from two widths, two curvatures and the angles of their axes. A circular
-  beam is still given by ``launch_beam_width`` and ``launch_beam_curvature``,
-  which are now optional (give one form, not both) and keyword arguments after
-  ``Psi_BC_flag``. Neither is needed for ``launch_flag="plasma"`` or
-  ``ray_tracing_flag=True``. ``inputs/launch_beam_Psi_w`` is always saved for
-  a vacuum launch; ``inputs/launch_beam_width`` and ``launch_beam_curvature``
-  are NaN when the beam was given as :math:`\Psi_w`.
+- ``launch_beam_width`` and ``launch_beam_curvature`` take a number, for a
+  circular beam, as before. A 2-tuple and a 3-tuple are reserved for
+  elliptical and astigmatic beams and raise ``NotImplementedError`` for now,
+  until the launch beam frame and the meaning of their elements are decided.
+  Anything else raises ``ValueError``.
 
 Running v3 inputs and outputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
