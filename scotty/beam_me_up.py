@@ -51,8 +51,9 @@ Notes
   works at zero density (e.g. at the plasma edge), where both roots have
   :math:`N = 1`, from their polarisations' zero-density limits. It fails
   only for :math:`K` nearly along :math:`B`, where both modes are circularly
-  polarised; give 1 or -1 there. The upper hybrid resonance stops the X-mode,
-  whichever ``mode_flag`` it was launched with.
+  polarised; give 1 or -1 there. The upper hybrid resonance stops the X-mode
+  (with ``upper_hybrid_flag="stop"``, the default), whichever ``mode_flag``
+  it was launched with.
 - ``ray_tracing_flag=True`` traces only the ray, with no beam.
 - Scripts written for Scotty v3 can be converted with `scotty.compat`.
 
@@ -109,6 +110,7 @@ from scotty.checks import (
     VALID_LAUNCH_FLAGS,
     VALID_LAUNCH_MODE_FLAGS,
     VALID_PSI_BC_FLAGS,
+    VALID_RESONANCE_FLAGS,
     Parameters,
 )
 from scotty.data_io import (
@@ -154,7 +156,9 @@ def beam_me_up(
     launch_flag: VALID_LAUNCH_FLAGS,
     Psi_BC_flag: VALID_PSI_BC_FLAGS,
     relativistic_flag: bool = False,  # includes relativistic corrections to electron mass when set to True
-    resonance_flag: bool = True,  # stop the ray at a cyclotron (or, in X-mode, upper-hybrid) resonance
+    first_harmonic_flag: VALID_RESONANCE_FLAGS = "stop",  # at the fundamental: "stop" (1e-3 short of it) or "raise"
+    second_harmonic_flag: VALID_RESONANCE_FLAGS = "stop",  # at the second cyclotron harmonic: "stop", "raise" or "pass"
+    upper_hybrid_flag: VALID_RESONANCE_FLAGS = "stop",  # at the upper hybrid layer (X-mode only): "stop" (1e-2 short of it) or "raise"
     auto_delta_sign: bool = True,  # For flipping signs to maintain forward difference
     delta_X: float = 1e-5,  # in the same units as data_X_coord
     delta_Y: float = 1e-5,  # in the same units as data_Y_coord
@@ -285,9 +289,46 @@ def beam_me_up(
     relativistic_flag : bool, default False
         Include the relativistic correction to the electron mass, from the
         temperature profile
-    resonance_flag : bool, default True
-        Stop the ray at the fundamental or second-harmonic electron cyclotron
-        resonance, and (for the X-mode) the upper hybrid resonance
+    first_harmonic_flag : {"stop", "raise"}, default "stop"
+        What the ray does at the first harmonic of the electron cyclotron
+        resonance (the fundamental), :math:`\omega_{ce} = \omega`:
+
+        - ``"stop"``: the ray stops, and the output ends 1e-3 short of the
+          layer, in :math:`\omega_{ce} / \omega`. Closer, :math:`K` isn't
+          resolved and can jump off the dispersion relation;
+        - ``"raise"``: a ``RuntimeError`` is raised.
+
+        ``"pass"`` is refused: the cold-plasma Hamiltonian is singular at the
+        first harmonic, so the ray can't be traced past it (#169). A ray that
+        starts on it raises whatever the flag
+    second_harmonic_flag : {"stop", "raise", "pass"}, default "stop"
+        What the ray does at the second harmonic of the electron cyclotron
+        resonance, :math:`2 \omega_{ce} = \omega`: ``"stop"`` ends the ray
+        and the output there, ``"raise"`` raises a ``RuntimeError``, and
+        ``"pass"`` carries on through it (the cold-plasma Hamiltonian is
+        regular there). A ray that starts on it raises unless the flag is
+        ``"pass"``
+    upper_hybrid_flag : {"stop", "raise"}, default "stop"
+        What the X-mode does at the upper hybrid resonance,
+        :math:`\omega_{UH} = \omega`. It applies to the X-mode only (whichever
+        ``mode_flag`` that is), and is ignored for the O-mode. The X-mode's
+        refractive index goes to infinity at the layer, and the ray only
+        approaches it asymptotically, so:
+
+        - ``"stop"``: the ray stops, and the output ends, 1e-2 short of the
+          layer, in :math:`\omega_{UH} / \omega`. Closer, the output points
+          are off the dispersion relation, and with :math:`K` perpendicular to
+          :math:`B` the solver stalls;
+        - ``"raise"``: a ``RuntimeError`` is raised there.
+
+        ``"pass"`` is refused, as the ray can't be traced through the layer. An
+        X-mode ray that starts within 1e-2 of the layer raises whatever the
+        flag
+
+        With a temperature profile (``relativistic_flag``), the three layers
+        include the relativistic mass correction. They replace
+        ``resonance_flag``, which now raises; v3's ``resonance_flag`` ``True``
+        and ``False`` are converted by `scotty.compat.from_v3_kwargs`
     auto_delta_sign : bool, default True
         Flip the signs of the spatial steps so that the forward differences
         point into the plasma at the plasma entry point
@@ -416,7 +457,9 @@ def beam_me_up(
         launch_flag=launch_flag,
         Psi_BC_flag=Psi_BC_flag,
         relativistic_flag=relativistic_flag,
-        resonance_flag=resonance_flag,
+        first_harmonic_flag=first_harmonic_flag,
+        second_harmonic_flag=second_harmonic_flag,
+        upper_hybrid_flag=upper_hybrid_flag,
         auto_delta_sign=auto_delta_sign,
         deltas_cylindrical=np.array(
             [delta_R, delta_Z, delta_K_R, delta_K_zeta, delta_K_Z], dtype=float
@@ -721,7 +764,9 @@ def beam_me_up(
         rtol=params.rtol,
         atol=params.atol,
         len_tau=params.len_tau,
-        resonance_flag=params.resonance_flag,
+        first_harmonic_flag=params.first_harmonic_flag,
+        second_harmonic_flag=params.second_harmonic_flag,
+        upper_hybrid_flag=params.upper_hybrid_flag,
         X_mode=X_mode,
         # tau_max = 1e5,
     )
