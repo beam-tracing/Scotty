@@ -25,6 +25,7 @@ dynamic = ["version"]
 [project.optional-dependencies]
 tests = [
     "pytest",
+    "pytest-timeout",
 ]
 docs = [
     "sphinx >= 5.3",

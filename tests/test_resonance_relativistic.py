@@ -1,4 +1,4 @@
-"""Relativistic resonances and resonance_flag (beam-tracing/Scotty#151), ported to v4.
+"""Relativistic resonances and the resonance flags (beam-tracing/Scotty#151), ported to v4.
 
 Generated from #151's v3 tests in the version of #161, whose expected end points are for
 find_B_method="analytical" = CircularFluxSurfaceField, the field v4's "analytical" now gives too
@@ -9,13 +9,18 @@ is plotted on this same plot. If the trajectory stops at the curve, it means tha
 working. These tests are for circular flux surfaces. The *_rel tests repeat the six fundamental and six
 second-harmonic cases of tests/test_resonance.py with a temperature profile, so that the resonances
 include the relativistic mass correction; both low (< 5 keV) and high (> 5 keV) temperatures are used.
-test_flag_true and test_flag_false check resonance_flag.
+test_default_flags_stop, test_first_harmonic_raise and test_first_harmonic_stop_second_pass
+check first_harmonic_flag, second_harmonic_flag and upper_hybrid_flag.
 """
 
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 from scotty.beam_me_up import beam_me_up
+from scotty.fun_general import (
+    find_normalised_gyro_ang_freq,
+    freq_GHz_to_angular_frequency,
+)
 
 # Print more of arrays in failed tests
 np.set_printoptions(linewidth=120, threshold=100)
@@ -541,11 +546,12 @@ def test_sec_harm_6_rel(tmp_path):
     )
 
 
-# test_flag: tests whether resonance_Flag works
+# The resonance flags: first_harmonic_flag, second_harmonic_flag, upper_hybrid_flag
 
 
-def test_flag_true(tmp_path):
-    kwargs_dict = {
+def default_flags_kwargs():
+    """test_resonance.py's test_fund_1 ray, with the default flags (all "stop")"""
+    return {
         "geometry": "cylindrical",
         "poloidal_launch_angle_Torbeam": 3,
         "toroidal_launch_angle_Torbeam": 0,
@@ -557,7 +563,6 @@ def test_flag_true(tmp_path):
         "density_fit_parameters": np.array([1.0]),
         "delta_R": -0.00001,
         "delta_Z": 0.00001,
-        "resonance_flag": True,
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",
         "launch_flag": "vacuum_analytic",
@@ -570,6 +575,10 @@ def test_flag_true(tmp_path):
         "R_axis": 1.5,
         "minor_radius_a": 0.5,
     }
+
+
+def test_default_flags_stop(tmp_path):
+    kwargs_dict = default_flags_kwargs()
     kwargs_dict["output_path"] = tmp_path
     output = beam_me_up(**kwargs_dict)
     assert_allclose(
@@ -584,11 +593,26 @@ def test_flag_true(tmp_path):
     )
 
 
-def test_flag_false(tmp_path):
-    # Regression check only: with resonance_flag=False the ray carries on past f_ce = f, but there the root
-    # selected by mode_flag switches from O to X, H jumps from 0 to -1 and stays there, so the rest of the ray is
-    # unphysical (the LCFS acts as a cutoff). This checks that Scotty says so.
-    kwargs_dict = {
+@pytest.mark.parametrize("rtol", [1e-3, 1e-4, 1e-6])
+def test_output_stops_short_of_the_fundamental(tmp_path, rtol):
+    """Within about 3e-5 of the fundamental, K can jump off the dispersion relation
+    in one output step, with |H| up to 0.48 and |K| 23% off"""
+    kwargs_dict = default_flags_kwargs()
+    kwargs_dict.update(output_path=tmp_path, rtol=rtol)
+    output = beam_me_up(**kwargs_dict)
+    Y = find_normalised_gyro_ang_freq(
+        freq_GHz_to_angular_frequency(kwargs_dict["launch_freq_GHz"]),
+        output["beam"]["B_magnitude"].values,
+    )
+    H = np.abs(output["beam"]["H_Booker"].values)
+    assert 1e-3 < 1 - Y[-1] < 2e-3
+    assert H.max() < 1e-4
+
+
+def first_harmonic_raise_kwargs(rtol):
+    """As `default_flags_kwargs`, but raising at the first harmonic, passing the
+    second harmonic, and with coarser output"""
+    return {
         "geometry": "cylindrical",
         "poloidal_launch_angle_Torbeam": 3,
         "toroidal_launch_angle_Torbeam": 0,
@@ -598,13 +622,11 @@ def test_flag_false(tmp_path):
         "launch_beam_curvature": -0.25,
         "launch_position": np.array([3, 0, 0]),
         "density_fit_parameters": np.array([1.0]),
-        # v3's defaults, for now: what this does past the resonance depends on the numerics
-        "rtol": 1e-3,
+        "rtol": rtol,
         "atol": 1e-6,
-        "delta_R": -1e-4,
-        "delta_Z": 1e-4,
         "len_tau": 102,
-        "resonance_flag": False,
+        "first_harmonic_flag": "raise",
+        "second_harmonic_flag": "pass",
         "density_fit_method": "quadratic",
         "find_B_method": "analytical",
         "launch_flag": "vacuum_analytic",
@@ -617,11 +639,34 @@ def test_flag_false(tmp_path):
         "R_axis": 1.5,
         "minor_radius_a": 0.5,
     }
+
+
+@pytest.mark.parametrize("rtol", [1e-3, 1e-5])
+def test_first_harmonic_raise(tmp_path, rtol):
+    # The ray isn't stopped at the second harmonic, but it can't go past f_ce = f: there the root selected
+    # by mode_flag switches from O to X. Depending on the tolerances, the ray then stays at H = -1 or K
+    # jumps onto the other root with H near 0 (beam-tracing/Scotty#169), so it raises at either.
+    # The error points to first_harmonic_flag="stop"
+    kwargs_dict = first_harmonic_raise_kwargs(rtol)
     kwargs_dict["output_path"] = tmp_path
-    # Past the resonance H is about -1 at these tolerances: the ray carried on,
-    # off the dispersion relation, where the same case with resonance_flag=True
-    # stops cleanly (test_flag_true). With tighter tolerances or wider steps, H
-    # stays near 0 instead, but only because K jumps onto the other root at the
-    # resonance, which is no more physical and which this check can't see
-    with pytest.raises(ValueError, match="unphysically large"):
+    with pytest.raises(RuntimeError, match="reached the first harmonic") as error:
         beam_me_up(**kwargs_dict)
+    assert '`first_harmonic_flag="stop"`' in str(error.value)
+
+
+@pytest.mark.parametrize("rtol", [1e-3, 1e-5])
+def test_first_harmonic_stop_second_pass(tmp_path, rtol):
+    """The same ray stopping at the first harmonic and passing the second is traced
+    up to 1e-3 short of the fundamental and returned, as for a two-stage run that
+    restarts past the layer"""
+    kwargs_dict = first_harmonic_raise_kwargs(rtol)
+    kwargs_dict.update(
+        output_path=tmp_path, first_harmonic_flag="stop", second_harmonic_flag="pass"
+    )
+    output = beam_me_up(**kwargs_dict)
+    Y = find_normalised_gyro_ang_freq(
+        freq_GHz_to_angular_frequency(kwargs_dict["launch_freq_GHz"]),
+        output["beam"]["B_magnitude"].values,
+    )
+    assert 1e-3 < 1 - Y[-1] < 3e-3
+    assert np.abs(output["beam"]["H_Booker"].values).max() < 1e-2

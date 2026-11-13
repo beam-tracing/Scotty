@@ -263,6 +263,21 @@ def test_check_H_output_sees_either_sign(sign):
         check_H_output(H)
 
 
+@pytest.mark.parametrize("H_max", [0.5, 0.99, -0.99])
+def test_check_H_output_raises_short_of_the_wrong_root(H_max):
+    """A ray on the wrong root has |H| near 1, and can stop just short of it (#169)"""
+    H = np.zeros(10)
+    H[5] = H_max
+    with pytest.raises(ValueError, match="unphysically large"):
+        check_H_output(H)
+
+
+def test_check_H_output_passes_the_usual_drift():
+    H = np.zeros(10)
+    H[5] = 0.05
+    check_H_output(H)
+
+
 @pytest.fixture(
     scope="module",
     params=[(0.0, 1), (10.0, 1), (10.0, -1)],

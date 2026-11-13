@@ -1,10 +1,12 @@
-"""The ray solver's resonance event (beam-tracing/Scotty#151), checked directly.
+"""The ray solver's resonance events (beam-tracing/Scotty#151), checked directly.
 
 The ported #151 trajectory tests never reach the upper-hybrid layer, so they pass with or without
-its term in the event. Here the event is evaluated at points on either side of each resonance on a
-line through the plasma, and must change sign across exactly the layers it is meant to detect:
-the cyclotron fundamental and second harmonic in both modes, and the upper-hybrid layer in X-mode
-only. With resonance_flag=False it must never change sign.
+its event. Here each event is evaluated at points on either side of the resonances on a line
+through the plasma, and must change sign across its own layer and no other: the first harmonic
+(the fundamental) and the second harmonic of the electron cyclotron frequency in both modes, and,
+in X-mode only, the upper-hybrid event, which is `_UPPER_HYBRID_MARGIN` short of its layer on the
+side the ray starts on. The second harmonic has no event when its flag is "pass"; the first
+harmonic and the upper hybrid layer can't be passed.
 """
 
 import numpy as np
@@ -20,13 +22,18 @@ from scotty.geometry import CircularFluxSurfaceField
 from scotty.hamiltonian import Hamiltonian
 from scotty.logger import config_logger
 from scotty.profile_fit import QuadraticFit
-from scotty.ray_solver import make_solver_events
+from scotty.ray_solver import (
+    _UPPER_HYBRID_MARGIN,
+    _tau_short_of_first_harmonic,
+    make_solver_events,
+)
 
 R_AXIS, A, B_T_AXIS, B_P_A = 1.5, 0.5, 1.0, 0.1
 FIELD = CircularFluxSurfaceField(B_T_AXIS, R_AXIS, A, B_P_A)
 DENSITY = QuadraticFit(1.0, 5.0)  # 5e19 m^-3 on axis
 OMEGA = freq_GHz_to_angular_frequency(50.0)
 Z = 0.0
+RESONANCES = ("first_harmonic", "second_harmonic", "upper_hybrid")
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -34,11 +41,20 @@ def trace_level(tmp_path_factory):
     config_logger("warning", None, tmp_path_factory.mktemp("log"), "")
 
 
-def event(mode_flag, resonance_flag, temperature_fit=None, X_mode=None):
-    """The resonance event for the Hamiltonian with `mode_flag`. Unless given,
-    `X_mode` is True for mode_flag = -1, the X-mode in this geometry"""
+def events(
+    mode_flag,
+    temperature_fit=None,
+    X_mode=None,
+    omega=OMEGA,
+    upper_hybrid_side=-1.0,
+    **flags,
+):
+    """The resonance events for the Hamiltonian with `mode_flag`, as functions of
+    R on the midplane. Unless given, `X_mode` is True for mode_flag = -1, the
+    X-mode in this geometry. `upper_hybrid_side` is -1 by default, for a ray from
+    the outboard edge, where omega_UH < omega"""
     hamiltonian = Hamiltonian(
-        launch_angular_freq=OMEGA,
+        launch_angular_freq=omega,
         mode_flag=mode_flag,
         deltas=np.array([1e-4, 1e-4, 0.1, 0.1, 0.1]),
         field=FIELD,
@@ -47,9 +63,25 @@ def event(mode_flag, resonance_flag, temperature_fit=None, X_mode=None):
     )
     if X_mode is None:
         X_mode = mode_flag == -1
-    events = make_solver_events(1.0, OMEGA, FIELD, resonance_flag, X_mode=X_mode)
-    cross = events["cross_resonance"]
-    return lambda R: cross(0.0, [R, 0.0, Z, 0.0, 0.0, 0.0], hamiltonian)
+    all_events = make_solver_events(
+        1.0,
+        omega,
+        FIELD,
+        X_mode=X_mode,
+        upper_hybrid_side=upper_hybrid_side,
+        **flags,
+    )
+
+    def at_R(event):
+        return lambda R: event(0.0, [R, 0.0, Z, 0.0, 0.0, 0.0], hamiltonian)
+
+    return {
+        name: at_R(event) for name, event in all_events.items() if name in RESONANCES
+    }
+
+
+def changes_sign(f, R_layer):
+    return np.sign(f(R_layer - 1e-3)) != np.sign(f(R_layer + 1e-3))
 
 
 def normalised(R):
@@ -71,57 +103,173 @@ def layer(f):
 # is not reached anywhere in this plasma
 UH = layer(lambda R: np.hypot(*normalised(R)) - 1)
 SECOND = layer(lambda R: normalised(R)[0] - 0.5)
+# Where the upper hybrid event is, for a ray from the outboard edge (omega_UH < omega)
+UH_EVENT = layer(lambda R: np.hypot(*normalised(R)) - 1 + _UPPER_HYBRID_MARGIN)
+
+
+def UH_layer_at(offset):
+    """R where omega_UH / omega = 1 + offset"""
+    return layer(lambda R: np.hypot(*normalised(R)) - 1 - offset)
 
 
 def test_layers_are_separated():
     assert abs(UH - SECOND) > 0.02
+    assert abs(UH_EVENT - SECOND) > 0.02
+    # The margin is resolved by the +-1 mm used by `changes_sign`
+    assert abs(UH_EVENT - UH) > 2e-3
+
+
+@pytest.mark.parametrize("mode_flag", [1, -1])
+def test_events_present_by_default(mode_flag):
+    """The first and second harmonics for both modes, the upper hybrid for the
+    X-mode only"""
+    expected = {"first_harmonic", "second_harmonic"} | (
+        {"upper_hybrid"} if mode_flag == -1 else set()
+    )
+    assert set(events(mode_flag)) == expected
 
 
 @pytest.mark.parametrize(
-    ("mode_flag", "R_layer", "must_change"),
+    ("mode_flag", "name", "R_layer"),
     [
-        pytest.param(1, SECOND, True, id="O-second-harmonic"),
-        pytest.param(-1, SECOND, True, id="X-second-harmonic"),
-        pytest.param(-1, UH, True, id="X-upper-hybrid"),
-        pytest.param(1, UH, False, id="O-no-upper-hybrid"),
+        pytest.param(1, "second_harmonic", SECOND, id="O-second-harmonic"),
+        pytest.param(-1, "second_harmonic", SECOND, id="X-second-harmonic"),
+        pytest.param(-1, "upper_hybrid", UH_EVENT, id="X-upper-hybrid"),
     ],
 )
-def test_event_changes_sign_across_its_layers(mode_flag, R_layer, must_change):
-    f = event(mode_flag, resonance_flag=True)
-    before, after = f(R_layer - 1e-3), f(R_layer + 1e-3)
-    assert (np.sign(before) != np.sign(after)) == must_change
+def test_each_event_changes_sign_across_its_own_layer_only(mode_flag, name, R_layer):
+    """On the 50 GHz outboard line, the layer's event changes sign across it and
+    not across the other layer, and no other event changes sign across it (the
+    fundamental isn't on this line)"""
+    fs = events(mode_flag)
+    other_R = UH_EVENT if R_layer == SECOND else SECOND
+    assert changes_sign(fs[name], R_layer)
+    assert not changes_sign(fs[name], other_R)
+    for other_name, f in fs.items():
+        if other_name != name:
+            assert not changes_sign(f, R_layer), other_name
+
+
+@pytest.mark.parametrize("mode_flag", [1, -1])
+def test_first_harmonic_event(mode_flag):
+    """At 30 GHz the fundamental is inside the plasma, on the inboard side. Only
+    the first-harmonic event changes sign across it"""
+    omega = freq_GHz_to_angular_frequency(30.0)
+    fs = events(mode_flag, omega=omega)
+    f = fs["first_harmonic"]
+    R_layer = brentq(f, R_AXIS - A + 1e-3, R_AXIS - 1e-3)
+    B = float(FIELD.magnitude(R_layer, 0.0, Z))
+    assert float(find_normalised_gyro_ang_freq(omega, B)) == pytest.approx(1.0)
+    assert changes_sign(f, R_layer)
+    for name, other in fs.items():
+        if name != "first_harmonic":
+            assert not changes_sign(other, R_layer), name
 
 
 @pytest.mark.parametrize(
-    ("mode_flag", "X_mode", "must_change"),
+    ("mode_flag", "X_mode", "must_exist"),
     [
         pytest.param(1, True, True, id="X-mode-as-mode_flag+1"),
         pytest.param(-1, False, False, id="O-mode-as-mode_flag-1"),
     ],
 )
-def test_upper_hybrid_follows_the_X_mode_not_mode_flag(mode_flag, X_mode, must_change):
+def test_upper_hybrid_follows_the_X_mode_not_mode_flag(mode_flag, X_mode, must_exist):
     """Which mode_flag is the X-mode depends on the plasma and K, so the
     upper-hybrid layer is detected for the X-mode whatever its mode_flag"""
-    f = event(mode_flag, resonance_flag=True, X_mode=X_mode)
-    before, after = f(UH - 1e-3), f(UH + 1e-3)
-    assert (np.sign(before) != np.sign(after)) == must_change
+    fs = events(mode_flag, X_mode=X_mode)
+    assert ("upper_hybrid" in fs) == must_exist
+    if must_exist:
+        assert changes_sign(fs["upper_hybrid"], UH_EVENT)
+    # No other event changes sign at the upper-hybrid layer or its event
+    for name, f in fs.items():
+        if name != "upper_hybrid":
+            assert not changes_sign(f, UH), name
+            assert not changes_sign(f, UH_EVENT), name
+
+
+@pytest.mark.parametrize("side", [1.0, -1.0])
+def test_upper_hybrid_event_is_short_of_the_layer_on_the_side_the_ray_starts(side):
+    """Zero `_UPPER_HYBRID_MARGIN` short of the layer, in omega_UH / omega, on the
+    ray's side; positive on that side and negative closer, at the layer and past
+    it. So a solver step across the whole band around the layer is seen, as is a
+    ray that would approach the layer asymptotically"""
+    f = events(-1, upper_hybrid_side=side)["upper_hybrid"]
+    m = _UPPER_HYBRID_MARGIN
+    assert f(UH_layer_at(side * m)) == pytest.approx(0.0, abs=1e-9)
+    assert f(UH_layer_at(side * 2 * m)) > 0
+    for offset in (side * 0.5 * m, 0.0, -side * m, -side * 2 * m):
+        assert f(UH_layer_at(offset)) < 0, offset
+
+
+@pytest.mark.parametrize("side", [None, 0.0, 2.0])
+def test_upper_hybrid_side_is_needed_for_the_X_mode(side):
+    with pytest.raises(ValueError, match="`upper_hybrid_side` must be 1 or -1"):
+        events(-1, upper_hybrid_side=side)
+    # Not for the O-mode
+    assert "upper_hybrid" not in events(1, upper_hybrid_side=side)
+
+
+@pytest.mark.parametrize("first_harmonic_flag", ["stop", "raise"])
+def test_pass_has_no_event(first_harmonic_flag):
+    fs = events(
+        -1, first_harmonic_flag=first_harmonic_flag, second_harmonic_flag="pass"
+    )
+    assert "second_harmonic" not in fs
+    assert "first_harmonic" in fs
+    assert set(fs) == set(RESONANCES) - {"second_harmonic"}
+
+
+def test_first_harmonic_cant_be_passed():
+    with pytest.raises(ValueError, match="first_harmonic_flag"):
+        events(1, first_harmonic_flag="pass")
 
 
 @pytest.mark.parametrize("mode_flag", [1, -1])
-def test_resonance_flag_false_never_changes_sign(mode_flag):
-    f = event(mode_flag, resonance_flag=False)
-    R = np.linspace(R_AXIS + 1e-3, R_AXIS + A - 1e-3, 401)
-    values = np.array([f(r) for r in R])
-    assert np.all(values >= 0)
+def test_upper_hybrid_cant_be_passed(mode_flag):
+    with pytest.raises(ValueError, match="`upper_hybrid_flag` can't be 'pass'"):
+        events(mode_flag, upper_hybrid_flag="pass")
+
+
+def test_two_layers_in_one_step_both_change_sign():
+    """The event functions at the two ends of a solver step from before both the
+    second harmonic and the upper hybrid event to after both: each event changes
+    sign, whereas their product (the single event used before) has the same sign
+    at both ends and would miss both. This checks the event functions, not a run
+    of `solve_ivp`"""
+    before, after = min(SECOND, UH_EVENT) - 1e-3, max(SECOND, UH_EVENT) + 1e-3
+    fs = events(-1)
+    second, upper_hybrid = fs["second_harmonic"], fs["upper_hybrid"]
+    assert np.sign(second(before)) != np.sign(second(after))
+    assert np.sign(upper_hybrid(before)) != np.sign(upper_hybrid(after))
+    assert np.sign(second(before) * upper_hybrid(before)) == np.sign(
+        second(after) * upper_hybrid(after)
+    )
 
 
 def test_relativistic_correction_moves_the_layer():
     """With a temperature, the relativistic mass increase lowers the cyclotron frequency, so the
     second-harmonic layer moves to stronger field (smaller R on the outboard side)"""
     hot = QuadraticFit(1.0, 20.0)  # 20 keV on axis
-    f_cold = event(1, resonance_flag=True)
-    f_hot = event(1, resonance_flag=True, temperature_fit=hot)
+    f_cold = events(1)["second_harmonic"]
+    f_hot = events(1, temperature_fit=hot)["second_harmonic"]
     R_cold = brentq(f_cold, SECOND - 0.05, SECOND + 0.05)
     R_hot = brentq(f_hot, R_AXIS + 1e-3, SECOND + 0.05)
     assert np.isclose(R_cold, SECOND, atol=1e-6)
     assert R_hot < R_cold - 1e-3
+
+
+def test_output_stop_is_the_last_approach_to_the_first_harmonic():
+    """A ray that comes within the margin, turns away and comes back has several
+    crossings of the margin. The output must stop at the last one (tau = 2.5 here),
+    not at an earlier near-approach (0.5 or 1.5)"""
+    distance = lambda tau: 1e-3 * np.cos(np.pi * tau)
+    steps = np.linspace(0.0, 3.0, 31)
+    assert _tau_short_of_first_harmonic(steps, 3.0, distance) == pytest.approx(2.5)
+
+
+def test_output_stop_leaves_other_ends_alone():
+    """Unchanged if the ray ends outside the margin (another layer, or the plasma
+    edge), or if it is within the margin at every step"""
+    steps = np.linspace(0.0, 1.0, 11)
+    assert _tau_short_of_first_harmonic(steps, 1.0, lambda tau: 0.1) == 1.0
+    assert _tau_short_of_first_harmonic(steps, 1.0, lambda tau: -0.1) == 1.0

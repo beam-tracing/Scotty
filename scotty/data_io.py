@@ -55,7 +55,9 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         # As a string, since netCDF cannot store `None`
         "Psi_BC_flag": str(params.Psi_BC_flag),
         "relativistic_flag": params.relativistic_flag,
-        "resonance_flag": params.resonance_flag,
+        "first_harmonic_flag": params.first_harmonic_flag,
+        "second_harmonic_flag": params.second_harmonic_flag,
+        "upper_hybrid_flag": params.upper_hybrid_flag,
         "auto_delta_sign": params.auto_delta_sign,
         **({"delta_X": params.delta_X} if cart else {"delta_R": params.delta_R}),
         **({"delta_Y": params.delta_Y} if cart else {}),

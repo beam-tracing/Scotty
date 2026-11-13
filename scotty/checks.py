@@ -37,6 +37,9 @@ VALID_GEOMETRIES = Literal["cylindrical", "cartesian"]
 VALID_LAUNCH_MODE_FLAGS = Literal[1, -1, "O", "X"]
 VALID_LAUNCH_FLAGS = Literal["vacuum_analytic", "vacuum_numerical", "plasma"]
 VALID_PSI_BC_FLAGS = Optional[Literal["continuous", "discontinuous"]]
+# What the ray does at a resonance layer (`first_harmonic_flag`,
+# `second_harmonic_flag`, `upper_hybrid_flag`; see `Parameters._check_resonance_flag`)
+VALID_RESONANCE_FLAGS = Literal["stop", "raise", "pass"]
 VALID_FIELDS = Union[
     MagneticField_Cylindrical,
     MagneticField_Cartesian,
@@ -132,7 +135,9 @@ class Parameters:
         launch_flag: VALID_LAUNCH_FLAGS,
         Psi_BC_flag: VALID_PSI_BC_FLAGS,
         relativistic_flag: bool,
-        resonance_flag: bool,
+        first_harmonic_flag: VALID_RESONANCE_FLAGS,
+        second_harmonic_flag: VALID_RESONANCE_FLAGS,
+        upper_hybrid_flag: VALID_RESONANCE_FLAGS,
         auto_delta_sign: bool,
         deltas_cylindrical: FloatArray,
         deltas_cartesian: FloatArray,
@@ -235,7 +240,16 @@ class Parameters:
             needs_beam=(self.launch_flag != "plasma" and not ray_tracing_flag),
         )
         self.relativistic_flag = relativistic_flag
-        self.resonance_flag = resonance_flag
+        self._check_replaced_kwargs(extras=kwargs)
+        self.first_harmonic_flag = self._check_resonance_flag(
+            "first_harmonic_flag", first_harmonic_flag
+        )
+        self.second_harmonic_flag = self._check_resonance_flag(
+            "second_harmonic_flag", second_harmonic_flag
+        )
+        self.upper_hybrid_flag = self._check_resonance_flag(
+            "upper_hybrid_flag", upper_hybrid_flag
+        )
         self.auto_delta_sign = auto_delta_sign
         self.len_tau = int(self._check_positive("len_tau", len_tau))
         self.rtol = rtol
@@ -523,6 +537,48 @@ class Parameters:
                 f"`launch_flag` must be one of {get_args(VALID_LAUNCH_FLAGS)}, but got {launch_flag!r}"
             )
         return cast(VALID_LAUNCH_FLAGS, launch_flag)
+
+    def _check_resonance_flag(self, name: str, value) -> VALID_RESONANCE_FLAGS:
+        # `isinstance` first, so that the old `resonance_flag`'s booleans and
+        # integers are refused rather than compared with the strings
+        if not isinstance(value, str) or value not in get_args(VALID_RESONANCE_FLAGS):
+            raise ValueError(
+                f"`{name}` must be one of {get_args(VALID_RESONANCE_FLAGS)}, but got "
+                f"{value!r}"
+            )
+        # The cold-plasma Hamiltonian is singular at the first harmonic, and past
+        # it the root that `mode_flag` selects swaps (beam-tracing/Scotty#169)
+        if name == "first_harmonic_flag" and value == "pass":
+            raise ValueError(
+                "`first_harmonic_flag` can't be 'pass': the cold-plasma Hamiltonian is "
+                "singular at the first harmonic of the electron cyclotron resonance "
+                "(the fundamental), so the ray can't be traced past it. Use 'stop' to "
+                "get the ray up to 1e-3 short of the layer, in omega_ce / omega, or "
+                "'raise'"
+            )
+        # The X-mode's refractive index goes to infinity at the upper hybrid layer,
+        # which a ray only approaches asymptotically
+        if name == "upper_hybrid_flag" and value == "pass":
+            raise ValueError(
+                "`upper_hybrid_flag` can't be 'pass': the X-mode's refractive index "
+                "goes to infinity at the upper hybrid resonance, so the ray can't be "
+                "traced past it. Use 'stop' to get the ray up to 1e-2 short of the "
+                "layer, in omega_UH / omega, or 'raise'"
+            )
+        return cast(VALID_RESONANCE_FLAGS, value)
+
+    def _check_replaced_kwargs(self, **extras):
+        # Raised rather than warned about as an unused keyword, since ignoring it
+        # would change where the ray stops
+        extras = extras["extras"]
+        if "resonance_flag" in extras:
+            raise ValueError(
+                f"`resonance_flag` (got {extras['resonance_flag']!r}) has been replaced "
+                "by `first_harmonic_flag`, `second_harmonic_flag` and "
+                "`upper_hybrid_flag`, each 'stop', 'raise' or 'pass'. To run a Scotty "
+                "v3 script, pass its arguments through `scotty.compat.from_v3_kwargs`, "
+                "which converts `resonance_flag`"
+            )
 
     def _check_Psi_BC_flag(
         self, Psi_BC_flag, launch_flag: VALID_LAUNCH_FLAGS
@@ -863,7 +919,9 @@ def check_H_output(H_arr: ArrayLike, H_tol: float = 1e-2) -> None:
     log.debug("Checking `H` output along the ray (it should be zero)")
 
     H_max = np.max(np.abs(H_arr))
-    if H_max > 1.0:
+    # On-surface drift is about 10 rtol, so about 0.01 at the default. A ray on the
+    # wrong root is at about 1 (beam-tracing/Scotty#169)
+    if H_max > 0.1:
         raise ValueError(
             f"`H_output` is unphysically large! `max(|H_output|)` = {H_max}"
         )

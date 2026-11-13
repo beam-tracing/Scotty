@@ -23,3 +23,32 @@ def test_initial_position_is_the_start_of_the_ray(tmp_path):
         atol=1e-12,
     )
     assert not np.allclose(so["q_initial_cylindrical"], so["q_launch_cylindrical"])
+
+
+def test_resonance_flags_saved_in_the_inputs(tmp_path):
+    """The three flags, as strings, in the output and in the saved file"""
+    import xarray as xr
+
+    kwargs = get_parameters_for_Scotty("DBS_synthetic")
+    kwargs.update(
+        len_tau=12,
+        ray_tracing_flag=True,
+        console_log_level="WARNING",
+        first_harmonic_flag="raise",
+        second_harmonic_flag="pass",
+        upper_hybrid_flag="stop",
+        output_filename_suffix="_flags",
+    )
+    dt = beam_me_up(**kwargs, output_path=tmp_path)
+    expected = {
+        "first_harmonic_flag": "raise",
+        "second_harmonic_flag": "pass",
+        "upper_hybrid_flag": "stop",
+    }
+    with xr.open_datatree(
+        tmp_path / "scotty_output_flags.h5", engine="h5netcdf"
+    ) as saved:
+        for inputs in (dt["inputs"], saved["inputs"]):
+            for name, value in expected.items():
+                assert str(inputs[name].values) == value
+            assert "resonance_flag" not in inputs
