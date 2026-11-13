@@ -113,6 +113,16 @@ Defaults
 - ``poloidal_flux_zero_temperature`` defaults to ``None``, which is
   ``poloidal_flux_zero_density``.
 
+Fixes
+~~~~~
+
+- The O-mode's Hamiltonian at Booker's :math:`\alpha = \epsilon_\perp = 0`
+  (the X-mode's upper hybrid layer): the root was 0/0 there, though the O-mode is
+  regular, so an O-mode beam crossing that density with :math:`K` exactly
+  perpendicular to :math:`B` could stop the beam solver (#180, #181). ``find_Booker_root`` uses the rationalised form where
+  :math:`m\beta > 0`, where it can't cancel. The same root in
+  ``boundary_conditions`` and ``launch`` uses it too.
+
 Other interface changes
 ~~~~~~~~~~~~~~~~~~~~~~~
 
