@@ -317,7 +317,6 @@ def run_linear_layer(a0_deg, R_y, gyro_ratio, output_path):
         find_B_method=linear_layer_field(B0_for(gyro_ratio), a0),
         density_fit_method=LinearFit(1.0, N_CUTOFF),
         poloidal_flux_zero_density=1.0,
-        resonance_flag=False,
         delta_X=DELTA_Q,
         delta_Y=DELTA_Q,
         delta_Z=DELTA_Q,
