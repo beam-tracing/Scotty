@@ -80,9 +80,51 @@ def test_unset_arguments_get_v3_defaults():
     # v3's defaults are v4's again, so they are not set
     for name in ("interp_smoothing", "find_B_method"):
         assert name not in kw
-    # v3's 1.01, raised to poloidal_flux_enter as v4 requires
-    assert kw["poloidal_flux_zero_density"] == 1.2
-    assert kw["poloidal_flux_zero_temperature"] == 1.2
+    # v4 has no separate zero points
+    assert "poloidal_flux_zero_density" not in kw
+    assert "poloidal_flux_zero_temperature" not in kw
+
+
+def test_v3_named_fit_becomes_a_profile_with_v3s_zero_point():
+    """v3's 1.01 (raised to poloidal_flux_enter), or the value given, is the
+    profile's zero point; an unnamed fit is guessed from its parameters"""
+    from scotty.profile_fit import QuadraticFit, TanhFit
+
+    kw = from_v3_kwargs({"density_fit_parameters": [4.0, 1.01]})  # guessed
+    fit = kw["density_fit_method"]
+    assert isinstance(fit, QuadraticFit)
+    assert fit.poloidal_flux_zero_profile == 1.01
+    assert "density_fit_parameters" not in kw
+    kw = from_v3_kwargs(
+        {
+            "density_fit_method": "tanh",
+            "density_fit_parameters": [4.0, 1.0],
+            "poloidal_flux_zero_density": 1.05,
+            "poloidal_flux_enter": 1.02,
+        }
+    )
+    assert isinstance(kw["density_fit_method"], TanhFit)
+    assert kw["density_fit_method"].poloidal_flux_zero_profile == 1.05
+    assert kw["poloidal_flux_enter"] == 1.02
+    kw = from_v3_kwargs(
+        {
+            "poloidal_flux_enter": 1.2,
+            "density_fit_method": "quadratic",
+            "density_fit_parameters": [4.0],
+        }
+    )
+    assert kw["density_fit_method"].poloidal_flux_zero_profile == 1.2
+
+
+def test_v3_file_and_object_keep_their_own_zero_point():
+    from scotty.profile_fit import QuadraticFit
+
+    kw = from_v3_kwargs({"poloidal_flux_zero_density": 1.05})
+    assert "poloidal_flux_zero_density" not in kw
+    assert "density_fit_method" not in kw  # read from ne.dat, ending with its data
+    fit = QuadraticFit(1.0, 4.0)
+    kw = from_v3_kwargs({"density_fit_method": fit, "poloidal_flux_zero_density": 1.05})
+    assert kw["density_fit_method"] is fit
 
 
 def test_explicit_arguments_kept_and_idempotent():
@@ -91,17 +133,15 @@ def test_explicit_arguments_kept_and_idempotent():
         "launch_flag": "plasma",
         "Psi_BC_flag": "discontinuous",
         "interp_smoothing": 3,
+        "density_fit_method": "quadratic",
+        "density_fit_parameters": [4.0],
         "poloidal_flux_zero_density": 1.1,
         "vacuum_propagation_flag": True,
     }
     kw = from_v3_kwargs(given)
-    for name in (
-        "launch_flag",
-        "Psi_BC_flag",
-        "interp_smoothing",
-        "poloidal_flux_zero_density",
-    ):
+    for name in ("launch_flag", "Psi_BC_flag", "interp_smoothing"):
         assert kw[name] == given[name]
+    assert kw["density_fit_method"].poloidal_flux_zero_profile == 1.1
     assert from_v3_kwargs(kw) == kw
 
 

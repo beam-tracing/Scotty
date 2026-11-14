@@ -34,13 +34,17 @@ What it converts:
   refuses it otherwise). With ``"vacuum_numerical"`` it is set to ``None``,
   with a warning: v3 propagated through the vacuum numerically without
   boundary conditions and ignored the flag, and v4 refuses it there;
-- ``poloidal_flux_enter``, if not given, is set to
-  ``poloidal_flux_zero_density``, so that the plasma starts where the density
-  is zero, as the continuous boundary condition needs (v3 started at 1.0 with
-  the density zero at 1.01). A density that does not reach zero at its edge
-  (such as an ``ne.dat`` file that ends with a non-zero density) is refused
-  there by the continuous condition: give such a script
-  ``Psi_BC_flag="discontinuous"``;
+- v3's ``poloidal_flux_zero_density`` and ``poloidal_flux_zero_temperature``
+  (default 1.01), which v4 removed, become the profiles' own zero points: a
+  named fit with its parameters becomes a profile object with that zero point
+  (v3 guessed an unnamed fit from the number of its parameters, and so does
+  this conversion). A profile object keeps its own. A density or temperature file ends where its data end, and
+  a zero point given for it is dropped, with a warning;
+- ``poloidal_flux_enter`` is left unset if not given, so that v4 starts the
+  plasma where the density profile ends (v3 started at 1.0 with the density
+  zero at 1.01). A density that does not reach zero at its edge (such as an
+  ``ne.dat`` file that ends with a non-zero density) is refused there by the
+  continuous condition: give such a script ``Psi_BC_flag="discontinuous"``;
 - ``geometry`` is set to ``"cylindrical"``, the only geometry v3 had;
 - a plasma launch: ``plasmaLaunch_K`` (cylindrical, as in v3) to the
   Cartesian ``plasmaLaunch_K_cartesian``, and
@@ -52,10 +56,7 @@ What it converts:
 - ``output_path`` given as a string, to a ``pathlib.Path`` (v4 accepts
   either, but v3 used a string as a file-name prefix, which is warned about);
 - defaults that differ between v3 and v4, restored when the v3 script left
-  them unset: ``poloidal_flux_zero_density`` and
-  ``poloidal_flux_zero_temperature`` (1.01, raised to
-  ``poloidal_flux_enter`` if that is larger, since v4 requires it); the
-  spatial finite-difference steps ``delta_R`` = -1e-4 and ``delta_Z`` = 1e-4
+  them unset: the spatial finite-difference steps ``delta_R`` = -1e-4 and ``delta_Z`` = 1e-4
   (v4's default is 1e-5 for both; v3 had no other spatial step); the solver
   tolerances ``rtol`` = 1e-3 and ``atol`` = 1e-6 (v4's are 1e-4, 1e-7); and the
   number of output points ``len_tau`` = 102 (v4's is 4002).
@@ -140,6 +141,66 @@ def _warn(message: str) -> None:
     if message not in _warned:
         _warned.add(message)
         log.warning(f"from_v3_kwargs: {message}")
+
+
+def _v3_zero_points(kw: Dict[str, Any]) -> None:
+    """v3's ``poloidal_flux_zero_density`` and ``poloidal_flux_zero_temperature``
+    (removed in v4) into the profiles: the first parameter of a named fit (the
+    fit guessed from the number of parameters, as v3 did, when unnamed); a
+    profile object or a file keeps or makes its own"""
+    from scotty.profile_fit import PROFILE_FIT_METHODS, _guess_profile_fit_method
+
+    enter = kw.get("poloidal_flux_enter", 1.0)
+    for zero_name, method_name, parameters_name, used in (
+        (
+            "poloidal_flux_zero_density",
+            "density_fit_method",
+            "density_fit_parameters",
+            True,
+        ),
+        (
+            "poloidal_flux_zero_temperature",
+            "temperature_fit_method",
+            "temperature_fit_parameters",
+            bool(kw.get("relativistic_flag")),
+        ),
+    ):
+        given = zero_name in kw
+        zero = kw.pop(zero_name, None)
+        method = kw.get(method_name)
+        parameters = kw.get(parameters_name)
+        if not used:
+            continue
+        if callable(method):
+            own = getattr(method, "poloidal_flux_zero_profile", None)
+            if given and zero is not None and own is not None and zero != own:
+                _warn(
+                    f"dropped `{zero_name}` = {zero}: the profile object's own zero "
+                    f"point, {own}, is what v3 used too"
+                )
+            continue
+        if parameters is None:
+            # A file: it ends where its data end
+            if given and zero is not None:
+                _warn(
+                    f"dropped `{zero_name}` = {zero}: v4 ends a profile read from a "
+                    "file where its data end"
+                )
+            continue
+        if method is None:
+            method = _guess_profile_fit_method(parameters, None)
+            _warn(f"`{method_name}` guessed as {method!r}, as v3 did")
+        if zero is None:
+            zero = max(V3_DEFAULT_POLOIDAL_FLUX_ZERO, enter)
+        # A profile object, which carries its zero point (and makes the
+        # conversion idempotent)
+        kw[method_name] = PROFILE_FIT_METHODS[method](zero, *list(parameters))
+        del kw[parameters_name]
+        _warn(
+            f"`{method_name}` = {kw[method_name]!r}, from v3's fit and parameters "
+            f"and `{zero_name}` = {zero}"
+            + ("" if given else " (v3's default, at least `poloidal_flux_enter`)")
+        )
 
 
 def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
@@ -266,30 +327,8 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
             )
         kw["output_path"] = pathlib.Path(output_path)
 
-    enter = kw.get("poloidal_flux_enter", 1.0)
-    for name, fit in (
-        ("poloidal_flux_zero_density", "density_fit_method"),
-        ("poloidal_flux_zero_temperature", "temperature_fit_method"),
-    ):
-        own_zero = getattr(kw.get(fit), "poloidal_flux_zero_profile", None)
-        if name not in kw and own_zero is None:
-            kw[name] = max(V3_DEFAULT_POLOIDAL_FLUX_ZERO, enter)
-            _warn(
-                f"set `{name}` = {kw[name]} (v3's default, at least `poloidal_flux_enter`)"
-            )
-    if "poloidal_flux_enter" not in kw and kw["launch_flag"] != "plasma":
-        zero_density = kw.get("poloidal_flux_zero_density")
-        if zero_density is None:
-            zero_density = getattr(
-                kw.get("density_fit_method"), "poloidal_flux_zero_profile", None
-            )
-        if zero_density is not None and zero_density != 1.0:
-            kw["poloidal_flux_enter"] = zero_density
-            _warn(
-                f"set `poloidal_flux_enter` = {zero_density}, "
-                "`poloidal_flux_zero_density` (v3 entered the plasma at 1.0, where "
-                "the density is not zero)"
-            )
+    # v4 removed the separate zero points: each profile has its own
+    _v3_zero_points(kw)
 
     for name, value in V3_DEFAULT_SPATIAL_STEPS.items():
         if name not in kw:

@@ -708,62 +708,133 @@ def find_Psi_3D_plasma(
     return Psi_3D_plasma_labframe
 
 
-def check_density_zero_at_entry(
+def find_density_start(
+    density_fit,
+    poloidal_flux_entry: float,
+    threshold: float,
+    points: int = 2001,
+) -> float:
+    """Where the density starts, going in from the entry point: the largest
+    flux at or inside ``poloidal_flux_entry`` where ``|n_e| > threshold``
+    (found on ``points`` points and refined by bisection). The entry point
+    itself if the density there is above the threshold, and 0 if it never is"""
+
+    def above(psi):
+        return abs(float(np.asarray(density_fit(psi)))) > threshold
+
+    if above(poloidal_flux_entry):
+        return poloidal_flux_entry
+    grid = np.linspace(poloidal_flux_entry, 0.0, points)
+    values = np.abs(np.asarray(density_fit(grid), dtype=float)) > threshold
+    if not values.any():
+        return 0.0
+    k = int(np.argmax(values))
+    outside, inside = grid[k - 1], grid[k]
+    for _ in range(60):
+        middle = 0.5 * (outside + inside)
+        if above(middle):
+            inside = middle
+        else:
+            outside = middle
+    return float(inside)
+
+
+def check_density_at_entry(
     density_fit,
     poloidal_flux_entry: float,
     Psi_BC_flag: VALID_PSI_BC_FLAGS,
     rtol: float = 1e-5,
     step: float = 1e-7,
+    band: float = 1e-4,
+    zero: float = 1e-10,
 ) -> None:
-    r"""Check that the density is zero at the plasma entry point, as
-    `Psi_BC_flag` = ``"continuous"`` and None assume, and raise a `ValueError`
-    if not.
+    r"""Check the density where the beam enters the plasma, and raise a
+    `ValueError` where the boundary condition would be wrong.
 
-    Both conditions keep the vacuum :math:`K` at the entry point. That
-    satisfies the dispersion relation only where the density is zero; where it
-    is not, the ray starts with :math:`H \ne 0` and stays on that wrong
-    dispersion surface, with :math:`|H|` about :math:`n_e/n_c` there. The
-    density must be at most `rtol` times the largest density inside the
-    plasma, both at the entry point and a relative `step` further in (at
-    most at the profile's zero point): the entry point is found only to
-    rounding, and a profile cut at its zero point jumps there. ``"discontinuous"``
-    solves for :math:`K` in the plasma instead, so it needs no such check.
+    First, find where the density starts (`find_density_start`, where it
+    exceeds ``zero`` times its maximum inside the entry point: a band where
+    the profile is zero, not one where it is small, as near the edge of a
+    profile that is flat there).
+
+    - If it starts inside the entry point (by more than ``band`` of the entry
+      flux), the solver crosses the start by itself, with no boundary
+      condition. That is right only if the profile is continuous and flat
+      there, whatever `Psi_BC_flag` is (`check_density_smooth_at_edge`).
+    - Otherwise it starts at the entry point. ``"continuous"`` and ``None``
+      keep the vacuum :math:`K` there, which is right only where the density
+      is zero: it is checked at the entry point and a relative ``step``
+      further in, since root finding can put the entry point on either side
+      of a profile that jumps there. ``None`` also needs the profile to be
+      flat there.
     """
-    edge = max(
-        poloidal_flux_entry,
-        getattr(density_fit, "poloidal_flux_zero_profile", poloidal_flux_entry),
+    n_max = float(
+        np.max(np.abs(density_fit(np.linspace(0.0, poloidal_flux_entry, 201))))
     )
-    n_max = float(np.max(np.abs(density_fit(np.linspace(0.0, edge, 201)))))
     if n_max == 0:
         return
-    zero_point = getattr(density_fit, "poloidal_flux_zero_profile", edge)
-    inside = min(poloidal_flux_entry, zero_point) * (1 - step)
+    start = find_density_start(density_fit, poloidal_flux_entry, zero * n_max)
+
+    if start < poloidal_flux_entry * (1 - band):
+        try:
+            check_density_smooth_at_edge(density_fit, start)
+        except ValueError as error:
+            raise ValueError(
+                f"The density is zero from poloidal flux {start:.6g} out to the "
+                f"plasma entry point ({poloidal_flux_entry:.6g}), so the beam "
+                "crosses the start of the density inside the plasma, where no "
+                f"boundary condition is applied. {error}. Set "
+                f"`poloidal_flux_enter` = {start:.6g}, where the density starts "
+                "(or leave it unset, which does that), so that the boundary "
+                "condition is applied there"
+            ) from None
+        return
+
+    if Psi_BC_flag == "discontinuous":
+        return
+
+    inside = poloidal_flux_entry * (1 - step)
     n_entry = max(
         (float(np.asarray(density_fit(psi))) for psi in (poloidal_flux_entry, inside)),
         key=abs,
     )
     if abs(n_entry) > rtol * n_max:
+        zero_point = getattr(density_fit, "poloidal_flux_zero_profile", None)
+        # Moving the entry point out helps only if the density falls to zero
+        # further out; at a profile that jumps to zero there, it doesn't
+        further_out = (
+            zero_point is not None
+            and zero_point > poloidal_flux_entry * (1 + band)
+            and abs(float(np.asarray(density_fit(zero_point * (1 - step)))))
+            <= rtol * n_max
+        )
+        advice = (
+            f"Use `Psi_BC_flag` = 'discontinuous', or set `poloidal_flux_enter` "
+            f"to {zero_point:.6g}, where the density is zero"
+            if further_out
+            else "The density jumps at the entry point, so use `Psi_BC_flag` = "
+            "'discontinuous'"
+        )
         raise ValueError(
             f"The density at the plasma entry point (poloidal flux "
             f"{poloidal_flux_entry:.6g}) is n_e = {n_entry:.4g} (e19), "
             f"{abs(n_entry) / n_max:.2e} of its maximum, but `Psi_BC_flag` = "
             f"{Psi_BC_flag!r} keeps the vacuum K there, which is only right where "
-            f"the density is zero (tolerance {rtol}). Use `Psi_BC_flag` = "
-            "'discontinuous', or set `poloidal_flux_enter` to where the density is "
-            "zero (`poloidal_flux_zero_density`)"
+            f"the density is zero (tolerance {rtol}). {advice}"
         )
+    if Psi_BC_flag is None:
+        check_density_smooth_at_edge(density_fit, poloidal_flux_entry)
 
 
 def check_density_smooth_at_edge(
     density_fit,
-    poloidal_flux_zero_density: Optional[float] = None,
+    edge: Optional[float] = None,
     rtol: float = 1e-3,
     step: float = 1e-4,
 ) -> None:
     r"""Check that the density profile is continuous and flat at the plasma
     edge, as `Psi_BC_flag` = None assumes, and raise a `ValueError` if not.
 
-    At the edge, `poloidal_flux_zero_density` (:math:`\psi_e`), the density
+    At the edge, `edge` (:math:`\psi_e`), the density
     must go to zero (continuous, since it is zero outside) with zero gradient
     (differentiable). Both are measured relative to the largest density
     :math:`n_{max}` inside the plasma: :math:`|n(\psi_e)| \le` `rtol`
@@ -771,16 +842,15 @@ def check_density_smooth_at_edge(
     :math:`n_{max}`. The gradient is the one-sided, second-order difference
     from inside the plasma, with spacing `step` :math:`\psi_e`.
 
-    If `poloidal_flux_zero_density` is not given, the profile's own
-    `poloidal_flux_zero_profile` is used.
+    If `edge` is not given, the profile's own `poloidal_flux_zero_profile`
+    is used.
     """
-    edge = poloidal_flux_zero_density
     if edge is None:
         edge = getattr(density_fit, "poloidal_flux_zero_profile", None)
     if edge is None:
         raise ValueError(
-            "`poloidal_flux_zero_density` is needed to check the density at the "
-            "plasma edge for `Psi_BC_flag` = None"
+            "The plasma edge is needed to check the density there for "
+            "`Psi_BC_flag` = None"
         )
 
     n_max = float(np.max(np.abs(density_fit(np.linspace(0.0, edge, 201)))))

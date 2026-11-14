@@ -10,7 +10,7 @@ from scipy import constants
 # from scotty.checks import VALID_LAUNCH_MODE_FLAGS
 from scotty.logger import arr2str
 from scotty.typing import ArrayLike, Array, FloatArray, ComplexFloatArray
-from typing import Callable, Union, Tuple, Optional, List, Literal, TextIO
+from typing import Callable, Union, Tuple, Optional, List, TextIO
 
 log = logging.getLogger(__name__)
 
