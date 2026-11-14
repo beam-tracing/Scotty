@@ -37,7 +37,10 @@ What it converts:
 - ``poloidal_flux_enter``, if not given, is set to
   ``poloidal_flux_zero_density``, so that the plasma starts where the density
   is zero, as the continuous boundary condition needs (v3 started at 1.0 with
-  the density zero at 1.01);
+  the density zero at 1.01). A density that does not reach zero at its edge
+  (such as an ``ne.dat`` file that ends with a non-zero density) is refused
+  there by the continuous condition: give such a script
+  ``Psi_BC_flag="discontinuous"``;
 - ``geometry`` is set to ``"cylindrical"``, the only geometry v3 had;
 - a plasma launch: ``plasmaLaunch_K`` (cylindrical, as in v3) to the
   Cartesian ``plasmaLaunch_K_cartesian``, and

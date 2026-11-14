@@ -16,6 +16,7 @@ from scotty.compat import from_v3_kwargs
 from scotty.fun_general import launch_direction_cartesian, ray_line
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.profile_fit import (
+    PolynomialFit,
     QuadraticFit,
     SmoothingSplineFit,
     StefanikovaFit,
@@ -146,6 +147,25 @@ def test_B2_density_at_entry_refused(tmp_path, Psi_BC_flag):
     )
     with pytest.raises(ValueError, match="density at the plasma entry point"):
         beam_me_up(**kwargs)
+
+
+@pytest.mark.parametrize(("ratio", "refused"), [(3e-5, True), (3e-6, False)])
+def test_B2_tolerance(tmp_path, ratio, refused):
+    """The density left at the entry point, relative to its maximum, just above
+    and just below the tolerance (1e-5). The profile is cut at the entry point,
+    so the check must look just inside it, not only at the entry point found by
+    root finding, which can land on either side of the jump"""
+    kwargs = synthetic(
+        tmp_path,
+        Psi_BC_flag="continuous",
+        density_fit_method=PolynomialFit(1.0, -4.0 * (1 - ratio), 0.0, 4.0),
+    )
+    if refused:
+        with pytest.raises(ValueError, match="density at the plasma entry point"):
+            beam_me_up(**kwargs)
+    else:
+        dt = beam_me_up(**kwargs)
+        assert np.max(np.abs(dt["beam"].ds["H_Booker"].values)) < 1e-4
 
 
 def test_B2_discontinuous_accepts_density_at_entry(tmp_path):

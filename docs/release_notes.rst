@@ -24,7 +24,10 @@ Results that change
 - The launch angles are measured from the local :math:`R` direction at the
   antenna, so an antenna at :math:`\zeta \ne 0` (or :math:`Y \ne 0`) gives the
   same beam as one at :math:`\zeta = 0`, turned. They were measured from the
-  global :math:`X` axis. Results at :math:`\zeta = 0` are unchanged. See
+  global :math:`X` axis. Results for an antenna on the :math:`+X` side of the
+  :math:`X`-:math:`Z` plane (:math:`\zeta = 0`, as in every cylindrical run
+  before) are unchanged; a Cartesian antenna at :math:`X < 0`, :math:`Y = 0` has
+  :math:`\zeta = \pi`, so its beam now turns round. See
   `scotty.fun_general.launch_direction_cartesian`, now the only place the
   launch direction is computed.
 - ``beam/curvature_1`` and ``curvature_2`` were too small by a factor
@@ -34,7 +37,11 @@ Results that change
   propagation, which is not converged across the kink in the density at the
   plasma edge), ``Psi_BC_flag="continuous"`` if it leaves that unset, and
   ``poloidal_flux_enter`` = ``poloidal_flux_zero_density`` (1.01 by default),
-  so that the plasma starts where the density is zero.
+  so that the plasma starts where the density is zero. A v3 script whose
+  density does not reach zero at its edge (for example an ``ne.dat`` file that
+  ends with a non-zero density at :math:`\psi = 1`) is then refused by the
+  check below; give it ``Psi_BC_flag="discontinuous"``. Before, such a script
+  failed on the negative density the spline extrapolated to.
 - ``get_parameters_for_Scotty("DBS_synthetic", launch_freq_GHz)`` uses the
   frequency given; it returned 55 GHz whatever was given. Presets that need a
   frequency raise a clear error without one.
@@ -43,7 +50,8 @@ Errors where results were wrong without one
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - ``Psi_BC_flag="continuous"`` and ``None`` raise if the density is not zero at
-  the plasma entry point. Both keep the vacuum :math:`K` there, so the ray started
+  the plasma entry point (more than 1e-5 of its maximum). Both keep the vacuum
+  :math:`K` there, so the ray started
   off the dispersion relation (:math:`|H|` up to 0.08) and stayed there, with at
   most a warning. Use ``"discontinuous"``, or set ``poloidal_flux_enter`` to where
   the density is zero.

@@ -1250,8 +1250,9 @@ def launch_direction_cartesian(
 
     The angles are measured from the local :math:`-\hat{R}` at the antenna,
     :math:`\zeta_a = \mathrm{atan2}(Y, X)`: with both angles zero, the beam
-    is launched horizontally towards the axis, whatever :math:`\zeta_a`. The
-    direction is
+    is launched horizontally towards the axis, whatever :math:`\zeta_a`. On
+    the axis (:math:`X = Y = 0`) :math:`\zeta_a` is taken as 0, so the angles
+    are measured from :math:`-\hat{X}`. The direction is
 
     .. math::
 

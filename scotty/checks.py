@@ -418,7 +418,7 @@ class Parameters:
             own = getattr(fit_method, "poloidal_flux_zero_profile", None)
             if given is None:
                 return default if own is None else own
-            if own is not None and given != own:
+            if own is not None and not np.isclose(given, own, rtol=1e-12, atol=0):
                 raise ValueError(
                     f"`{name}` = {given}, but the profile {fit_method!r} is zero "
                     f"from {own}, which is what the run would use. Leave `{name}` "

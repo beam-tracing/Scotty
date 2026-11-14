@@ -15,7 +15,7 @@ authors = [{name = "Valerian Hall-Chen"}]
 urls = {project = "https://github.com/beam-tracing/Scotty"}
 dependencies = [
     "numpy>=2.0",
-    # The first releases built for NumPy 2
+    # NumPy 2 needs these versions or newer
     "scipy>=1.13",
     "matplotlib>=3.8",
     "xarray>=2024.10.0",
