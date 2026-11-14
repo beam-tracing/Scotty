@@ -125,13 +125,6 @@ def config_logger(
 
 
 # RALT short for return_and_log_trace
-def ralt(log: logging.Logger, msg: str, f: Callable[..., Any], *args, **kwargs):
-    result = f(*args, **kwargs)
-    if msg:
-        log.trace(msg, result)  # type: ignore
-    return result
-
-
 P = ParamSpec("P")
 R = TypeVar("R")
 
@@ -148,16 +141,6 @@ def timer(func: Callable[P, R]) -> Callable[P, Tuple[R, float]]:
 
 
 # MLN short for multi-line numbers
-def mln(arr: Union[list, np.ndarray], prefix: str) -> str:
-    if isinstance(arr, list):
-        arr = np.array(arr)
-    if arr.ndim != 1:
-        raise ValueError(f"The array passed must be one-dimensional!")
-    split_arr = np.array_split(arr, len(arr) // 6 + 1)
-    msg = f"\n{prefix}".join(f"{sub_arr}" for sub_arr in split_arr)
-    return msg
-
-
 # To make arrays have commas in them (for debug messages)
 def arr2str(
     arr: Union[list, np.ndarray], precision: int = 7, separator: str = ", "

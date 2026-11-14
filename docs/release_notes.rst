@@ -1,6 +1,106 @@
 Release notes
 =============
 
+Unreleased (for 4.0.0rc)
+------------------------
+
+Fixes from the code audit of November 2026. Several change results, as noted.
+
+Results that change
+~~~~~~~~~~~~~~~~~~~
+
+- ``QuadraticFit`` is :math:`n_{e0}[1 - (\psi/\psi_0)^2]`, zero at
+  :math:`\psi_0`. It was :math:`n_{e0}(1 - \psi^2/\psi_0)` (as in v3), zero at
+  :math:`\sqrt{\psi_0}` and negative just inside :math:`\psi_0`, which made runs
+  fail. Results change for :math:`\psi_0 \ne 1`.
+- ``StefanikovaFit`` uses :math:`\exp[-(\psi/a_\mathrm{width})^{a_\mathrm{exp}}]`,
+  as its docstring and Stefanikova et al. (2016) have. The code computed
+  :math:`\exp(-a_\mathrm{exp}\psi/a_\mathrm{width})` (as in v3).
+- ``SmoothingSplineFit`` holds its end values past its data instead of
+  extrapolating (which could give negative densities), and its ``smoothing``
+  defaults to 0, so that it goes through the data. ``beam_me_up`` already passed
+  ``interp_smoothing=0``.
+- Every profile is clipped at zero, with a warning the first time.
+- The launch angles are measured from the local :math:`R` direction at the
+  antenna, so an antenna at :math:`\zeta \ne 0` (or :math:`Y \ne 0`) gives the
+  same beam as one at :math:`\zeta = 0`, turned. They were measured from the
+  global :math:`X` axis. Results for an antenna on the :math:`+X` side of the
+  :math:`X`-:math:`Z` plane (:math:`\zeta = 0`, as in every cylindrical run
+  before) are unchanged; a Cartesian antenna at :math:`X < 0`, :math:`Y = 0` has
+  :math:`\zeta = \pi`, so its beam now turns round. See
+  `scotty.fun_general.launch_direction_cartesian`, now the only place the
+  launch direction is computed.
+- ``beam/curvature_1`` and ``curvature_2`` were too small by a factor
+  :math:`|g|^2` (about 3e-6). The widths were right.
+- ``from_v3_kwargs``: a v3 script that leaves ``vacuum_propagation_flag`` unset
+  now gets ``launch_flag="vacuum_analytic"`` (v3's default was numerical
+  propagation, which is not converged across the kink in the density at the
+  plasma edge), ``Psi_BC_flag="continuous"`` if it leaves that unset, and
+  ``poloidal_flux_enter`` = ``poloidal_flux_zero_density`` (1.01 by default),
+  so that the plasma starts where the density is zero. A v3 script whose
+  density does not reach zero at its edge (for example an ``ne.dat`` file that
+  ends with a non-zero density at :math:`\psi = 1`) is then refused by the
+  check below; give it ``Psi_BC_flag="discontinuous"``. Before, such a script
+  failed on the negative density the spline extrapolated to.
+- ``get_parameters_for_Scotty("DBS_synthetic", launch_freq_GHz)`` uses the
+  frequency given; it returned 55 GHz whatever was given. Presets that need a
+  frequency raise a clear error without one.
+
+Errors where results were wrong without one
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``Psi_BC_flag="continuous"`` and ``None`` raise if the density is not zero at
+  the plasma entry point (more than 1e-5 of its maximum). Both keep the vacuum
+  :math:`K` there, so the ray started
+  off the dispersion relation (:math:`|H|` up to 0.08) and stayed there, with at
+  most a warning. Use ``"discontinuous"``, or set ``poloidal_flux_enter`` to where
+  the density is zero.
+- ``poloidal_flux_zero_density`` (and ``poloidal_flux_zero_temperature``) default
+  to ``None``: the zero point of the profile object, if it has one, and 1.0
+  otherwise. A value that disagrees with the profile object's raises; before, it
+  was ignored, and the output recorded it anyway.
+- A NaN or infinite ``launch_beam_width`` or ``launch_beam_curvature`` raises.
+
+Outputs
+~~~~~~~
+
+- ``width_1`` is the larger width at each point and ``width_2`` the smaller;
+  ``curvature_1`` is the smaller curvature and ``curvature_2`` the larger. They
+  are sorted at each point, not followed along fixed axes. The function meant to
+  follow them, ``check_eigval_order``, did nothing and is removed.
+- ``solver/e_hat_initial`` is labelled with ``col_field`` = (u1, u2, b), the
+  basis it is in, instead of ``col_cart``.
+- Duplicated variables are removed: ``epsilon_bb``, ``epsilon_11`` and
+  ``epsilon_12`` (use ``epsilon_para``, ``epsilon_perp`` and ``epsilon_g``);
+  ``H_Cardano_1``-``3`` (use ``H_Cardano``); ``H_eigval1``-``3`` (use
+  ``H_eigvals``); ``e_eigvec1``-``3`` (use ``e_eigvecs``); ``q_X_output``,
+  ``q_Y_output``, ``K_X_output`` and ``K_Y_output`` (use ``q_output_cartesian``
+  and ``K_output_cartesian``).
+
+Removed
+~~~~~~~
+
+- ``further_analysis_flag`` and ``detailed_analysis_flag``, which did nothing
+  in v4; ``from_v3_kwargs`` drops them. ``figure_flag`` stays (it still makes
+  no figures, and ``True`` logs a warning): separate flags for separate figures
+  may come later. See `scotty.plotting` for figures.
+- ``scotty/outplot.py``, which read only v2 output files, and the
+  ``TestFunctions``, ``WorkInProgress`` and ``Deprecated`` folders. The ``v3``
+  branch keeps them.
+- Unused functions in ``fun_general``: ``find_epsilon_para``,
+  ``find_epsilon_perp``, ``find_epsilon_g`` (use ``find_epsilon_terms``),
+  ``tilt_trns_RZ_make``, ``tilt_trns_TZ_make``,
+  ``mirrornorm_make_with_rot_tilt_operators`` and a second copy of
+  ``find_mode_index_and_ehat``; and ``mln`` and ``ralt`` in ``logger``.
+
+Packaging
+~~~~~~~~~
+
+- Requires SciPy 1.13 and Matplotlib 3.8 or newer (the first built for NumPy 2,
+  which Scotty already required). The project URL is ``beam-tracing/Scotty``.
+- The publish workflow fetches the full history, so that the package gets its
+  version from the tags.
+
 v4.0.0.dev0
 -----------
 
@@ -213,7 +313,7 @@ Other interface changes
   ``col_beam``) = (x, y), the stacked ``H_Cardano``, and in ``diagnostics/dbs``
   ``k_perp2_bs``, ``k_perp2_bs_normal`` and ``k_perp2_bs_binormal``.
 - ``benchmarking_flag`` is removed: it no longer did anything.
-- ``e_hat``, ``e_eigvecs`` and ``e_eigvec1``-``3`` are on ``col_field`` = (u1,
+- ``e_hat`` and ``e_eigvecs`` are on ``col_field`` = (u1,
   u2, b), the field-aligned frame D is written in, instead of ``col_cart``.
   Their values are unchanged.
 - ``solver_output/q_initial_cylindrical`` is where the solvers start: the

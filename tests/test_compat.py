@@ -40,10 +40,12 @@ def v3_style(kwargs: dict) -> dict:
             {"vacuumLaunch_flag": True, "vacuum_propagation_flag": False},
             "vacuum_numerical",
         ),
-        # v3's beam_me_up defaulted to vacuum_propagation_flag = False
-        ({"vacuumLaunch_flag": True}, "vacuum_numerical"),
+        # v3's beam_me_up defaulted to vacuum_propagation_flag = False, but
+        # from 4.0.0 an unset flag gives "vacuum_analytic": "vacuum_numerical"
+        # is not converged across the density kink at the plasma edge
+        ({"vacuumLaunch_flag": True}, "vacuum_analytic"),
         ({"vacuum_propagation_flag": True}, "vacuum_analytic"),
-        ({}, "vacuum_numerical"),
+        ({}, "vacuum_analytic"),
         ({"vacuumLaunch_flag": False}, "plasma"),
         ({"vacuumLaunch_flag": False, "vacuum_propagation_flag": True}, "plasma"),
     ],
@@ -68,13 +70,15 @@ def test_Psi_BC_flag_passed_through(Psi_BC_flag):
 
 def test_unset_arguments_get_v3_defaults():
     kw = from_v3_kwargs({"poloidal_flux_enter": 1.2})
-    assert kw["launch_flag"] == "vacuum_numerical"
-    assert kw["Psi_BC_flag"] is None
+    # Not v3's: an analytic vacuum launch with the continuous condition (4.0.0)
+    assert kw["launch_flag"] == "vacuum_analytic"
+    assert kw["Psi_BC_flag"] == "continuous"
+    assert kw["poloidal_flux_enter"] == 1.2
     # v3's spatial steps (upstream/master feb9499); v4's default is 1e-5
     assert kw["delta_R"] == -1e-4
     assert kw["delta_Z"] == 1e-4
     # v3's defaults are v4's again, so they are not set
-    for name in ("interp_smoothing", "find_B_method", "detailed_analysis_flag"):
+    for name in ("interp_smoothing", "find_B_method"):
         assert name not in kw
     # v3's 1.01, raised to poloidal_flux_enter as v4 requires
     assert kw["poloidal_flux_zero_density"] == 1.2
@@ -139,7 +143,7 @@ def test_unset_spatial_steps_warned(caplog, monkeypatch):
     "v3_flags",
     [
         {"vacuumLaunch_flag": True, "vacuum_propagation_flag": False},
-        {},  # v3's defaults
+        {"vacuum_propagation_flag": False},
     ],
 )
 def test_Psi_BC_flag_dropped_for_vacuum_numerical(
@@ -162,7 +166,7 @@ def test_Psi_BC_flag_dropped_is_accepted_by_v4():
     Psi_BC_flag with "vacuum_numerical\" """
     from scotty.checks import Parameters
 
-    kw = from_v3_kwargs({"Psi_BC_flag": "continuous"})
+    kw = from_v3_kwargs({"vacuum_propagation_flag": False, "Psi_BC_flag": "continuous"})
     params = Parameters.__new__(Parameters)
     assert params._check_Psi_BC_flag(kw["Psi_BC_flag"], kw["launch_flag"]) is None
     with pytest.raises(ValueError, match="must be None"):
@@ -288,7 +292,7 @@ def test_v3_arguments_point_to_the_converter(caplog):
 @pytest.fixture(scope="module")
 def v4_output(tmp_path_factory):
     kwargs = get_parameters_for_Scotty("DBS_synthetic")
-    kwargs.update(len_tau=52, interp_smoothing=0, detailed_analysis_flag=True)
+    kwargs.update(len_tau=52, interp_smoothing=0)
     path = tmp_path_factory.mktemp("v4")
     beam_me_up(**kwargs, output_path=path)
     return next(path.glob("*.h5"))

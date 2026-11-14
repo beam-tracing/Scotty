@@ -671,116 +671,6 @@ def find_epsilon_terms(
     return toreturn
 
 
-def find_epsilon_para(
-    launch_angular_freq: float,
-    electron_density: ArrayLike,
-    temperature: Optional[ArrayLike] = None,
-) -> ArrayLike:
-    """
-    Finds `epsilon_para`. Also called `epsilon_bb` in the paper
-
-    Parameters
-    ----------
-    launch_angular_freq : float
-        Angular frequency, in rad/s, at launch
-    electron_density : ArrayLike
-        Electron density, in 10^19 m^-3, at the points in the plasma to be
-        queried
-    temperature : ArrayLike or None
-        Temperature, in keV, at the points in the plasma to be queried
-
-    Returns
-    ----------
-    epsilon_para : ArrayLike
-        Also called epsilon_bb
-    """
-    return find_epsilon_terms(
-        launch_angular_freq,
-        0,
-        electron_density,
-        temperature,
-        para=True,
-        perp=False,
-        g=False,
-    )[0]
-
-
-def find_epsilon_perp(
-    launch_angular_freq: float,
-    B_total: ArrayLike,
-    electron_density: ArrayLike,
-    temperature: Optional[ArrayLike] = None,
-) -> ArrayLike:
-    """
-    Finds `epsilon_perp`. Also called `epsilon_11` in the paper
-
-    Parameters
-    ----------
-    launch_angular_freq : float
-        Angular frequency, in rad/s, at launch
-    B_total : ArrayLike
-        Magnitude of the magnetic field, in Tesla, at the points in the
-        plasma to be queried
-    electron_density : ArrayLike
-        Electron density, in 10^19 m^-3, at the points in the plasma to be
-        queried
-    temperature : ArrayLike or None
-        Temperature, in keV, at the points in the plasma to be queried
-
-    Returns
-    ----------
-    epsilon_perp : ArrayLike
-        Also called epsilon_11
-    """
-    return find_epsilon_terms(
-        launch_angular_freq,
-        B_total,
-        electron_density,
-        temperature,
-        para=False,
-        perp=True,
-        g=False,
-    )[0]
-
-
-def find_epsilon_g(
-    launch_angular_freq: float,
-    B_total: ArrayLike,
-    electron_density: ArrayLike,
-    temperature: Optional[ArrayLike] = None,
-) -> ArrayLike:
-    """
-    Finds `epsilon_g`. Also called `epsilon_12` in the paper
-
-    Parameters
-    ----------
-    launch_angular_freq : float
-        Angular frequency, in rad/s, at launch
-    B_total : ArrayLike
-        Magnitude of the magnetic field, in Tesla, at the points in the
-        plasma to be queried
-    electron_density : ArrayLike
-        Electron density, in 10^19 m^-3, at the points in the plasma to be
-        queried
-    temperature : ArrayLike or None
-        Temperature, in keV, at the points in the plasma to be queried
-
-    Returns
-    ----------
-    epsilon_g : ArrayLike
-        Also called epsilon_12
-    """
-    return find_epsilon_terms(
-        launch_angular_freq,
-        B_total,
-        electron_density,
-        temperature,
-        para=False,
-        perp=False,
-        g=True,
-    )[0]
-
-
 def find_Booker_terms(
     launch_angular_freq: float,
     B_total: ArrayLike,
@@ -1262,110 +1152,10 @@ def find_H_Cardano_formula(
     return H_1_Cardano, H_2_Cardano, H_3_Cardano
 
 
-def find_mode_index_and_ehat(
-    mode_flag: Literal[1, -1, "O", "X"],
-    H_Cardanos: FloatArray,
-    ehats: ComplexFloatArray,
-    tol_H: float = 1e-5,
-    tol_O_mode_polarisation: float = 0.25,
-) -> Tuple[int, float, ComplexFloatArray]:
-    """
-    Given an array `H_Cardanos` of shape (3,) and an array of `ehats` of
-    shape (3,3) where `H_Cardanos[i]` corresponds to `ehats[:,i]`, choose
-    the element of `H_Cardanos` which has the smallest absolute value; i.e.
-    choose `idx` such that `np.min(H_Cardanos) == abs(H_Cardanos[idx])`.
-    This corresponds to the solution to be used to calculate the correct
-    mode solution during post-processing
-
-    Parameters
-    ----------
-    mode_flag : VALID_LAUNCH_MODE_FLAGS
-        Must be one of [1, -1, "O", "X"]
-    H_Cardanos : FloatArray
-        Array of floats corresponding to the eigenvalues of the cold
-        plasma dispersion relation tensor
-    ehats : ComplexFloatArray
-        Array of vectors corresponding to the eigenvectors of the cold
-        plasma dispersion relation tensor, in the same order as
-        `H_Cardanos`
-    tol_H : float
-        Absolute tolerance for the solution in satisfying H=0
-    tol_O_mode_polarisation : float
-        Absolute tolerance to check if the polarisation vector corresponds
-        to O- or X-mode; i.e. if `e_hat[-1] < tol_O_mode_polarisation` then
-        it is X-mode, otherwise it's O-mode
-
-    Returns
-    ----------
-    mode_index : int
-        Index of the solution corresponding to the desired mode_flag
-    H : float
-        Value of the solution; i.e. `H_Cardanos[mode_index]`
-    ehat : ComplexFloatArray
-        Polarisation vector of the chosen solution; i.e. `ehats[mode_index]`
-    """
-    soln_idxs = np.where(np.abs(H_Cardanos) <= tol_H)[0]
-    soln_H = H_Cardanos[soln_idxs]
-    soln_ehats = ehats[
-        :, soln_idxs
-    ]  # note that soln_H[i] still corresponds to soln_ehats[:,i]
-
-    # We have three cases to check for:
-    #   (i)   If there are none or three solutions, raise an error
-    #   (ii)  If there is one solution, just return that
-    #   (iii) If there is more than 1 solution and the user specifies `mode_flag` = 1 or -1,
-    # then we have no way of knowing what exactly the user wants (i.e. we don't know
-    # if the O-mode or X-mode solution is wanted), so raise an error
-    #         Otherwise, check which mode index yields the desired mode
-
-    if soln_idxs.shape in [(0,), (3,)]:
-        raise RuntimeError(
-            f"Unable to check which mode index corresponds to O- and X-mode. Found {soln_idxs.shape} solutions!"
-        )
-
-    elif soln_idxs.shape == (1,):
-        mode_idx = soln_idxs[0]
-        H = soln_H[0]
-        ehat = soln_ehats
-
-    elif soln_idxs.shape == (2,) and mode_flag in [1, -1]:
-        raise RuntimeError(
-            f"Specific mode to be used not specified (`mode_flag` = {mode_flag}) and unable to determine which mode indices correspond to O- and X-mode"
-        )
-
-    else:  # soln_idxs.shape == (2,) and mode_flag in ["O", "X"]:
-        H0, H1 = H_Cardanos[soln_idxs]
-        e0, e1 = soln_ehats.T  # because soln_ehats.shape == (3,2)
-        abs_Re_e0_b = abs(np.real(e0[-1]))
-        abs_Re_e1_b = abs(np.real(e1[-1]))
-
-        if (
-            abs_Re_e0_b < 1 - tol_O_mode_polarisation
-            and abs_Re_e1_b < 1 - tol_O_mode_polarisation
-        ):
-            log.warning(
-                f"Both computed vectors ({e0} and {e1}) are not within the O-mode polarisation tolerance (tol = {tol_O_mode_polarisation})"
-            )
-            log.warning(
-                f"Setting the vector with the largets b-component to be the O-mode. This may or may not cause issues"
-            )
-
-        if mode_flag == "O":
-            idx = 0 if abs_Re_e0_b > abs_Re_e1_b else 1
-        else:
-            idx = 1 if abs_Re_e0_b > abs_Re_e1_b else 0
-
-        mode_idx = soln_idxs[idx]
-        H = soln_H[idx]
-        ehat = soln_ehats[idx]
-
-    return np.squeeze(mode_idx), np.squeeze(H), np.squeeze(ehat)
-
-
 def find_beam_widths_and_curvs(
     Psi_w: ComplexFloatArray, K_vec: FloatArray, g_hat: FloatArray
 ):
-    """
+    r"""
     Calculate the beam widths and curvatures
 
     Parameters
@@ -1380,63 +1170,35 @@ def find_beam_widths_and_curvs(
     Returns
     ----------
     curv1 : float or (N,) FloatArray
+        The smaller curvature at each point, from the smaller eigenvalue of
+        :math:`\mathrm{Re}(\Psi_w)`
     curv2 : float or (N,) FloatArray
+        The larger curvature
     width1 : float or (N,) FloatArray
+        The larger width at each point, from the smaller eigenvalue of
+        :math:`\mathrm{Im}(\Psi_w)`
     width2 : float or (N,) FloatArray
+        The smaller width
+
+    The values are sorted at each point; they are not followed along fixed
+    axes, so ``width1`` and ``width2`` exchange axes where the widths cross.
+    The axes of the curvatures and of the widths are in general different.
     """
 
     Re_Psi_w = np.real(Psi_w)
     Re_Psi_w_eigvals, Re_Psi_w_eigvecs = np.linalg.eigh(Re_Psi_w)  # (N,2) and (N,2,2)
-    Re_Psi_w_eigvals = check_eigval_order(Re_Psi_w_eigvals, Re_Psi_w_eigvecs)  # type: ignore
     K_mag = np.linalg.norm(K_vec, axis=1)
     K_g_mag = np.sum(K_vec * g_hat, axis=1)
     curvs = np.squeeze((K_g_mag**2 / K_mag**3)[:, np.newaxis] * Re_Psi_w_eigvals)
 
     Im_Psi_w = np.imag(Psi_w)
     Im_Psi_w_eigvals, Im_Psi_w_eigvecs = np.linalg.eigh(Im_Psi_w)
-    Im_Psi_w_eigvals = check_eigval_order(Im_Psi_w_eigvals, Im_Psi_w_eigvecs)  # type: ignore
     widths = np.squeeze(np.sqrt(np.full(Im_Psi_w_eigvals.shape, 2) / Im_Psi_w_eigvals))
 
     if curvs.ndim == 1:
         return curvs[0], curvs[1], widths[0], widths[1]
     else:
         return curvs[:, 0], curvs[:, 1], widths[:, 0], widths[:, 1]
-
-
-def check_eigval_order(
-    eigvals: FloatArray, eigvecs: FloatArray, diff_tol: float = 0.1
-) -> FloatArray:
-    """
-    Check if the eigenvalues are correctly ordered by comparing
-    each eigenvector of `eigvec1`
-
-    Parameters
-    ----------
-    eigvals : (N,2) FloatArray
-    eigvecs : (N,2,2) FloatArray
-        Note that the eigenvector `e_vec[:,:,i]` is the eigenvector
-        of the i-th eigenvalue `e_val[:,i]`
-
-    Returns
-    ----------
-    eigvals_sorted : (N,2) FloatArray
-        Correctly ordered array of eigenvalues
-    """
-    eigval1 = eigvals[:, 0]
-    eigval2 = eigvals[:, 1]
-    eigvec1 = eigvecs[:, :, 0].T  # (2, N)
-    arr1 = eigvec1[:-1]  # (2, N-1)
-    arr2 = eigvec1[1:]  # (2, N-1)
-    diff = np.linalg.norm(arr1 - arr2, axis=0)  # (N-1,)
-    diff_mask = np.where(diff < diff_tol)[0]
-    if diff_mask.shape == (0,):
-        for i in diff_mask:
-            idx = i + 1
-            _temp = eigval1[idx:]
-            eigval1[idx:] = eigval2[idx:]
-            eigval2[idx:] = _temp
-
-    return np.array([eigval1, eigval2]).T  # (N, 2)
 
 
 ##################################################
@@ -1477,6 +1239,44 @@ def find_nearest(array: ArrayLike, value: Any) -> int:
     return int(idx)
 
 
+def launch_direction_cartesian(
+    q_X_launch: float,
+    q_Y_launch: float,
+    poloidal_launch_angle_deg_Torbeam: float,
+    toroidal_launch_angle_deg_Torbeam: float,
+) -> FloatArray:
+    r"""The unit vector along the launch wavevector, in Cartesian
+    coordinates, from the launch angles in the TORBEAM convention.
+
+    The angles are measured from the local :math:`-\hat{R}` at the antenna,
+    :math:`\zeta_a = \mathrm{atan2}(Y, X)`: with both angles zero, the beam
+    is launched horizontally towards the axis, whatever :math:`\zeta_a`. On
+    the axis (:math:`X = Y = 0`) :math:`\zeta_a` is taken as 0, so the angles
+    are measured from :math:`-\hat{X}`. The direction is
+
+    .. math::
+
+        \hat{K} = -(\cos p \cos t, \cos p \sin t, \sin p),
+        \quad t = t_\mathrm{Torbeam} + \zeta_a, \quad p = p_\mathrm{Torbeam}
+
+    .. versionchanged:: 4.0.0
+       The angles were measured from the global :math:`X` axis, so an
+       antenna at :math:`\zeta_a \ne 0` needed :math:`\zeta_a` added to the
+       toroidal angle by hand. This is the only place the launch direction
+       is computed: `ray_line` and the launch :math:`K` both use it.
+    """
+    zeta_launch = np.arctan2(q_Y_launch, q_X_launch)
+    poloidal = np.deg2rad(poloidal_launch_angle_deg_Torbeam)
+    toroidal = np.deg2rad(toroidal_launch_angle_deg_Torbeam) + zeta_launch
+    return -np.array(
+        [
+            np.cos(poloidal) * np.cos(toroidal),
+            np.cos(poloidal) * np.sin(toroidal),
+            np.sin(poloidal),
+        ]
+    )
+
+
 def ray_line(
     q_X_launch: float,
     q_Y_launch: float,
@@ -1511,16 +1311,13 @@ def ray_line(
 
     XYZ_start = np.array([q_X_launch, q_Y_launch, q_Z_launch])
 
-    # This parametrises the ray in a line away from the antenna,
-    # at a/up to some values of the parameter `tau`
-    poloidal_launch_angle = -np.deg2rad(poloidal_launch_angle_deg_Torbeam)
-    toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_deg_Torbeam) + np.pi
-    XYZ_step = np.array(
-        [
-            np.cos(toroidal_launch_angle) * np.cos(poloidal_launch_angle),
-            np.sin(toroidal_launch_angle) * np.cos(poloidal_launch_angle),
-            np.sin(poloidal_launch_angle),
-        ]
+    # This parametrises the ray in a line away from the antenna, along the
+    # launch K, at a/up to some values of the parameter `tau`
+    XYZ_step = launch_direction_cartesian(
+        q_X_launch,
+        q_Y_launch,
+        poloidal_launch_angle_deg_Torbeam,
+        toroidal_launch_angle_deg_Torbeam,
     )
 
     ray_line_positions = XYZ_start + np.outer(tau, XYZ_step)
@@ -1972,87 +1769,6 @@ def use_deg_args(func, *args, **kwargs):
     return func(*[a * np.pi / 180 for a in args], **kwargs)
 
 
-def tilt_trns_RZ_make(t: float) -> FloatArray:
-    """
-    Tilts R ([1,0,0]) in to Z ([0,0,1]) using angle in radians
-
-    Parameters
-    ----------
-    t : float
-        Tilt angle in radians
-
-    Returns
-    ----------
-    rot_matrix : (3,3) FloatArray
-        Rotation matrix in RZ corresponding to a tilt of `t` radians
-    """
-    ctilt = np.cos(t)
-    stilt = np.sin(t)
-    return np.array([[ctilt, 0, stilt], [0, 1, 0], [-stilt, 0, ctilt]])
-
-
-def tilt_trns_TZ_make(t: float) -> FloatArray:
-    """
-    Tilts T ([0,1,0]) in to Z ([0,0,1]) using angle in radians
-
-    Parameters
-    ----------
-    t : float
-        Tilt angle in radians
-
-    Returns
-    ----------
-    rot_matrix : (3,3) FloatArray
-        Rotation matrix in TZ corresponding to a tilt of `t` radians
-    """
-    ctilt = np.cos(t)
-    stilt = np.sin(t)
-    return np.array([[1, 0, 0], [0, ctilt, -stilt], [0, stilt, ctilt]])
-
-
-def rot_trns_make(r: float) -> FloatArray:
-    """
-    Rotates R ([1,0,0]) into T ([0,1,0]) using angle in radians
-
-    Parameters
-    ----------
-    r : float
-        Rotation angle in radians
-
-    Returns
-    ----------
-    rot_matrix : (3,3) FloatArray
-        Rotation matrix in RT corresponding to a rotation of `r` radians
-    """
-    crot = np.cos(r)
-    srot = np.sin(r)
-    return np.array([[crot, -srot, 0], [srot, crot, 0], [0, 0, 1]])
-
-
-def mirrornorm_make_with_rot_tilt_operators(r: float, t: float) -> FloatArray:
-    """
-    Makes norm vector for mirror using tilt and rot operators (in that order) given
-    angles in radians
-
-    Parameters
-    ----------
-    r : float
-        Rotation angle in radians
-    t : float
-        Tilt angle in radians
-
-    Returns
-    ----------
-    mirrornorm : (3,) FloatArray
-        Mirror normal vector
-    """
-    mirrornorm0 = np.array([0, 1, 0])
-    tilt_trns = tilt_trns_TZ_make(t)
-    rot_trns = rot_trns_make(np.pi / 4 + r)
-    mirrornorm = rot_trns @ (tilt_trns @ mirrornorm0)
-    return mirrornorm
-
-
 def mirrornorm_make(r: float, t: float) -> FloatArray:
     """
     Makes norm vector for mirror directly using angles in radians
@@ -2114,6 +1830,25 @@ def reflector_make(r: float, t: float) -> FloatArray:
     mirrornorm = mirrornorm_make(r, t)
     reflector = reflector_make_from_mirrornorm(mirrornorm)
     return reflector
+
+
+def rot_trns_make(r: float) -> FloatArray:
+    """
+    Rotates R ([1,0,0]) into T ([0,1,0]) using angle in radians
+
+    Parameters
+    ----------
+    r : float
+        Rotation angle in radians
+
+    Returns
+    ----------
+    rot_matrix : (3,3) FloatArray
+        Rotation matrix in RT corresponding to a rotation of `r` radians
+    """
+    crot = np.cos(r)
+    srot = np.sin(r)
+    return np.array([[crot, -srot, 0], [srot, crot, 0], [0, 0, 1]])
 
 
 def genray_angles_from_mirror_angles(

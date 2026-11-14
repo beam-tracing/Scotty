@@ -70,8 +70,8 @@ def beam_path_cylindrical(dt: xr.DataTree) -> Tuple[FloatArray, FloatArray, Floa
     zeta = atan2(Y, X)"""
     so = dt["solver"]
     if _is_cartesian(dt):
-        X, Y = so["q_X_output"].values, so["q_Y_output"].values
-        return np.hypot(X, Y), np.arctan2(Y, X), so["q_Z_output"].values
+        X, Y, Z = so["q_output_cartesian"].values.T
+        return np.hypot(X, Y), np.arctan2(Y, X), Z
     return (
         so["q_R_output"].values,
         so["q_zeta_output"].values,
@@ -84,7 +84,8 @@ def beam_path_cartesian(dt: xr.DataTree) -> Tuple[FloatArray, FloatArray, FloatA
     geometry"""
     if _is_cartesian(dt):
         so = dt["solver"]
-        return so["q_X_output"].values, so["q_Y_output"].values, so["q_Z_output"].values
+        X, Y, Z = so["q_output_cartesian"].values.T
+        return X, Y, Z
     R, zeta, Z = beam_path_cylindrical(dt)
     return R * np.cos(zeta), R * np.sin(zeta), Z
 

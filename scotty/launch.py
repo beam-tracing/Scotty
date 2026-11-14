@@ -10,6 +10,7 @@ from scotty.antenna.gaussian import circular_gaussian_Psi_w
 from scotty.boundary_conditions import (
     apply_boundary_conditions,
     check_density_smooth_at_edge,
+    check_density_zero_at_entry,
 )
 from scotty.checks import (
     VALID_FIELDS,
@@ -23,6 +24,7 @@ from scotty.fun_general import (
     find_q_labframe_cart_to_cyl,
     find_q_labframe_cyl_to_cart,
     find_Psi_3D_labframe_cart_to_cyl,
+    launch_direction_cartesian,
     ray_line,
     poloidal_flux_difference_along_ray_line,
     make_array_3x3,
@@ -92,9 +94,9 @@ def find_plasma_entry_position(
     or `q_launch` (for `launch_flag` = "plasma", after checking that it is
     inside the plasma).
 
-    As in v3, the launch angles are taken in the TORBEAM convention for an
-    antenna at zeta = 0: the launch line's direction, like the launch K, is
-    measured from the X axis, so `q_launch` should have zeta = 0 (Y = 0)."""
+    The launch angles are in the TORBEAM convention, measured from the local
+    R at the antenna (`launch_direction_cartesian`), so the antenna can be at
+    any zeta."""
 
     log.info(f"Finding plasma entry position")
 
@@ -153,7 +155,9 @@ def find_plasma_entry_position(
 
     if np.isnan(polflux_arr).all():
         raise RuntimeError(
-            f"The ray does not intersect the plasma. Check that the launch position is from q_zeta = 0 with acute launch angles"
+            "The ray does not intersect the plasma. Check the launch position and the "
+            "launch angles: with both angles zero, the beam is launched "
+            "horizontally towards the axis"
         )
 
     start_idx = np.where(~np.isnan(polflux_arr))[0][0]
@@ -875,19 +879,22 @@ def find_plasma_entry_parameters(
         log.debug(
             f"`launch_flag` = {launch_flag}. Launching from outside the plasma boundary"
         )
+        # The angles are measured from the local R at the antenna, at
+        # toroidal angle zeta_launch (`launch_direction_cartesian`)
+        zeta_launch = np.arctan2(q_launch_cartesian[1], q_launch_cartesian[0])
         poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_deg_Torbeam)
-        toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_deg_Torbeam)
+        toroidal_launch_angle = (
+            np.deg2rad(toroidal_launch_angle_deg_Torbeam) + zeta_launch
+        )
 
         # Find K_launch, returned in the field's coordinates like K_initial.
-        # The two only coincide with no toroidal launch angle: in cylindrical,
-        # K_zeta is the toroidal mode number, q_R times the Cartesian K_Y
-        # at the launch position (which is at zeta = 0)
-        K_launch_cartesian = -K0 * np.array(
-            [
-                np.cos(poloidal_launch_angle) * np.cos(toroidal_launch_angle),
-                np.cos(poloidal_launch_angle) * np.sin(toroidal_launch_angle),
-                np.sin(poloidal_launch_angle),
-            ]
+        # In cylindrical, K_zeta is the toroidal mode number, q_R times the
+        # toroidal component of the Cartesian K at the launch position
+        K_launch_cartesian = K0 * launch_direction_cartesian(
+            q_launch_cartesian[0],
+            q_launch_cartesian[1],
+            poloidal_launch_angle_deg_Torbeam,
+            toroidal_launch_angle_deg_Torbeam,
         )
         K_launch = (
             K_launch_cartesian
@@ -912,6 +919,8 @@ def find_plasma_entry_parameters(
 
             # Setting up the rotation matrices, so that we can convert
             # Psi_3D_launch_beamframe_cartesian into Psi_3D_launch_labframe_cartesian
+            # (toroidal_launch_angle includes zeta_launch, so the beam frame
+            # turns with the antenna)
             poloidal_rotation_angle = poloidal_launch_angle + np.pi / 2
             toroidal_rotation_angle = toroidal_launch_angle
             sin_pol, cos_pol = np.sin(poloidal_rotation_angle), np.cos(
@@ -1013,6 +1022,9 @@ def find_plasma_entry_parameters(
         # Psi_entry. Check that assumption holds for the density profile
         elif Psi_BC_flag is None:
             log.debug(f"`Psi_BC_flag` = {Psi_BC_flag}. No boundary conditions applied")
+            check_density_zero_at_entry(
+                density_fit, field.polflux_cartesian(*q_initial_cartesian), Psi_BC_flag
+            )
             check_density_smooth_at_edge(density_fit, poloidal_flux_zero_density)
 
             K_entry = (
@@ -1044,6 +1056,12 @@ def find_plasma_entry_parameters(
             log.debug(
                 f"`Psi_BC_flag` = {Psi_BC_flag}. Applying {Psi_BC_flag} boundary conditions to find K and Psi"
             )
+            if Psi_BC_flag == "continuous":
+                check_density_zero_at_entry(
+                    density_fit,
+                    field.polflux_cartesian(*q_initial_cartesian),
+                    Psi_BC_flag,
+                )
 
             def initial_K_and_Psi(hamiltonian):
                 return apply_boundary_conditions(

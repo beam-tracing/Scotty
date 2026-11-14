@@ -191,10 +191,14 @@ def test_e_hat_initial_is_the_traced_roots_at_low_density(
     tmp_path, poloidal_flux_enter, mode_flag
 ):
     """Each root's own polarisation, as on the ray's first point, not the same
-    vector for both."""
+    vector for both. The density is not zero at this entry point, so the
+    discontinuous condition is needed (the continuous one is refused there)"""
     dt = beam_me_up(
         **synthetic(
-            tmp_path, mode_flag=mode_flag, poloidal_flux_enter=poloidal_flux_enter
+            tmp_path,
+            mode_flag=mode_flag,
+            poloidal_flux_enter=poloidal_flux_enter,
+            Psi_BC_flag="discontinuous",
         )
     )
     assert_allclose(

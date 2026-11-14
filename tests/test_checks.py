@@ -7,6 +7,7 @@ import pytest
 from scotty.beam_me_up import beam_me_up
 from scotty.checks import Parameters
 from scotty.init_bruv import get_parameters_for_Scotty
+from scotty.profile_fit import QuadraticFit
 
 
 def _check_flux(enter, zero_density, zero_temperature):
@@ -91,8 +92,10 @@ def test_poloidal_flux_zero_temperature_none_in_a_run(tmp_path):
     dt = beam_me_up(
         **_synthetic(
             tmp_path,
+            density_fit_method=QuadraticFit(1.05, 4.0),
             poloidal_flux_zero_density=1.05,
             poloidal_flux_zero_temperature=None,
+            poloidal_flux_enter=1.05,
         )
     )
     assert float(dt["inputs"]["poloidal_flux_zero_temperature"]) == 1.05
@@ -103,7 +106,6 @@ def test_poloidal_flux_zero_temperature_none_in_a_run(tmp_path):
     [
         ("interp_smoothing", 0),
         ("find_B_method", "torbeam"),
-        ("detailed_analysis_flag", True),
     ],
 )
 def test_defaults_are_v3s(name, v3_default):

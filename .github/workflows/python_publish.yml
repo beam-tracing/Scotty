@@ -9,6 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          # setuptools_scm needs the tags, or the package gets a placeholder version
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v4
         with:

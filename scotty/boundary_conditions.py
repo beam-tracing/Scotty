@@ -708,6 +708,52 @@ def find_Psi_3D_plasma(
     return Psi_3D_plasma_labframe
 
 
+def check_density_zero_at_entry(
+    density_fit,
+    poloidal_flux_entry: float,
+    Psi_BC_flag: VALID_PSI_BC_FLAGS,
+    rtol: float = 1e-5,
+    step: float = 1e-7,
+) -> None:
+    r"""Check that the density is zero at the plasma entry point, as
+    `Psi_BC_flag` = ``"continuous"`` and None assume, and raise a `ValueError`
+    if not.
+
+    Both conditions keep the vacuum :math:`K` at the entry point. That
+    satisfies the dispersion relation only where the density is zero; where it
+    is not, the ray starts with :math:`H \ne 0` and stays on that wrong
+    dispersion surface, with :math:`|H|` about :math:`n_e/n_c` there. The
+    density must be at most `rtol` times the largest density inside the
+    plasma, both at the entry point and a relative `step` further in (at
+    most at the profile's zero point): the entry point is found only to
+    rounding, and a profile cut at its zero point jumps there. ``"discontinuous"``
+    solves for :math:`K` in the plasma instead, so it needs no such check.
+    """
+    edge = max(
+        poloidal_flux_entry,
+        getattr(density_fit, "poloidal_flux_zero_profile", poloidal_flux_entry),
+    )
+    n_max = float(np.max(np.abs(density_fit(np.linspace(0.0, edge, 201)))))
+    if n_max == 0:
+        return
+    zero_point = getattr(density_fit, "poloidal_flux_zero_profile", edge)
+    inside = min(poloidal_flux_entry, zero_point) * (1 - step)
+    n_entry = max(
+        (float(np.asarray(density_fit(psi))) for psi in (poloidal_flux_entry, inside)),
+        key=abs,
+    )
+    if abs(n_entry) > rtol * n_max:
+        raise ValueError(
+            f"The density at the plasma entry point (poloidal flux "
+            f"{poloidal_flux_entry:.6g}) is n_e = {n_entry:.4g} (e19), "
+            f"{abs(n_entry) / n_max:.2e} of its maximum, but `Psi_BC_flag` = "
+            f"{Psi_BC_flag!r} keeps the vacuum K there, which is only right where "
+            f"the density is zero (tolerance {rtol}). Use `Psi_BC_flag` = "
+            "'discontinuous', or set `poloidal_flux_enter` to where the density is "
+            "zero (`poloidal_flux_zero_density`)"
+        )
+
+
 def check_density_smooth_at_edge(
     density_fit,
     poloidal_flux_zero_density: Optional[float] = None,

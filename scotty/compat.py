@@ -20,17 +20,27 @@ What it converts:
 - the launch flags: ``vacuumLaunch_flag`` and ``vacuum_propagation_flag`` to
   ``launch_flag``. ``vacuumLaunch_flag=False`` is ``"plasma"``.
   ``vacuumLaunch_flag=True`` (v3's default) is ``"vacuum_analytic"`` if
-  ``vacuum_propagation_flag`` is True, and ``"vacuum_numerical"`` otherwise
-  (v3's ``beam_me_up`` defaulted to ``vacuum_propagation_flag=False``, so a
-  script that does not set it gets ``"vacuum_numerical"``). v3's docstring
-  describes ``vacuum_propagation_flag`` the wrong way round: its code (and
-  this conversion) propagates analytically through the vacuum when it is
-  True;
+  ``vacuum_propagation_flag`` is True, and ``"vacuum_numerical"`` if it is
+  False. v3's docstring describes ``vacuum_propagation_flag`` the wrong way
+  round: its code (and this conversion) propagates analytically through the
+  vacuum when it is True. **A script that leaves ``vacuum_propagation_flag``
+  unset gets ``"vacuum_analytic"``**, not v3's default (numerical
+  propagation): ``"vacuum_numerical"`` integrates through the kink in the
+  density at the plasma edge, and is not converged at v3's tolerances;
 - ``Psi_BC_flag`` is passed through unchanged (v4 uses the same name and the
-  same values; v3's deprecated booleans raise in v4). If it is not given,
-  v3's default ``None`` is set. With ``"vacuum_numerical"`` it is set to
-  ``None``, with a warning: v3 propagated through the vacuum numerically
-  without boundary conditions and ignored the flag, and v4 refuses it there;
+  same values; v3's deprecated booleans raise in v4). **If it is not given,
+  ``"continuous"`` is set** for a vacuum launch from the antenna (v3's default
+  was ``None``, which assumes a density that is flat at the edge, and v4
+  refuses it otherwise). With ``"vacuum_numerical"`` it is set to ``None``,
+  with a warning: v3 propagated through the vacuum numerically without
+  boundary conditions and ignored the flag, and v4 refuses it there;
+- ``poloidal_flux_enter``, if not given, is set to
+  ``poloidal_flux_zero_density``, so that the plasma starts where the density
+  is zero, as the continuous boundary condition needs (v3 started at 1.0 with
+  the density zero at 1.01). A density that does not reach zero at its edge
+  (such as an ``ne.dat`` file that ends with a non-zero density) is refused
+  there by the continuous condition: give such a script
+  ``Psi_BC_flag="discontinuous"``;
 - ``geometry`` is set to ``"cylindrical"``, the only geometry v3 had;
 - a plasma launch: ``plasmaLaunch_K`` (cylindrical, as in v3) to the
   Cartesian ``plasmaLaunch_K_cartesian``, and
@@ -103,6 +113,11 @@ V3_ONLY_ARGUMENTS = (
     "resonance_flag",
 )
 
+#: Also in v4.0.0.dev0, but they did nothing in v4, so 4.0.0 removed them;
+#: `from_v3_kwargs` drops them. (`figure_flag` stays, for figures made by
+#: `beam_me_up` later; see `scotty.plotting` for now)
+REMOVED_ARGUMENTS = ("further_analysis_flag", "detailed_analysis_flag")
+
 
 V3_DEFAULT_POLOIDAL_FLUX_ZERO = 1.01
 
@@ -141,25 +156,35 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
     if "launch_flag" not in kw:
         if not vacuum_launch:
             kw["launch_flag"] = "plasma"
-        elif vacuum_propagation:
+        elif vacuum_propagation or not propagation_given:
             kw["launch_flag"] = "vacuum_analytic"
         else:
             kw["launch_flag"] = "vacuum_numerical"
 
-        def given(name: str, value: bool, was_given: bool) -> str:
-            return f"`{name}` = {value}" + ("" if was_given else " (v3's default)")
-
-        source = given("vacuumLaunch_flag", vacuum_launch, vacuum_launch_given)
+        source = f"`vacuumLaunch_flag` = {vacuum_launch}" + (
+            "" if vacuum_launch_given else " (v3's default)"
+        )
         if vacuum_launch:
-            source += ", " + given(
-                "vacuum_propagation_flag", vacuum_propagation, propagation_given
+            source += (
+                f", `vacuum_propagation_flag` = {vacuum_propagation}"
+                if propagation_given
+                else ", `vacuum_propagation_flag` not set (v3's default False, "
+                "numerical propagation, is not converged across the density kink "
+                "at the plasma edge in v4)"
             )
         _warn(f"{source} -> `launch_flag` = '{kw['launch_flag']}'")
 
     # Plasma-vacuum boundary conditions: same name and values in v4
     if "Psi_BC_flag" not in kw:
-        kw["Psi_BC_flag"] = None  # v3's default
-        _warn("set `Psi_BC_flag` = None (v3's default)")
+        if kw["launch_flag"] == "vacuum_analytic":
+            kw["Psi_BC_flag"] = "continuous"
+            _warn(
+                "set `Psi_BC_flag` = 'continuous' (v3's default None assumes the "
+                "density is flat at the plasma edge)"
+            )
+        else:
+            kw["Psi_BC_flag"] = None
+            _warn("set `Psi_BC_flag` = None (v3's default)")
     elif kw["launch_flag"] == "vacuum_numerical" and kw["Psi_BC_flag"] is not None:
         # v3 ignored it when propagating numerically through the vacuum (no
         # boundary conditions are applied there); v4 refuses it
@@ -169,6 +194,10 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
             "`Psi_BC_flag` = None"
         )
         kw["Psi_BC_flag"] = None
+
+    for name in REMOVED_ARGUMENTS:
+        if name in kw:
+            _warn(f"dropped `{name}` = {kw.pop(name)!r} (it did nothing in v4)")
 
     if "geometry" not in kw:
         kw["geometry"] = "cylindrical"
@@ -238,11 +267,28 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         kw["output_path"] = pathlib.Path(output_path)
 
     enter = kw.get("poloidal_flux_enter", 1.0)
-    for name in ("poloidal_flux_zero_density", "poloidal_flux_zero_temperature"):
-        if name not in kw:
+    for name, fit in (
+        ("poloidal_flux_zero_density", "density_fit_method"),
+        ("poloidal_flux_zero_temperature", "temperature_fit_method"),
+    ):
+        own_zero = getattr(kw.get(fit), "poloidal_flux_zero_profile", None)
+        if name not in kw and own_zero is None:
             kw[name] = max(V3_DEFAULT_POLOIDAL_FLUX_ZERO, enter)
             _warn(
                 f"set `{name}` = {kw[name]} (v3's default, at least `poloidal_flux_enter`)"
+            )
+    if "poloidal_flux_enter" not in kw and kw["launch_flag"] != "plasma":
+        zero_density = kw.get("poloidal_flux_zero_density")
+        if zero_density is None:
+            zero_density = getattr(
+                kw.get("density_fit_method"), "poloidal_flux_zero_profile", None
+            )
+        if zero_density is not None and zero_density != 1.0:
+            kw["poloidal_flux_enter"] = zero_density
+            _warn(
+                f"set `poloidal_flux_enter` = {zero_density}, "
+                "`poloidal_flux_zero_density` (v3 entered the plasma at 1.0, where "
+                "the density is not zero)"
             )
 
     for name, value in V3_DEFAULT_SPATIAL_STEPS.items():
@@ -656,7 +702,6 @@ _SAME_NAME_INPUTS = {
     "delta_R",
     "delta_Z",
     "density_fit_method",
-    "detailed_analysis_flag",
     "equil_time",
     "figure_flag",
     "find_B_method",
