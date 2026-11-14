@@ -62,13 +62,47 @@ def test_presets_give_both_methods():
 
 @pytest.mark.parametrize(
     "parameters, expected",
-    [(None, "smoothing-spline-file"), ([4.0, 1.0], "quadratic")],
+    [
+        (None, "smoothing-spline-file"),
+        ([4.0, 1.0], "quadratic"),
+        ([4.0, 1.0, 0.1], "tanh"),
+        ([4.0, 1.0, 0.0, 0.0], "polynomial"),
+        ([1.0] * 8, "stefanikova"),
+    ],
 )
 def test_v3_scripts_get_v3s_methods(parameters, expected):
     v3 = {"density_fit_parameters": parameters} if parameters is not None else {}
     kw = from_v3_kwargs(v3)
     assert kw["find_B_method"] == "torbeam"
     assert kw["density_fit_method"] == expected
+
+
+def test_v3_unknown_parameter_count_raises():
+    """As v3 did when it ran"""
+    with pytest.raises(ValueError, match="Couldn't match length"):
+        from_v3_kwargs({"density_fit_parameters": [1.0] * 5})
+
+
+def test_v3_field_object_kept():
+    from scotty.geometry import CircularFluxSurfaceField
+
+    field = CircularFluxSurfaceField(
+        B_T_axis=1.0, R_axis=1.5, minor_radius_a=0.5, B_p_a=0.1
+    )
+    assert from_v3_kwargs({"find_B_method": field})["find_B_method"] is field
+
+
+def test_torbeam_preset_reads_ne_dat():
+    kwargs = get_parameters_for_Scotty(
+        "DBS_UCLA_MAST-U", launch_freq_GHz=55.0, find_B_method="torbeam"
+    )
+    assert kwargs["density_fit_method"] == "smoothing-spline-file"
+
+
+@pytest.mark.parametrize("value", ["False", 0, None])
+def test_analysis_flags_must_be_booleans(tmp_path, value):
+    with pytest.raises(TypeError, match="must be True or False"):
+        beam_me_up(**synthetic(tmp_path, analysis_flag=value, dbs_analysis_flag=False))
 
 
 def test_v3_relativistic_script_gets_the_temperature_file():
@@ -145,4 +179,12 @@ def test_partial_trees_read_back(runs, label):
     groups = from_output_tree(runs[label])
     assert ("analysis" in groups) == (label == "beam")
     assert "dbs_analysis" not in groups
-    to_v3_output(runs[label])
+    v3 = to_v3_output(runs[label])
+    assert {"inputs", "solver_output"} <= set(v3.children)
+
+
+def test_no_beam_group_says_why(runs):
+    from scotty.compat import quick_cutoff
+
+    with pytest.raises(ValueError, match="analysis_flag=False"):
+        quick_cutoff(runs["none"])

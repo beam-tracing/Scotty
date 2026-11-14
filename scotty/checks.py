@@ -181,7 +181,7 @@ class Parameters:
         equil_time: Optional[Union[int, float]],
         # Interpolation settings
         find_B_method: Union[str, MagneticField_Cylindrical, MagneticField_Cartesian],
-        density_fit_method: Optional[Union[str, ProfileFitLike]],
+        density_fit_method: Union[str, ProfileFitLike],
         density_fit_parameters: Optional[Sequence],
         temperature_fit_method: Optional[Union[str, ProfileFitLike]],
         temperature_fit_parameters: Optional[Sequence],
@@ -713,6 +713,12 @@ class Parameters:
 
     @staticmethod
     def _check_analysis_flags(analysis_flag, dbs_analysis_flag):
+        for name, value in (
+            ("analysis_flag", analysis_flag),
+            ("dbs_analysis_flag", dbs_analysis_flag),
+        ):
+            if not isinstance(value, (bool, np.bool_)):
+                raise TypeError(f"`{name}` must be True or False, not {value!r}")
         if dbs_analysis_flag and not analysis_flag:
             raise ValueError(
                 "`dbs_analysis_flag=True` needs `analysis_flag=True`: the DBS "
@@ -728,7 +734,7 @@ class Parameters:
 
     def set_experimental_profiles(self):
         if (self.density_fit_parameters is None) and (
-            self.density_fit_method in [None, "smoothing-spline-file"]
+            self.density_fit_method == "smoothing-spline-file"
         ):
             self.ne_filename = self.ne_data_path / f"ne{self.input_filename_suffix}.dat"
             self.density_fit_parameters = [
@@ -741,11 +747,11 @@ class Parameters:
 
         # Temperature, only needed for relativistic corrections. As in v3
         # (beam-tracing/Scotty#151), a file is read only when no parameters
-        # are given and the method is None or "smoothing-spline-file"
+        # are given and the method is "smoothing-spline-file"
         if (
             self.relativistic_flag
             and (self.temperature_fit_parameters is None)
-            and (self.temperature_fit_method in [None, "smoothing-spline-file"])
+            and (self.temperature_fit_method == "smoothing-spline-file")
         ):
             self.Te_filename = self.Te_data_path / f"Te{self.input_filename_suffix}.dat"
             self.temperature_fit_parameters = [

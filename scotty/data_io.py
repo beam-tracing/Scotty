@@ -308,6 +308,17 @@ def to_output_tree(
     return xr.DataTree.from_dict(groups)
 
 
+def beam_group(dt: xr.DataTree) -> xr.DataTree:
+    """The ``beam`` group of an output, or a ValueError saying why it is
+    missing"""
+    if "beam" not in dt.children:
+        raise ValueError(
+            "This output has no `beam` group: it was made with "
+            "`analysis_flag=False`. Rerun with the analysis on"
+        )
+    return dt["beam"]
+
+
 def from_output_tree(dt: xr.DataTree) -> Dict[str, xr.Dataset]:
     """What `to_output_tree` was given, by name. The analysis groups are
     absent from a run made with ``analysis_flag`` or ``dbs_analysis_flag``

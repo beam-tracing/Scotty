@@ -71,12 +71,16 @@ Inputs
   ``ne.dat``, pass ``density_fit_method="smoothing-spline-file"``.
   ``temperature_fit_method`` stays optional, since only relativistic runs use
   it, but ``relativistic_flag=True`` now needs it (it read ``Te.dat`` before).
-  The presets set both methods. ``from_v3_kwargs`` sets v3's defaults, with a
-  warning.
+  ``get_parameters_for_Scotty`` sets both for ``"DBS_synthetic"``, and sets
+  ``density_fit_method`` for the machine presets when it is given
+  ``find_B_method`` (``"smoothing-spline-file"`` for ``"torbeam"``).
+  ``from_v3_kwargs`` sets v3's defaults, with a warning.
 - New ``analysis_flag`` and ``dbs_analysis_flag``, both ``True`` by default.
   ``analysis_flag=False`` saves only the inputs and the solver output (no
   ``beam`` group); ``dbs_analysis_flag=False`` leaves out the
-  ``diagnostics/dbs`` group and the DBS variables of ``beam``. The DBS analysis
+  ``diagnostics/dbs`` group and the variables of ``beam`` that the DBS analysis
+  computes (``scotty.data_io.BEAM_FROM_DBS``; they include ``beam_waist``,
+  ``theta`` and ``normal_hat``). The DBS analysis
   needs the beam analysis. Both flags are stored in the inputs.
 
 Outputs

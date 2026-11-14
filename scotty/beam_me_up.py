@@ -428,8 +428,11 @@ def beam_me_up(
         the dielectric tensor, the path lengths, ...). ``False`` saves only
         the inputs and the solver output
     dbs_analysis_flag : bool, default True
-        Also analyse for Doppler backscattering (the ``diagnostics/dbs``
-        group, and the DBS variables of ``beam``). Needs ``analysis_flag``
+        Also analyse for Doppler backscattering: the ``diagnostics/dbs``
+        group, and the variables of ``beam`` that the DBS analysis computes
+        (`scotty.data_io.BEAM_FROM_DBS`, which include some properties of the
+        beam itself, such as ``beam_waist``, ``theta`` and ``normal_hat``).
+        Needs ``analysis_flag``
     ray_tracing_flag : bool, default False
         Trace only the ray, with no beam (v3's ``quick_run``; see
         `scotty.compat.quick_cutoff`)

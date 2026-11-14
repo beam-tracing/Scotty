@@ -96,7 +96,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 import numpy as np
 import xarray as xr
 
-from scotty.data_io import from_output_tree, to_output_tree
+from scotty.data_io import beam_group, from_output_tree, to_output_tree
 from scotty.fun_general import find_K_labframe_cyl_to_cart
 
 log = logging.getLogger(__name__)
@@ -353,7 +353,7 @@ def quick_cutoff(dt: xr.DataTree) -> CutoffData:
 
         q_R, q_Z, K_norm, polflux, theta_m = quick_cutoff(beam_me_up(**from_v3_kwargs(kwargs)))
     """
-    so, an = dt["solver"].ds, dt["beam"].ds
+    so, an = dt["solver"].ds, beam_group(dt).ds
     K = np.asarray(so["K_output_magnitude"])
     i = int(np.argmin(K))
     return CutoffData(

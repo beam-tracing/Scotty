@@ -599,6 +599,7 @@ def get_parameters_for_Scotty(
     if find_B_method == "torbeam":
         parameters["ne_data_path"] = ne_path
         parameters["magnetic_data_path"] = topfile_path
+        parameters["density_fit_method"] = "smoothing-spline-file"
     elif find_B_method in ["EFITpp", "UDA_saved", "test"]:
         parameters["ne_data_path"] = UDA_saved_path
 
