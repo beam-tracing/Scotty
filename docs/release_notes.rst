@@ -58,6 +58,16 @@ Geometry, launch and boundary conditions
   polarisations where the solvers start. Which of 1 and -1 is the O-mode
   depends on the plasma and K; the cut-off check at the plasma boundary
   (``Psi_BC_flag="discontinuous"``) now uses the same test.
+- ``Psi_BC_flag="continuous"`` and ``"discontinuous"`` work whatever the
+  direction of :math:`\nabla \psi` at the plasma entry point (#176). The
+  tangents of the flux surface used to match the beam across the boundary were
+  built in coordinate planes, and became parallel when :math:`\nabla \psi` had no
+  Z or no X component, or had :math:`\psi_X = -\psi_Y`: for example a Cartesian
+  slab, an entry at the midplane of an up-down symmetric equilibrium, or one
+  where :math:`\nabla \psi` is vertical. ``find_Psi_3D_plasma`` then failed with
+  a singular matrix, and with ``"discontinuous"`` ``find_K_plasma`` gave a NaN
+  normal when :math:`\psi_X = 0`. Both now build the tangents from
+  :math:`\nabla \psi`. Elsewhere the results are unchanged, up to rounding.
 
 Running v3 inputs and outputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
