@@ -26,6 +26,7 @@ dynamic = ["version"]
 tests = [
     "pytest",
     "pytest-timeout",
+    "pytest-xdist",
 ]
 docs = [
     "sphinx >= 5.3",

@@ -4,7 +4,11 @@ import pytest
 from scipy import constants
 
 from scotty.boundary_conditions import find_K_plasma, find_Psi_3D_plasma
-from scotty.geometry import CircularFluxSurfaceField, MagneticField_Cylindrical
+from scotty.geometry import (
+    CircularFluxSurfaceField,
+    MagneticField_Cartesian,
+    MagneticField_Cylindrical,
+)
 from scotty.hamiltonian import Hamiltonian
 from scotty.launch import find_O_mode_flag
 
@@ -120,6 +124,118 @@ def test_find_Psi_3D_plasma_discontinuous():
 
 
 ##################################################
+# Cartesian entry points where grad psi is along a coordinate axis
+##################################################
+
+
+# Hessian of psi at the entry point, and the Hamiltonian's derivatives there
+_HESS_PSI = np.array([[0.7, 0.2, -0.3], [0.2, 1.1, 0.4], [-0.3, 0.4, 2.3]])
+_DH_CART = {
+    "dH_dX": -2.3,
+    "dH_dY": 0.6,
+    "dH_dZ": 0.4,
+    "dH_dKX": -2.1e-3,
+    "dH_dKY": 3.0e-4,
+    "dH_dKZ": -4.4e-4,
+}
+
+
+class FluxDerivativesCartesian(MagneticField_Cartesian):
+    """Only the poloidal flux derivatives at the entry point"""
+
+    def __init__(self, grad_psi):
+        self.grad_psi = grad_psi
+
+    def B_X(self, X, Y, Z):
+        raise NotImplementedError
+
+    B_Y = B_Z = polflux = B_X
+
+    def d_polflux_dX(self, X, Y, Z, delta_X):
+        return self.grad_psi[0]
+
+    def d_polflux_dY(self, X, Y, Z, delta_Y):
+        return self.grad_psi[1]
+
+    def d_polflux_dZ(self, X, Y, Z, delta_Z):
+        return self.grad_psi[2]
+
+    def d2_polflux_dX2(self, X, Y, Z, delta_X):
+        return _HESS_PSI[0, 0]
+
+    def d2_polflux_dY2(self, X, Y, Z, delta_Y):
+        return _HESS_PSI[1, 1]
+
+    def d2_polflux_dZ2(self, X, Y, Z, delta_Z):
+        return _HESS_PSI[2, 2]
+
+    def d2_polflux_dXdY(self, X, Y, Z, delta_X, delta_Y):
+        return _HESS_PSI[0, 1]
+
+    def d2_polflux_dXdZ(self, X, Y, Z, delta_X, delta_Z):
+        return _HESS_PSI[0, 2]
+
+    def d2_polflux_dYdZ(self, X, Y, Z, delta_Y, delta_Z):
+        return _HESS_PSI[1, 2]
+
+
+class HamiltonianDerivativesCartesian:
+    spacings = {"q0": 1e-4, "q1": 1e-4, "q2": 1e-4}
+
+    def derivatives(self, q, K):
+        return dict(_DH_CART)
+
+
+@pytest.mark.parametrize("Psi_BC_flag", ["continuous", "discontinuous"])
+@pytest.mark.parametrize(
+    "grad_psi",
+    [
+        [1.9, 0.0, 0.0],
+        [0.0, 1.9, 0.0],
+        [0.0, 0.0, 1.9],
+        [1.9, -1.9, 0.5],
+        [1.9, 0.0, -0.4],
+        [1.9, 0.5, -0.4],
+    ],
+    ids=["along-X", "along-Y", "along-Z", "X-equals-minus-Y", "XZ-plane", "general"],
+)
+def test_find_Psi_3D_plasma_any_normal(Psi_BC_flag, grad_psi):
+    """The matching conditions hold whatever the direction of grad psi. The
+    first four (along a coordinate axis, as in a slab or at a midplane entry,
+    or with psi_X = -psi_Y) made the old coordinate-plane interface matrix
+    singular."""
+    grad_psi = np.array(grad_psi)
+    K_vacuum = np.array([-720.2, -213.2, -89.4])
+    if Psi_BC_flag == "continuous":
+        K_plasma = K_vacuum
+    else:  # K jumps along grad psi only
+        K_plasma = K_vacuum + 75.0 * grad_psi
+    Psi_v = PSI_VACUUM_3D
+    Psi_p = find_Psi_3D_plasma(
+        Psi_BC_flag,
+        np.array([1.0, 0.0, 0.0]),
+        K_vacuum,
+        K_plasma,
+        Psi_v,
+        FluxDerivativesCartesian(grad_psi),
+        HamiltonianDerivativesCartesian(),
+    )
+
+    # t.Psi.t jumps by -(t.(grad grad psi).t) (delta_K . grad psi) / |grad psi|^2
+    # along every tangent t, here 5 random ones
+    rng = np.random.default_rng(0)
+    for t in rng.normal(size=(5, 3)):
+        t = t - (t @ grad_psi) / (grad_psi @ grad_psi) * grad_psi
+        jump = -(t @ _HESS_PSI @ t) * ((K_vacuum - K_plasma) @ grad_psi)
+        jump /= grad_psi @ grad_psi
+        npt.assert_allclose(t @ Psi_p @ t, t @ Psi_v @ t + jump, rtol=1e-10)
+    g_K = np.array([_DH_CART["dH_dKX"], _DH_CART["dH_dKY"], _DH_CART["dH_dKZ"]])
+    g_q = np.array([_DH_CART["dH_dX"], _DH_CART["dH_dY"], _DH_CART["dH_dZ"]])
+    npt.assert_allclose(Psi_p @ g_K, -g_q, atol=1e-12)
+    npt.assert_allclose(Psi_p, Psi_p.T)
+
+
+##################################################
 # Which cut-off is checked at the plasma boundary (discontinuous BC)
 ##################################################
 
@@ -171,3 +287,125 @@ def test_X_mode_at_entry_checked_against_the_L_cut_off():
     """At X = 3, w_L > w: the X-mode (`mode_flag` = +1 here) is cut off"""
     with pytest.raises(ValueError, match=r"for the X-mode \(`mode_flag` = 1\): w_L"):
         _find_K_plasma(3.0, mode_flag=1)
+
+
+##################################################
+# K at the entry point (discontinuous BC) whatever the direction of grad psi
+##################################################
+
+
+_SLAB_K0 = _OMEGA / constants.c
+_SLAB_L = 0.2
+_SLAB_Q0 = np.array([0.3, 0.1, -0.2])  # a point on the edge, psi = 1
+
+
+class _TurnedSlab(MagneticField_Cartesian):
+    """Uniform B along `b_hat`, and psi = 1 + (q - q0) . n_hat / L, so the plasma
+    (psi < 1) is on the side of -n_hat and grad psi is along n_hat"""
+
+    def __init__(self, n_hat, b_hat):
+        self.n_hat, self.B = np.asarray(
+            n_hat
+        ), 0.4 * _OMEGA * constants.m_e / constants.e * np.asarray(b_hat)
+
+    def _const(self, value, X):
+        return value + np.zeros_like(np.asarray(X, dtype=float))
+
+    def B_X(self, X, Y, Z):
+        return self._const(self.B[0], X)
+
+    def B_Y(self, X, Y, Z):
+        return self._const(self.B[1], X)
+
+    def B_Z(self, X, Y, Z):
+        return self._const(self.B[2], X)
+
+    def polflux(self, X, Y, Z):
+        q = np.array([X, Y, Z], dtype=float)
+        return 1 + (q - _SLAB_Q0) @ self.n_hat / _SLAB_L
+
+    def d_polflux_dX(self, X, Y, Z, delta_X=None):
+        return self._const(self.n_hat[0] / _SLAB_L, X)
+
+    def d_polflux_dY(self, X, Y, Z, delta_Y=None):
+        return self._const(self.n_hat[1] / _SLAB_L, X)
+
+    def d_polflux_dZ(self, X, Y, Z, delta_Z=None):
+        return self._const(self.n_hat[2] / _SLAB_L, X)
+
+    # psi is linear, so its second derivatives are zero
+    def d2_polflux_dX2(self, X, Y, Z, delta_X=None):
+        return self._const(0.0, X)
+
+    def d2_polflux_dY2(self, X, Y, Z, delta_Y=None):
+        return self._const(0.0, X)
+
+    def d2_polflux_dZ2(self, X, Y, Z, delta_Z=None):
+        return self._const(0.0, X)
+
+    def d2_polflux_dXdY(self, X, Y, Z, delta_X=None, delta_Y=None):
+        return self._const(0.0, X)
+
+    def d2_polflux_dXdZ(self, X, Y, Z, delta_X=None, delta_Z=None):
+        return self._const(0.0, X)
+
+    def d2_polflux_dYdZ(self, X, Y, Z, delta_Y=None, delta_Z=None):
+        return self._const(0.0, X)
+
+
+def _turned_find_K_plasma(turn, mode_flag):
+    """`find_K_plasma` for the slab with grad psi along X and B along Y, turned by
+    the rotation `turn`, with the vacuum K turned with it"""
+    n_hat, b_hat = turn[:, 0], turn[:, 1]
+    field = _TurnedSlab(n_hat, b_hat)
+    a, b = np.deg2rad(20.0), np.deg2rad(30.0)
+    K_vacuum = turn @ (
+        _SLAB_K0 * np.array([-np.cos(a), np.sin(a) * np.cos(b), np.sin(a) * np.sin(b)])
+    )
+    hamiltonian = Hamiltonian(
+        _OMEGA,
+        mode_flag,
+        np.array([1e-4, 1e-4, 1e-4, 0.1, 0.1, 0.1]),
+        field,
+        _jump_to(0.3),
+    )
+    q_entry = _SLAB_Q0 - 1e-9 * n_hat
+    return find_K_plasma("discontinuous", q_entry, K_vacuum, field, hamiltonian)
+
+
+def _rotation_taking_X_to(n_hat):
+    """A rotation whose first column (the image of X_hat) is `n_hat`"""
+    n_hat = np.asarray(n_hat, dtype=float) / np.linalg.norm(n_hat)
+    other = np.eye(3)[np.argmin(np.abs(n_hat))]
+    b_hat = other - (other @ n_hat) * n_hat
+    b_hat /= np.linalg.norm(b_hat)
+    return np.column_stack([n_hat, b_hat, np.cross(n_hat, b_hat)])
+
+
+@pytest.mark.parametrize("mode_flag", [1, -1])
+@pytest.mark.parametrize(
+    "n_hat",
+    [
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [0.0, 0.7, 0.4],
+        [1.9, -1.9, 0.5],
+        [1.9, 0.5, -0.4],
+    ],
+    ids=["along-Y", "along-Z", "YZ-plane", "X-equals-minus-Y", "general"],
+)
+def test_find_K_plasma_any_normal(n_hat, mode_flag):
+    """With grad psi along X and B along Y, the old coordinate-plane tangents work.
+    Turning the whole problem must turn K_plasma with it, also where psi_X = 0
+    (along Y, along Z, in the YZ plane), where those tangents were parallel and
+    the normal came out NaN"""
+    K_reference = _turned_find_K_plasma(np.eye(3), mode_flag)
+    turn = _rotation_taking_X_to(n_hat)
+    K_plasma = _turned_find_K_plasma(turn, mode_flag)
+    npt.assert_allclose(K_plasma, turn @ K_reference, rtol=1e-9, atol=1e-9 * _SLAB_K0)
+
+    # K keeps its components along the surface, and its normal one has changed,
+    # still pointing into the plasma (-n_hat)
+    K_vacuum_reference = _SLAB_K0 * np.array([-np.cos(np.deg2rad(20.0)), 0.0, 0.0])
+    assert K_reference[0] < 0
+    assert abs(K_reference[0] - K_vacuum_reference[0]) > 1e-3 * _SLAB_K0

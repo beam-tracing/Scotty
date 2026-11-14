@@ -22,4 +22,4 @@ jobs:
         pip install .[tests]
     - name: Test with pytest
       run: |
-        pytest -v
+        pytest -v -n auto --durations=20

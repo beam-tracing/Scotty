@@ -317,7 +317,13 @@ def run_linear_layer(a0_deg, R_y, gyro_ratio, output_path):
         find_B_method=linear_layer_field(B0_for(gyro_ratio), a0),
         density_fit_method=LinearFit(1.0, N_CUTOFF),
         poloidal_flux_zero_density=1.0,
-        resonance_flag=False,
+        # The analytic solution assumes no resonance on the ray. |B| is uniform,
+        # with Omega_ce / Omega = gyro_ratio everywhere (0.3 in every case), so
+        # neither cyclotron harmonic is reached, and the upper hybrid layer
+        # only stops the X-mode. "raise" makes a run fail loudly if a case
+        # ever reaches one, instead of stopping the ray early
+        first_harmonic_flag="raise",
+        second_harmonic_flag="raise",
         delta_X=DELTA_Q,
         delta_Y=DELTA_Q,
         delta_Z=DELTA_Q,
