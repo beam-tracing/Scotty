@@ -170,12 +170,56 @@ def test_Psi_BC_flag_dropped_is_accepted_by_v4():
 
 
 def test_output_path_and_quick_run():
-    kw = from_v3_kwargs(
-        {"output_path": "runs/case1/", "quick_run": True, "resonance_flag": False}
-    )
+    kw = from_v3_kwargs({"output_path": "runs/case1/", "quick_run": True})
     assert kw["output_path"] == pathlib.Path("runs/case1")
     assert kw["ray_tracing_flag"] is True
-    assert kw["resonance_flag"] is False  # v4 has resonance_flag since #151 was ported
+
+
+RESONANCE_FLAG_NAMES = (
+    "first_harmonic_flag",
+    "second_harmonic_flag",
+    "upper_hybrid_flag",
+)
+
+
+@pytest.mark.parametrize("value", [True, np.bool_(True)])
+def test_resonance_flag_True_is_stop_everywhere(value):
+    kw = from_v3_kwargs({"resonance_flag": value})
+    assert "resonance_flag" not in kw
+    assert [kw[name] for name in RESONANCE_FLAG_NAMES] == ["stop", "stop", "stop"]
+
+
+@pytest.mark.parametrize("value", [False, np.bool_(False)])
+def test_resonance_flag_False_raises_at_the_first_harmonic(value, monkeypatch, caplog):
+    """v3's False carried on past the first harmonic and the upper hybrid
+    resonance; v4 can't, so it raises there, and the warning says so"""
+    import scotty.compat
+
+    # Each message is warned about once per process
+    monkeypatch.setattr(scotty.compat, "_warned", set())
+    with caplog.at_level("WARNING", logger="scotty.compat"):
+        kw = from_v3_kwargs({"resonance_flag": value})
+    assert "resonance_flag" not in kw
+    assert [kw[name] for name in RESONANCE_FLAG_NAMES] == ["raise", "pass", "raise"]
+    assert "`resonance_flag` = False" in caplog.text
+    assert "`first_harmonic_flag` = 'raise'" in caplog.text
+    assert "`upper_hybrid_flag` = 'raise'" in caplog.text
+    assert "where v3 carried on past them" in caplog.text
+
+
+def test_resonance_flag_keeps_flags_given():
+    kw = from_v3_kwargs({"resonance_flag": False, "second_harmonic_flag": "stop"})
+    assert [kw[name] for name in RESONANCE_FLAG_NAMES] == ["raise", "stop", "raise"]
+    kw = from_v3_kwargs({"resonance_flag": True, "upper_hybrid_flag": "raise"})
+    assert [kw[name] for name in RESONANCE_FLAG_NAMES] == ["stop", "stop", "raise"]
+
+
+@pytest.mark.parametrize("value", [2, 0, "stop", None])
+def test_resonance_flag_not_a_bool_is_left_for_v4_to_refuse(value):
+    """v3's flag was a bool; anything else is passed on, and v4 raises on it"""
+    kw = from_v3_kwargs({"resonance_flag": value})
+    assert kw["resonance_flag"] == value
+    assert not set(RESONANCE_FLAG_NAMES) & set(kw)
 
 
 def test_plasma_launch_K_cylindrical_to_cartesian():

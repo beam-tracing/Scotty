@@ -494,3 +494,42 @@ def test_sec_harm_6(tmp_path):
         rtol=1e-2,
         atol=1e-2,
     )
+
+
+def test_sec_harm_1_raise(tmp_path):
+    """test_sec_harm_1's ray, which stops at the second harmonic, raises there with
+    `second_harmonic_flag="raise"`, naming the layer"""
+    kwargs_dict = {
+        "geometry": "cylindrical",
+        "poloidal_launch_angle_Torbeam": 0,
+        "toroidal_launch_angle_Torbeam": 0.0,
+        "launch_freq_GHz": 44,
+        "mode_flag": 1,
+        "launch_beam_width": 0.04,
+        "launch_beam_curvature": -0.25,
+        "launch_position": np.array([2.587, 0.0, -0.0157]),
+        "density_fit_parameters": np.array([1.0]),
+        "delta_R": -0.00001,
+        "delta_Z": 0.00001,
+        "density_fit_method": "quadratic",
+        "find_B_method": "analytical",
+        "launch_flag": "vacuum_analytic",
+        "Psi_BC_flag": "continuous",
+        "figure_flag": False,
+        "poloidal_flux_enter": 1.0,
+        "poloidal_flux_zero_density": 1.0,
+        "B_T_axis": 1.0,
+        "B_p_a": 0.1,
+        "R_axis": 1.5,
+        "minor_radius_a": 0.5,
+        "second_harmonic_flag": "raise",
+    }
+    kwargs_dict["output_path"] = tmp_path
+    with pytest.raises(RuntimeError, match="reached the second harmonic") as error:
+        beam_me_up(**kwargs_dict)  # type: ignore
+    message = str(error.value)
+    assert '`second_harmonic_flag="stop"`' in message
+    assert '`second_harmonic_flag="pass"`' in message
+    # Where test_sec_harm_1's output ends
+    R = float(message.split("q = [")[1].split()[0])
+    assert abs(R - 1.9249442300308424) < 1e-2

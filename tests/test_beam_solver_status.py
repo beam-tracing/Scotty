@@ -6,6 +6,9 @@ H NaN beyond q0 = 1 stands in for a Hamiltonian that can't be evaluated there,
 such as a Booker root lost to rounding: RK45 then can't take a step and stops.
 """
 
+import importlib
+from types import SimpleNamespace
+
 from scotty.beam_solver import beam_tracing
 from scotty.geometry import MagneticField_Cartesian
 from scotty.hamiltonian import Hamiltonian
@@ -65,3 +68,17 @@ def test_beam_solver_failure_raises():
         RuntimeError, match=r"Beam solver failed .*\(\d+ of 21 points\), last at q = "
     ):
         trace(2 * Q_NAN)
+
+
+def test_no_output_points_with_success_status_raises(monkeypatch):
+    """`solve_ivp` reports success but returns no points. This used to be
+    `TypeError: can't multiply sequence by non-int of type 'complex'`"""
+
+    def solve_ivp(**kwargs):
+        return SimpleNamespace(status=0, nfev=1, t=[], y=[], message="")
+
+    monkeypatch.setattr(
+        importlib.import_module("scotty.beam_solver"), "solve_ivp", solve_ivp
+    )
+    with pytest.raises(RuntimeError, match="no output points"):
+        trace(0.5 * Q_NAN)

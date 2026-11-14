@@ -50,7 +50,16 @@ What it converts:
   tolerances ``rtol`` = 1e-3 and ``atol`` = 1e-6 (v4's are 1e-4, 1e-7); and the
   number of output points ``len_tau`` = 102 (v4's is 4002).
 
-``resonance_flag`` is passed through unchanged (v4 has it since #151 was ported).
+``resonance_flag``, a bool in v3, becomes v4's ``first_harmonic_flag``,
+``second_harmonic_flag`` and ``upper_hybrid_flag``: ``True`` sets all three to
+``"stop"``, and ``False`` sets ``first_harmonic_flag="raise"``,
+``second_harmonic_flag="pass"`` and ``upper_hybrid_flag="raise"``. Any of the three
+given explicitly is kept. v3's ``False`` let the ray carry on past the first
+harmonic (the fundamental) and the upper hybrid resonance; v4 raises there instead,
+as the rest of the ray would be wrong: the cold-plasma Hamiltonian is singular at
+the first harmonic (#169), and the X-mode's refractive index goes to infinity at
+the upper hybrid resonance.
+A ``resonance_flag`` that isn't a bool is left in place, and v4 refuses it.
 
 Output files
 ------------
@@ -89,6 +98,9 @@ V3_ONLY_ARGUMENTS = (
     "quick_run",
     "plasmaLaunch_K",
     "plasmaLaunch_Psi_3D_lab_Cartesian",
+    # Also in v4.0.0.dev0; replaced by first_harmonic_flag, second_harmonic_flag
+    # and upper_hybrid_flag
+    "resonance_flag",
 )
 
 
@@ -184,6 +196,36 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         if "ray_tracing_flag" not in kw:
             kw["ray_tracing_flag"] = quick_run
             _warn(f"`quick_run` -> `ray_tracing_flag` = {quick_run}")
+
+    # v3's bool -> v4's three flags. v3's False carried on past the first harmonic,
+    # which v4 refuses (#169), so say so. Anything else is left for v4 to refuse
+    if isinstance(kw.get("resonance_flag"), (bool, np.bool_)):
+        resonance_flag = bool(kw.pop("resonance_flag"))
+        flags = (
+            {
+                "first_harmonic_flag": "stop",
+                "second_harmonic_flag": "stop",
+                "upper_hybrid_flag": "stop",
+            }
+            if resonance_flag
+            else {
+                "first_harmonic_flag": "raise",
+                "second_harmonic_flag": "pass",
+                "upper_hybrid_flag": "raise",
+            }
+        )
+        for name, value in flags.items():
+            kw.setdefault(name, value)
+        _warn(
+            f"`resonance_flag` = {resonance_flag} -> "
+            + ", ".join(f"`{name}` = '{kw[name]}'" for name in flags)
+            + (
+                ""
+                if resonance_flag
+                else " (v4 raises at the first harmonic, the fundamental, and at the "
+                "upper hybrid resonance, where v3 carried on past them)"
+            )
+        )
 
     # v3 built output file names by string concatenation; v4 joins Paths
     if isinstance(kw.get("output_path"), str):

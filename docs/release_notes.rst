@@ -123,6 +123,16 @@ Defaults
 - ``poloidal_flux_zero_temperature`` defaults to ``None``, which is
   ``poloidal_flux_zero_density``.
 
+Fixes
+~~~~~
+
+- The O-mode's Hamiltonian at Booker's :math:`\alpha = \epsilon_\perp = 0`
+  (the X-mode's upper hybrid layer): the root was 0/0 there, though the O-mode is
+  regular, so an O-mode beam crossing that density with :math:`K` exactly
+  perpendicular to :math:`B` could stop the beam solver (#180, #181). ``find_Booker_root`` uses the rationalised form where
+  :math:`m\beta > 0`, where it can't cancel. The same root in
+  ``boundary_conditions`` and ``launch`` uses it too.
+
 Other interface changes
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -145,8 +155,48 @@ Other interface changes
   ``filterfun_all``. Their path
   integrals are ``int_<name>_dl`` (``l`` is the length along the ray; ``L`` is
   kept for inhomogeneity lengths).
-- New argument: ``resonance_flag`` (#151). Temperature profiles are built when
-  given.
+- New arguments (#151, #169): ``first_harmonic_flag``, ``second_harmonic_flag``
+  and ``upper_hybrid_flag`` decide what the ray does at each resonance layer: the
+  first harmonic of the electron cyclotron resonance (the fundamental), its second
+  harmonic, and the upper hybrid resonance. Each is ``"stop"`` (the default: the
+  ray stops there and the output is returned), ``"raise"`` (a ``RuntimeError``) or
+  ``"pass"`` (the ray carries on through the layer). Each layer has its own solver
+  event, so two layers crossed in one solver step are both seen. Temperature
+  profiles are built when given, and the layers then include the relativistic
+  mass correction.
+
+  - ``first_harmonic_flag`` can't be ``"pass"``: the cold-plasma Hamiltonian is
+    singular there, and past it the root that ``mode_flag`` selects swaps (#169).
+  - ``upper_hybrid_flag`` applies to the X-mode only (whichever ``mode_flag``
+    that is) and is ignored for the O-mode. It can't be ``"pass"``: the X-mode's
+    refractive index goes to infinity at the layer, which the ray approaches only
+    asymptotically. ``"stop"`` ends the output 1e-2 short of the layer, in
+    :math:`\omega_{UH} / \omega`, and ``"raise"`` raises there. Closer, the
+    output points are off the dispersion relation (:math:`|H|` up to 1.4 at the
+    default ``len_tau``), and with :math:`K` perpendicular to :math:`B` the solver
+    stalled and the run didn't return.
+  - A ray that starts on the first harmonic raises whatever the flag, and so does
+    one that starts on the second harmonic unless its flag is ``"pass"``, or an
+    X-mode ray that starts within 1e-2 of the upper hybrid layer.
+
+  They replace ``resonance_flag``, which is removed: passing it raises a
+  ``ValueError`` rather than being ignored. ``from_v3_kwargs`` converts v3's
+  ``resonance_flag``: ``True`` sets all three flags to ``"stop"``, and ``False``
+  sets ``first_harmonic_flag="raise"``, ``second_harmonic_flag="pass"`` and
+  ``upper_hybrid_flag="raise"``. v3's ``False`` let the ray carry on past the first
+  harmonic and the upper hybrid layer; v4 raises at both.
+- Where the ray stops at the first harmonic, the output now ends where
+  :math:`\omega_{ce} / \omega` is 1e-3 from 1, about 2 mm before the layer on the
+  cases tried. Closer, :math:`K` could jump off the dispersion relation at the
+  last few output points (:math:`|H|` up to 0.48, :math:`|K|` 23% off). A ray
+  launched within 1e-3 of the layer still ends with such points, and raises from
+  ``check_H_output`` with a message about :math:`H`, not the resonance.
+- ``check_H_output`` raises above :math:`|H| = 0.1` (was 1) and warns above 0.01
+  (#169), so a run that used to finish with a warning may now raise. This
+  includes rays that approach the first harmonic from above and stall just short
+  of it without crossing it.
+- An output with no points from the beam solver raises a ``RuntimeError``, even
+  when the solver reports success.
 - ``convert_hessians`` takes a required ``K_start`` (Cartesian K).
   ``analysis.py`` is its only caller.
 - ``find_B_method="analytical"`` is ``CircularFluxSurfaceField``, as in v3; the
