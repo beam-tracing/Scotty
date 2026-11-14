@@ -61,6 +61,24 @@ Errors where results were wrong without one
   was ignored, and the output recorded it anyway.
 - A NaN or infinite ``launch_beam_width`` or ``launch_beam_curvature`` raises.
 
+Inputs
+~~~~~~
+
+- ``find_B_method`` and ``density_fit_method`` have no defaults, so every
+  script names where its field and density come from. Before, an unset
+  ``find_B_method`` read a TORBEAM topfile, and an unset ``density_fit_method``
+  read ``ne.dat`` or guessed the fit from the number of parameters. To read
+  ``ne.dat``, pass ``density_fit_method="smoothing-spline-file"``.
+  ``temperature_fit_method`` stays optional, since only relativistic runs use
+  it, but ``relativistic_flag=True`` now needs it (it read ``Te.dat`` before).
+  The presets set both methods. ``from_v3_kwargs`` sets v3's defaults, with a
+  warning.
+- New ``analysis_flag`` and ``dbs_analysis_flag``, both ``True`` by default.
+  ``analysis_flag=False`` saves only the inputs and the solver output (no
+  ``beam`` group); ``dbs_analysis_flag=False`` leaves out the
+  ``diagnostics/dbs`` group and the DBS variables of ``beam``. The DBS analysis
+  needs the beam analysis. Both flags are stored in the inputs.
+
 Outputs
 ~~~~~~~
 

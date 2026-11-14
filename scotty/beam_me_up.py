@@ -156,6 +156,10 @@ def beam_me_up(
     # Solver settings and finite-difference parameters
     launch_flag: VALID_LAUNCH_FLAGS,
     Psi_BC_flag: VALID_PSI_BC_FLAGS,
+    # Sources of the magnetic field and the density: no defaults, so that a
+    # run never falls back on a file the user didn't ask for
+    find_B_method: Union[str, MagneticField_Cylindrical, MagneticField_Cartesian],
+    density_fit_method: Union[str, ProfileFitLike],
     relativistic_flag: bool = False,  # includes relativistic corrections to electron mass when set to True
     first_harmonic_flag: VALID_RESONANCE_FLAGS = "stop",  # at the fundamental: "stop" (1e-3 short of it) or "raise"
     second_harmonic_flag: VALID_RESONANCE_FLAGS = "stop",  # at the second cyclotron harmonic: "stop", "raise" or "pass"
@@ -190,10 +194,6 @@ def beam_me_up(
     shot: Optional[int] = None,
     equil_time: Optional[Union[float, int]] = None,
     # Interpolation settings
-    find_B_method: Union[
-        str, MagneticField_Cylindrical, MagneticField_Cartesian
-    ] = "torbeam",
-    density_fit_method: Optional[Union[str, ProfileFitLike]] = None,
     density_fit_parameters: Optional[Sequence] = None,
     temperature_fit_method: Optional[Union[str, ProfileFitLike]] = None,
     temperature_fit_parameters: Optional[Sequence] = None,
@@ -208,6 +208,9 @@ def beam_me_up(
     ] = None,  # For returning log messages on a log file
     # Plotting flags
     figure_flag: bool = False,
+    # Analysis flags
+    analysis_flag: bool = True,
+    dbs_analysis_flag: bool = True,
     # Additional flags
     ray_tracing_flag: bool = False,
     return_dt_field: bool = False,  # For returning the datatree, field class
@@ -387,23 +390,23 @@ def beam_me_up(
         Shot number, for the field files that need one
     equil_time : float, optional
         Time of the equilibrium, for the field files that hold several
-    find_B_method : str or MagneticField_Cylindrical or MagneticField_Cartesian, default "torbeam"
-        Source of the magnetic field: a field object, or the name of a file
+    find_B_method : str or MagneticField_Cylindrical or MagneticField_Cartesian
+        Required. Source of the magnetic field: a field object, or the name of a file
         format (``"torbeam"``, ``"omfit"``, ``"test"``, ``"test_notime"``,
         ``"UDA_saved"``, ``"EFITpp"``) or of an analytical field
         (``"analytical"``: circular flux surfaces, which needs ``B_T_axis``,
         ``R_axis``, ``minor_radius_a`` and ``B_p_a``)
-    density_fit_method : str or callable, optional
-        Electron density profile (in 10¹⁹ m⁻³) as a function of the normalised
-        poloidal flux: a callable (e.g. a `scotty.profile_fit.ProfileFit`),
-        or the name of a fit, with ``density_fit_parameters``. ``None`` or
-        ``"smoothing-spline-file"`` with no parameters reads
-        ``ne{input_filename_suffix}.dat`` from ``ne_data_path``
+    density_fit_method : str or callable
+        Required. Electron density profile (in 10¹⁹ m⁻³) as a function of the
+        normalised poloidal flux: a callable (e.g. a
+        `scotty.profile_fit.ProfileFit`), or the name of a fit, with
+        ``density_fit_parameters``. ``"smoothing-spline-file"`` with no
+        parameters reads ``ne{input_filename_suffix}.dat`` from ``ne_data_path``
     density_fit_parameters : sequence, optional
         Parameters of the named density fit
     temperature_fit_method : str or callable, optional
         Electron temperature profile (in keV), as ``density_fit_method``;
-        used only with ``relativistic_flag``
+        used only with ``relativistic_flag``, and required with it
     temperature_fit_parameters : sequence, optional
         Parameters of the named temperature fit
     interp_order : int or str, default 5
@@ -420,6 +423,13 @@ def beam_me_up(
         Stored in the output's inputs. v4 does not make figures here yet, so
         ``True`` only logs a warning; see `scotty.plotting`. Separate flags for
         separate figures may come later
+    analysis_flag : bool, default True
+        Analyse the beam (the output's ``beam`` group: widths, curvatures,
+        the dielectric tensor, the path lengths, ...). ``False`` saves only
+        the inputs and the solver output
+    dbs_analysis_flag : bool, default True
+        Also analyse for Doppler backscattering (the ``diagnostics/dbs``
+        group, and the DBS variables of ``beam``). Needs ``analysis_flag``
     ray_tracing_flag : bool, default False
         Trace only the ray, with no beam (v3's ``quick_run``; see
         `scotty.compat.quick_cutoff`)
@@ -499,6 +509,9 @@ def beam_me_up(
         interp_smoothing=interp_smoothing,
         # Plotting flags
         figure_flag=figure_flag,
+        # Analysis flags
+        analysis_flag=analysis_flag,
+        dbs_analysis_flag=dbs_analysis_flag,
         # Additional flags
         ray_tracing_flag=ray_tracing_flag,
         # return_dt_field = return_dt_field,
@@ -549,6 +562,8 @@ def beam_me_up(
     #   - Psi_BC_flag = {params.Psi_BC_flag}
     #   - relativistic flag = {params.relativistic_flag}
     #   - figure flag = {params.figure_flag}
+    #   - analysis flag = {params.analysis_flag}
+    #   - DBS analysis flag = {params.dbs_analysis_flag}
     #
     ##################################################
     """)
@@ -830,32 +845,36 @@ def beam_me_up(
     inputs_ds = dict_to_dataset(*inputs_to_dicts(params, field))
     solver_output_ds = dict_to_dataset(*solver_output_to_dicts(params))
 
-    # Then do basic analysis (i.e. no DBS) and also DBS analysis and
-    # convert both to xarray datasets
-    analysis_ds = dict_to_dataset(
-        *basic_analysis(
-            inputs=inputs_ds,
-            solver_output=solver_output_ds,
-            hamiltonian=hamiltonian,
-            hamiltonian_other=hamiltonian_other,
-            field=field,
-            density_fit=density_fit,
-            temperature_fit=temperature_fit,
+    # Then do basic analysis (i.e. no DBS) and also DBS analysis, if asked
+    # for, and convert both to xarray datasets
+    analysis_ds = None
+    dbs_analysis_ds = None
+    if params.analysis_flag:
+        analysis_ds = dict_to_dataset(
+            *basic_analysis(
+                inputs=inputs_ds,
+                solver_output=solver_output_ds,
+                hamiltonian=hamiltonian,
+                hamiltonian_other=hamiltonian_other,
+                field=field,
+                density_fit=density_fit,
+                temperature_fit=temperature_fit,
+            )
         )
-    )
 
-    dbs_analysis_ds = dict_to_dataset(
-        *dbs_analysis(
-            inputs=inputs_ds,
-            solver_output=solver_output_ds,
-            analysis=analysis_ds,
-            hamiltonian=hamiltonian,
-            hamiltonian_other=hamiltonian_other,
-            field=field,
-            density_fit=density_fit,
-            temperature_fit=temperature_fit,
+    if params.dbs_analysis_flag:
+        dbs_analysis_ds = dict_to_dataset(
+            *dbs_analysis(
+                inputs=inputs_ds,
+                solver_output=solver_output_ds,
+                analysis=analysis_ds,
+                hamiltonian=hamiltonian,
+                hamiltonian_other=hamiltonian_other,
+                field=field,
+                density_fit=density_fit,
+                temperature_fit=temperature_fit,
+            )
         )
-    )
 
     dt = to_output_tree(inputs_ds, solver_output_ds, analysis_ds, dbs_analysis_ds)
     dt.attrs = {

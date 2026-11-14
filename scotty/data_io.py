@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import numpy as np
-from typing import Dict, Tuple, TYPE_CHECKING
+from typing import Dict, Optional, Tuple, TYPE_CHECKING
 import xarray as xr
 
 # Only for type hints: scotty.checks imports scotty.compat, which imports this
@@ -94,6 +94,8 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "output_filename_suffix": params.output_filename_suffix,
         # Plotting arguments
         "figure_flag": params.figure_flag,
+        "analysis_flag": params.analysis_flag,
+        "dbs_analysis_flag": params.dbs_analysis_flag,
     }
     # A plasma launch starts from the user's K and Psi (Cartesian, lab
     # frame), so keep them to make the run reproducible from its output
@@ -282,34 +284,47 @@ def _split(ds: xr.Dataset, names: Tuple[str, ...]) -> Tuple[xr.Dataset, xr.Datas
 def to_output_tree(
     inputs: xr.Dataset,
     solver_output: xr.Dataset,
-    analysis: xr.Dataset,
-    dbs_analysis: xr.Dataset,
+    analysis: Optional[xr.Dataset] = None,
+    dbs_analysis: Optional[xr.Dataset] = None,
 ) -> xr.DataTree:
-    """The output's groups, from what the analysis functions make"""
+    """The output's groups, from what the analysis functions make. Without
+    ``analysis`` (``analysis_flag=False``) there is no ``beam`` group, and
+    without ``dbs_analysis`` no ``diagnostics/dbs`` group"""
+    groups = {"inputs": inputs, "solver": solver_output}
+    if analysis is None:
+        if dbs_analysis is not None:
+            raise ValueError("The DBS analysis needs the beam analysis")
+        return xr.DataTree.from_dict(groups)
+    if dbs_analysis is None:
+        groups["beam"] = analysis
+        return xr.DataTree.from_dict(groups)
     from_dbs, dbs = _split(dbs_analysis, BEAM_FROM_DBS)
     # `analysis` has the path lengths as variables, `dbs_analysis` as coordinates
     from_dbs = from_dbs.drop_vars(
         [c for c in from_dbs.coords if c in analysis.data_vars]
     )
-    return xr.DataTree.from_dict(
-        {
-            "inputs": inputs,
-            "solver": solver_output,
-            "beam": xr.merge([analysis, from_dbs], join="exact", compat="override"),
-            "diagnostics/dbs": dbs,
-        }
-    )
+    groups["beam"] = xr.merge([analysis, from_dbs], join="exact", compat="override")
+    groups["diagnostics/dbs"] = dbs
+    return xr.DataTree.from_dict(groups)
 
 
 def from_output_tree(dt: xr.DataTree) -> Dict[str, xr.Dataset]:
-    """What `to_output_tree` was given, by name"""
-    from_dbs, analysis = _split(dt["beam"].to_dataset(), BEAM_FROM_DBS)
-    dbs_analysis = xr.merge(
-        [dt["diagnostics/dbs"].to_dataset(), from_dbs], join="exact", compat="override"
-    )
-    return {
+    """What `to_output_tree` was given, by name. The analysis groups are
+    absent from a run made with ``analysis_flag`` or ``dbs_analysis_flag``
+    off, and so are their entries here"""
+    groups = {
         "inputs": dt["inputs"].to_dataset(),
         "solver_output": dt["solver"].to_dataset(),
-        "analysis": analysis,
-        "dbs_analysis": dbs_analysis,
     }
+    if "beam" not in dt.children:
+        return groups
+    beam = dt["beam"].to_dataset()
+    if "diagnostics" not in dt.children or "dbs" not in dt["diagnostics"].children:
+        groups["analysis"] = beam
+        return groups
+    from_dbs, analysis = _split(beam, BEAM_FROM_DBS)
+    groups["analysis"] = analysis
+    groups["dbs_analysis"] = xr.merge(
+        [dt["diagnostics/dbs"].to_dataset(), from_dbs], join="exact", compat="override"
+    )
+    return groups

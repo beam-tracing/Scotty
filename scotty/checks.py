@@ -189,6 +189,9 @@ class Parameters:
         interp_smoothing: int,
         # Plotting flags
         figure_flag: bool,
+        # Analysis flags
+        analysis_flag: bool,
+        dbs_analysis_flag: bool,
         # Additional flags
         ray_tracing_flag: bool,
         # return_dt_field: bool,
@@ -258,6 +261,9 @@ class Parameters:
         self.Psi_BC_flag = self._check_Psi_BC_flag(Psi_BC_flag, self.launch_flag)
         self.relativistic_flag = relativistic_flag
         self._check_replaced_kwargs(extras=kwargs)
+        self._check_methods_given(
+            find_B_method, density_fit_method, temperature_fit_method
+        )
         self.first_harmonic_flag = self._check_resonance_flag(
             "first_harmonic_flag", first_harmonic_flag
         )
@@ -321,6 +327,9 @@ class Parameters:
         self.output_filename_suffix = output_filename_suffix
 
         self.figure_flag = figure_flag
+        self.analysis_flag, self.dbs_analysis_flag = self._check_analysis_flags(
+            analysis_flag, dbs_analysis_flag
+        )
 
         self._unpack_kwargs_for_circular_flux_surfaces(extras=kwargs)
         self._unpack_kwargs_for_plasma_launch(extras=kwargs)
@@ -676,6 +685,40 @@ class Parameters:
                     f"{', '.join(v3_names)}: Scotty v3 arguments. To run a v3 script, "
                     "pass its arguments through `scotty.compat.from_v3_kwargs`"
                 )
+
+    def _check_methods_given(
+        self, find_B_method, density_fit_method, temperature_fit_method
+    ) -> None:
+        """The sources of the field and the profiles are never guessed: before
+        4.0.0, an unset ``find_B_method`` read a TORBEAM topfile, an unset
+        ``density_fit_method`` read ``ne.dat`` or guessed the fit from the
+        number of parameters, and an unset temperature read ``Te.dat``"""
+        if find_B_method is None:
+            raise ValueError(
+                "`find_B_method` must be given: a field object, or a file "
+                'format such as "torbeam" or "omfit", or "analytical"'
+            )
+        if density_fit_method is None:
+            raise ValueError(
+                "`density_fit_method` must be given: a profile object (see "
+                "`scotty.profile_fit`), the name of a fit, or "
+                '"smoothing-spline-file" to read ne.dat'
+            )
+        if self.relativistic_flag and temperature_fit_method is None:
+            raise ValueError(
+                "`relativistic_flag=True` needs `temperature_fit_method`: a "
+                "profile object, the name of a fit, or "
+                '"smoothing-spline-file" to read Te.dat'
+            )
+
+    @staticmethod
+    def _check_analysis_flags(analysis_flag, dbs_analysis_flag):
+        if dbs_analysis_flag and not analysis_flag:
+            raise ValueError(
+                "`dbs_analysis_flag=True` needs `analysis_flag=True`: the DBS "
+                "analysis uses the beam analysis"
+            )
+        return bool(analysis_flag), bool(dbs_analysis_flag)
 
     ##################################################
     #
