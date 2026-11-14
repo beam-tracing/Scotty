@@ -35,30 +35,56 @@ Results that change
 - ``from_v3_kwargs``: a v3 script that leaves ``vacuum_propagation_flag`` unset
   now gets ``launch_flag="vacuum_analytic"`` (v3's default was numerical
   propagation, which is not converged across the kink in the density at the
-  plasma edge), ``Psi_BC_flag="continuous"`` if it leaves that unset, and
-  ``poloidal_flux_enter`` = ``poloidal_flux_zero_density`` (1.01 by default),
-  so that the plasma starts where the density is zero. A v3 script whose
+  plasma edge), and ``Psi_BC_flag="continuous"`` if it leaves that unset. Its
+  ``poloidal_flux_enter``, if unset, stays unset, so the plasma starts where
+  the density profile ends (below). v3's ``poloidal_flux_zero_density`` (1.01
+  by default) becomes the zero point of a named fit, which is converted to a
+  profile object; a density file ends where its data end. A v3 script whose
   density does not reach zero at its edge (for example an ``ne.dat`` file that
-  ends with a non-zero density at :math:`\psi = 1`) is then refused by the
-  check below; give it ``Psi_BC_flag="discontinuous"``. Before, such a script
-  failed on the negative density the spline extrapolated to.
+  ends with a non-zero density) is then refused by the continuous condition;
+  give it ``Psi_BC_flag="discontinuous"``. Before, such a script failed on the
+  negative density the spline extrapolated to.
 - ``get_parameters_for_Scotty("DBS_synthetic", launch_freq_GHz)`` uses the
   frequency given; it returned 55 GHz whatever was given. Presets that need a
   frequency raise a clear error without one.
+
+Where the plasma starts
+~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``poloidal_flux_zero_density`` and ``poloidal_flux_zero_temperature`` are
+  removed: each profile has its own zero point, ``poloidal_flux_zero_profile``
+  (the first argument of the fits in `scotty.profile_fit`). Passing either
+  raises. Before, a value given with a profile object was ignored, and the
+  output recorded it anyway.
+- A named fit's ``density_fit_parameters`` (and ``temperature_fit_parameters``)
+  are the arguments of its class, starting with the zero point:
+  ``density_fit_method="quadratic", density_fit_parameters=[1.0, 4.0]`` is
+  ``QuadraticFit(1.0, 4.0)``. The fit is no longer guessed from the number of
+  parameters.
+- A profile read from a file ends where its data end: it is zero beyond them.
+- ``poloidal_flux_enter`` defaults to ``None``: where the density profile ends,
+  its zero point (it was 1.0). The boundary condition is then applied where the
+  density starts. A profile that is a plain function has no zero point, and
+  needs ``poloidal_flux_enter``. The output's ``inputs`` record the entry point
+  and the profiles' zero points.
 
 Errors where results were wrong without one
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - ``Psi_BC_flag="continuous"`` and ``None`` raise if the density is not zero at
   the plasma entry point (more than 1e-5 of its maximum). Both keep the vacuum
-  :math:`K` there, so the ray started
-  off the dispersion relation (:math:`|H|` up to 0.08) and stayed there, with at
-  most a warning. Use ``"discontinuous"``, or set ``poloidal_flux_enter`` to where
-  the density is zero.
-- ``poloidal_flux_zero_density`` (and ``poloidal_flux_zero_temperature``) default
-  to ``None``: the zero point of the profile object, if it has one, and 1.0
-  otherwise. A value that disagrees with the profile object's raises; before, it
-  was ignored, and the output recorded it anyway.
+  :math:`K` there, so the ray started off the dispersion relation (:math:`|H|`
+  up to 0.08) and stayed there, with at most a warning. Use
+  ``"discontinuous"``, or, if the density falls to zero further out, enter
+  there (the message says which).
+- Every boundary condition raises if the density is zero over a band inside
+  the entry point and starts with a kink or a jump: the beam would cross it in
+  the plasma with no boundary condition, and an adaptive solver can step over
+  it (the width at the cut-off was twice the converged one in one case). The
+  message gives the entry point to use. A profile that starts flat is
+  accepted.
+- ``Psi_BC_flag=None`` checks that the density is flat where the beam enters,
+  not at the profile's zero point.
 - A NaN or infinite ``launch_beam_width`` or ``launch_beam_curvature`` raises.
 
 Inputs
@@ -82,6 +108,14 @@ Inputs
   computes (``scotty.data_io.BEAM_FROM_DBS``; they include ``beam_waist``,
   ``theta`` and ``normal_hat``). The DBS analysis
   needs the beam analysis. Both flags are stored in the inputs.
+
+Presets
+~~~~~~~
+
+- ``get_parameters_for_Scotty`` takes ``data_path``, the folder of the input
+  files, instead of ``user``, which chose folders on particular computers.
+- ``DBS_synthetic`` no longer sets the zero points or the entry point: its
+  profile object decides.
 
 Outputs
 ~~~~~~~
@@ -109,6 +143,9 @@ Removed
 - ``scotty/outplot.py``, which read only v2 output files, and the
   ``TestFunctions``, ``WorkInProgress`` and ``Deprecated`` folders. The ``v3``
   branch keeps them.
+- The examples for particular machines, which used data files that are not in
+  the repository. ``Examples/`` keeps an analytical case
+  (``analytical_circular.py``) and the plotting example (``plot.py``).
 - Unused functions in ``fun_general``: ``find_epsilon_para``,
   ``find_epsilon_perp``, ``find_epsilon_g`` (use ``find_epsilon_terms``),
   ``tilt_trns_RZ_make``, ``tilt_trns_TZ_make``,

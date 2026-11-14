@@ -66,7 +66,6 @@ def run(gyro_ratio, output_path, **flags):
             X, Y, Z, zero, zero, zero - B0, 1 - X_grid / L
         ),
         density_fit_method=LinearFit(1.0, N_CUTOFF),
-        poloidal_flux_zero_density=1.0,
         **flags,
         ray_tracing_flag=True,
         delta_X=1e-3,

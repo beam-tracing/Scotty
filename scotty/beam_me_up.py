@@ -20,7 +20,7 @@ Notes
   ``None`` (density continuous and flat at the edge, so :math:`K` and
   :math:`\\Psi` carry straight over from vacuum; this is checked, and an
   error suggests ``"continuous"`` if the profile is not zero with zero
-  gradient at ``poloidal_flux_zero_density``). This is v3's
+  gradient where the beam enters). This is v3's
   ``vacuumLaunch_flag=True`` with ``vacuum_propagation_flag=True``.
 - ``launch_flag="vacuum_numerical"`` launches the beam in vacuum and starts
   the solvers at the antenna, so the beam is integrated numerically through
@@ -177,13 +177,9 @@ def beam_me_up(
     len_tau: int = 4002,
     rtol: float = 1e-4,  # for solve_ivp of the ray/beam solvers
     atol: float = 1e-7,  # for solve_ivp of the ray/beam solvers
-    poloidal_flux_enter: float = 1.0,
-    poloidal_flux_zero_density: Optional[
+    poloidal_flux_enter: Optional[
         float
-    ] = None,  # When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
-    poloidal_flux_zero_temperature: Optional[
-        float
-    ] = None,  # Temperature analogue of poloidal_flux_zero_density; None: the same
+    ] = None,  # None: where the density profile ends (its zero point)
     # Data input and output arguments
     magnetic_data_path: PathLike = pathlib.Path("."),
     ne_data_path: PathLike = pathlib.Path("."),
@@ -361,21 +357,19 @@ def beam_me_up(
         applies to :math:`q` as given, and to :math:`K` and :math:`\Psi` scaled
         by :math:`|K|` and :math:`\max|\Psi|` at the initial point (the first
         point in the plasma)
-    poloidal_flux_enter : float, default 1.0
+    poloidal_flux_enter : float, optional
         Normalised poloidal flux of the plasma boundary: where the beam
-        enters the plasma, and where the ray is stopped when it leaves
-    poloidal_flux_zero_density : float, optional
-        At and above this normalised poloidal flux, the electron density is
-        zero. Must be at least ``poloidal_flux_enter``. ``None`` (the default)
-        uses the zero point of ``density_fit_method`` when that is a profile
-        object (such as `scotty.profile_fit.QuadraticFit`), and 1.0 otherwise.
-        If it is given with a profile object, it must agree with the
-        profile's zero point
-    poloidal_flux_zero_temperature : float, optional
-        Temperature analogue of ``poloidal_flux_zero_density``; ``None`` (the
-        default) uses the zero point of ``temperature_fit_method`` when that is
-        a profile object, and ``poloidal_flux_zero_density`` otherwise. If
-        given, must be at least ``poloidal_flux_enter``
+        enters the plasma, and where the ray is stopped when it leaves.
+        ``None`` (the default) is where the density profile ends, its
+        ``poloidal_flux_zero_profile`` (for a density file, the end of its
+        data), so that the boundary condition is applied where the density
+        starts. A profile that is a plain function needs it given. Where the
+        density starts inside the entry point, the profile must be flat there
+        (this is checked).
+
+        .. versionchanged:: 4.0.0
+           ``poloidal_flux_zero_density`` and ``poloidal_flux_zero_temperature``
+           are removed: each profile has its own zero point
     magnetic_data_path, ne_data_path, Te_data_path : str or pathlib.Path, default "."
         Directories of the magnetic field, electron density and electron
         temperature files
@@ -491,8 +485,6 @@ def beam_me_up(
         rtol=rtol,
         atol=atol,
         poloidal_flux_enter=poloidal_flux_enter,
-        poloidal_flux_zero_density=poloidal_flux_zero_density,
-        poloidal_flux_zero_temperature=poloidal_flux_zero_temperature,
         # Data input and output arguments
         magnetic_data_path=magnetic_data_path,
         ne_data_path=ne_data_path,
@@ -579,10 +571,10 @@ def beam_me_up(
     # density_fit(poloidal_flux) = electron_density
     density_fit = make_fit(
         method=params.density_fit_method,
-        poloidal_flux_zero_density=params.poloidal_flux_zero_density,
         parameters=params.density_fit_parameters,
         filename=params.ne_filename,
     )
+    params.set_zero_points_and_entry(density_fit)
 
     # Using the temperature data, create a fit as a function of poloidal
     # flux, i.e. temperature_fit(poloidal_flux) = temperature. Only used for
@@ -590,10 +582,12 @@ def beam_me_up(
     if params.relativistic_flag:
         temperature_fit = make_fit(
             method=params.temperature_fit_method,
-            poloidal_flux_zero_density=params.poloidal_flux_zero_temperature,
             parameters=params.temperature_fit_parameters,
             filename=params.Te_filename,
             quantity="temperature",
+        )
+        params.poloidal_flux_zero_temperature = getattr(
+            temperature_fit, "poloidal_flux_zero_profile", np.nan
         )
     else:
         temperature_fit = None
@@ -726,7 +720,6 @@ def beam_me_up(
         field=field,
         K_plasmaLaunch_cartesian=params.K_plasmaLaunch_cartesian,
         Psi_3D_plasmaLaunch_labframe_cartesian=params.Psi_3D_plasmaLaunch_labframe_cartesian,
-        poloidal_flux_zero_density=params.poloidal_flux_zero_density,
         hamiltonian_pos1=hamiltonian_pos1,
         hamiltonian_neg1=hamiltonian_neg1,
         tol_H=1e-2,
@@ -902,14 +895,13 @@ def beam_me_up(
 
 def make_fit(
     method: Optional[Union[str, ProfileFitLike]],
-    poloidal_flux_zero_density: float,
     parameters: Optional[Sequence],
     filename: Optional[PathLike],
     quantity: str = "density",
 ) -> ProfileFitLike:
     """Profile fit for the electron density or temperature (``quantity``).
-    ``poloidal_flux_zero_density`` is the flux beyond which the profile is
-    zero, for whichever quantity it is"""
+    A named fit's ``parameters`` start with its zero point (see
+    `scotty.profile_fit.profile_fit`)"""
 
     log = logging.getLogger(__name__)
     log.debug(f"Making {quantity} fit profile")
@@ -927,4 +919,4 @@ def make_fit(
             f"Passing `{quantity}_fit_method` ({method}) as string or None requires a list or array of parameters"
         )
 
-    return profile_fit(method, poloidal_flux_zero_density, parameters, filename)
+    return profile_fit(method, parameters, filename)

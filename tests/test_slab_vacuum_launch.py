@@ -143,7 +143,6 @@ def run(axis, Psi_BC_flag, output_path):
         find_B_method=Slab(axis),
         density_fit_method=density(Psi_BC_flag),
         poloidal_flux_enter=1.0,
-        poloidal_flux_zero_density=ZERO_DENSITY[Psi_BC_flag],
         len_tau=202,
         output_path=output_path,
         figure_flag=False,

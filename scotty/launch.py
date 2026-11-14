@@ -9,8 +9,7 @@ from scipy.optimize import minimize_scalar, root_scalar
 from scotty.antenna.gaussian import circular_gaussian_Psi_w
 from scotty.boundary_conditions import (
     apply_boundary_conditions,
-    check_density_smooth_at_edge,
-    check_density_zero_at_entry,
+    check_density_at_entry,
 )
 from scotty.checks import (
     VALID_FIELDS,
@@ -744,7 +743,6 @@ def find_plasma_entry_parameters(
     field: VALID_FIELDS,
     K_plasmaLaunch_cartesian: Optional[FloatArray] = None,
     Psi_3D_plasmaLaunch_labframe_cartesian: Optional[FloatArray] = None,
-    poloidal_flux_zero_density: Optional[float] = None,
     hamiltonian_pos1: Optional[Hamiltonian] = None,
     hamiltonian_neg1: Optional[Hamiltonian] = None,
     tol_H: float = 1e-3,
@@ -1022,10 +1020,9 @@ def find_plasma_entry_parameters(
         # Psi_entry. Check that assumption holds for the density profile
         elif Psi_BC_flag is None:
             log.debug(f"`Psi_BC_flag` = {Psi_BC_flag}. No boundary conditions applied")
-            check_density_zero_at_entry(
+            check_density_at_entry(
                 density_fit, field.polflux_cartesian(*q_initial_cartesian), Psi_BC_flag
             )
-            check_density_smooth_at_edge(density_fit, poloidal_flux_zero_density)
 
             K_entry = (
                 K_launch_cartesian
@@ -1056,12 +1053,11 @@ def find_plasma_entry_parameters(
             log.debug(
                 f"`Psi_BC_flag` = {Psi_BC_flag}. Applying {Psi_BC_flag} boundary conditions to find K and Psi"
             )
-            if Psi_BC_flag == "continuous":
-                check_density_zero_at_entry(
-                    density_fit,
-                    field.polflux_cartesian(*q_initial_cartesian),
-                    Psi_BC_flag,
-                )
+            check_density_at_entry(
+                density_fit,
+                field.polflux_cartesian(*q_initial_cartesian),
+                Psi_BC_flag,
+            )
 
             def initial_K_and_Psi(hamiltonian):
                 return apply_boundary_conditions(

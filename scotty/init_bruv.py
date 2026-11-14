@@ -7,8 +7,7 @@
 This file contains the default settings for a range of various cases. This is
 split into a set of dictionaries (`DEFAULT_DIAGNOSTIC_PARAMETERS`,
 `LAUNCH_BEAM_METHODS`, and `DENSITY_FIT_PARAMETERS`) and functions
-(`get_parameters_for_Scotty`, `beam_settings`, `ne_settings`, and
-`user_settings`) that look up and parse the requested case.
+(`get_parameters_for_Scotty`, `beam_settings` and `ne_settings`) that look up and parse the requested case.
 
 """
 
@@ -27,6 +26,7 @@ from scotty.fun_general import (
 )
 from scotty.profile_fit import QuadraticFit, TanhFit, PolynomialFit, ProfileFit
 from typing import Callable, Dict, NamedTuple, Optional, Any, Literal
+from scotty.typing import PathLike
 
 log = logging.getLogger()
 
@@ -103,9 +103,8 @@ def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
 
 
 def parameters_DBS_synthetic(launch_freq_GHz: Optional[float]) -> dict:
-    poloidal_flux_zero_density = 1.0
-    poloidal_flux_zero_temperature = 1.0
-    ne_fit = QuadraticFit(poloidal_flux_zero_density, 4.0)
+    # The profile's zero point (1.0) is where the plasma starts
+    ne_fit = QuadraticFit(1.0, 4.0)
     return {
         "poloidal_launch_angle_Torbeam": 6.0,
         "toroidal_launch_angle_Torbeam": 0.0,
@@ -121,15 +120,12 @@ def parameters_DBS_synthetic(launch_freq_GHz: Optional[float]) -> dict:
         "geometry": "cylindrical",
         "launch_flag": "vacuum_analytic",
         "Psi_BC_flag": "continuous",
-        "poloidal_flux_zero_density": poloidal_flux_zero_density,
-        "poloidal_flux_enter": 1.0,
         "B_T_axis": 1.0,
         "B_p_a": 0.1,
         "R_axis": 1.5,
         "minor_radius_a": 0.5,
         # Arguments for testing relativistic corrections
         "relativistic_flag": False,
-        "poloidal_flux_zero_temperature": poloidal_flux_zero_temperature,
         "temperature_fit_method": None,
     }
 
@@ -491,7 +487,7 @@ def get_parameters_for_Scotty(
     find_ne_method: Optional[str] = None,
     equil_time: Optional[float] = None,
     shot: Optional[int] = None,
-    user: Optional[str] = None,
+    data_path: PathLike = pathlib.Path("."),
 ):
     """Return default settings and parameters for the given diagnostic
 
@@ -527,8 +523,10 @@ def get_parameters_for_Scotty(
         Time in seconds
     shot : int, optional
         Shot number
-    user : str, optional
-        User profile settings
+    data_path : str or pathlib.Path, default "."
+        Folder of the input files (``ne.dat``, the topfile, EFIT++ and saved
+        UDA data). It replaces ``user`` (removed in 4.0.0), which chose
+        folders on particular computers
 
     Returns
     ---------
@@ -557,10 +555,8 @@ def get_parameters_for_Scotty(
         "launch_position": None,
     }
 
-    # User settings. Currently just loads paths
-    ne_path, topfile_path, inbeam_path, efitpp_path, UDA_saved_path = user_settings(
-        diagnostic, user, shot
-    )
+    # Every input file is in `data_path`
+    ne_path = topfile_path = efitpp_path = UDA_saved_path = pathlib.Path(data_path)
 
     # Assign keys that we already have
     if find_B_method is not None:
@@ -605,9 +601,6 @@ def get_parameters_for_Scotty(
 
         density_fit = ne_settings(diagnostic, shot, equil_time, find_ne_method)
         parameters["density_fit_method"] = density_fit.fit
-        parameters["poloidal_flux_zero_density"] = (
-            density_fit.poloidal_flux_zero_density
-        )
 
     # MAST and MAST-U specific B-field and poloidal flux settings
     if find_B_method == "UDA":
@@ -731,78 +724,3 @@ def ne_settings(
     print("Nearest ne fit time:", ne_fit_time)
 
     return DensityFitParameters(ne_fit, ne_fit_time, ne_fit.poloidal_flux_zero_profile)
-
-
-def user_settings(diagnostic, user, shot):
-    """
-    Choosing paths appropriately
-    """
-
-    # Default path: all input files in current working directory
-    default_input_files_path = pathlib.Path(".")
-
-    #########################
-    # Initialising default paths
-    # Paths are overwritten if specific users are chosen
-    ne_path = default_input_files_path
-    topfile_path = default_input_files_path
-    inbeam_path = default_input_files_path
-    efitpp_path = default_input_files_path
-    UDA_saved_path = default_input_files_path
-    #########################
-
-    if user == "Freia":
-        # Not yet properly implemented
-        efitpp_path = None
-
-    elif user in ["Valerian_desktop", "Valerian_laptop"]:
-        if user == "Valerian_desktop":
-            prefix = pathlib.Path("D:\\Dropbox\\")
-        elif user == "Valerian_laptop":
-            prefix = pathlib.Path("C:\\Dropbox\\")
-
-        if diagnostic in ["DBS_NSTX_MAST", "DBS_SWIP_MAST-U", "DBS_UCLA_MAST-U"]:
-            if shot in [29684]:
-                # MAST reruns of EFIT. Done by Lucy Kogan.
-                # 29684: no MSE data, but reprocessed with more constraints,
-                # only good at the edge
-                efitpp_path = (
-                    prefix
-                    / f"VHChen2020/Data/Equilibrium/MAST/Lucy_EFIT_runs/{shot}/epk_lkogan_01/"
-                )
-                ne_path = prefix / "VHChen2021/Data - Equilibrium/MAST/"
-
-            elif shot in [30073, 30074, 30075, 30076, 30077]:
-                # MAST reruns of EFIT. Done by Lucy Kogan.
-                # 30073--30077: MSE data, processed better than original runs
-                efitpp_path = (
-                    prefix
-                    / f"VHChen2020/Data/Equilibrium/MAST/Lucy_EFIT_runs/{shot}/epi_lkogan_01/"
-                )
-            elif shot in [29908]:
-                # MAST EFIT runs. List of available shots not updated.
-                efitpp_path = (
-                    prefix
-                    / f"VHChen2020/Data/Equilibrium/MAST/MSE_efitruns/{shot}/Pass0/"
-                )
-            elif shot in [45177]:
-                # MAST EFIT runs. List of available shots not updated.
-                efitpp_path = (
-                    prefix
-                    / f"VHChen2022/Data - Equilibrium/MSE_efitruns/{shot}/efit_sgibson_02/"
-                )
-            # If it's not any of the above shots, I'll assume that there's no efit++ data
-            elif shot > 30471:  # MAST-U
-                UDA_saved_path = (
-                    prefix / "VHChen2020/Data/Equilibrium/MAST-U/Equilibrium_pyuda/"
-                )
-            else:
-                UDA_saved_path = (
-                    prefix / "VHChen2020/Data/Equilibrium/MAST/Equilibrium_pyuda/"
-                )
-
-        elif diagnostic == "DBS_UCLA_DIII-D_240":
-            ne_path = prefix / "VHChen2021/Data - Equilibrium/DIII-D/"
-            topfile_path = prefix / "VHChen2021/Data - Equilibrium/DIII-D/"
-
-    return ne_path, topfile_path, inbeam_path, efitpp_path, UDA_saved_path

@@ -64,17 +64,21 @@ def test_presets_give_both_methods():
     "parameters, expected",
     [
         (None, "smoothing-spline-file"),
-        ([4.0, 1.0], "quadratic"),
-        ([4.0, 1.0, 0.1], "tanh"),
-        ([4.0, 1.0, 0.0, 0.0], "polynomial"),
-        ([1.0] * 8, "stefanikova"),
+        # v3's optional last psi_0 must agree with its zero point, 1.01
+        ([4.0, 1.01], "QuadraticFit"),
+        ([4.0, 1.0, 1.01], "TanhFit"),
+        ([4.0, 1.0, 0.0, 0.0], "PolynomialFit"),
+        ([1.0] * 8, "StefanikovaFit"),
     ],
 )
 def test_v3_scripts_get_v3s_methods(parameters, expected):
+    """v3's file, or the fit v3 guessed from the number of parameters (as a
+    profile object with v3's zero point)"""
     v3 = {"density_fit_parameters": parameters} if parameters is not None else {}
     kw = from_v3_kwargs(v3)
     assert kw["find_B_method"] == "torbeam"
-    assert kw["density_fit_method"] == expected
+    method = kw["density_fit_method"]
+    assert (method if isinstance(method, str) else type(method).__name__) == expected
 
 
 def test_v3_unknown_parameter_count_raises():

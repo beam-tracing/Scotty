@@ -337,23 +337,29 @@ class StefanikovaFit(ProfileFit):
 class SmoothingSplineFit(ProfileFit):
     """1D smoothing spline using `scipy.interpolate.UnivariateSpline`
 
-    Past the ends of its data the spline holds the end values (``ext=3``)
-    rather than extrapolating, which could give negative densities.
+    The profile ends where its data end: ``poloidal_flux_zero_profile``
+    ``None`` (the default) is the largest flux in the data, and the profile is
+    zero beyond it. Between its data and a larger zero point, the spline
+    holds the end values (``ext=3``) rather than extrapolating, which could
+    give negative densities.
 
     .. versionchanged:: 4.0.0
        ``smoothing`` defaults to 0, so that the spline goes through the
-       data (it was SciPy's default, the number of points), and the
-       spline no longer extrapolates past its data.
+       data (it was SciPy's default, the number of points); the spline no
+       longer extrapolates past its data; and the zero point defaults to the
+       end of the data.
     """
 
     def __init__(
         self,
-        poloidal_flux_zero_profile: float,
+        poloidal_flux_zero_profile: Optional[float],
         poloidal_flux: ArrayLike,
         fitting_data: ArrayLike,
         order: int = 5,
         smoothing: Optional[float] = 0.0,
     ):
+        if poloidal_flux_zero_profile is None:
+            poloidal_flux_zero_profile = float(np.max(poloidal_flux))
         super().__init__(poloidal_flux_zero_profile)
         self.spline = UnivariateSpline(
             poloidal_flux,
@@ -369,7 +375,7 @@ class SmoothingSplineFit(ProfileFit):
     @classmethod
     def from_dat_file(
         cls,
-        poloidal_flux_zero_profile: float,
+        poloidal_flux_zero_profile: Optional[float],
         filename: PathLike,
         order: int = 5,
         smoothing: Optional[float] = 0.0,
@@ -384,6 +390,8 @@ class SmoothingSplineFit(ProfileFit):
         be in two columns: the first should contain the radial
         coordinate (:math:`\sqrt(\psi)`), the second the electron
         density/temperature. The columns should be separated by whitespace.
+        ``poloidal_flux_zero_profile`` ``None`` ends the profile where the
+        data end.
 
         .. code-block:: text
 
@@ -456,7 +464,6 @@ def _guess_profile_fit_method(
 
 def profile_fit(
     method: Optional[str],
-    poloidal_flux_zero_profile: float,
     parameters: Sequence,
     filename: Optional[PathLike] = None,
 ) -> ProfileFit:
@@ -466,28 +473,36 @@ def profile_fit(
     ==========
     method:
         Name of profile fit parameterisation
-    poloidal_flux_zero_profile:
-        Poloidal flux label where density/temperature goes to zero
     parameters:
-        List of parameters passed to profile fit
+        The arguments of the fit's class, starting with its zero point
+        (``poloidal_flux_zero_profile``): for example ``[1.0, 4.0]`` for
+        ``"quadratic"``, which is ``QuadraticFit(1.0, 4.0)``. For
+        ``"smoothing-spline-file"``, the file name, order and smoothing; that
+        profile ends where its data end
     filename:
+        The density or temperature file, for ``"smoothing-spline-file"``
 
-
+    .. versionchanged:: 4.0.0
+       ``parameters`` start with the zero point, which was a separate
+       argument; and the method is no longer guessed from the number of
+       parameters (`scotty.compat.from_v3_kwargs` still does, for v3 scripts)
     """
 
     if method is None:
-        method = _guess_profile_fit_method(parameters, filename)
-        warn(
-            "Creating a density fit without specifying a method is deprecated. "
-            f"Guessing method '{method}' from parameters.\n"
-            f"\tPass `density_fit_method='{method}'` to `beam_me_up` to suppress this warning",
-            DeprecationWarning,
-        )
+        if filename is None:
+            raise ValueError(
+                "Name the fit (e.g. `density_fit_method='quadratic'`): it is no "
+                "longer guessed from the number of parameters, which now start "
+                "with the zero point"
+            )
+        method = "smoothing-spline-file"
 
-    if method == "smoothing-spline-file" and filename != parameters[0]:
-        raise ValueError(
-            f"For '{method}', expected filename as second parameter, but got '{parameters[0]}'"
-        )
+    if method == "smoothing-spline-file":
+        if filename != parameters[0]:
+            raise ValueError(
+                f"For '{method}', expected filename as first parameter, but got '{parameters[0]}'"
+            )
+        return SmoothingSplineFit.from_dat_file(None, *parameters)
 
     try:
         fit_method = PROFILE_FIT_METHODS[method]
@@ -497,4 +512,4 @@ def profile_fit(
             f"Expected one of {PROFILE_FIT_METHODS.keys()}"
         )
 
-    return fit_method(poloidal_flux_zero_profile, *parameters)
+    return fit_method(*parameters)
