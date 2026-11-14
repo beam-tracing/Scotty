@@ -26,7 +26,6 @@ import pytest
 def steered_run(request, tmp_path_factory):
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
     kwargs_dict["toroidal_launch_angle_Torbeam"] = request.param
-    kwargs_dict["figure_flag"] = False
     kwargs_dict["len_tau"] = 10
     kwargs_dict["output_path"] = tmp_path_factory.mktemp("launch_outputs")
     return request.param, beam_me_up(**kwargs_dict)

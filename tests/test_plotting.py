@@ -73,8 +73,8 @@ def test_beam_path_in_both_geometries(run, geometry):
     assert_allclose(zeta, so["q_zeta_output"].values, atol=1e-12)
     assert_allclose(Z, so["q_Z_output"].values, rtol=1e-12)
     X, Y, Z = beam_path_cartesian(dt)
-    assert_allclose(X, so["q_X_output"].values, rtol=1e-12)
-    assert_allclose(Y, so["q_Y_output"].values, atol=1e-12)
+    assert_allclose(X, so["q_output_cartesian"].values[:, 0], rtol=1e-12)
+    assert_allclose(Y, so["q_output_cartesian"].values[:, 1], atol=1e-12)
 
 
 @pytest.mark.parametrize("geometry", ["cylindrical", "cartesian"])
@@ -111,8 +111,12 @@ def test_toroidal_beam_path(run, geometry):
     ray = line(ax, "Central (reference) ray")
     # From the launch position, then the beam path
     assert_allclose(ray.get_xdata()[0], so["q_launch_cartesian"].values[0])
-    assert_allclose(ray.get_xdata()[1:], so["q_X_output"].values, rtol=1e-12)
-    assert_allclose(ray.get_ydata()[1:], so["q_Y_output"].values, atol=1e-12)
+    assert_allclose(
+        ray.get_xdata()[1:], so["q_output_cartesian"].values[:, 0], rtol=1e-12
+    )
+    assert_allclose(
+        ray.get_ydata()[1:], so["q_output_cartesian"].values[:, 1], atol=1e-12
+    )
     # The last closed flux surface on the midplane: R = R_axis +- a
     circles = [l for l in ax.get_lines() if same_color(l.get_color(), "orange")]
     radii = sorted(np.hypot(c.get_xdata(), c.get_ydata()).mean() for c in circles)

@@ -5,7 +5,11 @@
 import logging
 import numpy as np
 from scotty.checks import VALID_FIELDS, check_H_output, check_Psi_g_output
-from scotty.data_io import CARTESIAN_VECTOR_COMPONENTS, SOLUTION_COMPONENTS
+from scotty.data_io import (
+    CARTESIAN_VECTOR_COMPONENTS,
+    FIELD_ALIGNED_COMPONENTS,
+    SOLUTION_COMPONENTS,
+)
 from scotty.derivatives import derivative
 from scotty.fun_general import (
     find_H_Cardano_eigh,
@@ -32,7 +36,6 @@ log = logging.getLogger(__name__)
 # (which also contains K), and u2 = b_hat x g / |b_hat x g| is perpendicular
 # to that plane. This is neither the Cartesian lab frame (col_cart) nor the
 # beam frame (x, y, g)
-FIELD_ALIGNED_COMPONENTS = ["u1", "u2", "b"]
 
 # Transverse directions of the beam frame (x, y, g), for Psi_w
 BEAM_TRANSVERSE_COMPONENTS = ["x", "y"]
@@ -274,11 +277,8 @@ def basic_analysis(
         {
             "electron_density": (["tau"], n_e),
             **({"electron_temperature": (["tau"], T_e)} if T_e is not None else {}),
-            "epsilon_bb": (["tau"], epsilon.e_bb),
             "epsilon_para": (["tau"], epsilon.e_bb),
-            "epsilon_11": (["tau"], epsilon.e_11),
             "epsilon_perp": (["tau"], epsilon.e_11),
-            "epsilon_12": (["tau"], epsilon.e_12),
             "epsilon_g": (["tau"], epsilon.e_12),
             "normalised_omega_pe": (["tau"], norm_omega_pe),
             "normalised_omega_ce": (["tau"], norm_omega_ce),
@@ -417,9 +417,6 @@ def basic_analysis(
                 ["tau", "solution"],
                 np.vstack([H_Cardano_1, H_Cardano_2, H_Cardano_3]).T,
             ),
-            "H_Cardano_1": (["tau"], H_Cardano_1),
-            "H_Cardano_2": (["tau"], H_Cardano_2),
-            "H_Cardano_3": (["tau"], H_Cardano_3),
             "mode_index_Cardano": ([], mode_index_Cardano),
             "H_Cardano_solution": (["tau"], H_Cardano_solution),
             "g_X_Cardano": (["tau"], g_X_Cardano),
@@ -458,14 +455,8 @@ def basic_analysis(
     analysis_dict.update(
         {
             "H_eigvals": (["tau", "solution"], H_eigvals),
-            "H_eigval1": (["tau"], H_eigvals[:, 0]),
-            "H_eigval2": (["tau"], H_eigvals[:, 1]),
-            "H_eigval3": (["tau"], H_eigvals[:, 2]),
             "H_eigval_solution": (["tau"], H_solution),
             "e_eigvecs": (["tau", "col_field", "solution"], e_eigvecs),
-            "e_eigvec1": (["tau", "col_field"], e_eigvecs[:, :, 0]),
-            "e_eigvec2": (["tau", "col_field"], e_eigvecs[:, :, 1]),
-            "e_eigvec3": (["tau", "col_field"], e_eigvecs[:, :, 2]),
             "e_hat": (["tau", "col_field"], e_hat),
         }
     )
@@ -530,7 +521,7 @@ def basic_analysis(
         ] = Psi_xy_output_beamframe_cartesian
         Psi_w_output_beamframe_cartesian[:, 1, 1] = Psi_yy_output_beamframe_cartesian
         curv1, curv2, width1, width2 = find_beam_widths_and_curvs(
-            Psi_w_output_beamframe_cartesian, K_vec_cart, g_vec_cart
+            Psi_w_output_beamframe_cartesian, K_vec_cart, g_hat_cart
         )
 
         # Psi is the gradient of K along the beam, so Psi . g = dK/dtau

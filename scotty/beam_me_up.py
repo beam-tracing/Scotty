@@ -174,7 +174,9 @@ def beam_me_up(
     rtol: float = 1e-4,  # for solve_ivp of the ray/beam solvers
     atol: float = 1e-7,  # for solve_ivp of the ray/beam solvers
     poloidal_flux_enter: float = 1.0,
-    poloidal_flux_zero_density: float = 1.0,  # When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
+    poloidal_flux_zero_density: Optional[
+        float
+    ] = None,  # When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
     poloidal_flux_zero_temperature: Optional[
         float
     ] = None,  # Temperature analogue of poloidal_flux_zero_density; None: the same
@@ -204,10 +206,6 @@ def beam_me_up(
     file_log_level: Optional[
         Union[str, int]
     ] = None,  # For returning log messages on a log file
-    # Plotting flags
-    figure_flag: bool = False,
-    further_analysis_flag: bool = False,
-    detailed_analysis_flag: bool = True,
     # Additional flags
     ray_tracing_flag: bool = False,
     return_dt_field: bool = False,  # For returning the datatree, field class
@@ -237,8 +235,9 @@ def beam_me_up(
     poloidal_launch_angle_Torbeam : float
         Poloidal launch angle in degrees, in the TORBEAM convention
     toroidal_launch_angle_Torbeam : float
-        Toroidal launch angle in degrees, in the TORBEAM convention. The
-        antenna is at :math:`\zeta = 0` (:math:`Y = 0`)
+        Toroidal launch angle in degrees, in the TORBEAM convention. Both
+        angles are measured from the local :math:`R` direction at the antenna,
+        so they mean the same for an antenna at any :math:`\zeta`
     launch_freq_GHz : float
         Beam frequency in GHz
     launch_beam_width : float
@@ -250,8 +249,8 @@ def beam_me_up(
         m⁻¹ (negative for a converging beam). A 2-tuple or 3-tuple is reserved,
         as for ``launch_beam_width``
     launch_position : array_like, shape (3,)
-        Antenna position: :math:`(R, \zeta, Z)` for ``geometry="cylindrical"``
-        (with :math:`\zeta = 0`), :math:`(X, Y, Z)` for ``"cartesian"``. For
+        Antenna position: :math:`(R, \zeta, Z)` for ``geometry="cylindrical"``,
+        :math:`(X, Y, Z)` for ``"cartesian"``. For
         ``launch_flag="plasma"``, where the solvers start, inside the plasma
     mode_flag : {1, -1, "O", "X"}
         Which root of the Booker quadratic to trace: 1 or -1 directly, or
@@ -360,13 +359,18 @@ def beam_me_up(
     poloidal_flux_enter : float, default 1.0
         Normalised poloidal flux of the plasma boundary: where the beam
         enters the plasma, and where the ray is stopped when it leaves
-    poloidal_flux_zero_density : float, default 1.0
+    poloidal_flux_zero_density : float, optional
         At and above this normalised poloidal flux, the electron density is
-        zero. Must be at least ``poloidal_flux_enter``
+        zero. Must be at least ``poloidal_flux_enter``. ``None`` (the default)
+        uses the zero point of ``density_fit_method`` when that is a profile
+        object (such as `scotty.profile_fit.QuadraticFit`), and 1.0 otherwise.
+        If it is given with a profile object, it must agree with the
+        profile's zero point
     poloidal_flux_zero_temperature : float, optional
         Temperature analogue of ``poloidal_flux_zero_density``; ``None`` (the
-        default) uses ``poloidal_flux_zero_density``. If given, must be at
-        least ``poloidal_flux_enter``
+        default) uses the zero point of ``temperature_fit_method`` when that is
+        a profile object, and ``poloidal_flux_zero_density`` otherwise. If
+        given, must be at least ``poloidal_flux_enter``
     magnetic_data_path, ne_data_path, Te_data_path : str or pathlib.Path, default "."
         Directories of the magnetic field, electron density and electron
         temperature files
@@ -410,13 +414,6 @@ def beam_me_up(
     file_log_level : str or int, optional
         Level of the log messages written to a log file in ``output_path``;
         ``None`` for no log file
-    figure_flag : bool, default False
-        Stored in the output's inputs. v4 does not make figures here, so
-        ``True`` only logs a warning; see `scotty.plotting`
-    further_analysis_flag : bool, default False
-        Stored in the output's inputs
-    detailed_analysis_flag : bool, default True
-        Stored in the output's inputs
     ray_tracing_flag : bool, default False
         Trace only the ray, with no beam (v3's ``quick_run``; see
         `scotty.compat.quick_cutoff`)
@@ -494,10 +491,6 @@ def beam_me_up(
         temperature_fit_parameters=temperature_fit_parameters,
         interp_order=interp_order,
         interp_smoothing=interp_smoothing,
-        # Plotting flags
-        figure_flag=figure_flag,
-        further_analysis_flag=further_analysis_flag,
-        detailed_analysis_flag=detailed_analysis_flag,
         # Additional flags
         ray_tracing_flag=ray_tracing_flag,
         # return_dt_field = return_dt_field,
@@ -515,10 +508,6 @@ def beam_me_up(
     log = logging.getLogger(__name__)
     log.debug(f"Saved and validated launch parameters")
     log.debug(f"Initialised logger")
-    if figure_flag:
-        log.warning(
-            "figure_flag=True makes no figures in v4: use scotty.plotting instead"
-        )
 
     log.info(f"""\n
     ##################################################
@@ -547,9 +536,6 @@ def beam_me_up(
     #   - launch_flag = {params.launch_flag}
     #   - Psi_BC_flag = {params.Psi_BC_flag}
     #   - relativistic flag = {params.relativistic_flag}
-    #   - figure flag = {params.figure_flag}
-    #   - further_analysis flag = {params.further_analysis_flag}
-    #   - detailed_analysis flag = {params.detailed_analysis_flag}
     #
     ##################################################
     """)

@@ -101,7 +101,6 @@ def run(output_path, upper_hybrid_flag, angle_deg=30.0, **solver):
         delta_X=1e-4,
         delta_Y=1e-4,
         delta_Z=1e-4,
-        figure_flag=False,
         output_path=output_path,
         console_log_level="ERROR",
         **solver,

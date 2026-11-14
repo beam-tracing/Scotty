@@ -41,7 +41,7 @@ BEAM = [
 
 def synthetic(tmp_path, **changes):
     kwargs = get_parameters_for_Scotty("DBS_synthetic")
-    kwargs.update(figure_flag=False, len_tau=10, output_path=tmp_path)
+    kwargs.update(len_tau=10, output_path=tmp_path)
     kwargs.update(changes)
     return kwargs
 
@@ -417,14 +417,15 @@ def test_no_boundary_condition_rejects_a_kink(tmp_path):
 
 
 def test_no_boundary_condition_rejects_a_jump(tmp_path):
-    """The profile is cut to zero at psi = 1, where it is still finite"""
+    """The profile is cut to zero at psi = 1, where it is still finite. The
+    density at the entry point is then not zero either, which is refused first"""
     kwargs = synthetic(
         tmp_path,
         Psi_BC_flag=None,
-        density_fit_method=QuadraticFit(1.3, 4.0),
+        density_fit_method=PolynomialFit(1.0, -4.0 / 1.3, 0.0, 4.0),
         poloidal_flux_zero_density=1.0,
     )
-    with pytest.raises(ValueError, match="not continuous"):
+    with pytest.raises(ValueError, match="density at the plasma entry point"):
         beam_me_up(**kwargs)
 
 

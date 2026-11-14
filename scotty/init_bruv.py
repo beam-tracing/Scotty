@@ -102,14 +102,15 @@ def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
     }
 
 
-def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
+def parameters_DBS_synthetic(launch_freq_GHz: Optional[float]) -> dict:
     poloidal_flux_zero_density = 1.0
     poloidal_flux_zero_temperature = 1.0
     ne_fit = QuadraticFit(poloidal_flux_zero_density, 4.0)
     return {
         "poloidal_launch_angle_Torbeam": 6.0,
         "toroidal_launch_angle_Torbeam": 0.0,
-        "launch_freq_GHz": 55.0,
+        # 55 GHz unless a frequency is given
+        "launch_freq_GHz": 55.0 if launch_freq_GHz is None else launch_freq_GHz,
         "mode_flag": 1,
         "launch_beam_width": 0.04,
         "launch_beam_curvature": 1 / -4.0,
@@ -132,6 +133,9 @@ def parameters_DBS_synthetic(launch_freq_GHz: float) -> dict:
         "temperature_fit_method": None,
     }
 
+
+#: Presets that have a default frequency; the others need `launch_freq_GHz`
+PRESETS_WITH_DEFAULT_FREQUENCY = ("DBS_synthetic",)
 
 DEFAULT_DIAGNOSTIC_PARAMETERS: Dict[str, Callable[[float], dict]] = {
     "DBS_NSTX_MAST": parameters_DBS_NSTX_MAST,
@@ -574,6 +578,11 @@ def get_parameters_for_Scotty(
             f"Unknown diagnostic '{diagnostic}', available kinds are: {DEFAULT_DIAGNOSTIC_PARAMETERS.keys()}"
         )
 
+    if launch_freq_GHz is None and diagnostic not in PRESETS_WITH_DEFAULT_FREQUENCY:
+        raise ValueError(
+            f"The `{diagnostic}` preset needs `launch_freq_GHz`, to compute its "
+            "launch beam"
+        )
     parameters.update(default_parameters(launch_freq_GHz))
 
     # Convert mirror angles to launch angles

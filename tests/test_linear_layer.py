@@ -328,8 +328,6 @@ def run_linear_layer(a0_deg, R_y, gyro_ratio, output_path):
         delta_Y=DELTA_Q,
         delta_Z=DELTA_Q,
         len_tau=LEN_TAU,
-        figure_flag=False,
-        detailed_analysis_flag=False,
         output_path=output_path,
         console_log_level="WARNING",
         **SOLVER,

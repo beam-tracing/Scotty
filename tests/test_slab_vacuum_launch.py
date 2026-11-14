@@ -114,17 +114,20 @@ def run(axis, Psi_BC_flag, output_path):
     """grad psi along X: launched from X = 0.3 towards -X, 10 deg below the
     horizontal. Along Z: the same turned by 90 deg about Y, from Z = 0.3 towards
     -Z, 10 deg towards +X. Both at Y = 0.2, off the Z axis, where the outputs'
-    cylindrical coordinates would divide by R = 0"""
+    cylindrical coordinates would divide by R = 0.
+
+    The toroidal angles are measured from the local R at the antenna, at
+    zeta_a = atan2(Y, X), so zeta_a is taken off the angles from the X axis"""
     launch = {
         0: dict(
             launch_position=np.array([0.3, 0.2, 0.0]),
             poloidal_launch_angle_Torbeam=10.0,
-            toroidal_launch_angle_Torbeam=0.0,
+            toroidal_launch_angle_Torbeam=0.0 - np.rad2deg(np.arctan2(0.2, 0.3)),
         ),
         2: dict(
             launch_position=np.array([0.0, 0.2, 0.3]),
             poloidal_launch_angle_Torbeam=80.0,
-            toroidal_launch_angle_Torbeam=180.0,
+            toroidal_launch_angle_Torbeam=180.0 - np.rad2deg(np.arctan2(0.2, 0.0)),
         ),
     }[axis]
     deltas = {"delta_X": 1e-4, "delta_Y": 1e-4, "delta_Z": 1e-4}
@@ -143,7 +146,6 @@ def run(axis, Psi_BC_flag, output_path):
         poloidal_flux_zero_density=ZERO_DENSITY[Psi_BC_flag],
         len_tau=202,
         output_path=output_path,
-        figure_flag=False,
         **launch,
         **deltas,
     )

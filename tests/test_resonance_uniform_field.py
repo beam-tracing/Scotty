@@ -75,7 +75,6 @@ def run(gyro_ratio, output_path, **flags):
         len_tau=50,
         rtol=1e-8,
         atol=1e-9,
-        figure_flag=False,
         output_path=output_path,
         console_log_level="WARNING",
     )

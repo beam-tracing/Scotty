@@ -20,7 +20,7 @@ from scotty.beam_me_up import beam_me_up
 from scotty.fun_general import find_K_labframe_cart_to_cyl, find_q_labframe_cyl_to_cart
 from scotty.geometry import InterpolatedField_Cylindrical
 from scotty.init_bruv import get_parameters_for_Scotty
-from scotty.profile_fit import QuadraticFit
+from scotty.profile_fit import PolynomialFit
 
 R0, A, B = 1.5, 0.5, 0.8
 
@@ -58,8 +58,11 @@ def boundary(request, tmp_path_factory):
         len_tau=52,
         interp_smoothing=0,
         Psi_BC_flag="discontinuous",
-        # zero at psi = 1.3, but cut to zero at the boundary psi = 1: a jump
-        density_fit_method=QuadraticFit(1.3, 4.0),
+        # 4 - 4 psi^2 / 1.3, cut to zero at the boundary psi = 1: a jump. (A
+        # profile object's own zero point is where it is cut; this was
+        # QuadraticFit(1.3, 4.0) with poloidal_flux_zero_density=1.0, which
+        # did not cut it, and is now refused)
+        density_fit_method=PolynomialFit(1.0, -4.0 / 1.3, 0.0, 4.0),
         poloidal_flux_enter=1.0,
         poloidal_flux_zero_density=1.0,
         poloidal_flux_zero_temperature=1.0,

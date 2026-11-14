@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 
 CYLINDRICAL_VECTOR_COMPONENTS = ["R", "zeta", "Z"]
 CARTESIAN_VECTOR_COMPONENTS = ["X", "Y", "Z"]
+FIELD_ALIGNED_COMPONENTS = ["u1", "u2", "b"]
 SOLUTION_COMPONENTS = ["solution_1", "solution_2", "solution_3"]
 
 
@@ -91,10 +92,6 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "input_filename_suffix": params.input_filename_suffix,
         "output_path": str(params.output_path),
         "output_filename_suffix": params.output_filename_suffix,
-        # Analysis and plotting arguments
-        "figure_flag": params.figure_flag,
-        "further_analysis_flag": params.further_analysis_flag,
-        "detailed_analysis_flag": params.detailed_analysis_flag,
     }
     # A plasma launch starts from the user's K and Psi (Cartesian, lab
     # frame), so keep them to make the run reproducible from its output
@@ -197,7 +194,7 @@ def solver_output_to_dicts(params: Parameters) -> Tuple[dict, dict]:
             if btf
             else {}
         ),
-        "e_hat_initial": (["col_cart"], params.e_hat_initial),
+        "e_hat_initial": (["col_field"], params.e_hat_initial),
         "mode_flag_initial": params.mode_flag_initial,
         "mode_index": params.mode_index,
         "distance_from_launch_to_entry": params.distance_from_launch_to_entry,
@@ -206,15 +203,11 @@ def solver_output_to_dicts(params: Parameters) -> Tuple[dict, dict]:
         "solver_nfev": params.solver_nfev,
         "solver_duration": params.solver_duration,
         # ray-tracing solver output
-        "q_X_output": (["tau"], params.q_output_cartesian.T[0]),
-        "q_Y_output": (["tau"], params.q_output_cartesian.T[1]),
         "q_R_output": (["tau"], params.q_output_cylindrical.T[0]),
         "q_zeta_output": (["tau"], params.q_output_cylindrical.T[1]),
         "q_Z_output": (["tau"], params.q_output_cylindrical.T[2]),
         "q_output_cartesian": (["tau", "row_cart"], params.q_output_cartesian),
         "q_output_cylindrical": (["tau", "row_cyld"], params.q_output_cylindrical),
-        "K_X_output": (["tau"], params.K_output_cartesian.T[0]),
-        "K_Y_output": (["tau"], params.K_output_cartesian.T[1]),
         "K_R_output": (["tau"], params.K_output_cylindrical.T[0]),
         "K_zeta_output": (["tau"], params.K_output_cylindrical.T[1]),
         "K_Z_output": (["tau"], params.K_output_cylindrical.T[2]),
@@ -249,6 +242,7 @@ def solver_output_to_dicts(params: Parameters) -> Tuple[dict, dict]:
         "row_cyld": CYLINDRICAL_VECTOR_COMPONENTS,
         "col_cart": CARTESIAN_VECTOR_COMPONENTS,
         "col_cyld": CYLINDRICAL_VECTOR_COMPONENTS,
+        "col_field": FIELD_ALIGNED_COMPONENTS,
     }
 
     return solver_output_dict, solver_output_coords

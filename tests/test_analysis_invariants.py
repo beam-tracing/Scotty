@@ -27,7 +27,6 @@ def steered_run(request, tmp_path_factory):
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
     kwargs_dict["toroidal_launch_angle_Torbeam"] = toroidal_angle
     kwargs_dict["mode_flag"] = mode_flag
-    kwargs_dict["figure_flag"] = False
     kwargs_dict["output_path"] = tmp_path_factory.mktemp("analysis_invariants")
     return beam_me_up(**kwargs_dict)
 
@@ -94,7 +93,7 @@ def test_dK_dtau_matches_spline_of_K(steered_run):
     max |dK/dtau| away from the ends, where the spline is poorer"""
     solver_output = steered_run["solver"]
     tau = solver_output["tau"].values
-    K = np.stack([solver_output[f"K_{c}_output"].values for c in "XYZ"], axis=-1)
+    K = solver_output["K_output_cartesian"].values
     spline = CubicSpline(tau, K)(tau, 1)
     analytic = steered_run["beam"]["dK_dtau_cartesian"].values
 
@@ -126,7 +125,6 @@ def test_Psi_g_check_warns_for_piecewise_linear_density(tmp_path):
     n_table = np.asarray(smooth(psi_table), dtype=float)
     kwargs_dict.update(
         toroidal_launch_angle_Torbeam=10.0,
-        figure_flag=False,
         output_path=tmp_path,
         density_fit_method=lambda psi: np.interp(psi, psi_table, n_table),
         file_log_level="WARNING",
@@ -169,7 +167,6 @@ def test_dispersion_drift_is_step_error(tmp_path):
         kwargs_dict.update(
             toroidal_launch_angle_Torbeam=10.0,
             mode_flag=-1,
-            figure_flag=False,
             output_path=tmp_path / folder,
             rtol=rtol,
             atol=atol,
@@ -288,7 +285,6 @@ def tight_run(request, tmp_path_factory):
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
     kwargs_dict["toroidal_launch_angle_Torbeam"] = toroidal_angle
     kwargs_dict["mode_flag"] = mode_flag
-    kwargs_dict["figure_flag"] = False
     kwargs_dict["rtol"] = 1e-5
     kwargs_dict["atol"] = 1e-8
     kwargs_dict["output_path"] = tmp_path_factory.mktemp("analysis_invariants")
@@ -303,13 +299,7 @@ def test_g_matches_dq_dtau(tight_run):
     run needs a tighter rtol than the default for the test to be sharp"""
     solver = tight_run["solver"]
     tau = solver["tau"].values
-    dq_dtau = np.stack(
-        [
-            CubicSpline(tau, solver[name].values)(tau, 1)
-            for name in ("q_X_output", "q_Y_output", "q_Z_output")
-        ],
-        axis=-1,
-    )
+    dq_dtau = CubicSpline(tau, solver["q_output_cartesian"].values)(tau, 1)
     g = np.real(tight_run["beam"]["g_vector_cartesian"].values)
 
     relative_difference = np.linalg.norm(dq_dtau - g, axis=-1) / np.linalg.norm(

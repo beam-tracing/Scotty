@@ -5,7 +5,7 @@
 import difflib
 import logging
 from pathlib import Path
-from scotty.compat import V3_ONLY_ARGUMENTS
+from scotty.compat import REMOVED_ARGUMENTS, V3_ONLY_ARGUMENTS
 from scotty.fun_general import (
     find_K_labframe_cart_to_cyl,
     find_K_labframe_cyl_to_cart,
@@ -80,6 +80,8 @@ def _circular_launch_beam(name: str, value: LaunchBeamArgument) -> float:
     are reserved until the launch beam frame and their meaning are decided"""
     array = np.asarray(value) if value is not None else np.asarray(np.nan, dtype=object)
     if array.ndim == 0 and array.dtype.kind in "iuf":
+        if not np.isfinite(array):
+            raise ValueError(f"`{name}` must be finite, but got {value!r}")
         return float(array)
     if array.ndim == 1 and len(array) in (2, 3) and array.dtype.kind in "iuf":
         raise NotImplementedError(
@@ -166,7 +168,7 @@ class Parameters:
         rtol: float,
         atol: float,
         poloidal_flux_enter: float,
-        poloidal_flux_zero_density: float,
+        poloidal_flux_zero_density: Optional[float],
         poloidal_flux_zero_temperature: Optional[float],
         # Data input and output arguments
         magnetic_data_path: Union[str, Path],
@@ -185,10 +187,6 @@ class Parameters:
         temperature_fit_parameters: Optional[Sequence],
         interp_order: Union[str, int],
         interp_smoothing: int,
-        # Plotting flags
-        figure_flag: bool,
-        further_analysis_flag: bool,
-        detailed_analysis_flag: bool,
         # Additional flags
         ray_tracing_flag: bool,
         # return_dt_field: bool,
@@ -280,6 +278,8 @@ class Parameters:
             poloidal_flux_zero_density,
             poloidal_flux_zero_temperature,
             relativistic_flag,
+            density_fit_method,
+            temperature_fit_method,
         )
 
         ##################################################
@@ -317,10 +317,6 @@ class Parameters:
         self.input_filename_suffix = input_filename_suffix
         self.output_path = self._check_data_path("output", output_path)
         self.output_filename_suffix = output_filename_suffix
-
-        self.figure_flag = figure_flag
-        self.further_analysis_flag = further_analysis_flag
-        self.detailed_analysis_flag = detailed_analysis_flag
 
         self._unpack_kwargs_for_circular_flux_surfaces(extras=kwargs)
         self._unpack_kwargs_for_plasma_launch(extras=kwargs)
@@ -391,7 +387,8 @@ class Parameters:
             return cast(VALID_GEOMETRIES, geometry)
 
     def _check_positive(self, name: str, value: Union[int, float]) -> Union[int, float]:
-        if value <= 0:
+        # `not value > 0` also catches NaN, for which `value <= 0` is False
+        if not value > 0:
             raise ValueError(f"`{name}` must be positive, but got {value}")
         else:
             return value
@@ -409,13 +406,39 @@ class Parameters:
     def _check_poloidal_flux_arguments(
         self,
         poloidal_flux_enter: float,
-        poloidal_flux_zero_density: float,
+        poloidal_flux_zero_density: Optional[float],
         poloidal_flux_zero_temperature: Optional[float],
         relativistic_flag: bool,
+        density_fit_method=None,
+        temperature_fit_method=None,
     ) -> Tuple[float, float, float]:
+        # A profile object (e.g. `QuadraticFit`) has its own zero point, which is
+        # what the run uses; the arguments must agree with it, and default to it
+        def zero_point(name, given, fit_method, default):
+            own = getattr(fit_method, "poloidal_flux_zero_profile", None)
+            if given is None:
+                return default if own is None else own
+            if own is not None and given != own:
+                raise ValueError(
+                    f"`{name}` = {given}, but the profile {fit_method!r} is zero "
+                    f"from {own}, which is what the run would use. Leave `{name}` "
+                    "unset (None) to use the profile's value, or make them agree"
+                )
+            return given
+
+        poloidal_flux_zero_density = zero_point(
+            "poloidal_flux_zero_density",
+            poloidal_flux_zero_density,
+            density_fit_method,
+            1.0,
+        )
         # By default, the temperature goes to zero where the density does
-        if poloidal_flux_zero_temperature is None:
-            poloidal_flux_zero_temperature = poloidal_flux_zero_density
+        poloidal_flux_zero_temperature = zero_point(
+            "poloidal_flux_zero_temperature",
+            poloidal_flux_zero_temperature,
+            temperature_fit_method,
+            poloidal_flux_zero_density,
+        )
         self._check_positive("poloidal_flux_enter", poloidal_flux_enter)
         self._check_positive("poloidal_flux_zero_density", poloidal_flux_zero_density)
         self._check_positive(
@@ -637,6 +660,12 @@ class Parameters:
                 "Unused keyword arguments, which are not arguments of `beam_me_up` "
                 f"and are ignored:\n         {'keyword':<{_indent}} value\n{_msg}"
             )
+            removed = sorted(set(extras_copy) & set(REMOVED_ARGUMENTS))
+            if removed:
+                log.warning(
+                    f"{', '.join(removed)}: removed in Scotty 4.0.0, as they did "
+                    "nothing; `beam_me_up` makes no figures (see `scotty.plotting`)"
+                )
             v3_names = sorted(set(extras_copy) & set(V3_ONLY_ARGUMENTS))
             if v3_names:
                 log.warning(
