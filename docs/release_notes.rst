@@ -54,10 +54,6 @@ Geometry, launch and boundary conditions
   raise an error (they were ``"continuous"`` and ``None``). ``None`` now checks
   that the density is zero and flat at the plasma edge, and raises otherwise.
   It must be ``None`` for ``launch_flag="vacuum_numerical"``.
-- ``mode_flag`` can also be ``"O"`` or ``"X"``, decided from the two roots'
-  polarisations where the solvers start. Which of 1 and -1 is the O-mode
-  depends on the plasma and K; the cut-off check at the plasma boundary
-  (``Psi_BC_flag="discontinuous"``) now uses the same test.
 - ``Psi_BC_flag="continuous"`` and ``"discontinuous"`` work whatever the
   direction of :math:`\nabla \psi` at the plasma entry point (#176). The
   tangents of the flux surface used to match the beam across the boundary were
@@ -68,6 +64,15 @@ Geometry, launch and boundary conditions
   a singular matrix, and with ``"discontinuous"`` ``find_K_plasma`` gave a NaN
   normal when :math:`\psi_X = 0`. Both now build the tangents from
   :math:`\nabla \psi`. Elsewhere the results are unchanged, up to rounding.
+- ``mode_flag`` can also be ``"O"`` or ``"X"``, decided from the two roots'
+  polarisations where the solvers start. Which of 1 and -1 is the O-mode
+  depends on the plasma and K; the cut-off check at the plasma boundary
+  (``Psi_BC_flag="discontinuous"``) now uses the same test.
+- ``launch_beam_width`` and ``launch_beam_curvature`` take a number, for a
+  circular beam, as before. A 2-tuple and a 3-tuple are reserved for
+  elliptical and astigmatic beams and raise ``NotImplementedError`` for now,
+  until the launch beam frame and the meaning of their elements are decided.
+  Anything else raises ``ValueError``.
 
 Running v3 inputs and outputs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

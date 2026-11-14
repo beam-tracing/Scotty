@@ -68,6 +68,28 @@ EXTRA_ARGUMENTS = (
 )
 
 
+LaunchBeamArgument = Union[float, Tuple[float, float], Tuple[float, float, float]]
+"""`launch_beam_width` and `launch_beam_curvature`: a number for a circular beam.
+A 2-tuple and a 3-tuple are reserved for elliptical and astigmatic beams, and
+are not implemented yet"""
+
+
+def _circular_launch_beam(name: str, value: LaunchBeamArgument) -> float:
+    """`value` as a number, for a circular beam. A 2-tuple or 3-tuple (an
+    elliptical or astigmatic beam) raises `NotImplementedError`: these forms
+    are reserved until the launch beam frame and their meaning are decided"""
+    array = np.asarray(value) if value is not None else np.asarray(np.nan, dtype=object)
+    if array.ndim == 0 and array.dtype.kind in "iuf":
+        return float(array)
+    if array.ndim == 1 and len(array) in (2, 3) and array.dtype.kind in "iuf":
+        raise NotImplementedError(
+            f"`{name}` = {value}: a {len(array)}-tuple (an elliptical or "
+            "astigmatic beam) is reserved, but not implemented yet. Give a "
+            "number, for a circular beam"
+        )
+    raise ValueError(f"`{name}` must be a number (a circular beam), but got {value!r}")
+
+
 def _known_argument_names() -> list:
     """The names of `beam_me_up`'s arguments, to suggest the intended name of
     a misspelt keyword argument"""
@@ -126,8 +148,8 @@ class Parameters:
         poloidal_launch_angle_Torbeam: float,
         toroidal_launch_angle_Torbeam: float,
         launch_freq_GHz: float,
-        launch_beam_width: float,
-        launch_beam_curvature: float,
+        launch_beam_width: LaunchBeamArgument,
+        launch_beam_curvature: LaunchBeamArgument,
         q_launch: FloatArray,
         mode_flag_launch: VALID_LAUNCH_MODE_FLAGS,
         # Solver settings and finite-difference parameters
@@ -216,9 +238,12 @@ class Parameters:
             self.launch_angular_frequency
         )
         self.launch_beam_width = self._check_positive(
-            "launch_beam_width", launch_beam_width
+            "launch_beam_width",
+            _circular_launch_beam("launch_beam_width", launch_beam_width),
         )
-        self.launch_beam_curvature = launch_beam_curvature
+        self.launch_beam_curvature = _circular_launch_beam(
+            "launch_beam_curvature", launch_beam_curvature
+        )
         self.q_launch = q_launch
         self.mode_flag_launch = self._check_mode_flag(mode_flag_launch)
 

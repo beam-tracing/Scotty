@@ -111,6 +111,7 @@ from scotty.checks import (
     VALID_LAUNCH_MODE_FLAGS,
     VALID_PSI_BC_FLAGS,
     VALID_RESONANCE_FLAGS,
+    LaunchBeamArgument,
     Parameters,
 )
 from scotty.data_io import (
@@ -148,8 +149,8 @@ def beam_me_up(
     poloidal_launch_angle_Torbeam: float,
     toroidal_launch_angle_Torbeam: float,
     launch_freq_GHz: float,
-    launch_beam_width: float,
-    launch_beam_curvature: float,
+    launch_beam_width: LaunchBeamArgument,
+    launch_beam_curvature: LaunchBeamArgument,
     launch_position: FloatArray,
     mode_flag: VALID_LAUNCH_MODE_FLAGS,
     # Solver settings and finite-difference parameters
@@ -241,10 +242,13 @@ def beam_me_up(
     launch_freq_GHz : float
         Beam frequency in GHz
     launch_beam_width : float
-        Beam width :math:`W` at the antenna, in m
+        Beam width :math:`W` at the antenna, in m. A 2-tuple or 3-tuple is
+        reserved for elliptical and astigmatic beams, and raises
+        ``NotImplementedError`` for now
     launch_beam_curvature : float
         Curvature of the beam's wavefronts at the antenna, :math:`1/R_c`, in
-        m⁻¹ (negative for a converging beam)
+        m⁻¹ (negative for a converging beam). A 2-tuple or 3-tuple is reserved,
+        as for ``launch_beam_width``
     launch_position : array_like, shape (3,)
         Antenna position: :math:`(R, \zeta, Z)` for ``geometry="cylindrical"``
         (with :math:`\zeta = 0`), :math:`(X, Y, Z)` for ``"cartesian"``. For
