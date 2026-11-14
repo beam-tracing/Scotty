@@ -7,6 +7,7 @@ Valerian Hongjie Hall-Chen
 
 """
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs
 import numpy as np
 
 pol_launch_angles = np.linspace(-20.0, -40.0, 21)
@@ -25,7 +26,7 @@ kwargs_dict = dict(
 kwargs_dict = dict(
     [
         ("find_B_method", "UDA_saved"),
-        ("Psi_BC_flag", True),
+        ("Psi_BC_flag", "continuous"),
         ("figure_flag", False),
         ("vacuum_propagation_flag", True),
         ("vacuumLaunch_flag", True),
@@ -90,7 +91,7 @@ for freq_GHz in freqs_GHz:
                 "output_path"
             ] = "D:\\Dropbox\\VHChen2021\\Data - Scotty\\Run 14\\"
 
-            beam_me_up(**kwargs_dict)
+            beam_me_up(**from_v3_kwargs(kwargs_dict))
 
             counter = counter + 1
             print(

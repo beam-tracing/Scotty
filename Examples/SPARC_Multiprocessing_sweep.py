@@ -1,5 +1,6 @@
 
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs
 from scotty.fun_general import freq_GHz_to_wavenumber
 import numpy as np
 import time
@@ -65,7 +66,7 @@ def wrap_me_up(arg_tuple):
     }
     
 
-    beam_me_up(**kwargs) # Calls Scotty
+    beam_me_up(**from_v3_kwargs(kwargs)) # Calls Scotty
 
 
 # Part that pools arguments for multiprocessing

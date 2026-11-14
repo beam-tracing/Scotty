@@ -1,8 +1,7 @@
-from scotty.init_bruv import ne_settings, beam_settings, get_parameters_for_Scotty
-
 import numpy as np
 import numpy.testing as nt
 import pytest
+from scotty.init_bruv import ne_settings, beam_settings, get_parameters_for_Scotty
 
 
 def test_ne_settings():
@@ -36,9 +35,9 @@ def test_bad_ne_settings():
         ("DBS_CIEMAT_JT60SA", "data", 90.0, 0.06323503329291348, -0.5535179506038995),
         ("DBS_UCLA_DIII-D_240", "thin_lens", 55.0, 0.02216858596, -1.0831303),
         ("DBS_UCLA_MAST-U", "thin_lens", 48.0, 0.05165271, -0.7997469),
-        # TODO: Check following, have different signs and magnitude to others
-        ("DBS_SWIP_MAST-U", "estimate_var_w0", 52.0, -11.518604, 26.2085140),
-        ("DBS_SWIP_MAST-U", "estimate_fix_w0", 52.0, -12.352420, 24.4393811),
+        # A Gaussian beam with its waist at the window, 27.7 cm in front of the mirror
+        ("DBS_SWIP_MAST-U", "estimate_var_w0", 52.0, 0.03966124, -0.42767136),
+        ("DBS_SWIP_MAST-U", "estimate_fix_w0", 52.0, 0.04197024, -0.33098776),
     ],
 )
 def test_beam_settings(
@@ -74,10 +73,9 @@ def test_parameters_DBS_NSTX_MAST():
         "launch_beam_width": 0.03629814335,
         "launch_beam_curvature": -0.7714837802263125,
         "launch_position": np.array([2.43521, 0.0, 0.0]),
+        "geometry": "cylindrical",
+        "launch_flag": "vacuum_analytic",
         "Psi_BC_flag": "continuous",
-        "figure_flag": True,
-        "vacuum_propagation_flag": True,
-        "vacuumLaunch_flag": True,
     }
     assert sorted(expected.keys()) == sorted(parameters.keys())
     for key, value in expected.items():
@@ -100,10 +98,9 @@ def test_parameters_DBS_UCLA_DIII_D_240():
         "launch_beam_width": 0.02173742019305591,
         "launch_beam_curvature": -1.2659055507320647,
         "launch_position": np.array([2.587, 0.0, -0.0157]),
+        "geometry": "cylindrical",
+        "launch_flag": "vacuum_analytic",
         "Psi_BC_flag": "continuous",
-        "figure_flag": True,
-        "vacuum_propagation_flag": True,
-        "vacuumLaunch_flag": True,
     }
     assert sorted(expected.keys()) == sorted(parameters.keys())
     for key, value in expected.items():
@@ -112,3 +109,23 @@ def test_parameters_DBS_UCLA_DIII_D_240():
             assert parameters[key] == value, key
         else:
             assert np.allclose(parameters[key], value), key
+
+
+@pytest.mark.parametrize("diagnostic", ["CPS_UCLA_MAST-U", "hiK_Strath_MAST"])
+def test_unimplemented_presets_raise(diagnostic):
+    """C11: listed, but with no preset yet (future work)"""
+    with pytest.raises(NotImplementedError, match=diagnostic):
+        get_parameters_for_Scotty(diagnostic)
+
+
+@pytest.mark.parametrize(
+    "diagnostic",
+    ["DBS_NSTX_MAST", "DBS_UCLA_MAST-U", "DBS_SWIP_MAST-U", "DBS_synthetic"],
+)
+def test_presets_launch_flag(diagnostic):
+    """C1: the presets launch from vacuum with analytic vacuum propagation (v3's
+    vacuum_propagation_flag = True), and use `Psi_BC_flag`"""
+    parameters = get_parameters_for_Scotty(diagnostic, launch_freq_GHz=55.0)
+    assert parameters["launch_flag"] == "vacuum_analytic"
+    assert parameters["Psi_BC_flag"] == "continuous"
+    assert "boundary_flag" not in parameters

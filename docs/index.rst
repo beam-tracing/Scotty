@@ -18,7 +18,9 @@ through `get_parameters_for_Scotty()
 
    input
    output
+   code_layout
    references
+   release_notes
    api/modules
 
 

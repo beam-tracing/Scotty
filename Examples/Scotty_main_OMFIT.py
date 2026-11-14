@@ -6,6 +6,7 @@ Created on Fri Jun  8 10:44:34 2018
 Valerian Hongjie Hall-Chen
 """
 from scotty.beam_me_up import beam_me_up
+from scotty.compat import from_v3_kwargs
 import ast
 
 """
@@ -38,4 +39,4 @@ f.close()
 
 # kwargs_dict = get_parameters_for_Scotty('DBS_synthetic')
 # kwargs_dict['output_path'] = './'
-beam_me_up(**kwargs_dict)
+beam_me_up(**from_v3_kwargs(kwargs_dict))

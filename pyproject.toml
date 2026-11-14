@@ -17,17 +17,15 @@ dependencies = [
     "numpy>=2.0",
     "scipy~=1.7",
     "matplotlib~=3.3",
-    "freeqdsk>=0.1.0",
     "xarray>=2024.10.0",
-	"typing-extensions>=4.0.0",
-    "h5netcdf",
-    "h5py",
+    "h5netcdf[h5py]",  # recent h5netcdf makes h5py (the backend Scotty uses) an optional extra
 ]
 dynamic = ["version"]
 
 [project.optional-dependencies]
 tests = [
     "pytest",
+    "pytest-timeout",
 ]
 docs = [
     "sphinx >= 5.3",

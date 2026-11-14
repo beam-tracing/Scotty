@@ -46,13 +46,9 @@ Version history
 
 from __future__ import annotations
 import argparse
-import pathlib
-
 import numpy as np
-import freeqdsk._fileutils as fortran
-
+import pathlib
 from scotty.fun_general import read_floats_into_list_until
-from scotty.geometry import ConstantCurrentDensityField
 from scotty.typing import PathLike
 
 
@@ -87,11 +83,36 @@ class Torbeam:
     def from_file(cls, filename: PathLike) -> Torbeam:
         """Read TORBEAM geometry file"""
 
+        # Section headers, in file order after the radial grid: older
+        # topfiles (and `write`) use the first set, newer ones the second
+        header_styles = {
+            "X-coordinates": ("Z-coordinates", "B_R", "B_t", "B_Z", "psi"),
+            "Radial grid coordinates": (
+                "Vertical grid coordinates",
+                "B_r",
+                "B_t",
+                "B_z",
+                "psi",
+            ),
+        }
+
         with open(filename) as f:
-            while "X-coordinates" not in f.readline():
-                pass  # Start reading only from X-coords onwards
-            R_grid = read_floats_into_list_until("Z-coordinates", f)
-            Z_grid = read_floats_into_list_until("B_R", f)
+            # Start reading only from R-coords onwards
+            while True:
+                line = f.readline()
+                if not line:
+                    raise ValueError(
+                        f"No radial grid header found in TORBEAM file '{filename}'"
+                    )
+                start = next((key for key in header_styles if key in line), None)
+                if start is not None:
+                    break
+            Z_header, B_R_header, B_T_header, B_Z_header, psi_header = header_styles[
+                start
+            ]
+
+            R_grid = read_floats_into_list_until(Z_header, f)
+            Z_grid = read_floats_into_list_until(B_R_header, f)
             R_points = len(R_grid)
             Z_points = len(Z_grid)
 
@@ -100,9 +121,9 @@ class Torbeam:
             def from_fortran(array):
                 return array.reshape((Z_points, R_points)).transpose()
 
-            B_R = from_fortran(read_floats_into_list_until("B_t", f))
-            B_T = from_fortran(read_floats_into_list_until("B_Z", f))
-            B_Z = from_fortran(read_floats_into_list_until("psi", f))
+            B_R = from_fortran(read_floats_into_list_until(B_T_header, f))
+            B_T = from_fortran(read_floats_into_list_until(B_Z_header, f))
+            B_Z = from_fortran(read_floats_into_list_until(psi_header, f))
             poloidal_flux = from_fortran(
                 read_floats_into_list_until("you fall asleep", f)
             )
@@ -116,8 +137,6 @@ class Torbeam:
         z_grid_length = len(self.Z_grid)
 
         with open(filename, "w") as topfile_file:
-            chunks = fortran.ChunkOutput(topfile_file, extraspaces=1)
-
             topfile_file.write("Dummy line\n")
             topfile_file.write(f"{x_grid_length} {z_grid_length}\n")
             topfile_file.write("Dummy line\n")
@@ -127,19 +146,29 @@ class Torbeam:
                 topfile_file.write("{:.8e}\n".format(self.R_grid[ii]))
 
             topfile_file.write("Grid: Z-coordinates\n")
-            fortran.write_1d(self.Z_grid, chunks)
+            _write_floats(topfile_file, self.Z_grid)
 
             topfile_file.write("Magnetic field: B_R\n")
-            fortran.write_2d(self.B_R, chunks)
+            _write_floats(topfile_file, np.transpose(self.B_R))
 
             topfile_file.write("Magnetic field: B_t\n")
-            fortran.write_2d(self.B_T, chunks)
+            _write_floats(topfile_file, np.transpose(self.B_T))
 
             topfile_file.write("Magnetic field: B_Z\n")
-            fortran.write_2d(self.B_Z, chunks)
+            _write_floats(topfile_file, np.transpose(self.B_Z))
 
             topfile_file.write("Poloidal flux: psi\n")
-            fortran.write_2d(self.psi, chunks)
+            _write_floats(topfile_file, np.transpose(self.psi))
+
+
+def _write_floats(file, values):
+    """Write floats five to a line, in the format of a topfile's data blocks.
+    A 2D array is written row by row, so transpose it first for Fortran's order"""
+    values = np.ravel(values)
+    for start in range(0, len(values), 5):
+        chunk = values[start : start + 5]
+        file.write("".join(f" {' ' if v >= 0.0 else ''}{v:1.9E}" for v in chunk))
+        file.write("\n")
 
 
 def write_inbeam(
@@ -237,10 +266,13 @@ def write_torbeam_file(
     B_poloidal_max: float,
     torbeam_directory_path: pathlib.Path,
 ):
-    """Write a TORBEAM magnetic geometry file based on a constant
-    current density equilibrium"""
+    """Write a TORBEAM magnetic geometry file based on the analytical
+    circular flux surface equilibrium (`CircularFluxSurfaceField`)"""
 
-    field = ConstantCurrentDensityField(
+    # Imported here: geometry imports Torbeam from this module
+    from scotty.geometry import CircularFluxSurfaceField
+
+    field = CircularFluxSurfaceField(
         B_toroidal_max,
         major_radius,
         minor_radius,
@@ -250,10 +282,10 @@ def write_torbeam_file(
         buffer_factor,
     )
     x_meshgrid, z_meshgrid = np.meshgrid(field.R_coord, field.Z_coord, indexing="ij")
-    B_t = field.B_T(x_meshgrid, z_meshgrid)
-    B_r = field.B_R(x_meshgrid, z_meshgrid)
-    B_z = field.B_Z(x_meshgrid, z_meshgrid)
-    psi = field.poloidal_flux(x_meshgrid, z_meshgrid)
+    B_t = field.B_T(x_meshgrid, 0.0, z_meshgrid)
+    B_r = field.B_R(x_meshgrid, 0.0, z_meshgrid)
+    B_z = field.B_Z(x_meshgrid, 0.0, z_meshgrid)
+    psi = field.polflux(x_meshgrid, 0.0, z_meshgrid)
 
     Torbeam(field.R_coord, field.Z_coord, B_r, B_t, B_z, psi).write(
         torbeam_directory_path / "topfile"

@@ -1,3 +1,7 @@
+# -*- coding: utf-8 -*-
+# Copyright 2018 - 2023, Valerian Hall-Chen and the Scotty contributors
+# SPDX-License-Identifier: GPL-3.0
+
 import numpy as np
 
 from typing import Callable, Dict, Optional, Tuple, Union
@@ -25,19 +29,19 @@ def cache(func):
     @functools.wraps(func)
     def wrapper_cache(*args, **kwargs):
         nonlocal hits, misses
-        cache_key = hash(
-            (
-                tuple(map(_maybe_bytes, args)),
-                tuple((k, _maybe_bytes(v)) for k, v in kwargs.items()),
-            )
+        # Keyed on the arguments themselves, not on their hash, so that two
+        # points whose hashes collide can't share a result
+        cache_key = (
+            tuple(map(_maybe_bytes, args)),
+            tuple((k, _maybe_bytes(v)) for k, v in kwargs.items()),
         )
 
         try:
-            result = wrapper_cache.cache[cache_key]
+            result = wrapper_cache.cache[cache_key]  # type: ignore
             hits += 1
         except KeyError:
             result = func(*args, **kwargs)
-            wrapper_cache.cache[cache_key] = result
+            wrapper_cache.cache[cache_key] = result  # type: ignore
             misses += 1
 
         return result
@@ -47,8 +51,8 @@ def cache(func):
         nonlocal hits, misses
         return {"hits": hits, "misses": misses}
 
-    wrapper_cache.cache = {}
-    wrapper_cache.cache_info = cache_info
+    wrapper_cache.cache = {}  # type: ignore
+    wrapper_cache.cache_info = cache_info  # type: ignore
     return wrapper_cache
 
 
@@ -108,6 +112,17 @@ second-order error overall
 _derivative_function_cache: Dict[Callable, Callable] = {}
 
 
+def clear_derivative_cache() -> None:
+    """Forget every cached function and evaluation used by `derivative`.
+
+    The cache holds each wrapped function (e.g. a run's `Hamiltonian`, with its
+    field splines) and every point it was evaluated at, so without clearing it
+    grows with every run in the same process. `beam_me_up` clears it at the
+    start and end of each run.
+    """
+    _derivative_function_cache.clear()
+
+
 def derivative(
     func: Callable,
     dims: Union[str, Tuple[str, ...]],
@@ -115,7 +130,7 @@ def derivative(
     spacings: Union[float, Dict[str, float]] = 1e-8,
     stencil: Optional[str] = None,
     use_cache: bool = True,
-) -> FloatArray:
+) -> ArrayLike:
     """Partial derivative of a function along one or more of its arguments.
 
     Currently this can take partial derivatives in one or two arguments, given
@@ -235,4 +250,9 @@ def derivative(
             full_result = np.zeros_like(result)
         full_result += result
 
-    return cast(FloatArray, full_result) / np.prod(dim_spacings)
+    # If float, return float
+    # If FloatArray, return FloatArray
+    final_result = cast(FloatArray, full_result) / np.prod(dim_spacings)
+    return final_result.squeeze()
+    # if isinstance(final_result, np.ndarray) and final_result.shape == (1,): return np.float64(final_result)
+    # else: return final_result

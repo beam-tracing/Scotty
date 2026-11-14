@@ -3,6 +3,11 @@
 Created on Sat Apr  8 16:15:32 2023
 
 @author: yvonne
+
+For old Scotty v2 output files (``data_output*.npz`` and so on). It does not
+read v3's or v4's ``.h5`` output, and does not import on v4
+(``cylindrical_to_cartesian`` is no longer in ``scotty.fun_general``). Kept for
+now, as it may be rewritten for v4. For v4 output, see ``scotty.plotting``.
 """
 
 import numpy as np

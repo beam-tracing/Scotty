@@ -1,4 +1,7 @@
 """
+TODO: not yet ported to Scotty v4; future work. This GUI calls `beam_me_up`
+with Scotty v3's arguments, and is untested with v4.
+
 GUI for Scotty
 
 Uses the Tkinter module to create an interface to run Scotty and utilise its functions, allowing more fluid user interaction
