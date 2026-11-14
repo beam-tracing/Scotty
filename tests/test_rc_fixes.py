@@ -132,6 +132,57 @@ def test_duplicated_outputs_removed(tmp_path, name):
     assert all(name not in node.ds for node in dt.subtree)
 
 
+# beam-tracing/Scotty#185. The old mode selection logged these on every run that
+# starts at zero density. `beam_me_up` clears the root logger's handlers
+# (caplog's too), so the warnings are read from the run's log file
+OLD_MODE_WARNINGS = ("unable to determine which mode indices", "Selecting min(H)")
+
+
+def _log_text(output_path):
+    (log_file,) = output_path.glob("scotty_log*.log")
+    return log_file.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("mode_flag", [1, -1, "O", "X"])
+def test_185_mode_index_at_the_edge_without_warning(tmp_path, mode_flag):
+    """At the plasma edge the density is zero, so two roots of the dispersion
+    tensor vanish together. The root with the smaller |H| was taken, with a
+    warning, and `mode_index` named the O-mode's root for the X-mode too. The
+    root is now the one whose eigenvector is the traced mode's polarisation"""
+    dt = beam_me_up(
+        **synthetic(tmp_path, mode_flag=mode_flag, len_tau=20, file_log_level="WARNING")
+    )
+    assert not any(warning in _log_text(tmp_path) for warning in OLD_MODE_WARNINGS)
+    solver = dt["solver"]
+    root = dt["beam"]["e_eigvecs"].values[0, :, int(solver["mode_index"])]
+    assert abs(np.vdot(root, solver["e_hat_initial"].values)) == pytest.approx(
+        1, abs=1e-6
+    )
+
+
+def test_185_plasma_launch_at_the_edge_without_warning(tmp_path):
+    """The case of #185: a plasma launch with `mode_flag="O"` at the plasma edge"""
+    vacuum = beam_me_up(**synthetic(tmp_path, len_tau=20))["solver"]
+    plasma_path = tmp_path / "plasma"
+    plasma_path.mkdir()
+    dt = beam_me_up(
+        **synthetic(
+            plasma_path,
+            len_tau=20,
+            mode_flag="O",
+            launch_flag="plasma",
+            launch_position=vacuum["q_initial_cylindrical"].values,
+            plasmaLaunch_K_cartesian=vacuum["K_initial_cartesian"].values,
+            plasmaLaunch_Psi_3D_lab_cartesian=vacuum[
+                "Psi_3D_initial_labframe_cartesian"
+            ].values,
+            file_log_level="WARNING",
+        )
+    )
+    assert not any(warning in _log_text(plasma_path) for warning in OLD_MODE_WARNINGS)
+    assert int(dt["solver"]["mode_flag_initial"]) == int(vacuum["mode_flag_initial"])
+
+
 # ---------------------------------------------------------------- boundary conditions
 
 
