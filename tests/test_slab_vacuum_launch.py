@@ -146,6 +146,7 @@ def run(axis, Psi_BC_flag, output_path):
         poloidal_flux_zero_density=ZERO_DENSITY[Psi_BC_flag],
         len_tau=202,
         output_path=output_path,
+        figure_flag=False,
         **launch,
         **deltas,
     )

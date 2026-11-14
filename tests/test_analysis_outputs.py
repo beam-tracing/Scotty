@@ -16,6 +16,7 @@ from scipy.integrate import trapezoid
 
 def _run(tmp_path_factory, **overrides):
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
+    kwargs_dict["figure_flag"] = False
     kwargs_dict["output_path"] = tmp_path_factory.mktemp("analysis_outputs")
     kwargs_dict.update(overrides)
     return beam_me_up(**kwargs_dict)

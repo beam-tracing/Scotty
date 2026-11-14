@@ -92,6 +92,8 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "input_filename_suffix": params.input_filename_suffix,
         "output_path": str(params.output_path),
         "output_filename_suffix": params.output_filename_suffix,
+        # Plotting arguments
+        "figure_flag": params.figure_flag,
     }
     # A plasma launch starts from the user's K and Psi (Cartesian, lab
     # frame), so keep them to make the run reproducible from its output

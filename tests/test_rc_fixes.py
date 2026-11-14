@@ -216,12 +216,17 @@ def test_launch_beam_not_finite_raises(tmp_path, name, value):
         beam_me_up(**synthetic(tmp_path, **{name: value}))
 
 
-@pytest.mark.parametrize(
-    "name", ["figure_flag", "further_analysis_flag", "detailed_analysis_flag"]
-)
+@pytest.mark.parametrize("name", ["further_analysis_flag", "detailed_analysis_flag"])
 def test_B22_flags_removed(name):
     assert name not in inspect.signature(beam_me_up).parameters
     assert name not in from_v3_kwargs({name: True})
+
+
+def test_figure_flag_kept():
+    """`figure_flag` stays (supervisor, 14 Nov), for figures `beam_me_up` may
+    make later; v3 scripts keep it"""
+    assert inspect.signature(beam_me_up).parameters["figure_flag"].default is False
+    assert from_v3_kwargs({"figure_flag": True})["figure_flag"] is True
 
 
 # ---------------------------------------------------------------- v3 scripts

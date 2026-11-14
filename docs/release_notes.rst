@@ -80,9 +80,10 @@ Outputs
 Removed
 ~~~~~~~
 
-- ``figure_flag``, ``further_analysis_flag`` and ``detailed_analysis_flag``,
-  which did nothing in v4; ``from_v3_kwargs`` drops them. See `scotty.plotting`
-  for figures.
+- ``further_analysis_flag`` and ``detailed_analysis_flag``, which did nothing
+  in v4; ``from_v3_kwargs`` drops them. ``figure_flag`` stays (it still makes
+  no figures, and ``True`` logs a warning): separate flags for separate figures
+  may come later. See `scotty.plotting` for figures.
 - ``scotty/outplot.py``, which read only v2 output files, and the
   ``TestFunctions``, ``WorkInProgress`` and ``Deprecated`` folders. The ``v3``
   branch keeps them.

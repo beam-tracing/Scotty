@@ -114,9 +114,9 @@ V3_ONLY_ARGUMENTS = (
 )
 
 #: Also in v4.0.0.dev0, but they did nothing in v4, so 4.0.0 removed them;
-#: `from_v3_kwargs` drops them. v4 makes no figures in `beam_me_up` (see
-#: `scotty.plotting`)
-REMOVED_ARGUMENTS = ("figure_flag", "further_analysis_flag", "detailed_analysis_flag")
+#: `from_v3_kwargs` drops them. (`figure_flag` stays, for figures made by
+#: `beam_me_up` later; see `scotty.plotting` for now)
+REMOVED_ARGUMENTS = ("further_analysis_flag", "detailed_analysis_flag")
 
 
 V3_DEFAULT_POLOIDAL_FLUX_ZERO = 1.01
@@ -703,6 +703,7 @@ _SAME_NAME_INPUTS = {
     "delta_Z",
     "density_fit_method",
     "equil_time",
+    "figure_flag",
     "find_B_method",
     "input_filename_suffix",
     "interp_smoothing",

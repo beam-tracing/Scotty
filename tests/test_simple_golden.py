@@ -1251,6 +1251,7 @@ def test_integrated_O_mode(tmp_path, generator):
 
     kwargs_dict = generator(tmp_path)
     kwargs_dict["output_filename_suffix"] = "_Bpa0.10"
+    kwargs_dict["figure_flag"] = False
     kwargs_dict["len_tau"] = 10
     kwargs_dict["output_path"] = tmp_path
 
@@ -1292,6 +1293,7 @@ def test_integrated_X_mode(tmp_path, generatorneg):
 
     kwargs_dict = generatorneg(tmp_path)
     kwargs_dict["output_filename_suffix"] = "_Bpa0.11"
+    kwargs_dict["figure_flag"] = False
     kwargs_dict["len_tau"] = 10
     kwargs_dict["output_path"] = tmp_path
     kwargs_dict["mode_flag"] = -1
@@ -1331,6 +1333,7 @@ def test_relativistic_O_mode(tmp_path, generator_rel):
 
     kwargs_dict = generator_rel(tmp_path)
     kwargs_dict["output_filename_suffix"] = "_Bpa1.10"
+    kwargs_dict["figure_flag"] = False
     kwargs_dict["len_tau"] = 10
     kwargs_dict["output_path"] = tmp_path
     kwargs_dict["relativistic_flag"] = True
@@ -1376,6 +1379,7 @@ def test_relativistic_O_mode_final_Psi(tmp_path, generator_relfinal):
     at rtol = 1e-6 in both codes, 2.4e-7 (Psi 0.26% apart)"""
     kwargs_dict = generator_relfinal(tmp_path)
     kwargs_dict["output_filename_suffix"] = "_Bpa1.12"
+    kwargs_dict["figure_flag"] = False
     kwargs_dict["len_tau"] = 10
     kwargs_dict["output_path"] = tmp_path
     kwargs_dict["relativistic_flag"] = True
@@ -1423,6 +1427,7 @@ def test_relativistic_X_mode(tmp_path, generator_relneg):
 
     kwargs_dict = generator_relneg(tmp_path)
     kwargs_dict["output_filename_suffix"] = "_Bpa1.11"
+    kwargs_dict["figure_flag"] = False
     kwargs_dict["len_tau"] = 10
     kwargs_dict["output_path"] = tmp_path
     kwargs_dict["relativistic_flag"] = True
@@ -1468,6 +1473,7 @@ def test_null_relativistic_O_mode(tmp_path, generator_nullrel):
 
     kwargs_dict = generator_nullrel(tmp_path)
     kwargs_dict["output_filename_suffix"] = "_Bpa2.10"
+    kwargs_dict["figure_flag"] = False
     kwargs_dict["len_tau"] = 10
     kwargs_dict["output_path"] = tmp_path
     kwargs_dict["relativistic_flag"] = True
@@ -1510,6 +1516,7 @@ def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
 
     kwargs_dict = generator_nullrelneg(tmp_path)
     kwargs_dict["output_filename_suffix"] = "_Bpa2.11"
+    kwargs_dict["figure_flag"] = False
     kwargs_dict["len_tau"] = 10
     kwargs_dict["output_path"] = tmp_path
     kwargs_dict["relativistic_flag"] = True
@@ -1557,6 +1564,7 @@ def test_X_mode_cutoff_Psi(tmp_path, generator_cutoff, temperature):
     rtol = 1e-6 (0.2%)"""
     kwargs_dict = generator_cutoff(tmp_path)
     kwargs_dict["output_filename_suffix"] = "_Bpa0.12"
+    kwargs_dict["figure_flag"] = False
     kwargs_dict["len_tau"] = 10
     kwargs_dict["output_path"] = tmp_path
     kwargs_dict["mode_flag"] = -1
@@ -1941,6 +1949,7 @@ def test_beam_me_up_uses_flipped_deltas(tmp_path):
     """The flipped steps must reach the Hamiltonian, not just the saved
     inputs: the initial Psi then matches v3's (which used delta_R < 0)"""
     kwargs_dict = simple(tmp_path)
+    kwargs_dict["figure_flag"] = False
     kwargs_dict["len_tau"] = 10
     kwargs_dict["output_path"] = tmp_path
     kwargs_dict["delta_R"] = 1e-4  # pointing out of the plasma at entry

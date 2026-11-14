@@ -400,6 +400,7 @@ def test_quick_cutoff_reproduces_v3_quick_run(tmp_path):
     kwargs = get_parameters_for_Scotty("DBS_synthetic")
     kwargs.update(
         interp_smoothing=0,
+        figure_flag=False,
         quick_run=True,
         rtol=1e-6,
     )

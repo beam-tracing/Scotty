@@ -187,6 +187,8 @@ class Parameters:
         temperature_fit_parameters: Optional[Sequence],
         interp_order: Union[str, int],
         interp_smoothing: int,
+        # Plotting flags
+        figure_flag: bool,
         # Additional flags
         ray_tracing_flag: bool,
         # return_dt_field: bool,
@@ -317,6 +319,8 @@ class Parameters:
         self.input_filename_suffix = input_filename_suffix
         self.output_path = self._check_data_path("output", output_path)
         self.output_filename_suffix = output_filename_suffix
+
+        self.figure_flag = figure_flag
 
         self._unpack_kwargs_for_circular_flux_surfaces(extras=kwargs)
         self._unpack_kwargs_for_plasma_launch(extras=kwargs)
@@ -664,7 +668,7 @@ class Parameters:
             if removed:
                 log.warning(
                     f"{', '.join(removed)}: removed in Scotty 4.0.0, as they did "
-                    "nothing; `beam_me_up` makes no figures (see `scotty.plotting`)"
+                    "nothing (see `scotty.plotting` for figures)"
                 )
             v3_names = sorted(set(extras_copy) & set(V3_ONLY_ARGUMENTS))
             if v3_names:

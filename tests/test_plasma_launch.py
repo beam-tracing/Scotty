@@ -41,7 +41,7 @@ BEAM = [
 
 def synthetic(tmp_path, **changes):
     kwargs = get_parameters_for_Scotty("DBS_synthetic")
-    kwargs.update(len_tau=10, output_path=tmp_path)
+    kwargs.update(figure_flag=False, len_tau=10, output_path=tmp_path)
     kwargs.update(changes)
     return kwargs
 

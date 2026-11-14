@@ -27,6 +27,7 @@ def steered_run(request, tmp_path_factory):
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
     kwargs_dict["toroidal_launch_angle_Torbeam"] = toroidal_angle
     kwargs_dict["mode_flag"] = mode_flag
+    kwargs_dict["figure_flag"] = False
     kwargs_dict["output_path"] = tmp_path_factory.mktemp("analysis_invariants")
     return beam_me_up(**kwargs_dict)
 
@@ -125,6 +126,7 @@ def test_Psi_g_check_warns_for_piecewise_linear_density(tmp_path):
     n_table = np.asarray(smooth(psi_table), dtype=float)
     kwargs_dict.update(
         toroidal_launch_angle_Torbeam=10.0,
+        figure_flag=False,
         output_path=tmp_path,
         density_fit_method=lambda psi: np.interp(psi, psi_table, n_table),
         file_log_level="WARNING",
@@ -167,6 +169,7 @@ def test_dispersion_drift_is_step_error(tmp_path):
         kwargs_dict.update(
             toroidal_launch_angle_Torbeam=10.0,
             mode_flag=-1,
+            figure_flag=False,
             output_path=tmp_path / folder,
             rtol=rtol,
             atol=atol,
@@ -285,6 +288,7 @@ def tight_run(request, tmp_path_factory):
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
     kwargs_dict["toroidal_launch_angle_Torbeam"] = toroidal_angle
     kwargs_dict["mode_flag"] = mode_flag
+    kwargs_dict["figure_flag"] = False
     kwargs_dict["rtol"] = 1e-5
     kwargs_dict["atol"] = 1e-8
     kwargs_dict["output_path"] = tmp_path_factory.mktemp("analysis_invariants")

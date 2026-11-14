@@ -24,6 +24,7 @@ def steered_run(request, tmp_path_factory):
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
     kwargs_dict["toroidal_launch_angle_Torbeam"] = toroidal_angle
     kwargs_dict["mode_flag"] = mode_flag
+    kwargs_dict["figure_flag"] = False
     kwargs_dict["output_path"] = tmp_path_factory.mktemp("filter_functions")
     return beam_me_up(**kwargs_dict)
 

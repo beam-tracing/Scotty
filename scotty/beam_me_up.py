@@ -206,6 +206,8 @@ def beam_me_up(
     file_log_level: Optional[
         Union[str, int]
     ] = None,  # For returning log messages on a log file
+    # Plotting flags
+    figure_flag: bool = False,
     # Additional flags
     ray_tracing_flag: bool = False,
     return_dt_field: bool = False,  # For returning the datatree, field class
@@ -414,6 +416,10 @@ def beam_me_up(
     file_log_level : str or int, optional
         Level of the log messages written to a log file in ``output_path``;
         ``None`` for no log file
+    figure_flag : bool, default False
+        Stored in the output's inputs. v4 does not make figures here yet, so
+        ``True`` only logs a warning; see `scotty.plotting`. Separate flags for
+        separate figures may come later
     ray_tracing_flag : bool, default False
         Trace only the ray, with no beam (v3's ``quick_run``; see
         `scotty.compat.quick_cutoff`)
@@ -491,6 +497,8 @@ def beam_me_up(
         temperature_fit_parameters=temperature_fit_parameters,
         interp_order=interp_order,
         interp_smoothing=interp_smoothing,
+        # Plotting flags
+        figure_flag=figure_flag,
         # Additional flags
         ray_tracing_flag=ray_tracing_flag,
         # return_dt_field = return_dt_field,
@@ -508,6 +516,10 @@ def beam_me_up(
     log = logging.getLogger(__name__)
     log.debug(f"Saved and validated launch parameters")
     log.debug(f"Initialised logger")
+    if figure_flag:
+        log.warning(
+            "figure_flag=True makes no figures in v4: use scotty.plotting instead"
+        )
 
     log.info(f"""\n
     ##################################################
@@ -536,6 +548,7 @@ def beam_me_up(
     #   - launch_flag = {params.launch_flag}
     #   - Psi_BC_flag = {params.Psi_BC_flag}
     #   - relativistic flag = {params.relativistic_flag}
+    #   - figure flag = {params.figure_flag}
     #
     ##################################################
     """)
