@@ -96,7 +96,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 import numpy as np
 import xarray as xr
 
-from scotty.data_io import from_output_tree, to_output_tree
+from scotty.data_io import beam_group, from_output_tree, to_output_tree
 from scotty.fun_general import find_K_labframe_cyl_to_cart
 
 log = logging.getLogger(__name__)
@@ -140,6 +140,16 @@ def _warn(message: str) -> None:
     if message not in _warned:
         _warned.add(message)
         log.warning(f"from_v3_kwargs: {message}")
+
+
+def _v3_fit_method(parameters) -> str:
+    """What v3 did with no fit method: read the file when there were no
+    parameters, else guess the fit from how many there were"""
+    from scotty.profile_fit import _guess_profile_fit_method
+
+    if parameters is None:
+        return "smoothing-spline-file"
+    return _guess_profile_fit_method(parameters, None)
 
 
 def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
@@ -198,6 +208,24 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
     for name in REMOVED_ARGUMENTS:
         if name in kw:
             _warn(f"dropped `{name}` = {kw.pop(name)!r} (it did nothing in v4)")
+
+    # v4 has no defaults for the sources of the field and the profiles; v3's
+    # were a TORBEAM topfile, and ne.dat (or a fit guessed from the number of
+    # parameters)
+    if kw.get("find_B_method") is None:
+        kw["find_B_method"] = "torbeam"
+        _warn("set `find_B_method` = 'torbeam' (v3's default)")
+    if kw.get("density_fit_method") is None:
+        kw["density_fit_method"] = _v3_fit_method(kw.get("density_fit_parameters"))
+        _warn(f"set `density_fit_method` = {kw['density_fit_method']!r} (v3's default)")
+    if kw.get("relativistic_flag") and kw.get("temperature_fit_method") is None:
+        kw["temperature_fit_method"] = _v3_fit_method(
+            kw.get("temperature_fit_parameters")
+        )
+        _warn(
+            f"set `temperature_fit_method` = {kw['temperature_fit_method']!r} "
+            "(v3's default)"
+        )
 
     if "geometry" not in kw:
         kw["geometry"] = "cylindrical"
@@ -325,7 +353,7 @@ def quick_cutoff(dt: xr.DataTree) -> CutoffData:
 
         q_R, q_Z, K_norm, polflux, theta_m = quick_cutoff(beam_me_up(**from_v3_kwargs(kwargs)))
     """
-    so, an = dt["solver"].ds, dt["beam"].ds
+    so, an = dt["solver"].ds, beam_group(dt).ds
     K = np.asarray(so["K_output_magnitude"])
     i = int(np.argmin(K))
     return CutoffData(
@@ -576,7 +604,8 @@ for _v3, _v4 in (
 def detect_version(dt: xr.DataTree) -> str:
     """'v3' or 'v4', from the layout"""
     # "dbs_analysis": files from v4.0.0.dev0, before the output had its groups
-    if "beam" in dt.children or "dbs_analysis" in dt.children:
+    # "solver": a run without the analyses (analysis_flag=False) has no "beam"
+    if {"beam", "solver", "dbs_analysis"} & set(dt.children):
         return "v4"
     if "q_R_output" in dt["solver_output"].ds:
         return "v4"
@@ -748,7 +777,7 @@ def to_v3_output(dt: xr.DataTree) -> xr.DataTree:
     """A v4 output tree in the v3 layout"""
     if detect_version(dt) != "v4":
         raise ValueError("Expected a v4 output tree")
-    if "beam" in dt.children:
+    if "solver" in dt.children:
         attrs = dt.attrs
         dt = xr.DataTree.from_dict(from_output_tree(dt))
         dt.attrs = attrs

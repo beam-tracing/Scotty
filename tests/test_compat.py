@@ -78,8 +78,11 @@ def test_unset_arguments_get_v3_defaults():
     assert kw["delta_R"] == -1e-4
     assert kw["delta_Z"] == 1e-4
     # v3's defaults are v4's again, so they are not set
-    for name in ("interp_smoothing", "find_B_method"):
-        assert name not in kw
+    assert "interp_smoothing" not in kw
+    # v4 has no defaults for these, so v3's are set
+    assert kw["find_B_method"] == "torbeam"
+    assert kw["density_fit_method"] == "smoothing-spline-file"
+    assert "temperature_fit_method" not in kw
     # v3's 1.01, raised to poloidal_flux_enter as v4 requires
     assert kw["poloidal_flux_zero_density"] == 1.2
     assert kw["poloidal_flux_zero_temperature"] == 1.2

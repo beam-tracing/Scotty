@@ -105,7 +105,6 @@ def test_poloidal_flux_zero_temperature_none_in_a_run(tmp_path):
     ("name", "v3_default"),
     [
         ("interp_smoothing", 0),
-        ("find_B_method", "torbeam"),
     ],
 )
 def test_defaults_are_v3s(name, v3_default):
