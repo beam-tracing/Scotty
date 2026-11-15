@@ -175,7 +175,13 @@ def beam_me_up(
     atol: float = 1e-7,  # for solve_ivp of the ray/beam solvers
     poloidal_flux_enter: Optional[
         float
-    ] = None,  # None: where the density profile ends (its zero point)
+    ] = None,  # None: where the density starts
+    poloidal_flux_zero_density: Optional[
+        float
+    ] = None,  # Deprecated: when polflux >= this, Scotty sets density = 0
+    poloidal_flux_zero_temperature: Optional[
+        float
+    ] = None,  # Deprecated: temperature analogue of poloidal_flux_zero_density
     # Data input and output arguments
     magnetic_data_path: PathLike = pathlib.Path("."),
     ne_data_path: PathLike = pathlib.Path("."),
@@ -357,16 +363,41 @@ def beam_me_up(
     poloidal_flux_enter : float, optional
         Normalised poloidal flux of the plasma boundary: where the beam
         enters the plasma, and where the ray is stopped when it leaves.
-        ``None`` (the default) is where the density profile ends, its
-        ``poloidal_flux_zero_profile`` (for a density file, the end of its
-        data), so that the boundary condition is applied where the density
-        starts. A profile that is a plain function needs it given. Where the
-        density starts inside the entry point, the profile must be flat there
-        (this is checked).
+        ``None`` (the default) is where the density starts, going in from
+        its zero point, so that the boundary condition is applied there: at a
+        density that jumps there, ``"discontinuous"``; at a kink (zero density
+        with a finite gradient), ``"continuous"`` or ``"discontinuous"``; at a
+        density that starts with zero gradient, any of them. The beam must not
+        cross the start of the density, or any other zero of it, inside the
+        plasma, where no boundary condition is applied: this is checked. The
+        simplest choice, which needs no knowledge of the edge, is
+        ``"discontinuous"`` with ``poloidal_flux_enter`` slightly inside where
+        the density starts (0.01 inside, say): the thin layer left outside is
+        treated as vacuum, which changes little where the edge density is
+        small.
 
         .. versionchanged:: 4.0.0
-           ``poloidal_flux_zero_density`` and ``poloidal_flux_zero_temperature``
-           are removed: each profile has its own zero point
+           The default was 1.0
+    poloidal_flux_zero_density : float, optional
+        At and above this normalised poloidal flux, the electron density is
+        zero. Must be at least ``poloidal_flux_enter``. ``None`` (the default)
+        uses the zero point of ``density_fit_method`` when that is a profile
+        object (such as `scotty.profile_fit.QuadraticFit`), and 1.0 otherwise.
+        If it is given with a profile object, it must agree with the
+        profile's zero point.
+
+        .. deprecated:: 4.0.0
+           Give the zero point to the profile object instead (the first
+           argument of the fits in `scotty.profile_fit`). It will be removed
+           after Scotty 4.x
+    poloidal_flux_zero_temperature : float, optional
+        Temperature analogue of ``poloidal_flux_zero_density``; ``None`` (the
+        default) uses the zero point of ``temperature_fit_method`` when that is
+        a profile object, and ``poloidal_flux_zero_density`` otherwise. If
+        given, must be at least ``poloidal_flux_enter``.
+
+        .. deprecated:: 4.0.0
+           As ``poloidal_flux_zero_density``
     magnetic_data_path, ne_data_path, Te_data_path : str or pathlib.Path, default "."
         Directories of the magnetic field, electron density and electron
         temperature files
@@ -472,6 +503,8 @@ def beam_me_up(
         rtol=rtol,
         atol=atol,
         poloidal_flux_enter=poloidal_flux_enter,
+        poloidal_flux_zero_density=poloidal_flux_zero_density,
+        poloidal_flux_zero_temperature=poloidal_flux_zero_temperature,
         # Data input and output arguments
         magnetic_data_path=magnetic_data_path,
         ne_data_path=ne_data_path,
@@ -553,10 +586,11 @@ def beam_me_up(
     # density_fit(poloidal_flux) = electron_density
     density_fit = make_fit(
         method=params.density_fit_method,
+        poloidal_flux_zero_density=params.poloidal_flux_zero_density,
         parameters=params.density_fit_parameters,
         filename=params.ne_filename,
     )
-    params.set_zero_points_and_entry(density_fit)
+    params.set_poloidal_flux_enter(density_fit)
 
     # Using the temperature data, create a fit as a function of poloidal
     # flux, i.e. temperature_fit(poloidal_flux) = temperature. Only used for
@@ -564,12 +598,10 @@ def beam_me_up(
     if params.relativistic_flag:
         temperature_fit = make_fit(
             method=params.temperature_fit_method,
+            poloidal_flux_zero_density=params.poloidal_flux_zero_temperature,
             parameters=params.temperature_fit_parameters,
             filename=params.Te_filename,
             quantity="temperature",
-        )
-        params.poloidal_flux_zero_temperature = getattr(
-            temperature_fit, "poloidal_flux_zero_profile", np.nan
         )
     else:
         temperature_fit = None
@@ -873,13 +905,14 @@ def beam_me_up(
 
 def make_fit(
     method: Optional[Union[str, ProfileFitLike]],
+    poloidal_flux_zero_density: float,
     parameters: Optional[Sequence],
     filename: Optional[PathLike],
     quantity: str = "density",
 ) -> ProfileFitLike:
     """Profile fit for the electron density or temperature (``quantity``).
-    A named fit's ``parameters`` start with its zero point (see
-    `scotty.profile_fit.profile_fit`)"""
+    ``poloidal_flux_zero_density`` is the flux beyond which the profile is
+    zero, for whichever quantity it is"""
 
     log = logging.getLogger(__name__)
     log.debug(f"Making {quantity} fit profile")
@@ -897,4 +930,4 @@ def make_fit(
             f"Passing `{quantity}_fit_method` ({method}) as string or None requires a list or array of parameters"
         )
 
-    return profile_fit(method, parameters, filename)
+    return profile_fit(method, poloidal_flux_zero_density, parameters, filename)

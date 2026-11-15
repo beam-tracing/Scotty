@@ -316,6 +316,7 @@ def run_linear_layer(a0_deg, R_y, gyro_ratio, output_path):
         plasmaLaunch_Psi_3D_lab_cartesian=Psi,
         find_B_method=linear_layer_field(B0_for(gyro_ratio), a0),
         density_fit_method=LinearFit(1.0, N_CUTOFF),
+        poloidal_flux_zero_density=1.0,
         # The analytic solution assumes no resonance on the ray. |B| is uniform,
         # with Omega_ce / Omega = gyro_ratio everywhere (0.3 in every case), so
         # neither cyclotron harmonic is reached, and the upper hybrid layer

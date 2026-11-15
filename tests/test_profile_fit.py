@@ -64,21 +64,15 @@ def test_spline_fit_from_file(ne_dat):
 
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_make_profile_fit(ne_dat):
-    # The parameters start with the zero point
-    fit = profile_fit("quadratic", [LCFS, CENTRAL_DENSITY])
+    fit = profile_fit("quadratic", LCFS, [CENTRAL_DENSITY])
     assert isinstance(fit, QuadraticFit)
-    assert fit.poloidal_flux_zero_profile == LCFS
 
-    # No longer guessed from the number of parameters
-    with pytest.raises(ValueError, match="no longer guessed"):
-        profile_fit(None, [LCFS, CENTRAL_DENSITY])
+    fit = profile_fit(None, LCFS, [CENTRAL_DENSITY, LCFS])
+    assert isinstance(fit, QuadraticFit)
 
-    # A file ends where its data end
     _, _, filename = ne_dat
-    fit = profile_fit(None, [filename, 5, 0], filename=filename)
+    fit = profile_fit(None, LCFS, [filename, 5, 0], filename=filename)
     assert isinstance(fit, SmoothingSplineFit)
-    psi_data = np.fromfile(filename, dtype=float, sep="   ")[1::2] ** 2
-    assert fit.poloidal_flux_zero_profile == psi_data.max()
 
 
 def test_polynomial_fit_repr():

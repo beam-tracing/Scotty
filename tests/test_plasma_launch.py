@@ -423,6 +423,7 @@ def test_no_boundary_condition_rejects_a_jump(tmp_path):
         tmp_path,
         Psi_BC_flag=None,
         density_fit_method=PolynomialFit(1.0, -4.0 / 1.3, 0.0, 4.0),
+        poloidal_flux_zero_density=1.0,
     )
     with pytest.raises(ValueError, match="density at the plasma entry point"):
         beam_me_up(**kwargs)

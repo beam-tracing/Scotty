@@ -129,7 +129,6 @@ def test_Psi_g_check_warns_for_piecewise_linear_density(tmp_path):
         figure_flag=False,
         output_path=tmp_path,
         density_fit_method=lambda psi: np.interp(psi, psi_table, n_table),
-        poloidal_flux_enter=1.0,  # a plain function has no zero point
         file_log_level="WARNING",
     )
     analysis = beam_me_up(**kwargs_dict)["beam"]

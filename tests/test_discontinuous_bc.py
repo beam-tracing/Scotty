@@ -64,6 +64,8 @@ def boundary(request, tmp_path_factory):
         # did not cut it, and is now refused)
         density_fit_method=PolynomialFit(1.0, -4.0 / 1.3, 0.0, 4.0),
         poloidal_flux_enter=1.0,
+        poloidal_flux_zero_density=1.0,
+        poloidal_flux_zero_temperature=1.0,
         launch_position=np.array(launch),
         poloidal_launch_angle_Torbeam=poloidal_angle,
         output_path=tmp_path_factory.mktemp("bc"),
