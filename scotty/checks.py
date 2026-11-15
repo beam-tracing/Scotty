@@ -529,9 +529,7 @@ class Parameters:
         data_end = getattr(density_fit, "poloidal_flux_data_end", None)
         if data_end is not None and data_end < zero_point:
             zero_point = data_end
-        n_max = float(
-            np.max(np.abs(density_fit(np.linspace(0.0, zero_point, 2001))))
-        )
+        n_max = float(np.max(np.abs(density_fit(np.linspace(0.0, zero_point, 2001)))))
         start = (
             find_density_start(density_fit, zero_point, 1e-10 * n_max)
             if n_max > 0
