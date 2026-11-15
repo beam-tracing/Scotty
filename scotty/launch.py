@@ -9,7 +9,7 @@ from scipy.optimize import minimize_scalar, root_scalar
 from scotty.antenna.gaussian import circular_gaussian_Psi_w
 from scotty.boundary_conditions import (
     apply_boundary_conditions,
-    check_density_smooth_at_edge,
+    check_density_at_entry,
 )
 from scotty.checks import (
     VALID_FIELDS,
@@ -23,6 +23,7 @@ from scotty.fun_general import (
     find_q_labframe_cart_to_cyl,
     find_q_labframe_cyl_to_cart,
     find_Psi_3D_labframe_cart_to_cyl,
+    launch_direction_cartesian,
     ray_line,
     poloidal_flux_difference_along_ray_line,
     make_array_3x3,
@@ -92,9 +93,9 @@ def find_plasma_entry_position(
     or `q_launch` (for `launch_flag` = "plasma", after checking that it is
     inside the plasma).
 
-    As in v3, the launch angles are taken in the TORBEAM convention for an
-    antenna at zeta = 0: the launch line's direction, like the launch K, is
-    measured from the X axis, so `q_launch` should have zeta = 0 (Y = 0)."""
+    The launch angles are in the TORBEAM convention, measured from the local
+    R at the antenna (`launch_direction_cartesian`), so the antenna can be at
+    any zeta."""
 
     log.info(f"Finding plasma entry position")
 
@@ -153,7 +154,9 @@ def find_plasma_entry_position(
 
     if np.isnan(polflux_arr).all():
         raise RuntimeError(
-            f"The ray does not intersect the plasma. Check that the launch position is from q_zeta = 0 with acute launch angles"
+            "The ray does not intersect the plasma. Check the launch position and the "
+            "launch angles: with both angles zero, the beam is launched "
+            "horizontally towards the axis"
         )
 
     start_idx = np.where(~np.isnan(polflux_arr))[0][0]
@@ -300,78 +303,6 @@ def find_auto_delta_signs(
         deltas = np.array([delta_X, delta_Y, delta_Z])
 
     return deltas
-
-
-def find_mode_index_and_ehat(
-    mode_flag: VALID_LAUNCH_MODE_FLAGS,
-    H_Cardanos: FloatArray,
-    ehats: ComplexFloatArray,
-    tol_H: float = 1e-3,
-    tol_O_mode_polarisation: float = 0.25,
-) -> Tuple[int, float, ComplexFloatArray]:
-    r"""`H_Cardanos` and `ehats` must be arranged such that `H_Cardano[i]` corresponds
-    to `ehats[:,i]`. If more than one `mode_flag` is provided, then `mode_flag[i]` must
-    also correspond to `H_cardano[i]`"""
-    soln_idxs = np.where(np.abs(H_Cardanos) <= tol_H)[0]
-    soln_H = H_Cardanos[soln_idxs]
-    soln_ehats = ehats[
-        :, soln_idxs
-    ]  # note that soln_H still corresponds to soln_ehats[i,:]
-
-    # We have three cases to check for:
-    #   (i)   If there are none or three solutions, raise an error
-    #   (ii)  If there is one solution, just return that
-    #   (iii) If there is more than 1 solution and the user specifies `mode_flag` = 1 or -1,
-    # then we have no way of knowing what exactly the user wants (i.e. we don't know
-    # if the O-mode or X-mode solution is wanted), so warn the user and choose the smallest solution
-    #   Otherwise, check which mode index yields the desired mode
-
-    if soln_idxs.shape in [(0,), (3,)]:
-        log.warning(
-            f"Possible wrong choice in mode index corresponding to O- and X-mode. Found {soln_idxs.shape} solutions (H = {H_Cardanos})! Check that `poloidal_flux_enter` is not too deep in the plasma"
-        )
-        log.warning(f"Selecting min(H) as the solution")
-        mode_idx = np.argmin(np.abs(H_Cardanos))
-        H = H_Cardanos[mode_idx]
-        ehat = ehats[:, mode_idx]
-
-    elif soln_idxs.shape == (1,):
-        mode_idx = soln_idxs[0]
-        H = soln_H[0]
-        ehat = soln_ehats
-
-    elif soln_idxs.shape == (2,) and mode_flag in [1, -1]:
-        log.warning(
-            f"Specific mode to be used not specified (`mode_flag` = {mode_flag}) and unable to determine which mode indices correspond to O- and X-mode. Perhaps `tol_H` may be too large, so try selecting a deeper `poloidal_flux_enter` or use `Psi_BC_flag` = `continuous` instead"
-        )
-        log.warning(f"Selecting min(H) as the solution")
-        mode_idx = np.argmin(np.abs(H_Cardanos))
-        H = H_Cardanos[mode_idx]
-        ehat = ehats[:, mode_idx]
-
-    else:  # soln_idxs.shape == (2,) and mode_flag in ["O", "X"]:
-        H0, H1 = H_Cardanos[soln_idxs]
-        e0, e1 = soln_ehats.T  # because soln_ehats.shape == (3,2)
-        abs_Re_e0_b = abs(np.real(e0[-1]))
-        abs_Re_e1_b = abs(np.real(e1[-1]))
-
-        if (
-            abs_Re_e0_b < 1 - tol_O_mode_polarisation
-            and abs_Re_e1_b < 1 - tol_O_mode_polarisation
-        ):
-            log.warning(
-                f"Both computed vectors ({e0} and {e1}) are not within the O-mode polarisation tolerance (tol = {tol_O_mode_polarisation})"
-            )
-            log.warning(
-                f"Setting the vector with the largets b-component to be the O-mode. This may or may not cause issues"
-            )
-
-        idx = 0 if abs_Re_e0_b > abs_Re_e1_b else 1
-        mode_idx = soln_idxs[idx]
-        H = soln_H[idx]
-        ehat = soln_ehats.T[idx]  # because soln_ehats.shape == (3,2)
-
-    return cast(int, np.squeeze(mode_idx)), np.squeeze(H), np.squeeze(ehat)
 
 
 def _check_dispersion_relation(
@@ -585,12 +516,17 @@ def _mode_solution(
     b_hat: FloatArray,
     epsilon_terms: Tuple[float, float, float],
     launch_angular_freq: float,
-    mode_flag_launch: VALID_LAUNCH_MODE_FLAGS,
+    polarisations: dict,
     tol_H: float,
-    tol_O_mode_polarisation: float,
 ) -> dict:
     r"""For one Hamiltonian, given K and Psi where the solvers start, find the
-    Cardano root (mode index) that vanishes there, and its polarisation e_hat"""
+    root of the dispersion tensor D (mode index, in the ascending order of
+    `find_H_Cardano_eigh`) that is the traced mode there, and its eigenvector.
+
+    The root is the one whose eigenvector is the traced mode's polarisation,
+    `polarisations[hamiltonian.mode_flag]` (from `_mode_polarisations`). |H|
+    alone cannot choose: at (near-)zero density, e.g. at the plasma edge, two
+    roots vanish together (N = 1), see beam-tracing/Scotty#185"""
     epsilon_para, epsilon_perp, epsilon_g = epsilon_terms
 
     K_magnitude_initial = find_K_magnitude(cart, *K_initial, q_initial[0])  # type: ignore
@@ -608,13 +544,17 @@ def _mode_solution(
         theta_m=theta_m,
     )
 
-    mode_index, H_Cardano, e_hat = find_mode_index_and_ehat(
-        mode_flag=mode_flag_launch,
-        H_Cardanos=H_Cardanos,
-        ehats=e_hats,
-        tol_H=tol_H,
-        tol_O_mode_polarisation=tol_O_mode_polarisation,
-    )
+    overlaps = np.abs(np.conj(e_hats).T @ polarisations[hamiltonian.mode_flag])
+    mode_index = int(np.argmax(overlaps))
+    H_Cardano = H_Cardanos[mode_index]
+    e_hat = e_hats[:, mode_index]
+    if np.abs(H_Cardano) > tol_H:
+        log.warning(
+            f"The root of the dispersion tensor with the polarisation of `mode_flag` = "
+            f"{hamiltonian.mode_flag:+d} has |H| = {np.abs(H_Cardano):.3e} where the "
+            f"solvers start (tolerance {tol_H}). The three roots have |H| = "
+            f"{np.abs(H_Cardanos)}"
+        )
 
     log.debug(f"""
         ##################################################
@@ -708,7 +648,6 @@ def _mode_from_K(
         K_initial=K_initial,
         Psi_3D_initial_labframe=Psi_3D_initial_labframe,
         q_initial=q_initial,
-        mode_flag_launch=mode_flag_found,
         **mode_kwargs,
     )
 
@@ -740,11 +679,9 @@ def find_plasma_entry_parameters(
     field: VALID_FIELDS,
     K_plasmaLaunch_cartesian: Optional[FloatArray] = None,
     Psi_3D_plasmaLaunch_labframe_cartesian: Optional[FloatArray] = None,
-    poloidal_flux_zero_density: Optional[float] = None,
     hamiltonian_pos1: Optional[Hamiltonian] = None,
     hamiltonian_neg1: Optional[Hamiltonian] = None,
     tol_H: float = 1e-3,
-    tol_O_mode_polarisation: float = 0.25,
 ) -> Tuple[
     FloatArray,
     FloatArray,
@@ -875,19 +812,22 @@ def find_plasma_entry_parameters(
         log.debug(
             f"`launch_flag` = {launch_flag}. Launching from outside the plasma boundary"
         )
+        # The angles are measured from the local R at the antenna, at
+        # toroidal angle zeta_launch (`launch_direction_cartesian`)
+        zeta_launch = np.arctan2(q_launch_cartesian[1], q_launch_cartesian[0])
         poloidal_launch_angle = np.deg2rad(poloidal_launch_angle_deg_Torbeam)
-        toroidal_launch_angle = np.deg2rad(toroidal_launch_angle_deg_Torbeam)
+        toroidal_launch_angle = (
+            np.deg2rad(toroidal_launch_angle_deg_Torbeam) + zeta_launch
+        )
 
         # Find K_launch, returned in the field's coordinates like K_initial.
-        # The two only coincide with no toroidal launch angle: in cylindrical,
-        # K_zeta is the toroidal mode number, q_R times the Cartesian K_Y
-        # at the launch position (which is at zeta = 0)
-        K_launch_cartesian = -K0 * np.array(
-            [
-                np.cos(poloidal_launch_angle) * np.cos(toroidal_launch_angle),
-                np.cos(poloidal_launch_angle) * np.sin(toroidal_launch_angle),
-                np.sin(poloidal_launch_angle),
-            ]
+        # In cylindrical, K_zeta is the toroidal mode number, q_R times the
+        # toroidal component of the Cartesian K at the launch position
+        K_launch_cartesian = K0 * launch_direction_cartesian(
+            q_launch_cartesian[0],
+            q_launch_cartesian[1],
+            poloidal_launch_angle_deg_Torbeam,
+            toroidal_launch_angle_deg_Torbeam,
         )
         K_launch = (
             K_launch_cartesian
@@ -912,6 +852,8 @@ def find_plasma_entry_parameters(
 
             # Setting up the rotation matrices, so that we can convert
             # Psi_3D_launch_beamframe_cartesian into Psi_3D_launch_labframe_cartesian
+            # (toroidal_launch_angle includes zeta_launch, so the beam frame
+            # turns with the antenna)
             poloidal_rotation_angle = poloidal_launch_angle + np.pi / 2
             toroidal_rotation_angle = toroidal_launch_angle
             sin_pol, cos_pol = np.sin(poloidal_rotation_angle), np.cos(
@@ -1013,7 +955,9 @@ def find_plasma_entry_parameters(
         # Psi_entry. Check that assumption holds for the density profile
         elif Psi_BC_flag is None:
             log.debug(f"`Psi_BC_flag` = {Psi_BC_flag}. No boundary conditions applied")
-            check_density_smooth_at_edge(density_fit, poloidal_flux_zero_density)
+            check_density_at_entry(
+                density_fit, field.polflux_cartesian(*q_initial_cartesian), Psi_BC_flag
+            )
 
             K_entry = (
                 K_launch_cartesian
@@ -1043,6 +987,11 @@ def find_plasma_entry_parameters(
         else:
             log.debug(
                 f"`Psi_BC_flag` = {Psi_BC_flag}. Applying {Psi_BC_flag} boundary conditions to find K and Psi"
+            )
+            check_density_at_entry(
+                density_fit,
+                field.polflux_cartesian(*q_initial_cartesian),
+                Psi_BC_flag,
             )
 
             def initial_K_and_Psi(hamiltonian):
@@ -1087,7 +1036,6 @@ def find_plasma_entry_parameters(
         epsilon_terms=epsilon_terms,
         launch_angular_freq=launch_angular_freq,
         tol_H=tol_H,
-        tol_O_mode_polarisation=tol_O_mode_polarisation,
     )
 
     # Which root (`mode_flag` +1 or -1) is the O-mode, from the two roots'
@@ -1114,6 +1062,7 @@ def find_plasma_entry_parameters(
         electron_density,
         electron_temperature,
     )
+    mode_kwargs["polarisations"] = polarisations
     try:
         O_mode_flag = _O_mode_flag(polarisations)
     except ValueError:
@@ -1158,7 +1107,6 @@ def find_plasma_entry_parameters(
             hamiltonian=hamiltonian,
             K_initial=K_initial_mode,
             Psi_3D_initial_labframe=Psi_3D_initial_labframe_mode,
-            mode_flag_launch=mode_flag,
             **mode_kwargs,
         )
 

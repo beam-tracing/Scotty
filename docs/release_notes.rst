@@ -1,6 +1,205 @@
 Release notes
 =============
 
+Unreleased (for 4.0.0rc)
+------------------------
+
+Fixes from the code audit of November 2026. Several change results, as noted.
+
+Results that change
+~~~~~~~~~~~~~~~~~~~
+
+- ``QuadraticFit`` is :math:`n_{e0}[1 - (\psi/\psi_0)^2]`, zero at
+  :math:`\psi_0`. It was :math:`n_{e0}(1 - \psi^2/\psi_0)` (as in v3), zero at
+  :math:`\sqrt{\psi_0}` and negative just inside :math:`\psi_0`, which made runs
+  fail. Results change for :math:`\psi_0 \ne 1`.
+- ``StefanikovaFit`` uses :math:`\exp[-(\psi/a_\mathrm{width})^{a_\mathrm{exp}}]`,
+  as its docstring and Stefanikova et al. (2016) have. The code computed
+  :math:`\exp(-a_\mathrm{exp}\psi/a_\mathrm{width})` (as in v3).
+- ``SmoothingSplineFit`` holds its end values past its data instead of
+  extrapolating (which could give negative densities), and its ``smoothing``
+  defaults to 0, so that it goes through the data. ``beam_me_up`` already passed
+  ``interp_smoothing=0``.
+- Every profile is clipped at zero, with a warning the first time.
+- The launch angles are measured from the local :math:`R` direction at the
+  antenna, so an antenna at :math:`\zeta \ne 0` (or :math:`Y \ne 0`) gives the
+  same beam as one at :math:`\zeta = 0`, turned. They were measured from the
+  global :math:`X` axis. Results for an antenna on the :math:`+X` side of the
+  :math:`X`-:math:`Z` plane (:math:`\zeta = 0`, as in every cylindrical run
+  before) are unchanged; a Cartesian antenna at :math:`X < 0`, :math:`Y = 0` has
+  :math:`\zeta = \pi`, so its beam now turns round. See
+  `scotty.fun_general.launch_direction_cartesian`, now the only place the
+  launch direction is computed.
+- ``beam/curvature_1`` and ``curvature_2`` were too small by a factor
+  :math:`|g|^2` (about 3e-6). The widths were right.
+- ``from_v3_kwargs``: a v3 script that leaves ``vacuum_propagation_flag`` unset
+  now gets ``launch_flag="vacuum_analytic"`` (v3's default was numerical
+  propagation, which is not converged across the kink in the density at the
+  plasma edge), and ``Psi_BC_flag="continuous"`` if it leaves that unset. Its
+  ``poloidal_flux_enter``, if unset, stays unset, so the plasma starts where
+  the density starts (below), going in from v3's ``poloidal_flux_zero_density``
+  (1.01 by default), except for a density that is a plain function and for a
+  plasma launch, which keep v3's 1.0. A v3 script whose density does not reach
+  zero at its edge (for example an ``ne.dat`` file that ends with a non-zero
+  density) is then refused by the continuous condition, and the error says
+  what to use. Before, such a script failed on the negative density the spline
+  extrapolated to.
+- ``get_parameters_for_Scotty("DBS_synthetic", launch_freq_GHz)`` uses the
+  frequency given; it returned 55 GHz whatever was given. Presets that need a
+  frequency raise a clear error without one.
+
+Where the plasma starts
+~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``poloidal_flux_enter`` defaults to ``None``: where the density starts,
+  going in from its zero point (it was 1.0), so that the boundary condition is
+  applied there and the beam never crosses the start of the density inside
+  the plasma, where no boundary condition is applied. For a profile from data
+  (`scotty.profile_fit.SmoothingSplineFit`) that end inside its zero point, it
+  goes in from the end of the data, ``poloidal_flux_data_end``: beyond it the
+  profile holds its last value, with a kink there. The output's ``inputs``
+  record the entry point used.
+- The boundary condition to use depends on how the density starts:
+
+  =====================================  ===================  ====================  ========
+  Density where it starts                ``"discontinuous"``  ``"continuous"``      ``None``
+  =====================================  ===================  ====================  ========
+  jumps (finite)                         yes                  no                    no
+  kink (zero, with a finite gradient)    yes                  yes (exact)           no
+  zero, with zero gradient               yes                  yes (as ``None``)     yes
+  =====================================  ===================  ====================  ========
+
+  The simplest choice, which needs no knowledge of the edge, is
+  ``"discontinuous"`` with ``poloidal_flux_enter`` slightly inside where the
+  density starts (0.01 inside, say). The thin layer left outside is treated as
+  vacuum, which changes little where the edge density is small: in a test
+  with a kink, entering from 0.001 to 0.1 inside changed the beam width at the
+  cut-off by less than 0.01%.
+- ``poloidal_flux_zero_density`` and ``poloidal_flux_zero_temperature`` are
+  deprecated, and will be removed after 4.x: give the zero point to the
+  profile object instead (the first argument of the fits in
+  `scotty.profile_fit`). Giving either warns (``FutureWarning``). Their
+  meaning is unchanged, as is that of a named fit's parameters. They default
+  to ``None``: the zero point of the profile object, if it has one, and 1.0
+  otherwise. A value that disagrees with the profile object's raises; before,
+  it was ignored, and the output recorded it anyway.
+
+Errors where results were wrong without one
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- ``Psi_BC_flag="continuous"`` and ``None`` raise if the density is not zero at
+  the plasma entry point (more than 1e-5 of its maximum). Both keep the vacuum
+  :math:`K` there, so the ray started off the dispersion relation (:math:`|H|`
+  up to 0.08) and stayed there, with at most a warning. The message says what
+  to use instead (the table above).
+- Every boundary condition raises if the density is zero over a band inside
+  the entry point and starts with a kink or a jump: the beam would cross it in
+  the plasma with no boundary condition, and an adaptive solver can step over
+  it. In one case the width at the cut-off was 0.107 m at the default
+  tolerance against 0.0498 m converged, and right only at ``rtol`` 1e-5 or
+  below. The message gives the entry point and boundary condition to use. A
+  profile that starts with zero gradient is accepted.
+- Every boundary condition raises if the density is zero (or negative, which
+  the profile clips to zero) anywhere inside where it starts, as a spline
+  through data padded with zeros can give.
+- Every boundary condition raises if the entry point is beyond the end of a
+  spline's data, and the profile is not flat there: beyond its data the
+  profile holds its last value, with a kink at the end of the data. In one
+  case entering beyond it gave a width at the cut-off of 0.113 m against
+  0.0454 m.
+- In `scotty.boundary_conditions`, ``check_density_at_entry`` replaces
+  ``check_density_zero_at_entry``, and ``check_density_smooth_at_edge`` takes
+  the flux to check as ``edge`` (it was ``poloidal_flux_zero_density``).
+  `scotty.launch.find_plasma_entry_parameters` no longer takes
+  ``poloidal_flux_zero_density``.
+- ``Psi_BC_flag=None`` checks that the density is flat where the beam enters,
+  not at the profile's zero point.
+- A NaN or infinite ``launch_beam_width`` or ``launch_beam_curvature`` raises.
+
+Inputs
+~~~~~~
+
+- ``find_B_method`` and ``density_fit_method`` have no defaults, so every
+  script names where its field and density come from. Before, an unset
+  ``find_B_method`` read a TORBEAM topfile, and an unset ``density_fit_method``
+  read ``ne.dat`` or guessed the fit from the number of parameters. To read
+  ``ne.dat``, pass ``density_fit_method="smoothing-spline-file"``.
+  ``temperature_fit_method`` stays optional, since only relativistic runs use
+  it, but ``relativistic_flag=True`` now needs it (it read ``Te.dat`` before).
+  ``get_parameters_for_Scotty`` sets both for ``"DBS_synthetic"``, and sets
+  ``density_fit_method`` for the machine presets when it is given
+  ``find_B_method`` (``"smoothing-spline-file"`` for ``"torbeam"``).
+  ``from_v3_kwargs`` sets v3's defaults, with a warning.
+- New ``analysis_flag`` and ``dbs_analysis_flag``, both ``True`` by default.
+  ``analysis_flag=False`` saves only the inputs and the solver output (no
+  ``beam`` group); ``dbs_analysis_flag=False`` leaves out the
+  ``diagnostics/dbs`` group and the variables of ``beam`` that the DBS analysis
+  computes (``scotty.data_io.BEAM_FROM_DBS``; they include ``beam_waist``,
+  ``theta`` and ``normal_hat``). The DBS analysis
+  needs the beam analysis. Both flags are stored in the inputs.
+
+Presets
+~~~~~~~
+
+- ``get_parameters_for_Scotty`` takes ``data_path``, the folder of the input
+  files, instead of ``user``, which chose folders on particular computers.
+- ``DBS_synthetic`` no longer sets the zero points or the entry point: its
+  profile object decides, and the plasma starts where its density does (1.0).
+
+Outputs
+~~~~~~~
+
+- ``width_1`` is the larger width at each point and ``width_2`` the smaller;
+  ``curvature_1`` is the smaller curvature and ``curvature_2`` the larger. They
+  are sorted at each point, not followed along fixed axes. The function meant to
+  follow them, ``check_eigval_order``, did nothing and is removed.
+- ``solver/e_hat_initial`` is labelled with ``col_field`` = (u1, u2, b), the
+  basis it is in, instead of ``col_cart``.
+- ``solver/mode_index`` (the traced root of the dispersion tensor where the
+  solvers start, in the ascending order of its eigenvalues) is the root whose
+  eigenvector is the traced mode's polarisation, ``solver/e_hat_initial``. At
+  zero density (an entry point at the plasma edge) two roots vanish together;
+  the root with the smaller ``|H|`` was taken, so ``mode_index`` named the
+  O-mode's root for the X-mode too, and every such run warned that it could not
+  tell the O- and X-modes apart (#185). The warnings are gone. The results of
+  the runs did not change.
+- Duplicated variables are removed: ``epsilon_bb``, ``epsilon_11`` and
+  ``epsilon_12`` (use ``epsilon_para``, ``epsilon_perp`` and ``epsilon_g``);
+  ``H_Cardano_1``-``3`` (use ``H_Cardano``); ``H_eigval1``-``3`` (use
+  ``H_eigvals``); ``e_eigvec1``-``3`` (use ``e_eigvecs``); ``q_X_output``,
+  ``q_Y_output``, ``K_X_output`` and ``K_Y_output`` (use ``q_output_cartesian``
+  and ``K_output_cartesian``).
+
+Removed
+~~~~~~~
+
+- ``further_analysis_flag`` and ``detailed_analysis_flag``, which did nothing
+  in v4; ``from_v3_kwargs`` drops them. ``figure_flag`` stays (it still makes
+  no figures, and ``True`` logs a warning): separate flags for separate figures
+  may come later. See `scotty.plotting` for figures.
+- ``scotty/outplot.py``, which read only v2 output files, and the
+  ``TestFunctions``, ``WorkInProgress`` and ``Deprecated`` folders. The ``v3``
+  branch keeps them.
+- The examples for particular machines, which used data files that are not in
+  the repository. ``Examples/`` keeps an analytical case
+  (``analytical_circular.py``) and the plotting example (``plot.py``).
+- Unused functions in ``fun_general``: ``find_epsilon_para``,
+  ``find_epsilon_perp``, ``find_epsilon_g`` (use ``find_epsilon_terms``),
+  ``tilt_trns_RZ_make``, ``tilt_trns_TZ_make``,
+  ``mirrornorm_make_with_rot_tilt_operators`` and a second copy of
+  ``find_mode_index_and_ehat``; and ``mln`` and ``ralt`` in ``logger``.
+- ``launch.find_mode_index_and_ehat`` and the ``tol_O_mode_polarisation``
+  argument of ``launch.find_plasma_entry_parameters`` (#185). Its branch for
+  ``"O"`` and ``"X"`` could not be reached, and it chose the O-mode for both.
+
+Packaging
+~~~~~~~~~
+
+- Requires SciPy 1.13 and Matplotlib 3.8 or newer (the first built for NumPy 2,
+  which Scotty already required). The project URL is ``beam-tracing/Scotty``.
+- The publish workflow fetches the full history, so that the package gets its
+  version from the tags.
+
 v4.0.0.dev0
 -----------
 
@@ -125,8 +324,10 @@ Defaults
   v3 script gives v3's accuracy.
 - ``interp_smoothing=0``, ``find_B_method="torbeam"`` and
   ``detailed_analysis_flag=True``, as in v3.
-- ``poloidal_flux_zero_temperature`` defaults to ``None``, which is
-  ``poloidal_flux_zero_density``.
+- ``poloidal_flux_zero_temperature`` defaults to ``None``: the temperature
+  profile object's zero point, if it has one, and ``poloidal_flux_zero_density``
+  otherwise. It must be at least ``poloidal_flux_enter`` only in a
+  relativistic run, the only kind that uses the temperature.
 
 Fixes
 ~~~~~
@@ -213,7 +414,7 @@ Other interface changes
   ``col_beam``) = (x, y), the stacked ``H_Cardano``, and in ``diagnostics/dbs``
   ``k_perp2_bs``, ``k_perp2_bs_normal`` and ``k_perp2_bs_binormal``.
 - ``benchmarking_flag`` is removed: it no longer did anything.
-- ``e_hat``, ``e_eigvecs`` and ``e_eigvec1``-``3`` are on ``col_field`` = (u1,
+- ``e_hat`` and ``e_eigvecs`` are on ``col_field`` = (u1,
   u2, b), the field-aligned frame D is written in, instead of ``col_cart``.
   Their values are unchanged.
 - ``solver_output/q_initial_cylindrical`` is where the solvers start: the

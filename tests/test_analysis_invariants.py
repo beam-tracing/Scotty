@@ -94,7 +94,7 @@ def test_dK_dtau_matches_spline_of_K(steered_run):
     max |dK/dtau| away from the ends, where the spline is poorer"""
     solver_output = steered_run["solver"]
     tau = solver_output["tau"].values
-    K = np.stack([solver_output[f"K_{c}_output"].values for c in "XYZ"], axis=-1)
+    K = solver_output["K_output_cartesian"].values
     spline = CubicSpline(tau, K)(tau, 1)
     analytic = steered_run["beam"]["dK_dtau_cartesian"].values
 
@@ -303,13 +303,7 @@ def test_g_matches_dq_dtau(tight_run):
     run needs a tighter rtol than the default for the test to be sharp"""
     solver = tight_run["solver"]
     tau = solver["tau"].values
-    dq_dtau = np.stack(
-        [
-            CubicSpline(tau, solver[name].values)(tau, 1)
-            for name in ("q_X_output", "q_Y_output", "q_Z_output")
-        ],
-        axis=-1,
-    )
+    dq_dtau = CubicSpline(tau, solver["q_output_cartesian"].values)(tau, 1)
     g = np.real(tight_run["beam"]["g_vector_cartesian"].values)
 
     relative_difference = np.linalg.norm(dq_dtau - g, axis=-1) / np.linalg.norm(

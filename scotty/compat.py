@@ -20,17 +20,29 @@ What it converts:
 - the launch flags: ``vacuumLaunch_flag`` and ``vacuum_propagation_flag`` to
   ``launch_flag``. ``vacuumLaunch_flag=False`` is ``"plasma"``.
   ``vacuumLaunch_flag=True`` (v3's default) is ``"vacuum_analytic"`` if
-  ``vacuum_propagation_flag`` is True, and ``"vacuum_numerical"`` otherwise
-  (v3's ``beam_me_up`` defaulted to ``vacuum_propagation_flag=False``, so a
-  script that does not set it gets ``"vacuum_numerical"``). v3's docstring
-  describes ``vacuum_propagation_flag`` the wrong way round: its code (and
-  this conversion) propagates analytically through the vacuum when it is
-  True;
+  ``vacuum_propagation_flag`` is True, and ``"vacuum_numerical"`` if it is
+  False. v3's docstring describes ``vacuum_propagation_flag`` the wrong way
+  round: its code (and this conversion) propagates analytically through the
+  vacuum when it is True. **A script that leaves ``vacuum_propagation_flag``
+  unset gets ``"vacuum_analytic"``**, not v3's default (numerical
+  propagation): ``"vacuum_numerical"`` integrates through the kink in the
+  density at the plasma edge, and is not converged at v3's tolerances;
 - ``Psi_BC_flag`` is passed through unchanged (v4 uses the same name and the
-  same values; v3's deprecated booleans raise in v4). If it is not given,
-  v3's default ``None`` is set. With ``"vacuum_numerical"`` it is set to
-  ``None``, with a warning: v3 propagated through the vacuum numerically
-  without boundary conditions and ignored the flag, and v4 refuses it there;
+  same values; v3's deprecated booleans raise in v4). **If it is not given,
+  ``"continuous"`` is set** for a vacuum launch from the antenna (v3's default
+  was ``None``, which assumes a density that is flat at the edge, and v4
+  refuses it otherwise). With ``"vacuum_numerical"`` it is set to ``None``,
+  with a warning: v3 propagated through the vacuum numerically without
+  boundary conditions and ignored the flag, and v4 refuses it there;
+- ``poloidal_flux_enter``, if not given, is left unset, so that v4 starts the
+  plasma where the density starts, going in from ``poloidal_flux_zero_density``
+  (v3 started at 1.0 with the density zero at 1.01, so the beam crossed the
+  start of the density inside the plasma). A density that does not reach zero
+  at its edge (such as an ``ne.dat`` file that ends with a non-zero density)
+  is refused there by the continuous condition, and the error says what to
+  use. Two cases keep v3's 1.0: a density that is a plain function (with no
+  zero point, so Scotty can't tell where it starts), and a plasma launch
+  (where it is only where the ray stops);
 - ``geometry`` is set to ``"cylindrical"``, the only geometry v3 had;
 - a plasma launch: ``plasmaLaunch_K`` (cylindrical, as in v3) to the
   Cartesian ``plasmaLaunch_K_cartesian``, and
@@ -86,7 +98,7 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Tuple, Union
 import numpy as np
 import xarray as xr
 
-from scotty.data_io import from_output_tree, to_output_tree
+from scotty.data_io import beam_group, from_output_tree, to_output_tree
 from scotty.fun_general import find_K_labframe_cyl_to_cart
 
 log = logging.getLogger(__name__)
@@ -103,8 +115,14 @@ V3_ONLY_ARGUMENTS = (
     "resonance_flag",
 )
 
+#: Also in v4.0.0.dev0, but they did nothing in v4, so 4.0.0 removed them;
+#: `from_v3_kwargs` drops them. (`figure_flag` stays, for figures made by
+#: `beam_me_up` later; see `scotty.plotting` for now)
+REMOVED_ARGUMENTS = ("further_analysis_flag", "detailed_analysis_flag")
+
 
 V3_DEFAULT_POLOIDAL_FLUX_ZERO = 1.01
+V3_DEFAULT_POLOIDAL_FLUX_ENTER = 1.0
 
 #: v3's beam_me_up defaults for the spatial finite-difference steps
 #: (upstream/master feb9499); v4's are 1e-5
@@ -127,6 +145,16 @@ def _warn(message: str) -> None:
         log.warning(f"from_v3_kwargs: {message}")
 
 
+def _v3_fit_method(parameters) -> str:
+    """What v3 did with no fit method: read the file when there were no
+    parameters, else guess the fit from how many there were"""
+    from scotty.profile_fit import _guess_profile_fit_method
+
+    if parameters is None:
+        return "smoothing-spline-file"
+    return _guess_profile_fit_method(parameters, None)
+
+
 def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
     """Return a copy of ``kwargs`` with v3 arguments converted to v4"""
     kw = dict(kwargs)
@@ -141,25 +169,35 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
     if "launch_flag" not in kw:
         if not vacuum_launch:
             kw["launch_flag"] = "plasma"
-        elif vacuum_propagation:
+        elif vacuum_propagation or not propagation_given:
             kw["launch_flag"] = "vacuum_analytic"
         else:
             kw["launch_flag"] = "vacuum_numerical"
 
-        def given(name: str, value: bool, was_given: bool) -> str:
-            return f"`{name}` = {value}" + ("" if was_given else " (v3's default)")
-
-        source = given("vacuumLaunch_flag", vacuum_launch, vacuum_launch_given)
+        source = f"`vacuumLaunch_flag` = {vacuum_launch}" + (
+            "" if vacuum_launch_given else " (v3's default)"
+        )
         if vacuum_launch:
-            source += ", " + given(
-                "vacuum_propagation_flag", vacuum_propagation, propagation_given
+            source += (
+                f", `vacuum_propagation_flag` = {vacuum_propagation}"
+                if propagation_given
+                else ", `vacuum_propagation_flag` not set (v3's default False, "
+                "numerical propagation, is not converged across the density kink "
+                "at the plasma edge in v4)"
             )
         _warn(f"{source} -> `launch_flag` = '{kw['launch_flag']}'")
 
     # Plasma-vacuum boundary conditions: same name and values in v4
     if "Psi_BC_flag" not in kw:
-        kw["Psi_BC_flag"] = None  # v3's default
-        _warn("set `Psi_BC_flag` = None (v3's default)")
+        if kw["launch_flag"] == "vacuum_analytic":
+            kw["Psi_BC_flag"] = "continuous"
+            _warn(
+                "set `Psi_BC_flag` = 'continuous' (v3's default None assumes the "
+                "density is flat at the plasma edge)"
+            )
+        else:
+            kw["Psi_BC_flag"] = None
+            _warn("set `Psi_BC_flag` = None (v3's default)")
     elif kw["launch_flag"] == "vacuum_numerical" and kw["Psi_BC_flag"] is not None:
         # v3 ignored it when propagating numerically through the vacuum (no
         # boundary conditions are applied there); v4 refuses it
@@ -169,6 +207,28 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
             "`Psi_BC_flag` = None"
         )
         kw["Psi_BC_flag"] = None
+
+    for name in REMOVED_ARGUMENTS:
+        if name in kw:
+            _warn(f"dropped `{name}` = {kw.pop(name)!r} (it did nothing in v4)")
+
+    # v4 has no defaults for the sources of the field and the profiles; v3's
+    # were a TORBEAM topfile, and ne.dat (or a fit guessed from the number of
+    # parameters)
+    if kw.get("find_B_method") is None:
+        kw["find_B_method"] = "torbeam"
+        _warn("set `find_B_method` = 'torbeam' (v3's default)")
+    if kw.get("density_fit_method") is None:
+        kw["density_fit_method"] = _v3_fit_method(kw.get("density_fit_parameters"))
+        _warn(f"set `density_fit_method` = {kw['density_fit_method']!r} (v3's default)")
+    if kw.get("relativistic_flag") and kw.get("temperature_fit_method") is None:
+        kw["temperature_fit_method"] = _v3_fit_method(
+            kw.get("temperature_fit_parameters")
+        )
+        _warn(
+            f"set `temperature_fit_method` = {kw['temperature_fit_method']!r} "
+            "(v3's default)"
+        )
 
     if "geometry" not in kw:
         kw["geometry"] = "cylindrical"
@@ -238,11 +298,34 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
         kw["output_path"] = pathlib.Path(output_path)
 
     enter = kw.get("poloidal_flux_enter", 1.0)
-    for name in ("poloidal_flux_zero_density", "poloidal_flux_zero_temperature"):
-        if name not in kw:
+    for name, fit in (
+        ("poloidal_flux_zero_density", "density_fit_method"),
+        ("poloidal_flux_zero_temperature", "temperature_fit_method"),
+    ):
+        method = kw.get(fit)
+        own_zero = getattr(method, "poloidal_flux_zero_profile", None)
+        # A plain function isn't masked by a zero point: don't set one
+        plain_function = callable(method) and own_zero is None
+        if name not in kw and own_zero is None and not plain_function:
             kw[name] = max(V3_DEFAULT_POLOIDAL_FLUX_ZERO, enter)
             _warn(
                 f"set `{name}` = {kw[name]} (v3's default, at least `poloidal_flux_enter`)"
+            )
+    if "poloidal_flux_enter" not in kw:
+        method = kw.get("density_fit_method")
+        plain_function = callable(method) and not hasattr(
+            method, "poloidal_flux_zero_profile"
+        )
+        if kw["launch_flag"] == "plasma" or plain_function:
+            kw["poloidal_flux_enter"] = V3_DEFAULT_POLOIDAL_FLUX_ENTER
+            _warn(
+                f"set `poloidal_flux_enter` = {V3_DEFAULT_POLOIDAL_FLUX_ENTER} "
+                "(v3's default; v4's starts the plasma where the density starts, "
+                + (
+                    "but a plasma launch only stops the ray there)"
+                    if kw["launch_flag"] == "plasma"
+                    else "which a plain function doesn't say)"
+                )
             )
 
     for name, value in V3_DEFAULT_SPATIAL_STEPS.items():
@@ -279,7 +362,7 @@ def quick_cutoff(dt: xr.DataTree) -> CutoffData:
 
         q_R, q_Z, K_norm, polflux, theta_m = quick_cutoff(beam_me_up(**from_v3_kwargs(kwargs)))
     """
-    so, an = dt["solver"].ds, dt["beam"].ds
+    so, an = dt["solver"].ds, beam_group(dt).ds
     K = np.asarray(so["K_output_magnitude"])
     i = int(np.argmin(K))
     return CutoffData(
@@ -530,7 +613,8 @@ for _v3, _v4 in (
 def detect_version(dt: xr.DataTree) -> str:
     """'v3' or 'v4', from the layout"""
     # "dbs_analysis": files from v4.0.0.dev0, before the output had its groups
-    if "beam" in dt.children or "dbs_analysis" in dt.children:
+    # "solver": a run without the analyses (analysis_flag=False) has no "beam"
+    if {"beam", "solver", "dbs_analysis"} & set(dt.children):
         return "v4"
     if "q_R_output" in dt["solver_output"].ds:
         return "v4"
@@ -656,7 +740,6 @@ _SAME_NAME_INPUTS = {
     "delta_R",
     "delta_Z",
     "density_fit_method",
-    "detailed_analysis_flag",
     "equil_time",
     "figure_flag",
     "find_B_method",
@@ -703,7 +786,7 @@ def to_v3_output(dt: xr.DataTree) -> xr.DataTree:
     """A v4 output tree in the v3 layout"""
     if detect_version(dt) != "v4":
         raise ValueError("Expected a v4 output tree")
-    if "beam" in dt.children:
+    if "solver" in dt.children:
         attrs = dt.attrs
         dt = xr.DataTree.from_dict(from_output_tree(dt))
         dt.attrs = attrs

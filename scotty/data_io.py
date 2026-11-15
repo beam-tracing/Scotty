@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import numpy as np
-from typing import Dict, Tuple, TYPE_CHECKING
+from typing import Dict, Optional, Tuple, TYPE_CHECKING
 import xarray as xr
 
 # Only for type hints: scotty.checks imports scotty.compat, which imports this
@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 
 CYLINDRICAL_VECTOR_COMPONENTS = ["R", "zeta", "Z"]
 CARTESIAN_VECTOR_COMPONENTS = ["X", "Y", "Z"]
+FIELD_ALIGNED_COMPONENTS = ["u1", "u2", "b"]
 SOLUTION_COMPONENTS = ["solution_1", "solution_2", "solution_3"]
 
 
@@ -91,10 +92,10 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "input_filename_suffix": params.input_filename_suffix,
         "output_path": str(params.output_path),
         "output_filename_suffix": params.output_filename_suffix,
-        # Analysis and plotting arguments
+        # Plotting arguments
         "figure_flag": params.figure_flag,
-        "further_analysis_flag": params.further_analysis_flag,
-        "detailed_analysis_flag": params.detailed_analysis_flag,
+        "analysis_flag": params.analysis_flag,
+        "dbs_analysis_flag": params.dbs_analysis_flag,
     }
     # A plasma launch starts from the user's K and Psi (Cartesian, lab
     # frame), so keep them to make the run reproducible from its output
@@ -197,7 +198,7 @@ def solver_output_to_dicts(params: Parameters) -> Tuple[dict, dict]:
             if btf
             else {}
         ),
-        "e_hat_initial": (["col_cart"], params.e_hat_initial),
+        "e_hat_initial": (["col_field"], params.e_hat_initial),
         "mode_flag_initial": params.mode_flag_initial,
         "mode_index": params.mode_index,
         "distance_from_launch_to_entry": params.distance_from_launch_to_entry,
@@ -206,15 +207,11 @@ def solver_output_to_dicts(params: Parameters) -> Tuple[dict, dict]:
         "solver_nfev": params.solver_nfev,
         "solver_duration": params.solver_duration,
         # ray-tracing solver output
-        "q_X_output": (["tau"], params.q_output_cartesian.T[0]),
-        "q_Y_output": (["tau"], params.q_output_cartesian.T[1]),
         "q_R_output": (["tau"], params.q_output_cylindrical.T[0]),
         "q_zeta_output": (["tau"], params.q_output_cylindrical.T[1]),
         "q_Z_output": (["tau"], params.q_output_cylindrical.T[2]),
         "q_output_cartesian": (["tau", "row_cart"], params.q_output_cartesian),
         "q_output_cylindrical": (["tau", "row_cyld"], params.q_output_cylindrical),
-        "K_X_output": (["tau"], params.K_output_cartesian.T[0]),
-        "K_Y_output": (["tau"], params.K_output_cartesian.T[1]),
         "K_R_output": (["tau"], params.K_output_cylindrical.T[0]),
         "K_zeta_output": (["tau"], params.K_output_cylindrical.T[1]),
         "K_Z_output": (["tau"], params.K_output_cylindrical.T[2]),
@@ -249,6 +246,7 @@ def solver_output_to_dicts(params: Parameters) -> Tuple[dict, dict]:
         "row_cyld": CYLINDRICAL_VECTOR_COMPONENTS,
         "col_cart": CARTESIAN_VECTOR_COMPONENTS,
         "col_cyld": CYLINDRICAL_VECTOR_COMPONENTS,
+        "col_field": FIELD_ALIGNED_COMPONENTS,
     }
 
     return solver_output_dict, solver_output_coords
@@ -286,34 +284,58 @@ def _split(ds: xr.Dataset, names: Tuple[str, ...]) -> Tuple[xr.Dataset, xr.Datas
 def to_output_tree(
     inputs: xr.Dataset,
     solver_output: xr.Dataset,
-    analysis: xr.Dataset,
-    dbs_analysis: xr.Dataset,
+    analysis: Optional[xr.Dataset] = None,
+    dbs_analysis: Optional[xr.Dataset] = None,
 ) -> xr.DataTree:
-    """The output's groups, from what the analysis functions make"""
+    """The output's groups, from what the analysis functions make. Without
+    ``analysis`` (``analysis_flag=False``) there is no ``beam`` group, and
+    without ``dbs_analysis`` no ``diagnostics/dbs`` group"""
+    groups = {"inputs": inputs, "solver": solver_output}
+    if analysis is None:
+        if dbs_analysis is not None:
+            raise ValueError("The DBS analysis needs the beam analysis")
+        return xr.DataTree.from_dict(groups)
+    if dbs_analysis is None:
+        groups["beam"] = analysis
+        return xr.DataTree.from_dict(groups)
     from_dbs, dbs = _split(dbs_analysis, BEAM_FROM_DBS)
     # `analysis` has the path lengths as variables, `dbs_analysis` as coordinates
     from_dbs = from_dbs.drop_vars(
         [c for c in from_dbs.coords if c in analysis.data_vars]
     )
-    return xr.DataTree.from_dict(
-        {
-            "inputs": inputs,
-            "solver": solver_output,
-            "beam": xr.merge([analysis, from_dbs], join="exact", compat="override"),
-            "diagnostics/dbs": dbs,
-        }
-    )
+    groups["beam"] = xr.merge([analysis, from_dbs], join="exact", compat="override")
+    groups["diagnostics/dbs"] = dbs
+    return xr.DataTree.from_dict(groups)
+
+
+def beam_group(dt: xr.DataTree) -> xr.DataTree:
+    """The ``beam`` group of an output, or a ValueError saying why it is
+    missing"""
+    if "beam" not in dt.children:
+        raise ValueError(
+            "This output has no `beam` group: it was made with "
+            "`analysis_flag=False`. Rerun with the analysis on"
+        )
+    return dt["beam"]
 
 
 def from_output_tree(dt: xr.DataTree) -> Dict[str, xr.Dataset]:
-    """What `to_output_tree` was given, by name"""
-    from_dbs, analysis = _split(dt["beam"].to_dataset(), BEAM_FROM_DBS)
-    dbs_analysis = xr.merge(
-        [dt["diagnostics/dbs"].to_dataset(), from_dbs], join="exact", compat="override"
-    )
-    return {
+    """What `to_output_tree` was given, by name. The analysis groups are
+    absent from a run made with ``analysis_flag`` or ``dbs_analysis_flag``
+    off, and so are their entries here"""
+    groups = {
         "inputs": dt["inputs"].to_dataset(),
         "solver_output": dt["solver"].to_dataset(),
-        "analysis": analysis,
-        "dbs_analysis": dbs_analysis,
     }
+    if "beam" not in dt.children:
+        return groups
+    beam = dt["beam"].to_dataset()
+    if "diagnostics" not in dt.children or "dbs" not in dt["diagnostics"].children:
+        groups["analysis"] = beam
+        return groups
+    from_dbs, analysis = _split(beam, BEAM_FROM_DBS)
+    groups["analysis"] = analysis
+    groups["dbs_analysis"] = xr.merge(
+        [dt["diagnostics/dbs"].to_dataset(), from_dbs], join="exact", compat="override"
+    )
+    return groups
