@@ -133,6 +133,14 @@ Outputs
   follow them, ``check_eigval_order``, did nothing and is removed.
 - ``solver/e_hat_initial`` is labelled with ``col_field`` = (u1, u2, b), the
   basis it is in, instead of ``col_cart``.
+- ``solver/mode_index`` (the traced root of the dispersion tensor where the
+  solvers start, in the ascending order of its eigenvalues) is the root whose
+  eigenvector is the traced mode's polarisation, ``solver/e_hat_initial``. At
+  zero density (an entry point at the plasma edge) two roots vanish together;
+  the root with the smaller ``|H|`` was taken, so ``mode_index`` named the
+  O-mode's root for the X-mode too, and every such run warned that it could not
+  tell the O- and X-modes apart (#185). The warnings are gone. The results of
+  the runs did not change.
 - Duplicated variables are removed: ``epsilon_bb``, ``epsilon_11`` and
   ``epsilon_12`` (use ``epsilon_para``, ``epsilon_perp`` and ``epsilon_g``);
   ``H_Cardano_1``-``3`` (use ``H_Cardano``); ``H_eigval1``-``3`` (use
@@ -158,6 +166,9 @@ Removed
   ``tilt_trns_RZ_make``, ``tilt_trns_TZ_make``,
   ``mirrornorm_make_with_rot_tilt_operators`` and a second copy of
   ``find_mode_index_and_ehat``; and ``mln`` and ``ralt`` in ``logger``.
+- ``launch.find_mode_index_and_ehat`` and the ``tol_O_mode_polarisation``
+  argument of ``launch.find_plasma_entry_parameters`` (#185). Its branch for
+  ``"O"`` and ``"X"`` could not be reached, and it chose the O-mode for both.
 
 Packaging
 ~~~~~~~~~
