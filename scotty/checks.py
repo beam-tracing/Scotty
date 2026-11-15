@@ -4,6 +4,7 @@
 
 import difflib
 import logging
+import warnings
 from pathlib import Path
 from scotty.compat import REMOVED_ARGUMENTS, V3_ONLY_ARGUMENTS
 from scotty.fun_general import (
@@ -168,6 +169,8 @@ class Parameters:
         rtol: float,
         atol: float,
         poloidal_flux_enter: Optional[float],
+        poloidal_flux_zero_density: Optional[float],
+        poloidal_flux_zero_temperature: Optional[float],
         # Data input and output arguments
         magnetic_data_path: Union[str, Path],
         ne_data_path: Union[str, Path],
@@ -275,10 +278,18 @@ class Parameters:
         self.len_tau = int(self._check_positive("len_tau", len_tau))
         self.rtol = rtol
         self.atol = atol
-        self.poloidal_flux_enter = self._check_poloidal_flux_enter(poloidal_flux_enter)
-        # Set from the profiles, once they exist
-        self.poloidal_flux_zero_density = np.nan
-        self.poloidal_flux_zero_temperature = np.nan
+        (
+            self.poloidal_flux_enter,
+            self.poloidal_flux_zero_density,
+            self.poloidal_flux_zero_temperature,
+        ) = self._check_poloidal_flux_arguments(
+            poloidal_flux_enter,
+            poloidal_flux_zero_density,
+            poloidal_flux_zero_temperature,
+            relativistic_flag,
+            density_fit_method,
+            temperature_fit_method,
+        )
 
         ##################################################
         #
@@ -406,37 +417,154 @@ class Parameters:
         else:
             return cast(VALID_LAUNCH_MODE_FLAGS, mode_flag_launch)
 
-    def _check_poloidal_flux_enter(
-        self, poloidal_flux_enter: Optional[float]
-    ) -> Optional[float]:
-        """``None`` is resolved once the density profile exists, by
-        `set_zero_points_and_entry`"""
-        if poloidal_flux_enter is not None:
-            self._check_positive("poloidal_flux_enter", poloidal_flux_enter)
-        return poloidal_flux_enter
-
-    def set_zero_points_and_entry(self, density_fit) -> None:
-        """The density's zero point (for the output), and the entry point
-        where it was left unset: where the density profile ends"""
-        zero_point = getattr(density_fit, "poloidal_flux_zero_profile", None)
-        self.poloidal_flux_zero_density = (
-            np.nan if zero_point is None else float(zero_point)
-        )
-        if self.poloidal_flux_enter is None:
-            if zero_point is None:
+    def _check_poloidal_flux_arguments(
+        self,
+        poloidal_flux_enter: Optional[float],
+        poloidal_flux_zero_density: Optional[float],
+        poloidal_flux_zero_temperature: Optional[float],
+        relativistic_flag: bool,
+        density_fit_method=None,
+        temperature_fit_method=None,
+    ) -> Tuple[float, float, float]:
+        # A profile object (e.g. `QuadraticFit`) has its own zero point, which is
+        # what the run uses; the arguments must agree with it, and default to it
+        def zero_point(name, given, fit_method, default):
+            own = getattr(fit_method, "poloidal_flux_zero_profile", None)
+            if given is None:
+                return default if own is None else own
+            if own is not None and not np.isclose(given, own, rtol=1e-12, atol=0):
                 raise ValueError(
-                    "`poloidal_flux_enter` must be given when the density profile "
-                    f"({density_fit!r}) has no zero point "
-                    "(`poloidal_flux_zero_profile`)"
+                    f"`{name}` = {given}, but the profile {fit_method!r} is zero "
+                    f"from {own}, which is what the run would use. Leave `{name}` "
+                    "unset (None) to use the profile's value, or make them agree"
                 )
-            self.poloidal_flux_enter = self._check_positive(
-                "poloidal_flux_enter (the density profile's zero point)",
-                float(zero_point),
+            return given
+
+        for name, given in (
+            ("poloidal_flux_zero_density", poloidal_flux_zero_density),
+            ("poloidal_flux_zero_temperature", poloidal_flux_zero_temperature),
+        ):
+            if given is not None:
+                warnings.warn(
+                    f"`{name}` is deprecated, and will be removed after Scotty 4.x: "
+                    "give the zero point to the profile object instead, as the "
+                    "first argument of the fits in `scotty.profile_fit` (for "
+                    "example `QuadraticFit(1.0, 4.0)` for `'quadratic'` with "
+                    "parameters `[4.0]`, or `SmoothingSplineFit.from_dat_file(1.0, "
+                    "'ne.dat')` for a density file). Leaving it unset with a named "
+                    "fit or a file means a zero point of 1.0. With "
+                    "`poloidal_flux_enter` unset, the plasma starts where the "
+                    "density does",
+                    FutureWarning,
+                    stacklevel=4,
+                )
+
+        poloidal_flux_zero_density = zero_point(
+            "poloidal_flux_zero_density",
+            poloidal_flux_zero_density,
+            density_fit_method,
+            1.0,
+        )
+        # By default, the temperature goes to zero where the density does
+        poloidal_flux_zero_temperature = zero_point(
+            "poloidal_flux_zero_temperature",
+            poloidal_flux_zero_temperature,
+            temperature_fit_method,
+            poloidal_flux_zero_density,
+        )
+        self._check_positive("poloidal_flux_zero_density", poloidal_flux_zero_density)
+        self._check_positive(
+            "poloidal_flux_zero_temperature", poloidal_flux_zero_temperature
+        )
+        if poloidal_flux_enter is None:
+            # Set where the density starts, once the profile exists
+            # (`set_poloidal_flux_enter`)
+            return (
+                poloidal_flux_enter,
+                poloidal_flux_zero_density,
+                poloidal_flux_zero_temperature,
             )
-            log.info(
-                f"`poloidal_flux_enter` = {self.poloidal_flux_enter}: where the "
-                "density profile ends"
+        self._check_positive("poloidal_flux_enter", poloidal_flux_enter)
+        self._check_zero_points_against_entry(
+            poloidal_flux_enter,
+            poloidal_flux_zero_density,
+            poloidal_flux_zero_temperature,
+            relativistic_flag,
+        )
+        return (
+            poloidal_flux_enter,
+            poloidal_flux_zero_density,
+            poloidal_flux_zero_temperature,
+        )
+
+    @staticmethod
+    def _check_zero_points_against_entry(
+        poloidal_flux_enter: float,
+        poloidal_flux_zero_density: float,
+        poloidal_flux_zero_temperature: float,
+        relativistic_flag: bool,
+    ) -> None:
+        if poloidal_flux_zero_density < poloidal_flux_enter:
+            raise ValueError(
+                f"`poloidal_flux_zero_density` must be greater than or equal to `poloidal_flux_enter`, but got `poloidal_flux_zero_density` = {poloidal_flux_zero_density} and `poloidal_flux_enter` = {poloidal_flux_enter}"
             )
+        # The temperature profile is used only by relativistic runs
+        if relativistic_flag and poloidal_flux_zero_temperature < poloidal_flux_enter:
+            raise ValueError(
+                f"`poloidal_flux_zero_temperature` must be greater than or equal to `poloidal_flux_enter`, but got `poloidal_flux_zero_temperature` = {poloidal_flux_zero_temperature} and `poloidal_flux_enter` = {poloidal_flux_enter}"
+                " (the temperature would be zero inside the plasma)"
+            )
+        if (
+            poloidal_flux_zero_density != poloidal_flux_zero_temperature
+            and relativistic_flag
+        ):
+            log.warning(
+                f"`poloidal_flux_zero_density` ({poloidal_flux_zero_density}) and `poloidal_flux_zero_temperature` ({poloidal_flux_zero_temperature}) are set to different values. This may cause issues because `relativistic_flag` = {relativistic_flag}"
+            )
+
+    def set_poloidal_flux_enter(self, density_fit) -> None:
+        """If `poloidal_flux_enter` was left unset: where the density starts,
+        going in from its zero point (`find_density_start`), so that the
+        boundary condition is applied there and the beam never crosses the
+        start of the density inside the plasma"""
+        if self.poloidal_flux_enter is not None:
+            return
+        from scotty.boundary_conditions import find_density_start
+
+        # A spline from data that end inside the zero point holds its last
+        # value beyond them, with a kink at the end of the data: start there
+        # at the latest
+        zero_point = self.poloidal_flux_zero_density
+        data_end = getattr(density_fit, "poloidal_flux_data_end", None)
+        if data_end is not None and data_end < zero_point:
+            zero_point = data_end
+        n_max = float(
+            np.max(np.abs(density_fit(np.linspace(0.0, zero_point, 2001))))
+        )
+        start = (
+            find_density_start(density_fit, zero_point, 1e-10 * n_max)
+            if n_max > 0
+            else 0.0
+        )
+        if start <= 0:
+            raise ValueError(
+                f"The density profile ({density_fit!r}) is zero everywhere inside "
+                f"poloidal flux {zero_point}: give `poloidal_flux_enter`"
+            )
+        # A profile that falls to zero at its zero point crosses the threshold
+        # just inside it (by 5e-6 for one that starts flat, 4(1 - psi^2)^2):
+        # that is not a zero band, so enter at the zero point itself, as
+        # `check_density_at_entry` does (the same `band`, 1e-4)
+        if start >= zero_point * (1 - 1e-4):
+            start = float(zero_point)
+        self.poloidal_flux_enter = start
+        log.info(f"`poloidal_flux_enter` = {start:.6g}: where the density starts")
+        self._check_zero_points_against_entry(
+            start,
+            self.poloidal_flux_zero_density,
+            self.poloidal_flux_zero_temperature,
+            self.relativistic_flag,
+        )
 
     def _check_data_path(
         self, name: Literal["magnetic", "ne", "Te", "output"], path: Union[str, Path]
@@ -523,16 +651,6 @@ class Parameters:
                 "v3 script, pass its arguments through `scotty.compat.from_v3_kwargs`, "
                 "which converts `resonance_flag`"
             )
-        for name in ("poloidal_flux_zero_density", "poloidal_flux_zero_temperature"):
-            if name in extras:
-                raise ValueError(
-                    f"`{name}` (got {extras[name]!r}) was removed in Scotty 4.0.0: "
-                    "each profile has its own zero point (`poloidal_flux_zero_profile`, "
-                    "the first argument of the fits in `scotty.profile_fit`, and the "
-                    "first of `density_fit_parameters` for a named fit; a density file "
-                    "ends where its data end). To run a Scotty v3 script, pass its "
-                    "arguments through `scotty.compat.from_v3_kwargs`"
-                )
 
     def _check_Psi_BC_flag(
         self, Psi_BC_flag, launch_flag: VALID_LAUNCH_FLAGS

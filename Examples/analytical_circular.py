@@ -45,7 +45,8 @@ beam = dict(
     minor_radius_a=0.5,  # m
     B_p_a=0.1,  # T
     # Vacuum propagation to the plasma, then the boundary condition. The plasma
-    # starts where the density profile ends, its zero point (here psi = 1)
+    # starts where the density does (here psi = 1), since
+    # `poloidal_flux_enter` is left unset
     launch_flag="vacuum_analytic",
 )
 
@@ -58,7 +59,7 @@ dt = beam_me_up(
     output_filename_suffix="_continuous",
 )
 solver = dt["solver"]
-cutoff = int(solver["K_output_magnitude"].argmin())
+cutoff = int(np.argmin(solver["K_output_magnitude"].values))
 print(
     f"Cut-off (minimum |K|) at R = {float(solver['q_R_output'][cutoff]):.4f} m, "
     f"Z = {float(solver['q_Z_output'][cutoff]):.4f} m"

@@ -95,6 +95,7 @@ def run(output_path, upper_hybrid_flag, angle_deg=30.0, **solver):
         plasmaLaunch_Psi_3D_lab_cartesian=(1.0 + 1.0j) * np.eye(3),
         find_B_method=field(),
         density_fit_method=LinearFit(1.0, N_CUTOFF),
+        poloidal_flux_zero_density=1.0,
         upper_hybrid_flag=upper_hybrid_flag,
         ray_tracing_flag=True,
         delta_X=1e-4,

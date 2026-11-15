@@ -145,8 +145,12 @@ def test_B2_density_at_entry_refused(tmp_path, Psi_BC_flag):
         density_fit_method=QuadraticFit(1.05, 4.0),
         poloidal_flux_enter=1.0,
     )
-    # The density falls to zero further out, so moving the entry point helps
-    with pytest.raises(ValueError, match="or set `poloidal_flux_enter` to 1.05"):
+    # The density falls to zero further out, with a kink, so both remedies apply
+    with pytest.raises(
+        ValueError,
+        match="'discontinuous' with `poloidal_flux_enter` = 1.04.*"
+        "'continuous' with `poloidal_flux_enter` = 1.05",
+    ):
         beam_me_up(**kwargs)
 
 
@@ -163,8 +167,11 @@ def test_B2_tolerance(tmp_path, ratio, refused):
     )
     if refused:
         # The profile jumps at the entry point: only "discontinuous" helps
-        with pytest.raises(ValueError, match="density jumps at the entry point"):
+        with pytest.raises(
+            ValueError, match="'discontinuous' with `poloidal_flux_enter` = 0.99"
+        ) as error:
             beam_me_up(**kwargs)
+        assert "'continuous' with" not in str(error.value)
     else:
         dt = beam_me_up(**kwargs)
         assert np.max(np.abs(dt["beam"].ds["H_Booker"].values)) < 1e-4
@@ -188,11 +195,48 @@ def test_B2_discontinuous_accepts_density_at_entry(tmp_path):
 
 
 def test_B9_the_profiles_zero_point_is_used_and_recorded(tmp_path):
-    """The profile's own zero point is what the run uses (there is no
-    separate argument to disagree with it), and the output records it"""
+    """The profile's own zero point is what the run uses, and the output
+    records it, with the entry point where the density starts"""
     dt = beam_me_up(**synthetic(tmp_path, density_fit_method=QuadraticFit(1.05, 4.0)))
     assert float(dt["inputs"].ds["poloidal_flux_zero_density"]) == 1.05
-    assert float(dt["inputs"].ds["poloidal_flux_enter"]) == 1.05
+    assert float(dt["inputs"].ds["poloidal_flux_enter"]) == pytest.approx(
+        1.05, abs=1e-9
+    )
+
+
+@pytest.mark.parametrize(
+    "name", ["poloidal_flux_zero_density", "poloidal_flux_zero_temperature"]
+)
+def test_zero_points_deprecated(tmp_path, name):
+    """Still accepted, with their old meaning, but each warns"""
+    with pytest.warns(FutureWarning, match=f"`{name}` is deprecated"):
+        beam_me_up(**synthetic(tmp_path, **{name: 1.0}))
+
+
+def test_no_deprecation_warning_without_the_zero_points(tmp_path):
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        beam_me_up(**synthetic(tmp_path))
+
+
+def test_named_fit_keeps_its_parameters(tmp_path):
+    """A named fit's parameters mean what they did: the zero point is not
+    among them"""
+    with pytest.warns(FutureWarning):
+        dt = beam_me_up(
+            **synthetic(
+                tmp_path,
+                density_fit_method="quadratic",
+                density_fit_parameters=[4.0],
+                poloidal_flux_zero_density=1.05,
+            )
+        )
+    assert float(dt["inputs"].ds["poloidal_flux_zero_density"]) == 1.05
+    assert float(dt["inputs"].ds["poloidal_flux_enter"]) == pytest.approx(
+        1.05, abs=1e-9
+    )
 
 
 def test_B10_preset_frequency_given_wins():
@@ -229,7 +273,8 @@ def test_figure_flag_kept():
 
 
 def test_converted_v3_script_enters_where_the_density_is_zero(tmp_path):
-    """v3's defaults: density zero at 1.01. The plasma now starts there, with
+    """v3's defaults: density zero at 1.01. The plasma now starts where the
+    density does, there, with
     an analytic vacuum launch and the continuous condition, and the ray stays
     on the dispersion relation"""
     v3_script = synthetic(tmp_path)
@@ -245,9 +290,12 @@ def test_converted_v3_script_enters_where_the_density_is_zero(tmp_path):
     assert kwargs["launch_flag"] == "vacuum_analytic"
     assert kwargs["Psi_BC_flag"] == "continuous"
     assert "poloidal_flux_enter" not in kwargs
-    assert kwargs["density_fit_method"].poloidal_flux_zero_profile == 1.01
-    dt = beam_me_up(**kwargs)
-    assert float(dt["inputs"].ds["poloidal_flux_enter"]) == 1.01
+    assert kwargs["poloidal_flux_zero_density"] == 1.01
+    with pytest.warns(FutureWarning):
+        dt = beam_me_up(**kwargs)
+    assert float(dt["inputs"].ds["poloidal_flux_enter"]) == pytest.approx(
+        1.01, abs=1e-9
+    )
     # Entering at 1.0 instead, as before, gave |H| = 1e-2 all along the ray. The
     # bound allows for v3's loose tolerances (rtol 1e-3), which from_v3_kwargs sets
     assert np.max(np.abs(dt["beam"].ds["H_Booker"].values)) < 1e-4
@@ -316,34 +364,93 @@ def test_B7_antenna_at_zeta_gives_the_rotated_run(tmp_path, Psi_BC_flag):
 PSI_DATA = np.linspace(0.0, 1.0, 101) ** 2  # the docstring's ne.dat: rho 0 to 1
 
 
-def kinked_file_profile(zero_point=None):
+def kinked_file_profile(zero_point=1.0):
     """n_e = 4(1 - psi), as in the `from_dat_file` docstring: zero at the end
     of its data, with a kink there"""
     return SmoothingSplineFit(zero_point, PSI_DATA, 4.0 * (1 - PSI_DATA))
 
 
-def flat_file_profile(zero_point=None):
+def flat_file_profile(zero_point=1.0):
     """n_e = 4(1 - psi)^2: zero and flat at the end of its data"""
     return SmoothingSplineFit(zero_point, PSI_DATA, 4.0 * (1 - PSI_DATA) ** 2)
 
 
-def test_file_profile_ends_with_its_data():
-    assert kinked_file_profile().poloidal_flux_zero_profile == 1.0
-    assert kinked_file_profile()(1.005) == 0.0
+def test_density_start_inside_a_zero_band():
+    """Between the end of the data (1.0) and the zero point (1.01), the spline
+    holds its last value, 0"""
+    from scotty.boundary_conditions import find_density_start
+
+    profile = kinked_file_profile(1.01)
+    assert profile(1.005) == 0.0
+    assert find_density_start(profile, 1.01, 1e-10 * 4.0) == pytest.approx(
+        1.0, abs=1e-6
+    )
 
 
 @pytest.mark.parametrize("Psi_BC_flag", ["continuous", "discontinuous", None])
 def test_kink_inside_the_entry_point_refused(tmp_path, Psi_BC_flag):
     """Eduard's case 1: the density is zero from the end of its data (1.0) to
     the entry point (1.01), so the beam crosses the kink at 1.0 with no
-    boundary condition. Every condition refuses it, and says where to enter"""
+    boundary condition. Every condition refuses it, and gives both remedies:
+    'discontinuous' slightly inside, or 'continuous' at the kink"""
     kwargs = synthetic(
         tmp_path,
         Psi_BC_flag=Psi_BC_flag,
         density_fit_method=kinked_file_profile(1.01),
+        poloidal_flux_enter=1.01,
     )
-    with pytest.raises(ValueError, match="Set `poloidal_flux_enter` = 1,"):
+    with pytest.raises(
+        ValueError,
+        match="starts with a kink at 1, .*'discontinuous' with `poloidal_flux_enter` "
+        "= 0.99.*'continuous' with `poloidal_flux_enter` = 1 ",
+    ):
         beam_me_up(**kwargs)
+
+
+def test_zero_inside_the_plasma_refused(tmp_path):
+    """A density that is zero in a band inside where it starts, as a spline
+    through zero-padded data can give: the beam would cross it"""
+
+    def density(psi):
+        psi = np.asarray(psi, dtype=float)
+        return 4.0 * (1 - psi) * (np.abs(psi - 0.5) > 0.05)
+
+    kwargs = synthetic(
+        tmp_path,
+        Psi_BC_flag="continuous",
+        density_fit_method=density,
+        poloidal_flux_enter=1.0,
+    )
+    with pytest.raises(
+        ValueError, match="inside the plasma, between poloidal flux 0.45"
+    ):
+        beam_me_up(**kwargs)
+
+
+def test_discontinuous_slightly_inside_the_kink_agrees(tmp_path):
+    """The supervisor's simple recipe: 'discontinuous' 0.01 inside the kink, at
+    the default tolerance, against 'continuous' at the kink, converged. The
+    layer left outside (n_e up to 1% of the axis value) changes the width at
+    the cut-off by less than 1e-3 (Kai, 2026-11-15: 0.01% for entries from
+    0.999 to 0.9)"""
+    widths = []
+    for flag, enter, rtol in (
+        ("discontinuous", 0.99, 1e-4),
+        ("continuous", 1.0, 1e-7),
+    ):
+        dt = beam_me_up(
+            **synthetic(
+                tmp_path / flag,
+                Psi_BC_flag=flag,
+                density_fit_method=kinked_file_profile(1.01),
+                poloidal_flux_enter=enter,
+                rtol=rtol,
+                atol=rtol * 1e-3,
+            )
+        )
+        cutoff = int(np.argmin(dt["solver"].ds["K_output_magnitude"].values))
+        widths.append(float(dt["beam"].ds["width_1"].values[cutoff]))
+    assert widths[0] == pytest.approx(widths[1], rel=1e-3)
 
 
 def test_flat_start_inside_the_entry_point_accepted(tmp_path):
@@ -351,7 +458,10 @@ def test_flat_start_inside_the_entry_point_accepted(tmp_path):
     nothing it can't integrate"""
     dt = beam_me_up(
         **synthetic(
-            tmp_path, density_fit_method=flat_file_profile(1.01), Psi_BC_flag=None
+            tmp_path,
+            density_fit_method=flat_file_profile(1.01),
+            Psi_BC_flag=None,
+            poloidal_flux_enter=1.01,
         )
     )
     assert float(dt["inputs"].ds["poloidal_flux_enter"]) == 1.01
@@ -371,8 +481,9 @@ def test_None_with_a_kink_at_the_entry_point_refused(tmp_path):
 
 
 def test_default_entry_with_a_file_is_converged(tmp_path):
-    """With the entry point left unset, a profile read from a file starts where
-    its data end, with the boundary condition there: the width at the cut-off
+    """With the entry point left unset, the plasma starts where the density
+    does (the end of the file's data, inside the zero point 1.01), with the
+    boundary condition there: the width at the cut-off
     at v3's loose tolerance agrees with a tight run (Eduard's case 1 gave 0.107
     m against 0.0498 m when entering at 1.01)"""
     widths = []
@@ -380,7 +491,7 @@ def test_default_entry_with_a_file_is_converged(tmp_path):
         dt = beam_me_up(
             **synthetic(
                 tmp_path / f"rtol{rtol}",
-                density_fit_method=kinked_file_profile(),
+                density_fit_method=kinked_file_profile(1.01),
                 rtol=rtol,
                 atol=rtol * 1e-3,
             )
@@ -388,8 +499,159 @@ def test_default_entry_with_a_file_is_converged(tmp_path):
         beam = dt["beam"].ds
         cutoff = int(np.argmin(dt["solver"].ds["K_output_magnitude"].values))
         widths.append(float(beam["width_1"].values[cutoff]))
-        assert float(dt["inputs"].ds["poloidal_flux_enter"]) == 1.0
+        assert float(dt["inputs"].ds["poloidal_flux_enter"]) == pytest.approx(
+            1.0, abs=1e-6
+        )
     assert widths[0] == pytest.approx(widths[1], rel=1e-2)
+
+
+def width_at_cutoff(dt):
+    cutoff = int(np.argmin(dt["solver"].ds["K_output_magnitude"].values))
+    return float(dt["beam"].ds["width_1"].values[cutoff])
+
+
+def plateau_file_profile():
+    """Data that end at a finite density (0.3) inside the zero point (1.01):
+    the spline holds 0.3 beyond them, with a kink at the end of the data"""
+    return SmoothingSplineFit(1.01, PSI_DATA, 4.0 * (1 - PSI_DATA) + 0.3)
+
+
+@pytest.fixture(scope="module")
+def plateau_converged(tmp_path_factory):
+    """Entering at the end of the data, at a tight tolerance (the referee,
+    2026-11-15: 0.04542 m; entering at 1.01 gave 0.1127 m at rtol 1e-4)"""
+    return width_at_cutoff(
+        beam_me_up(
+            **synthetic(
+                tmp_path_factory.mktemp("plateau"),
+                Psi_BC_flag="discontinuous",
+                density_fit_method=plateau_file_profile(),
+                poloidal_flux_enter=1.0,
+                rtol=1e-7,
+                atol=1e-10,
+            )
+        )
+    )
+
+
+def test_default_entry_stops_at_the_end_of_the_data(tmp_path, plateau_converged):
+    dt = beam_me_up(
+        **synthetic(
+            tmp_path,
+            Psi_BC_flag="discontinuous",
+            density_fit_method=plateau_file_profile(),
+        )
+    )
+    assert float(dt["inputs"].ds["poloidal_flux_enter"]) == 1.0
+    assert width_at_cutoff(dt) == pytest.approx(plateau_converged, rel=1e-3)
+
+
+def test_entry_beyond_the_end_of_the_data_refused(tmp_path):
+    kwargs = synthetic(
+        tmp_path,
+        Psi_BC_flag="discontinuous",
+        density_fit_method=plateau_file_profile(),
+        poloidal_flux_enter=1.01,
+    )
+    with pytest.raises(
+        ValueError,
+        match="data end at poloidal flux 1, .*kink at 1 .*'discontinuous' with "
+        "`poloidal_flux_enter` = 0.99",
+    ):
+        beam_me_up(**kwargs)
+
+
+def test_continuous_at_a_plateau_advises_the_end_of_the_data(tmp_path):
+    """Refused (the density is finite at the entry point), and the advice
+    must not send the beam out past the end of the data, to 1.01"""
+    kwargs = synthetic(
+        tmp_path,
+        Psi_BC_flag="continuous",
+        density_fit_method=plateau_file_profile(),
+    )
+    with pytest.raises(ValueError, match="'discontinuous'") as error:
+        beam_me_up(**kwargs)
+    assert "1.01" not in str(error.value).split("keeps the vacuum K")[1]
+
+
+def test_flat_data_end_inside_the_entry_accepted(tmp_path):
+    """Data that end flat (here at a finite density) carry straight on into
+    the held value: no kink, nothing to refuse"""
+    psi = np.linspace(0.0, 1.0, 101) ** 2
+    profile = SmoothingSplineFit(1.01, psi, 0.3 + 4.0 * (1 - psi) ** 2)
+    beam_me_up(
+        **synthetic(
+            tmp_path,
+            Psi_BC_flag="discontinuous",
+            density_fit_method=profile,
+            poloidal_flux_enter=1.01,
+        )
+    )
+
+
+def test_default_entry_moves_inside_a_kink_not_at_1(tmp_path):
+    """The data end, with a kink at n_e = 0, at 0.95, inside the zero point
+    1.0. The old default entry, 1.0, crossed the kink; the new one starts at
+    it, and agrees with a tight run at v3's loose tolerance"""
+    psi = np.linspace(0.0, 0.95, 101)
+    profile = SmoothingSplineFit(1.0, psi, 4.0 * (0.95 - psi) / 0.95)
+    widths = []
+    for rtol in (1e-3, 1e-7):
+        dt = beam_me_up(
+            **synthetic(
+                tmp_path / f"rtol{rtol}",
+                density_fit_method=profile,
+                rtol=rtol,
+                atol=rtol * 1e-3,
+            )
+        )
+        assert float(dt["inputs"].ds["poloidal_flux_enter"]) == pytest.approx(
+            0.95, abs=1e-6
+        )
+        widths.append(width_at_cutoff(dt))
+    assert widths[0] == pytest.approx(widths[1], rel=1e-2)
+
+
+@pytest.mark.parametrize("enter", [None, 0.99])
+def test_jump_with_discontinuous(tmp_path, enter):
+    """A density that jumps at its zero point, entering at the jump (left
+    unset) or slightly inside it, both stay on the dispersion surface"""
+    dt = beam_me_up(
+        **synthetic(
+            tmp_path,
+            Psi_BC_flag="discontinuous",
+            # n_e = 4 - 3.6 psi^2: 0.4 at its zero point, 1.0
+            density_fit_method=PolynomialFit(1.0, -3.6, 0.0, 4.0),
+            **({} if enter is None else {"poloidal_flux_enter": enter}),
+        )
+    )
+    assert np.max(np.abs(dt["beam"].ds["H_Booker"].values)) < 1e-4
+
+
+def test_temperature_zero_inside_the_default_entry_refused(tmp_path):
+    """The temperature checks also run once the entry point is set from the
+    density (the referee, 2026-11-15)"""
+    kwargs = synthetic(
+        tmp_path,
+        density_fit_method=QuadraticFit(1.05, 4.0),
+        relativistic_flag=True,
+        temperature_fit_method=QuadraticFit(1.0, 1.0),
+    )
+    with pytest.raises(ValueError, match="temperature would be zero inside"):
+        beam_me_up(**kwargs)
+
+
+def test_unused_temperature_not_checked(tmp_path):
+    """Without relativity the temperature profile isn't used, so its zero
+    point doesn't matter (the referee, 2026-11-15)"""
+    beam_me_up(
+        **synthetic(
+            tmp_path,
+            density_fit_method=QuadraticFit(1.05, 4.0),
+            relativistic_flag=False,
+            temperature_fit_method=QuadraticFit(1.0, 1.0),
+        )
+    )
 
 
 # ---------------------------------------------------------------- presets
@@ -405,6 +667,25 @@ def test_presets_take_one_data_folder(tmp_path):
     )
     assert kwargs["ne_data_path"] == tmp_path
     assert kwargs["magnetic_data_path"] == tmp_path
+
+
+def test_v3_plain_function_keeps_v3s_entry():
+    """A plain function has no zero point, so Scotty can't tell where its
+    density starts: the converted script enters at v3's 1.0"""
+    kw = from_v3_kwargs({"density_fit_method": lambda psi: 4.0 * (1 - psi)})
+    assert kw["poloidal_flux_enter"] == 1.0
+
+
+def test_v3_plasma_launch_keeps_v3s_entry():
+    """There the entry point is only where the ray stops"""
+    kw = from_v3_kwargs({"vacuumLaunch_flag": False})
+    assert kw["launch_flag"] == "plasma"
+    assert kw["poloidal_flux_enter"] == 1.0
+
+
+def test_v3_given_entry_kept():
+    kw = from_v3_kwargs({"poloidal_flux_enter": 0.98})
+    assert kw["poloidal_flux_enter"] == 0.98
 
 
 def test_synthetic_preset_leaves_the_zero_point_to_its_profile():

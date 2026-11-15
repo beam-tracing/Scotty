@@ -10,15 +10,43 @@ from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.profile_fit import QuadraticFit
 
 
-@pytest.mark.parametrize(
-    "name", ["poloidal_flux_zero_density", "poloidal_flux_zero_temperature"]
-)
-def test_zero_point_arguments_removed(tmp_path, name):
-    """4.0.0: each profile has its own zero point; the arguments are refused,
-    not ignored, since ignoring them would change the profile"""
-    assert name not in inspect.signature(beam_me_up).parameters
-    with pytest.raises(ValueError, match="removed in Scotty 4.0.0"):
-        beam_me_up(**_synthetic(tmp_path, **{name: 1.0}))
+def _check_flux(enter, zero_density, zero_temperature, relativistic=True):
+    # The checks only use the class's helper methods, so no full Parameters set-up is needed.
+    # The temperature is checked only for relativistic runs, which use it
+    return Parameters._check_poloidal_flux_arguments(
+        Parameters.__new__(Parameters),
+        enter,
+        zero_density,
+        zero_temperature,
+        relativistic,
+    )
+
+
+def test_poloidal_flux_zero_temperature_unchecked_without_relativity():
+    assert _check_flux(1.3, 1.3, 1.0, relativistic=False) == (1.3, 1.3, 1.0)
+
+
+def test_poloidal_flux_equal_values_accepted():
+    assert _check_flux(1.3, 1.3, 1.3) == (1.3, 1.3, 1.3)
+
+
+def test_poloidal_flux_zero_density_below_enter_names_density():
+    with pytest.raises(ValueError) as err:
+        _check_flux(1.3, 1.0, 1.3)
+    message = str(err.value)
+    assert "`poloidal_flux_zero_density` must be greater than or equal to" in message
+    assert "= 1.0" in message
+
+
+def test_poloidal_flux_zero_temperature_below_enter_names_temperature():
+    with pytest.raises(ValueError) as err:
+        _check_flux(1.3, 1.3, 1.0)
+    message = str(err.value)
+    assert (
+        "`poloidal_flux_zero_temperature` must be greater than or equal to" in message
+    )
+    assert "`poloidal_flux_zero_density`" not in message
+    assert "= 1.0" in message
 
 
 def _circular_flag(**extras):
@@ -56,34 +84,30 @@ def _synthetic(tmp_path, **kwargs):
     return parameters
 
 
-def test_entry_defaults_to_the_profiles_zero_point(tmp_path):
-    """`poloidal_flux_enter` None is where the density profile ends"""
-    assert (
-        inspect.signature(beam_me_up).parameters["poloidal_flux_enter"].default is None
-    )
-    dt = beam_me_up(**_synthetic(tmp_path, density_fit_method=QuadraticFit(1.05, 4.0)))
-    assert float(dt["inputs"]["poloidal_flux_enter"]) == 1.05
-    assert float(dt["inputs"]["poloidal_flux_zero_density"]) == 1.05
+def test_poloidal_flux_zero_temperature_defaults_to_zero_density():
+    """C3: None (the default) is poloidal_flux_zero_density"""
+    assert _check_flux(1.0, 1.2, None) == (1.0, 1.2, 1.2)
+    default = inspect.signature(beam_me_up).parameters["poloidal_flux_zero_temperature"]
+    assert default.default is None
 
 
-def test_entry_needed_for_a_profile_without_zero_point(tmp_path):
-    with pytest.raises(ValueError, match="`poloidal_flux_enter` must be given"):
-        beam_me_up(
-            **_synthetic(
-                tmp_path, density_fit_method=lambda psi: 4.0 * (1 - psi) * (psi < 1)
-            )
-        )
+def test_poloidal_flux_zero_temperature_given_still_checked():
+    """C3: a value given below poloidal_flux_enter still raises"""
+    with pytest.raises(ValueError, match="poloidal_flux_zero_temperature"):
+        _check_flux(1.3, 1.3, 1.1)
 
 
-def test_temperature_zero_point_from_its_profile(tmp_path):
+def test_poloidal_flux_zero_temperature_none_in_a_run(tmp_path):
     dt = beam_me_up(
         **_synthetic(
             tmp_path,
-            relativistic_flag=True,
-            temperature_fit_method=QuadraticFit(1.1, 2.0),
+            density_fit_method=QuadraticFit(1.05, 4.0),
+            poloidal_flux_zero_density=1.05,
+            poloidal_flux_zero_temperature=None,
+            poloidal_flux_enter=1.05,
         )
     )
-    assert float(dt["inputs"]["poloidal_flux_zero_temperature"]) == 1.1
+    assert float(dt["inputs"]["poloidal_flux_zero_temperature"]) == 1.05
 
 
 @pytest.mark.parametrize(
