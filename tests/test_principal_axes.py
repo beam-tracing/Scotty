@@ -241,20 +241,18 @@ def test_default_run_unchanged(tmp_path):
     assert_sorted_where_different(beam["curvature_1"], beam["curvature_2"])
 
 
-def test_coarse_run_keeps_sorted_order_and_warns(tmp_path):
+def test_coarse_run_keeps_sorted_order(tmp_path):
     """The referee's case (2026-11-16): launched numerically in vacuum, the
-    curvatures come within about 2% of each other just past the cut-off, and
-    their axes turn by about 60 degrees between output points at the default
-    len_tau. They keep the sorted order there, and the run says so"""
+    curvatures come within about 4% of each other just past the cut-off, and
+    their axes turn by tens of degrees between output points at the default
+    len_tau. They keep the sorted order there. Whether a step turns by more
+    than 40 degrees, and so is reported, depends on where the output points
+    fall relative to the near-crossing (59 degrees on Windows; not reported on
+    the Linux CI), so only the order is checked; the warning is checked in
+    the next test, where the axes turn by 90 degrees within one step"""
     dt = beam_me_up(
-        **synthetic(
-            tmp_path,
-            launch_flag="vacuum_numerical",
-            Psi_BC_flag=None,
-            file_log_level="WARNING",
-        )
+        **synthetic(tmp_path, launch_flag="vacuum_numerical", Psi_BC_flag=None)
     )
-    assert "principal axes of the beam's curvatures" in logged(tmp_path)
     beam = dt["beam"].ds
     assert_sorted_where_different(beam["curvature_1"], beam["curvature_2"])
 
