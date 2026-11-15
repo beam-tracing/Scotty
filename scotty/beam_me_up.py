@@ -755,7 +755,6 @@ def beam_me_up(
         hamiltonian_pos1=hamiltonian_pos1,
         hamiltonian_neg1=hamiltonian_neg1,
         tol_H=1e-2,
-        tol_O_mode_polarisation=0.25,
     )
 
     # Assigning the correct Hamiltonian
