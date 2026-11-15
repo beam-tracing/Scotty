@@ -5,12 +5,12 @@ A spline of degree :math:`k` reproduces polynomials of degree :math:`\le k`, so
 on any grid a quintic (or cubic) spline of a quadratic :math:`\psi` and a
 linear :math:`\mathbf{B}` is exact: the only error left is in solving for the
 spline coefficients. scipy (>= 1.13) solves for them iteratively, and its
-default stops at an absolute residual of 1e-6. The coefficient errors that
-leaves (~1e-5) are amplified by the second derivatives of :math:`\psi`, which
-enter the beam equation: on this grid, with scipy's default, they are off by
-up to 0.012 against values of order 1 (scipy 1.18), and by more on finer
-grids. Without the fix, every test here fails for the quintic spline.
-`geometry.CUBOID_SPLINE_SOLVER_ARGS` tightens the solve.
+default stops at a residual of 1e-5 times the norm of all the grid values.
+The coefficient errors that leaves are amplified by the second derivatives of
+:math:`\psi`, which enter the beam equation: on this grid, with scipy's
+default, they are off by up to 0.012 (quintic) and 0.009 (cubic) against
+values of order 1 (scipy 1.18). Without
+`geometry.CUBOID_SPLINE_SOLVER_ARGS`, every test here fails.
 
 The derivatives are Scotty's own (finite differences of the spline, step
 1e-4 m), which are exact for a quadratic up to rounding, ~1e-16 / 1e-8.
