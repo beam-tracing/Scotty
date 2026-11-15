@@ -102,9 +102,8 @@ def test_B1_curvature_at_the_antenna_is_the_launch_curvature(tmp_path):
         ("curvature_2", -0.25),
     ):
         assert_allclose(beam[name].values[0], value, rtol=1e-6)
-    # B11: width_1 is the larger width at each point, curvature_1 the smaller
-    assert np.all(beam["width_1"].values >= beam["width_2"].values)
-    assert np.all(beam["curvature_1"].values <= beam["curvature_2"].values)
+    # B11: how width_1 and width_2 are labelled is tested in
+    # test_principal_axes.py
 
 
 def test_B12_e_hat_initial_is_field_aligned(tmp_path):

@@ -1152,53 +1152,254 @@ def find_H_Cardano_formula(
     return H_1_Cardano, H_2_Cardano, H_3_Cardano
 
 
+#: Two eigenvalues closer than this, relative to the sum of their sizes, are
+#: taken as equal: their axes are then undefined, and which is which doesn't
+#: matter
+PRINCIPAL_AXES_GAP_TOLERANCE = 1e-4
+#: Two eigenvalues further apart than this (relatively) would visibly change
+#: if exchanged: only there is their order decided, and a poorly resolved
+#: point reported. Closer, as in a nearly circular beam, noise can set the axes
+PRINCIPAL_AXES_GAP_MATTERS = 1e-2
+#: Axes that turn by more than this between consecutive points (in degrees)
+#: are poorly resolved: increase ``len_tau``. (A turn of 34° between output
+#: points happens at the default ``len_tau`` where the curvatures nearly cross
+#: just past the cut-off of ``DBS_synthetic``)
+PRINCIPAL_AXES_MAX_TURN = 40.0
+#: Two eigenvalues are taken to cross (to exchange their order) only where
+#: the matrix, in the axes of the last point where the order was decided, has
+#: an off-diagonal element below this (relative to the sum of the eigenvalues' sizes). They cross only
+#: where the off-diagonal element vanishes, by symmetry (1e-8 to 1e-6 in
+#: ``DBS_synthetic`` with ``B_p_a = 0``). Where they come close without
+#: crossing (an avoided crossing), it is at least half the closest gap,
+#: whatever the step (2e-3 with ``B_p_a = 0.01``), while the turn of the axes in
+#: one step depends on the step
+PRINCIPAL_AXES_CROSSING_COUPLING = 1e-4
+
+
+def follow_principal_axes(
+    eigvals: FloatArray,
+    eigvecs: FloatArray,
+    gap_tolerance: float = PRINCIPAL_AXES_GAP_TOLERANCE,
+    max_turn: float = PRINCIPAL_AXES_MAX_TURN,
+    crossing_coupling: float = PRINCIPAL_AXES_CROSSING_COUPLING,
+) -> Tuple[FloatArray, FloatArray, Array, Array]:
+    r"""Follow the principal axes of a symmetric 2×2 matrix along the beam,
+    so that each eigenvalue stays with its own axis.
+
+    `numpy.linalg.eigh` sorts the eigenvalues at each point, so where two of
+    them cross, the sorted ones exchange axes and each has a cusp there.
+    Here, instead, the eigenvalues are labelled at the point where they differ
+    most relative to their sizes (the smaller first), and the labels are
+    carried from point to point along the beam, in both directions.
+
+    A real symmetric matrix that varies along the beam generically has an
+    avoided crossing rather than a crossing: its eigenvalues come close and
+    turn away, while its axes turn by about 90°. Each eigenvalue then follows
+    its turning axis, which keeps the sorted order. Its eigenvalues cross only
+    where its off-diagonal element also vanishes, which happens by symmetry
+    (for example a beam with no poloidal field and no toroidal launch angle),
+    and there the axes don't turn. So the order of the two eigenvalues is
+    exchanged only where the eigenvectors, matched by the overlaps
+    :math:`|\hat{e}_\mathrm{before} \cdot \hat{e}_\mathrm{now}|`, show that
+    the eigenvalues have crossed, and the matrix, in the axes of the last point
+    where the order was decided, has an off-diagonal element below
+    ``crossing_coupling`` (relative to the sum of the eigenvalues' sizes). Each eigenvector's sign is also chosen to
+    follow on, so the axes are continuous.
+
+    Where the two eigenvalues are equal to within ``gap_tolerance`` (relative
+    to the sum of their sizes), the axes are undefined, and which is which
+    doesn't matter. Where they differ by less than
+    ``PRINCIPAL_AXES_GAP_MATTERS`` (1%), as in a nearly circular beam, noise
+    can set the axes, and exchanging the eigenvalues would hardly change them.
+    There, the order isn't decided: each point takes the labels that follow on
+    from the previous point where the axes were defined, and the order is
+    decided again, against the axes of the last point where it was, where the
+    eigenvalues next differ by more than 1%. The labels can then change from
+    following the axes to the sorted order, a change of under 1% in the
+    eigenvalues.
+
+    Parameters
+    ----------
+    eigvals : (N, 2) FloatArray
+        Eigenvalues at each point, ascending, as from `numpy.linalg.eigh`
+    eigvecs : (N, 2, 2) FloatArray
+        Eigenvectors, as columns, in a frame that varies continuously along
+        the beam
+    gap_tolerance : float
+        Relative difference below which two eigenvalues are taken as equal
+    max_turn : float
+        In degrees: points where the axes turn by more than this from the
+        previous one, where both differ by more than 1%, are marked as poorly
+        resolved. The order is kept there, as at an avoided crossing, unless
+        the coupling shows a true crossing
+    crossing_coupling : float
+        The eigenvalues are taken to cross only where the off-diagonal element
+        in the axes of the last point where the order was decided is below
+        this, relative to their sizes
+
+    Returns
+    -------
+    eigvals, eigvecs : the same, reordered (and the eigenvectors' signs
+        chosen) at each point to follow the axes
+    poorly_resolved : (N,) bool
+        Points where the axes turned too far to be followed reliably
+    defined : (N,) bool
+        Points where the eigenvalues differ, so that the axes are defined
+    """
+    eigvals = np.array(eigvals, dtype=float)
+    eigvecs = np.array(eigvecs, dtype=float)
+    n_points = len(eigvals)
+    poorly_resolved = np.zeros(n_points, dtype=bool)
+
+    # Relative to the sum of their sizes, but not below 1% of its largest
+    # value along the beam: eigenvalues that both pass through zero (the
+    # curvatures where the beam turns from converging to diverging) are then
+    # equal, not far apart
+    size = np.abs(eigvals).sum(axis=1)
+    size = np.maximum(size, 1e-2 * size.max(initial=0.0))
+    gap = np.abs(eigvals[:, 1] - eigvals[:, 0]) / np.where(size > 0, size, 1.0)
+    defined = gap >= gap_tolerance
+    # Only where they differ by this much would exchanging them matter
+    matters = gap >= PRINCIPAL_AXES_GAP_MATTERS
+    if n_points < 2 or not defined.any():
+        # Nothing to follow, or equal everywhere (a circular beam)
+        return eigvals, eigvecs, poorly_resolved, defined
+
+    cos_max_turn = np.cos(np.radians(max_turn))
+
+    # The labels are set where the eigenvalues differ most (for curvatures of
+    # opposite signs, the first such point): the smaller first, as from eigh
+    anchor = int(np.argmax(gap))
+    for step in (1, -1):
+        # The axes where the order was last decided, and at the last point
+        # where they were defined
+        reference = eigvecs[anchor].copy()
+        previous = reference
+        reversed_order = False  # whether the labels are in descending order
+        reference_is_previous = True
+        stop = n_points if step == 1 else -1
+        for i in range(anchor + step, stop, step):
+            if matters[i]:
+                overlap = reference.T @ eigvecs[i]  # (before, now)
+                # The cosines of the turn of the axes since the reference, if
+                # labelled in ascending order here, and if in descending order
+                cos_ascending = 0.5 * (abs(overlap[0, 0]) + abs(overlap[1, 1]))
+                cos_descending = 0.5 * (abs(overlap[0, 1]) + abs(overlap[1, 0]))
+                cos_kept, cos_exchanged = (
+                    (cos_descending, cos_ascending)
+                    if reversed_order
+                    else (cos_ascending, cos_descending)
+                )
+                # The off-diagonal element of the matrix in the reference axes
+                coupling = abs(np.sum(overlap[0] * overlap[1] * eigvals[i])) / size[i]
+                crossed = cos_exchanged > cos_kept and coupling < crossing_coupling
+                descending = reversed_order != crossed
+                cos_turn = cos_exchanged if crossed else cos_kept
+                # Only a turn between consecutive points says they are too far
+                # apart; after a nearly circular stretch, the axes may have
+                # turned by anything
+                if reference_is_previous and cos_turn < cos_max_turn:
+                    poorly_resolved[i] = True
+            else:
+                # Nearly equal eigenvalues: whichever follows on from the
+                # previous point
+                overlap = previous.T @ eigvecs[i]
+                descending = abs(overlap[0, 1]) + abs(overlap[1, 0]) > abs(
+                    overlap[0, 0]
+                ) + abs(overlap[1, 1])
+            if descending:
+                eigvals[i] = eigvals[i, ::-1]
+                eigvecs[i] = eigvecs[i][:, ::-1]
+            # Follow on in sign, too
+            signs = np.sign(np.sum(previous * eigvecs[i], axis=0))
+            eigvecs[i] *= np.where(signs == 0, 1.0, signs)
+            if defined[i]:
+                previous = eigvecs[i].copy()
+            reference_is_previous = bool(matters[i])
+            if matters[i]:
+                reversed_order = descending
+                reference = previous
+    return eigvals, eigvecs, poorly_resolved, defined
+
+
 def find_beam_widths_and_curvs(
-    Psi_w: ComplexFloatArray, K_vec: FloatArray, g_hat: FloatArray
+    Psi_w: ComplexFloatArray,
+    K_vec: FloatArray,
+    g_hat: FloatArray,
+    return_axes: bool = False,
 ):
     r"""
-    Calculate the beam widths and curvatures
+    Calculate the beam widths and curvatures, each followed along its own
+    principal axis (`follow_principal_axes`)
 
     Parameters
     ----------
     Psi_w : (2,2) or (N,2,2) ComplexFloatArray
-        The beam matrix
+        The beam matrix, in the beam frame :math:`(\hat{x}, \hat{y})`
     K_vec : (3,) or (N,3) FloatArray
         The wavevector
     g_hat : (3,) or (N,3) FloatArray
         The group velocity unit vector
+    return_axes : bool
+        Also return the axes, and where following them was ambiguous
 
     Returns
     ----------
-    curv1 : float or (N,) FloatArray
-        The smaller curvature at each point, from the smaller eigenvalue of
-        :math:`\mathrm{Re}(\Psi_w)`
-    curv2 : float or (N,) FloatArray
-        The larger curvature
-    width1 : float or (N,) FloatArray
-        The larger width at each point, from the smaller eigenvalue of
-        :math:`\mathrm{Im}(\Psi_w)`
-    width2 : float or (N,) FloatArray
-        The smaller width
+    curv1, curv2 : float or (N,) FloatArray
+        The curvatures, from the eigenvalues of :math:`\mathrm{Re}(\Psi_w)`.
+        ``curv1`` is the smaller where the two differ most, and each then
+        follows its own axis
+    width1, width2 : float or (N,) FloatArray
+        The widths, from the eigenvalues of :math:`\mathrm{Im}(\Psi_w)`.
+        ``width1`` is the larger where the two differ most, and each then
+        follows its own axis, so where the widths cross (by symmetry),
+        ``width1`` becomes the smaller one. Which width is ``width1`` is set
+        in each run, so in a scan where the widths cross, it can differ
+        between neighbouring runs
+    curv_axes, width_axes : (N,2,2) FloatArray
+        Only with ``return_axes``: the axes of ``curv1``, ``curv2`` and of
+        ``width1``, ``width2``, as columns in the beam frame; NaN where the
+        two eigenvalues are equal (to ``PRINCIPAL_AXES_GAP_TOLERANCE``), so
+        that the axes are undefined
+    curv_poorly_resolved, width_poorly_resolved : (N,) bool
+        Only with ``return_axes``: points where the axes turned too far
+        between points to be followed reliably
 
-    The values are sorted at each point; they are not followed along fixed
-    axes, so ``width1`` and ``width2`` exchange axes where the widths cross.
-    The axes of the curvatures and of the widths are in general different.
+    The axes of the curvatures and of the widths are in general different:
+    ``curv1`` is not along ``width1``.
+
+    .. versionchanged:: 4.0.0
+       The widths and curvatures follow their axes; they were sorted at each
+       point, so they exchanged axes, with a cusp, where they crossed
     """
 
     Re_Psi_w = np.real(Psi_w)
     Re_Psi_w_eigvals, Re_Psi_w_eigvecs = np.linalg.eigh(Re_Psi_w)  # (N,2) and (N,2,2)
-    K_mag = np.linalg.norm(K_vec, axis=1)
-    K_g_mag = np.sum(K_vec * g_hat, axis=1)
-    curvs = np.squeeze((K_g_mag**2 / K_mag**3)[:, np.newaxis] * Re_Psi_w_eigvals)
-
     Im_Psi_w = np.imag(Psi_w)
     Im_Psi_w_eigvals, Im_Psi_w_eigvecs = np.linalg.eigh(Im_Psi_w)
-    widths = np.squeeze(np.sqrt(np.full(Im_Psi_w_eigvals.shape, 2) / Im_Psi_w_eigvals))
 
-    if curvs.ndim == 1:
-        return curvs[0], curvs[1], widths[0], widths[1]
+    if Re_Psi_w_eigvals.ndim == 2:
+        Re_Psi_w_eigvals, Re_Psi_w_eigvecs, curv_poor, curv_defined = (
+            follow_principal_axes(Re_Psi_w_eigvals, Re_Psi_w_eigvecs)
+        )
+        Im_Psi_w_eigvals, Im_Psi_w_eigvecs, width_poor, width_defined = (
+            follow_principal_axes(Im_Psi_w_eigvals, Im_Psi_w_eigvecs)
+        )
+        # Where the eigenvalues are equal, the axes are undefined
+        Re_Psi_w_eigvecs[~curv_defined] = np.nan
+        Im_Psi_w_eigvecs[~width_defined] = np.nan
     else:
-        return curvs[:, 0], curvs[:, 1], widths[:, 0], widths[:, 1]
+        curv_poor = width_poor = np.zeros(1, dtype=bool)
+
+    K_mag = np.linalg.norm(K_vec, axis=-1)
+    K_g_mag = np.sum(K_vec * g_hat, axis=-1)
+    curvs = (np.asarray(K_g_mag**2 / K_mag**3)[..., np.newaxis]) * Re_Psi_w_eigvals
+    widths = np.sqrt(2 / Im_Psi_w_eigvals)
+
+    values = (curvs[..., 0], curvs[..., 1], widths[..., 0], widths[..., 1])
+    if not return_axes:
+        return values
+    return values + (Re_Psi_w_eigvecs, Im_Psi_w_eigvecs, curv_poor, width_poor)
 
 
 ##################################################

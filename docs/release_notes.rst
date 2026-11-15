@@ -127,10 +127,42 @@ Presets
 Outputs
 ~~~~~~~
 
-- ``width_1`` is the larger width at each point and ``width_2`` the smaller;
-  ``curvature_1`` is the smaller curvature and ``curvature_2`` the larger. They
-  are sorted at each point, not followed along fixed axes. The function meant to
+- ``width_1`` and ``width_2`` each follow their own principal axis of
+  :math:`\mathrm{Im}(\Psi_w)` along the beam, and so do ``curvature_1`` and
+  ``curvature_2`` for :math:`\mathrm{Re}(\Psi_w)`
+  (`scotty.fun_general.follow_principal_axes`). ``width_1`` is the larger width,
+  and ``curvature_1`` the smaller curvature, where the two differ most; from
+  there the axes are matched from point to point by the overlaps of their
+  eigenvectors. Before, the values were sorted at each point, so where the
+  widths crossed they exchanged axes, each with a cusp. The function meant to
   follow them, ``check_eigval_order``, did nothing and is removed.
+
+  The widths really cross only where :math:`\Psi_{xy}` vanishes too, by
+  symmetry (for example with no poloidal field and no toroidal launch angle),
+  and there their axes don't turn. Otherwise they come close and turn away
+  while the axes turn by about 90° (an avoided crossing), and each width
+  follows its turning axis: then the labels are the sorted ones, as before. So
+  the order of the two is exchanged only where, in the axes of the last point
+  where the order was decided, the off-diagonal element is below 1e-4 of the
+  size: true crossings give 1e-8 to 1e-6, and an avoided crossing at least half
+  its closest gap, however coarse the output steps. Widths within 1e-4 of each other (relative) are
+  taken as equal, and the axes undefined. Where they are within 1%, as in a
+  nearly circular beam, noise can set the axes, and exchanging the widths would
+  hardly change them: there the labels follow the axes from point to point,
+  and the order isn't decided. Where the axes turn by more than 40° between
+  consecutive output points that both differ by more than 1%, a warning says so
+  (increase ``len_tau``), and the order is kept there unless the coupling shows
+  a true crossing.
+
+  Which width is ``width_1`` is set in each run. In a scan where the widths
+  cross, it can be the larger in one run and the smaller in the next.
+- The axes are saved as Cartesian unit vectors: ``width_1_direction``,
+  ``width_2_direction``, ``curvature_1_direction`` and
+  ``curvature_2_direction``, NaN where the two widths (or curvatures) are equal
+  and the axes undefined, as for a circular beam. The axes of the widths and of
+  the curvatures are in general different.
+- `scotty.fun_general.find_beam_widths_and_curvs` works for a single beam
+  matrix too (it raised an error before).
 - ``solver/e_hat_initial`` is labelled with ``col_field`` = (u1, u2, b), the
   basis it is in, instead of ``col_cart``.
 - ``solver/mode_index`` (the traced root of the dispersion tensor where the
