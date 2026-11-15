@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 from abc import ABC, abstractmethod
+import inspect
 import json
 from multiprocessing.managers import ValueProxy
 import numpy as np
@@ -138,17 +139,37 @@ def _make_rect_spline_derivatives(
     )
 
 
+CUBOID_SPLINE_SOLVER_ARGS = {"rtol": 1e-12, "atol": 0.0}
+"""Tolerances for the sparse solve that gives the coefficients of the 3D
+``"slinear"``, ``"cubic"`` and ``"quintic"`` splines of
+`InterpolatedField_Cartesian`. scipy's own default (an absolute ``atol`` of
+1e-6 for `scipy.sparse.linalg.gcrotmk`) leaves coefficient errors of order
+1e-5, which the second derivatives of the poloidal flux amplify to several
+percent, more on finer grids. If the solve does not reach these tolerances,
+scipy raises a ``ValueError`` rather than returning a poor spline."""
+
+# scipy >= 1.13 builds these splines by a sparse solve and takes `solver_args`;
+# older versions build them recursively, with nothing to set
+_RGI_TAKES_SOLVER_ARGS = (
+    "solver_args" in inspect.signature(RegularGridInterpolator).parameters
+)
+
+
 @timer
 def _make_cuboid_spline(
     X_coord, Y_coord, Z_coord, data_array, interp_order_str: str
 ) -> Tuple[
     Callable[[ArrayLike, ArrayLike, ArrayLike], FloatArray], RegularGridInterpolator
 ]:
+    solver = {}
+    if _RGI_TAKES_SOLVER_ARGS and interp_order_str in ("slinear", "cubic", "quintic"):
+        solver["solver_args"] = dict(CUBOID_SPLINE_SOLVER_ARGS)
     spline = RegularGridInterpolator(
         points=(X_coord, Y_coord, Z_coord),
         values=data_array,
         method=interp_order_str,
         bounds_error=False,
+        **solver,
     )
     return lambda X, Y, Z: spline((X, Y, Z)), spline
 
