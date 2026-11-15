@@ -38,6 +38,7 @@ except ImportError:  # only the 3D plots need plotly
             )
 
     pgo = pio = _MissingPlotly()
+from scotty.data_io import beam_group
 from scotty.geometry import (
     InterpolatedField_Cartesian,
     MagneticField_Cartesian,
@@ -107,7 +108,7 @@ def _beam_edges(
     if "Psi_3D_output_labframe_cartesian" not in so:
         return None
     q = np.stack(beam_path_cartesian(dt), axis=-1)
-    g_hat = dt["beam"]["g_hat_cartesian"].values
+    g_hat = beam_group(dt)["g_hat_cartesian"].values
     Psi = so["Psi_3D_output_labframe_cartesian"].values
     W_vec = np.cross(g_hat, orthogonal_dirs)
     W_hat = W_vec / np.linalg.norm(W_vec, axis=-1, keepdims=True)
@@ -194,13 +195,13 @@ def plot_dispersion_relation(
 
     ``dt`` is the output of `beam_me_up`."""
     ax = maybe_make_axis(ax)
-    l_lc = dt["beam"]["beam_path_length_wrt_cutoff"].values
+    l_lc = beam_group(dt)["beam_path_length_wrt_cutoff"].values
 
     styles = [("pink", "lightgreen", "gray"), ("k", "r", "g")]
     for (name, linestyle), colours in zip(
         (("H_eigvals", "-"), ("H_Cardano", ":")), styles
     ):
-        values = np.abs(np.asarray(dt["beam"][name].values))
+        values = np.abs(np.asarray(beam_group(dt)[name].values))
         for i, colour in enumerate(colours):
             ax.plot(
                 l_lc,
