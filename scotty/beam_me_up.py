@@ -177,9 +177,7 @@ def beam_me_up(
     len_tau: int = 4002,
     rtol: float = 1e-4,  # for solve_ivp of the ray/beam solvers
     atol: float = 1e-7,  # for solve_ivp of the ray/beam solvers
-    poloidal_flux_enter: Optional[
-        float
-    ] = None,  # None: where the density starts
+    poloidal_flux_enter: Optional[float] = None,  # None: where the density starts
     poloidal_flux_zero_density: Optional[
         float
     ] = None,  # Deprecated: when polflux >= this, Scotty sets density = 0
