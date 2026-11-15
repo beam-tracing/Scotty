@@ -663,8 +663,9 @@ def find_epsilon_terms(
             1 - normalised_plasma_ang_freq**2 / (1 - normalised_gyro_ang_freq**2)
         )
     if g:
+        # -X Y / (1 - Y^2), as in `hamiltonian.DielectricTensor`
         toreturn.append(
-            normalised_plasma_ang_freq**2
+            -(normalised_plasma_ang_freq**2)
             * normalised_gyro_ang_freq
             / (1 - normalised_gyro_ang_freq**2)
         )

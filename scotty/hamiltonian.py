@@ -52,7 +52,13 @@ class DielectricTensor:
 
         self._epsilon_bb = 1 - plasma_freq_2
         self._epsilon_11 = 1 - plasma_freq_2 / (1 - gyro_freq_2)
-        self._epsilon_12 = plasma_freq_2 * gyro_freq / (1 - gyro_freq_2)
+        # With fields ~ exp(-i Omega t) and electrons of charge -e (e > 0, so
+        # that gyro_freq Y > 0), the dielectric tensor contains
+        # -i X Y / (1 - Y^2) b_hat x I. D (in `find_H_Cardano_eigh`) is
+        # written with +i epsilon_12 b_hat x I, so epsilon_12 = -X Y / (1 - Y^2)
+        # (negative for Y < 1). Hall-Chen, Parra & Hillesheim (2022) define it
+        # with the opposite sign, eqs. (2) and (35)
+        self._epsilon_12 = -plasma_freq_2 * gyro_freq / (1 - gyro_freq_2)
 
     @property
     def e_bb(self) -> ArrayLike:

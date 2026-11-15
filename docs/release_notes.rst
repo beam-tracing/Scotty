@@ -44,6 +44,25 @@ Results that change
   density) is then refused by the continuous condition, and the error says
   what to use. Before, such a script failed on the negative density the spline
   extrapolated to.
+- :math:`\epsilon_{12}` (``epsilon_g``) has the opposite sign:
+  :math:`\epsilon_{12} = -XY/(1 - Y^2)`, with :math:`Y = eB/(m_e\Omega) > 0`
+  (the electron charge stays unsigned), negative for :math:`Y < 1`. With fields
+  :math:`\propto \exp(-i\Omega t)`, the electrons, of charge :math:`-e`, give
+  the dielectric tensor a term
+  :math:`-i[XY/(1 - Y^2)]\hat{\mathbf{b}}\times\mathbf{1}`, which Scotty
+  writes as :math:`+i\epsilon_{12}\hat{\mathbf{b}}\times\mathbf{1}`. Before, the
+  polarisations were the complex conjugates of the right ones: along
+  :math:`\mathbf{B}`, :math:`\hat{\mathbf{u}}_1 + i\hat{\mathbf{u}}_2`, which
+  rotates with the electrons, was given to the wave with
+  :math:`N^2 = 1 - X/(1 + Y)`, instead of the one with :math:`N^2 = 1 - X/(1 -
+  Y)` that resonates at :math:`Y \to 1`. Hall-Chen, Parra & Hillesheim (2022),
+  eqs. (2) and (35), have the same sign error. The
+  dispersion relation depends only on :math:`\epsilon_{12}^2`, so the rays, the
+  beams, the widths, the curvatures and the DBS weighting (``filterfun_p``,
+  which depends only on :math:`|\hat{\mathbf{e}}^* \cdot (\boldsymbol{\epsilon}
+  - \mathbf{1}) \cdot \hat{\mathbf{e}}|`) are unchanged. ``epsilon_g`` changes
+  sign, and ``e_hat``, ``e_eigvecs`` and ``solver/e_hat_initial`` become their
+  complex conjugates (up to an overall sign, which was arbitrary before too).
 - ``get_parameters_for_Scotty("DBS_synthetic", launch_freq_GHz)`` uses the
   frequency given; it returned 55 GHz whatever was given. Presets that need a
   frequency raise a clear error without one.
