@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0
 
 from abc import ABC, abstractmethod
+import inspect
 import json
 from multiprocessing.managers import ValueProxy
 import numpy as np
@@ -138,18 +139,53 @@ def _make_rect_spline_derivatives(
     )
 
 
+CUBOID_SPLINE_SOLVER_ARGS = {"rtol": 1e-12, "atol": 0.0}
+"""Tolerances for the sparse solve that gives the coefficients of the 3D
+``"slinear"``, ``"cubic"`` and ``"quintic"`` splines of
+`InterpolatedField_Cartesian`. scipy solves for them iteratively with
+`scipy.sparse.linalg.gcrotmk`, whose default stops once the residual is below
+``rtol * ||b||`` with ``rtol = 1e-5`` and ``b`` all the grid values (so the
+threshold grows with the size of the grid and the scale of the data). The
+coefficient errors that leaves are amplified by the second derivatives of the
+poloidal flux, to several percent for a tokamak field on a 2-4 cm grid.
+``atol`` must be 0 too: scipy otherwise sets it to 1e-6. If the solve does not
+reach these tolerances, `_make_cuboid_spline` raises an error rather than
+returning a poor spline."""
+
+# scipy >= 1.13 builds these splines by a sparse solve and takes `solver_args`;
+# older versions build them recursively, with nothing to set
+_RGI_TAKES_SOLVER_ARGS = (
+    "solver_args" in inspect.signature(RegularGridInterpolator).parameters
+)
+
+
 @timer
 def _make_cuboid_spline(
     X_coord, Y_coord, Z_coord, data_array, interp_order_str: str
 ) -> Tuple[
     Callable[[ArrayLike, ArrayLike, ArrayLike], FloatArray], RegularGridInterpolator
 ]:
-    spline = RegularGridInterpolator(
-        points=(X_coord, Y_coord, Z_coord),
-        values=data_array,
-        method=interp_order_str,
-        bounds_error=False,
-    )
+    solver = {}
+    if _RGI_TAKES_SOLVER_ARGS and interp_order_str in ("slinear", "cubic", "quintic"):
+        solver["solver_args"] = dict(CUBOID_SPLINE_SOLVER_ARGS)
+    try:
+        spline = RegularGridInterpolator(
+            points=(X_coord, Y_coord, Z_coord),
+            values=data_array,
+            method=interp_order_str,
+            bounds_error=False,
+            **solver,
+        )
+    except ValueError as error:
+        if not solver:
+            raise
+        raise ValueError(
+            "The sparse solve for the 3D spline coefficients did not reach the "
+            f"tolerances in `geometry.CUBOID_SPLINE_SOLVER_ARGS` "
+            f"({CUBOID_SPLINE_SOLVER_ARGS}). Loosening them makes the second "
+            "derivatives of the poloidal flux inaccurate; a smoother or coarser "
+            "grid may converge instead"
+        ) from error
     return lambda X, Y, Z: spline((X, Y, Z)), spline
 
 
