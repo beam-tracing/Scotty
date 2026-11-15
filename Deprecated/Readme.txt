@@ -1,1 +1,0 @@
-This folder is for scripts that are no longer used. After some time, they will be removed from the repository.

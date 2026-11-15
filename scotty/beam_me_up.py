@@ -20,7 +20,7 @@ Notes
   ``None`` (density continuous and flat at the edge, so :math:`K` and
   :math:`\\Psi` carry straight over from vacuum; this is checked, and an
   error suggests ``"continuous"`` if the profile is not zero with zero
-  gradient at ``poloidal_flux_zero_density``). This is v3's
+  gradient where the beam enters). This is v3's
   ``vacuumLaunch_flag=True`` with ``vacuum_propagation_flag=True``.
 - ``launch_flag="vacuum_numerical"`` launches the beam in vacuum and starts
   the solvers at the antenna, so the beam is integrated numerically through
@@ -173,11 +173,13 @@ def beam_me_up(
     len_tau: int = 4002,
     rtol: float = 1e-4,  # for solve_ivp of the ray/beam solvers
     atol: float = 1e-7,  # for solve_ivp of the ray/beam solvers
-    poloidal_flux_enter: float = 1.0,
-    poloidal_flux_zero_density: float = 1.0,  # When polflux >= poloidal_flux_zero_density, Scotty sets density = 0
+    poloidal_flux_enter: Optional[float] = None,  # None: where the density starts
+    poloidal_flux_zero_density: Optional[
+        float
+    ] = None,  # Deprecated: when polflux >= this, Scotty sets density = 0
     poloidal_flux_zero_temperature: Optional[
         float
-    ] = None,  # Temperature analogue of poloidal_flux_zero_density; None: the same
+    ] = None,  # Deprecated: temperature analogue of poloidal_flux_zero_density
     # Data input and output arguments
     magnetic_data_path: PathLike = pathlib.Path("."),
     ne_data_path: PathLike = pathlib.Path("."),
@@ -206,8 +208,6 @@ def beam_me_up(
     ] = None,  # For returning log messages on a log file
     # Plotting flags
     figure_flag: bool = False,
-    further_analysis_flag: bool = False,
-    detailed_analysis_flag: bool = True,
     # Additional flags
     ray_tracing_flag: bool = False,
     return_dt_field: bool = False,  # For returning the datatree, field class
@@ -237,8 +237,9 @@ def beam_me_up(
     poloidal_launch_angle_Torbeam : float
         Poloidal launch angle in degrees, in the TORBEAM convention
     toroidal_launch_angle_Torbeam : float
-        Toroidal launch angle in degrees, in the TORBEAM convention. The
-        antenna is at :math:`\zeta = 0` (:math:`Y = 0`)
+        Toroidal launch angle in degrees, in the TORBEAM convention. Both
+        angles are measured from the local :math:`R` direction at the antenna,
+        so they mean the same for an antenna at any :math:`\zeta`
     launch_freq_GHz : float
         Beam frequency in GHz
     launch_beam_width : float
@@ -250,8 +251,8 @@ def beam_me_up(
         m⁻¹ (negative for a converging beam). A 2-tuple or 3-tuple is reserved,
         as for ``launch_beam_width``
     launch_position : array_like, shape (3,)
-        Antenna position: :math:`(R, \zeta, Z)` for ``geometry="cylindrical"``
-        (with :math:`\zeta = 0`), :math:`(X, Y, Z)` for ``"cartesian"``. For
+        Antenna position: :math:`(R, \zeta, Z)` for ``geometry="cylindrical"``,
+        :math:`(X, Y, Z)` for ``"cartesian"``. For
         ``launch_flag="plasma"``, where the solvers start, inside the plasma
     mode_flag : {1, -1, "O", "X"}
         Which root of the Booker quadratic to trace: 1 or -1 directly, or
@@ -357,16 +358,44 @@ def beam_me_up(
         applies to :math:`q` as given, and to :math:`K` and :math:`\Psi` scaled
         by :math:`|K|` and :math:`\max|\Psi|` at the initial point (the first
         point in the plasma)
-    poloidal_flux_enter : float, default 1.0
+    poloidal_flux_enter : float, optional
         Normalised poloidal flux of the plasma boundary: where the beam
-        enters the plasma, and where the ray is stopped when it leaves
-    poloidal_flux_zero_density : float, default 1.0
+        enters the plasma, and where the ray is stopped when it leaves.
+        ``None`` (the default) is where the density starts, going in from
+        its zero point, so that the boundary condition is applied there: at a
+        density that jumps there, ``"discontinuous"``; at a kink (zero density
+        with a finite gradient), ``"continuous"`` or ``"discontinuous"``; at a
+        density that starts with zero gradient, any of them. The beam must not
+        cross the start of the density, or any other zero of it, inside the
+        plasma, where no boundary condition is applied: this is checked. The
+        simplest choice, which needs no knowledge of the edge, is
+        ``"discontinuous"`` with ``poloidal_flux_enter`` slightly inside where
+        the density starts (0.01 inside, say): the thin layer left outside is
+        treated as vacuum, which changes little where the edge density is
+        small.
+
+        .. versionchanged:: 4.0.0
+           The default was 1.0
+    poloidal_flux_zero_density : float, optional
         At and above this normalised poloidal flux, the electron density is
-        zero. Must be at least ``poloidal_flux_enter``
+        zero. Must be at least ``poloidal_flux_enter``. ``None`` (the default)
+        uses the zero point of ``density_fit_method`` when that is a profile
+        object (such as `scotty.profile_fit.QuadraticFit`), and 1.0 otherwise.
+        If it is given with a profile object, it must agree with the
+        profile's zero point.
+
+        .. deprecated:: 4.0.0
+           Give the zero point to the profile object instead (the first
+           argument of the fits in `scotty.profile_fit`). It will be removed
+           after Scotty 4.x
     poloidal_flux_zero_temperature : float, optional
         Temperature analogue of ``poloidal_flux_zero_density``; ``None`` (the
-        default) uses ``poloidal_flux_zero_density``. If given, must be at
-        least ``poloidal_flux_enter``
+        default) uses the zero point of ``temperature_fit_method`` when that is
+        a profile object, and ``poloidal_flux_zero_density`` otherwise. If
+        given, must be at least ``poloidal_flux_enter``.
+
+        .. deprecated:: 4.0.0
+           As ``poloidal_flux_zero_density``
     magnetic_data_path, ne_data_path, Te_data_path : str or pathlib.Path, default "."
         Directories of the magnetic field, electron density and electron
         temperature files
@@ -411,12 +440,9 @@ def beam_me_up(
         Level of the log messages written to a log file in ``output_path``;
         ``None`` for no log file
     figure_flag : bool, default False
-        Stored in the output's inputs. v4 does not make figures here, so
-        ``True`` only logs a warning; see `scotty.plotting`
-    further_analysis_flag : bool, default False
-        Stored in the output's inputs
-    detailed_analysis_flag : bool, default True
-        Stored in the output's inputs
+        Stored in the output's inputs. v4 does not make figures here yet, so
+        ``True`` only logs a warning; see `scotty.plotting`. Separate flags for
+        separate figures may come later
     ray_tracing_flag : bool, default False
         Trace only the ray, with no beam (v3's ``quick_run``; see
         `scotty.compat.quick_cutoff`)
@@ -496,8 +522,6 @@ def beam_me_up(
         interp_smoothing=interp_smoothing,
         # Plotting flags
         figure_flag=figure_flag,
-        further_analysis_flag=further_analysis_flag,
-        detailed_analysis_flag=detailed_analysis_flag,
         # Additional flags
         ray_tracing_flag=ray_tracing_flag,
         # return_dt_field = return_dt_field,
@@ -548,8 +572,6 @@ def beam_me_up(
     #   - Psi_BC_flag = {params.Psi_BC_flag}
     #   - relativistic flag = {params.relativistic_flag}
     #   - figure flag = {params.figure_flag}
-    #   - further_analysis flag = {params.further_analysis_flag}
-    #   - detailed_analysis flag = {params.detailed_analysis_flag}
     #
     ##################################################
     """)
@@ -566,6 +588,7 @@ def beam_me_up(
         parameters=params.density_fit_parameters,
         filename=params.ne_filename,
     )
+    params.set_poloidal_flux_enter(density_fit)
 
     # Using the temperature data, create a fit as a function of poloidal
     # flux, i.e. temperature_fit(poloidal_flux) = temperature. Only used for
@@ -709,11 +732,9 @@ def beam_me_up(
         field=field,
         K_plasmaLaunch_cartesian=params.K_plasmaLaunch_cartesian,
         Psi_3D_plasmaLaunch_labframe_cartesian=params.Psi_3D_plasmaLaunch_labframe_cartesian,
-        poloidal_flux_zero_density=params.poloidal_flux_zero_density,
         hamiltonian_pos1=hamiltonian_pos1,
         hamiltonian_neg1=hamiltonian_neg1,
         tol_H=1e-2,
-        tol_O_mode_polarisation=0.25,
     )
 
     # Assigning the correct Hamiltonian

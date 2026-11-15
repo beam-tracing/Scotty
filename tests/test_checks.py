@@ -7,13 +7,23 @@ import pytest
 from scotty.beam_me_up import beam_me_up
 from scotty.checks import Parameters
 from scotty.init_bruv import get_parameters_for_Scotty
+from scotty.profile_fit import QuadraticFit
 
 
-def _check_flux(enter, zero_density, zero_temperature):
-    # The checks only use the class's helper methods, so no full Parameters set-up is needed
+def _check_flux(enter, zero_density, zero_temperature, relativistic=True):
+    # The checks only use the class's helper methods, so no full Parameters set-up is needed.
+    # The temperature is checked only for relativistic runs, which use it
     return Parameters._check_poloidal_flux_arguments(
-        Parameters.__new__(Parameters), enter, zero_density, zero_temperature, False
+        Parameters.__new__(Parameters),
+        enter,
+        zero_density,
+        zero_temperature,
+        relativistic,
     )
+
+
+def test_poloidal_flux_zero_temperature_unchecked_without_relativity():
+    assert _check_flux(1.3, 1.3, 1.0, relativistic=False) == (1.3, 1.3, 1.0)
 
 
 def test_poloidal_flux_equal_values_accepted():
@@ -91,8 +101,10 @@ def test_poloidal_flux_zero_temperature_none_in_a_run(tmp_path):
     dt = beam_me_up(
         **_synthetic(
             tmp_path,
+            density_fit_method=QuadraticFit(1.05, 4.0),
             poloidal_flux_zero_density=1.05,
             poloidal_flux_zero_temperature=None,
+            poloidal_flux_enter=1.05,
         )
     )
     assert float(dt["inputs"]["poloidal_flux_zero_temperature"]) == 1.05
@@ -103,7 +115,6 @@ def test_poloidal_flux_zero_temperature_none_in_a_run(tmp_path):
     [
         ("interp_smoothing", 0),
         ("find_B_method", "torbeam"),
-        ("detailed_analysis_flag", True),
     ],
 )
 def test_defaults_are_v3s(name, v3_default):

@@ -1709,7 +1709,7 @@ def test_launch_golden_answer(tmp_path, generator):
 
     density_fit = make_fit(
         args["density_fit_method"],
-        args["poloidal_flux_zero_density"],
+        args.get("poloidal_flux_zero_density", 1.0),
         parameters,
         ne_filename,
     )
@@ -1729,7 +1729,7 @@ def test_launch_golden_answer(tmp_path, generator):
         args["launch_position"],
         "vacuum_analytic",
         field,
-        args["poloidal_flux_enter"],
+        args.get("poloidal_flux_enter", 1.0),  # where the density starts
     )
 
     (
@@ -1890,7 +1890,7 @@ def test_find_plasma_entry_position(
 ):
     args = generator(tmp_path)
     field = make_field(args)
-    poloidal_flux_enter = args["poloidal_flux_enter"]
+    poloidal_flux_enter = args.get("poloidal_flux_enter", 1.0)
 
     # The launch angles above are in radians, but v4 takes degrees
     entry_position = find_plasma_entry_position(
