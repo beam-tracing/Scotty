@@ -78,10 +78,14 @@ def test_unset_arguments_get_v3_defaults():
     assert kw["delta_R"] == -1e-4
     assert kw["delta_Z"] == 1e-4
     # v3's defaults are v4's again, so they are not set
-    assert "interp_smoothing" not in kw
+    for name in ("interp_smoothing", "interp_order"):
+        assert not [key for key in kw if key.startswith(name)]
     # v4 has no defaults for these, so v3's are set
     assert kw["find_B_method"] == "torbeam"
     assert kw["density_fit_method"] == "smoothing-spline-file"
+    # v3's files in v3's default folder "."
+    assert kw["magnetic_data_path"] == pathlib.Path("topfile")
+    assert kw["ne_data_path"] == pathlib.Path("ne.dat")
     assert "temperature_fit_method" not in kw
     # v3's 1.01, raised to poloidal_flux_enter as v4 requires
     assert kw["poloidal_flux_zero_density"] == 1.2
@@ -101,10 +105,13 @@ def test_explicit_arguments_kept_and_idempotent():
     for name in (
         "launch_flag",
         "Psi_BC_flag",
-        "interp_smoothing",
         "poloidal_flux_zero_density",
     ):
         assert kw[name] == given[name]
+    # v3's one smoothing, for the field and for the density file
+    assert kw["interp_smoothing_magnetic"] == 3
+    assert kw["interp_smoothing_ne"] == 3
+    assert "interp_smoothing" not in kw
     assert from_v3_kwargs(kw) == kw
 
 
@@ -253,7 +260,6 @@ def test_v3_script_gives_same_result_as_v4(tmp_path):
     v4 = get_parameters_for_Scotty("DBS_synthetic")
     v4.update(
         len_tau=52,
-        interp_smoothing=0,
         delta_R=-1e-4,
         delta_Z=1e-4,
         rtol=1e-3,
@@ -295,7 +301,7 @@ def test_v3_arguments_point_to_the_converter(caplog):
 @pytest.fixture(scope="module")
 def v4_output(tmp_path_factory):
     kwargs = get_parameters_for_Scotty("DBS_synthetic")
-    kwargs.update(len_tau=52, interp_smoothing=0)
+    kwargs.update(len_tau=52)
     path = tmp_path_factory.mktemp("v4")
     beam_me_up(**kwargs, output_path=path)
     return next(path.glob("*.h5"))

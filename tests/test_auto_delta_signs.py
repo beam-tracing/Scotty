@@ -58,9 +58,7 @@ def test_boundary_condition_independent_of_step_sign(tmp_path):
     psi = {}
     for sign in (1, -1):
         kwargs = get_parameters_for_Scotty("DBS_synthetic")
-        kwargs.update(
-            len_tau=52, interp_smoothing=0, delta_R=sign * 1e-5, delta_Z=sign * 1e-5
-        )
+        kwargs.update(len_tau=52, delta_R=sign * 1e-5, delta_Z=sign * 1e-5)
         out = beam_me_up(
             **kwargs, output_path=tmp_path, output_filename_suffix=f"_{sign}"
         )

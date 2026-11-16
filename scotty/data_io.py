@@ -74,22 +74,23 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "poloidal_flux_zero_temperature": params.poloidal_flux_zero_temperature,
         # Data input and output arguments
         "find_B_method": str(params.find_B_method),
+        # The paths of the files that the run read, as strings ("None" for
+        # none), since netCDF cannot store `None`
         "magnetic_data_path": str(params.magnetic_data_path),
-        "magnetic_data_interp_order": params.interp_order_magnetic_data_int,
+        "interp_order_magnetic": params.interp_order_magnetic,  # int
+        "interp_smoothing_magnetic": params.interp_smoothing_magnetic,
         "ne_data_path": str(params.ne_data_path),
-        "ne_data_interp_order": params.interp_order_ne_data,  # int
+        "interp_order_ne": params.interp_order_ne,
+        "interp_smoothing_ne": params.interp_smoothing_ne,
         # "density_fit_parameters": params.density_fit_parameters, # TODO: netCDF cannot serialise (int, WindowsPath)
         # As strings, since the methods can be ProfileFit objects, which
         # netCDF cannot serialise (as for `find_B_method` above)
         "density_fit_method": str(params.density_fit_method),
         "Te_data_path": str(params.Te_data_path),
-        "Te_data_interp_order": params.interp_order_Te_data,
+        "interp_order_Te": params.interp_order_Te,
+        "interp_smoothing_Te": params.interp_smoothing_Te,
         # "temperature_fit_parameters": params.temperature_fit_parameters, # TODO: netCDF cannot serialise (int, WindowsPath)
         "temperature_fit_method": str(params.temperature_fit_method),
-        "interp_smoothing": params.interp_smoothing,
-        "shot": params.shot,
-        "equil_time": params.equil_time,
-        "input_filename_suffix": params.input_filename_suffix,
         "output_path": str(params.output_path),
         "output_filename_suffix": params.output_filename_suffix,
         # Plotting arguments

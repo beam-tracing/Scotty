@@ -7,6 +7,7 @@ import json
 from multiprocessing.managers import ValueProxy
 import numpy as np
 import pathlib
+import warnings
 import h5py
 from scipy.interpolate import (
     RectBivariateSpline,
@@ -33,10 +34,11 @@ def get_profile_data(
     find_B_method: str,
     geometry: Literal["cylindrical", "cartesian"],
     magnetic_data_path: pathlib.Path,
-    input_filename_suffix: str,
 ) -> Tuple[
     FloatArray, FloatArray, FloatArray, FloatArray, FloatArray, FloatArray, FloatArray
 ]:
+    """The grids, field and poloidal flux in the file ``magnetic_data_path``: a
+    TORBEAM topfile (``"torbeam"``) or its OMFIT JSON form (``"omfit"``)"""
 
     ##############################################
     # OMFIT
@@ -48,9 +50,8 @@ def get_profile_data(
             """Convert from column-major (TORBEAM, Fortran) to row-major order (Scotty, Python)"""
             return np.asarray(arr).reshape(len(Z_coord), len(R_coord)).T
 
-        topfile_path = magnetic_data_path / f"topfile{input_filename_suffix}.json"
         if geometry == "cylindrical":
-            with open(topfile_path) as f:
+            with open(magnetic_data_path) as f:
                 data = json.load(f)
             q0 = np.array(data["R"])
             q1 = np.array([0])
@@ -69,9 +70,8 @@ def get_profile_data(
     ##############################################
     elif find_B_method == "torbeam":
         log.info(f"Using TORBEAM input files for B and poloidal flux")
-        topfile_path = magnetic_data_path / f"topfile{input_filename_suffix}"
         if geometry == "cylindrical":
-            torbeam = Torbeam.from_file(topfile_path)
+            torbeam = Torbeam.from_file(magnetic_data_path)
             q0 = torbeam.R_grid
             q1 = np.array([0])
             q2 = torbeam.Z_grid
@@ -464,7 +464,14 @@ class EFITField(InterpolatedField_Cylindrical):
     r"""Field from EFIT output: the normalised poloidal flux on an (R, Z) grid
     and :math:`R B_\phi` as a function of normalised flux. :math:`B_R` and
     :math:`B_Z` are computed from the flux gradient, and :math:`B_T` from
-    :math:`R B_\phi`, rather than interpolated from grids"""
+    :math:`R B_\phi`, rather than interpolated from grids
+
+    .. deprecated:: 4.0.0
+       ``find_B_method`` no longer takes ``"UDA_saved"`` or ``"EFITpp"``, so
+       `beam_me_up` does not build this field. The class and its readers
+       (`from_EFITpp`, `from_MAST_saved`, `from_MAST_U_saved`) are kept for
+       now, but they are not tested. Give a field object to ``find_B_method``
+    """
 
     def __init__(
         self,
@@ -480,6 +487,12 @@ class EFITField(InterpolatedField_Cylindrical):
         interp_order: int = 5,
         interp_smoothing: int = 0,
     ):
+        warnings.warn(
+            "`EFITField` is deprecated: `find_B_method` no longer takes "
+            "'UDA_saved' or 'EFITpp', and this class is not tested",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self.R_coord = R_grid
         self.Z_coord = Z_grid
         self.poloidalFlux_grid = psi_norm_2D
@@ -1218,18 +1231,40 @@ class InterpolatedField_Cartesian(MagneticField_Cartesian):
 ##################################################
 
 
+#: `find_B_method` names removed in 4.0.0 (lower case). They read files with
+#: several shots or time slices (``shot``, ``equil_time``), or a file that
+#: `beam_me_up` could not accept (``"test_notime"``, and ``"UDA_saved"`` with
+#: no shot). They may come back later
+REMOVED_FIND_B_METHODS = ("test", "test_notime", "uda_saved", "efitpp")
+
+#: `find_B_method` names that read the file ``magnetic_data_path``
+FILE_FIND_B_METHODS = ("torbeam", "omfit")
+
+
+def removed_find_B_method_error(find_B_method: str) -> ValueError:
+    """The error for a `find_B_method` in `REMOVED_FIND_B_METHODS`"""
+    return ValueError(
+        f"`find_B_method` = '{find_B_method}' is deprecated, and removed for now "
+        "(Scotty 4.0.0), with `shot` and `equil_time`. Give a field object (for "
+        "example a `scotty.geometry.InterpolatedField_Cylindrical` made from your "
+        "data), a TORBEAM topfile (`find_B_method` = 'torbeam' or 'omfit', with "
+        "the path of the file in `magnetic_data_path`), or 'analytical'"
+    )
+
+
 def create_magnetic_geometry(
     geometry: Literal["cylindrical", "cartesian"],
     find_B_method: Union[str, MagneticField_Cylindrical, MagneticField_Cartesian],
     interp_order_str: str,
     interp_order_int: int,
-    interp_smoothing: int,
-    magnetic_data_path: pathlib.Path,
-    input_filename_suffix: str = "",
-    shot: Optional[int] = None,
-    equil_time: Optional[float] = None,
+    interp_smoothing: float,
+    magnetic_data_path: Optional[pathlib.Path] = None,
     **kwargs: Optional[dict],
 ) -> Union[MagneticField_Cylindrical, MagneticField_Cartesian]:
+    """The magnetic field: ``find_B_method`` itself if it is a field object,
+    else the field it names. ``"torbeam"`` and ``"omfit"`` read the file
+    ``magnetic_data_path``; ``"analytical"`` takes ``B_T_axis``, ``R_axis``,
+    ``minor_radius_a`` and ``B_p_a`` from ``kwargs``"""
 
     log.debug(f"Reading and creating field profile")
 
@@ -1329,7 +1364,9 @@ def create_magnetic_geometry(
                 derivative_method=derivative_method,
             )
 
-        elif find_B_method in ["omfit", "torbeam"]:
+        elif find_B_method in FILE_FIND_B_METHODS:
+            if magnetic_data_path is None:
+                raise ValueError(missing_arg("magnetic_data_path"))
             (
                 q0,
                 q1,
@@ -1341,8 +1378,7 @@ def create_magnetic_geometry(
             ) = get_profile_data(
                 find_B_method=find_B_method.lower(),
                 geometry=geometry,
-                magnetic_data_path=magnetic_data_path,
-                input_filename_suffix=input_filename_suffix,
+                magnetic_data_path=pathlib.Path(magnetic_data_path),
             )
 
             if geometry == "cylindrical":
@@ -1378,22 +1414,8 @@ def create_magnetic_geometry(
                 f"Interpolating B and poloidal flux profiles took {duration_field_interpolation} s"
             )
 
-        # Sources from v3 that only exist in cylindrical geometry
-        elif find_B_method in ["test", "test_notime", "uda_saved", "efitpp"]:
-            if geometry != "cylindrical":
-                raise ValueError(
-                    f"`find_B_method` = '{find_B_method}' only works for `geometry` = 'cylindrical' for now"
-                )
-            field = _create_v3_cylindrical_field(
-                find_B_method,
-                magnetic_data_path,
-                shot,
-                equil_time,
-                interp_order_int,
-                interp_smoothing,
-                delta_R=kwargs.get("delta_R", 1e-4),
-                delta_Z=kwargs.get("delta_Z", 1e-4),
-            )
+        elif find_B_method in REMOVED_FIND_B_METHODS:
+            raise removed_find_B_method_error(find_B_method)
 
         else:
             raise ValueError(f"`find_B_method` = '{find_B_method}' is not supported")
@@ -1402,98 +1424,3 @@ def create_magnetic_geometry(
 
     else:
         raise ValueError(f"`find_B_method` = '{find_B_method}' is not supported")
-
-
-def _create_v3_cylindrical_field(
-    find_B_method: str,
-    magnetic_data_path: pathlib.Path,
-    shot: Optional[int],
-    equil_time: Optional[float],
-    interp_order: int,
-    interp_smoothing: int,
-    delta_R: Optional[float],
-    delta_Z: Optional[float],
-) -> MagneticField_Cylindrical:
-    """The field sources carried over from v3: "test", "test_notime",
-    "UDA_saved" (MAST and MAST-U) and "EFITpp" (``find_B_method`` lower case)"""
-
-    def missing_arg(argument: str) -> str:
-        return f"Missing '{argument}' for find_B_method='{find_B_method}'"
-
-    if find_B_method == "test":
-        # Works nicely with the new MAST-U UDA output
-        if equil_time is None:
-            raise ValueError(missing_arg("equil_time"))
-        filename = magnetic_data_path / f"{shot}_equilibrium_data.npz"
-        with np.load(filename) as loadfile:
-            time_EFIT = loadfile["time_EFIT"]
-            t_idx = find_nearest(time_EFIT, equil_time)
-            log.info(f"EFIT time {time_EFIT[t_idx]}")
-            return InterpolatedField_Cylindrical(
-                R_coord=loadfile["R_EFIT"],
-                Z_coord=loadfile["Z_EFIT"],
-                B_R=loadfile["Br_grid"][t_idx, :, :],
-                B_T=loadfile["Bphi_grid"][t_idx, :, :],
-                B_Z=loadfile["Bz_grid"][t_idx, :, :],
-                psi=loadfile["poloidalFlux_grid"][t_idx, :, :],
-                interp_order=interp_order,
-                interp_smoothing=interp_smoothing,
-            )
-
-    if find_B_method == "test_notime":
-        # magnetic_data_path includes the filename
-        with np.load(magnetic_data_path) as loadfile:
-            return InterpolatedField_Cylindrical(
-                R_coord=loadfile["R_EFIT"],
-                Z_coord=loadfile["Z_EFIT"],
-                B_R=loadfile["Br_grid"],
-                B_T=loadfile["Bphi_grid"],
-                B_Z=loadfile["Bz_grid"],
-                psi=loadfile["poloidalFlux_grid"],
-                interp_order=interp_order,
-                interp_smoothing=interp_smoothing,
-            )
-
-    if find_B_method == "uda_saved" and shot is None:
-        log.info("Using MAST(-U) saved UDA data")
-        # magnetic_data_path includes the filename; assumes one time in the file
-        with np.load(magnetic_data_path) as loadfile:
-            return EFITField(
-                R_grid=loadfile["R_EFIT"],
-                Z_grid=loadfile["Z_EFIT"],
-                rBphi=loadfile["rBphi"],
-                psi_norm_2D=loadfile["poloidalFlux_grid"],
-                psi_unnorm_axis=loadfile["poloidalFlux_unnormalised_axis"],
-                psi_unnorm_boundary=loadfile["poloidalFlux_unnormalised_boundary"],
-                delta_R=delta_R,
-                delta_Z=delta_Z,
-                interp_order=interp_order,
-                interp_smoothing=interp_smoothing,
-            )
-
-    # Data files with multiple time slices
-    if equil_time is None:
-        raise ValueError(missing_arg("equil_time"))
-
-    if find_B_method == "efitpp":
-        log.info("Using MSE-constrained EFIT++ output files for B and poloidal flux")
-        return EFITField.from_EFITpp(
-            magnetic_data_path / "efitOut.nc",
-            equil_time,
-            delta_R,
-            delta_Z,
-            interp_order,
-            interp_smoothing,
-        )
-
-    # 30471 is the last MAST shot; MAST and MAST-U data are saved differently
-    filename = magnetic_data_path / f"{shot}_equilibrium_data.npz"
-    if shot is not None and shot <= 30471:
-        log.info(f"Using MAST shot {shot} from saved UDA data")
-        return EFITField.from_MAST_saved(
-            filename, equil_time, delta_R, delta_Z, interp_order, interp_smoothing
-        )
-    log.info(f"Using MAST-U shot {shot} from saved UDA data")
-    return EFITField.from_MAST_U_saved(
-        filename, equil_time, delta_R, delta_Z, interp_order, interp_smoothing
-    )

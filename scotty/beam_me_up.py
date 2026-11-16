@@ -134,7 +134,7 @@ from scotty.launch import (
     find_plasma_entry_parameters,
 )
 from scotty.logger import config_logger, arr2str
-from scotty.profile_fit import ProfileFitLike, profile_fit
+from scotty.profile_fit import ProfileFitLike, make_fit
 from scotty.ray_solver import ray_tracing
 from scotty.typing import FloatArray, PathLike
 from scotty._version import __version__
@@ -184,21 +184,22 @@ def beam_me_up(
     poloidal_flux_zero_temperature: Optional[
         float
     ] = None,  # Deprecated: temperature analogue of poloidal_flux_zero_density
-    # Data input and output arguments
-    magnetic_data_path: PathLike = pathlib.Path("."),
-    ne_data_path: PathLike = pathlib.Path("."),
-    Te_data_path: PathLike = pathlib.Path("."),
-    input_filename_suffix: str = "",
+    # Data input and output arguments: the paths of the files themselves
+    magnetic_data_path: Optional[PathLike] = None,
+    ne_data_path: Optional[PathLike] = None,
+    Te_data_path: Optional[PathLike] = None,
     output_path: PathLike = pathlib.Path("."),
     output_filename_suffix: str = "",
-    shot: Optional[int] = None,
-    equil_time: Optional[Union[float, int]] = None,
     # Interpolation settings
     density_fit_parameters: Optional[Sequence] = None,
     temperature_fit_method: Optional[Union[str, ProfileFitLike]] = None,
     temperature_fit_parameters: Optional[Sequence] = None,
-    interp_order: Union[str, int] = 5,  # For the 3D interpolation functions
-    interp_smoothing: int = 0,  # For the interpolation functions; 0 for no smoothing
+    interp_order_magnetic: Union[str, int] = 5,
+    interp_smoothing_magnetic: float = 0,
+    interp_order_ne: Union[str, int] = 5,
+    interp_smoothing_ne: float = 0,
+    interp_order_Te: Union[str, int] = 5,
+    interp_smoothing_Te: float = 0,
     # Logging flags
     console_log_level: Union[
         str, int
@@ -399,40 +400,42 @@ def beam_me_up(
 
         .. deprecated:: 4.0.0
            As ``poloidal_flux_zero_density``
-    magnetic_data_path, ne_data_path, Te_data_path : str or pathlib.Path, default "."
-        Directories of the magnetic field, electron density and electron
-        temperature files
-    input_filename_suffix : str, default ""
-        Suffix of the input file names (e.g. ``ne{suffix}.dat``)
+    magnetic_data_path : str or pathlib.Path, optional
+        Path of the magnetic field file, for ``find_B_method`` ``"torbeam"``
+        (a TORBEAM topfile) or ``"omfit"`` (its OMFIT JSON form). A full path,
+        or a path relative to the current folder
+    ne_data_path : str or pathlib.Path, optional
+        Path of the electron density file, for ``density_fit_method``
+        ``"smoothing-spline-file"`` (format: see
+        `scotty.profile_fit.SmoothingSplineFit.from_dat_file`)
+    Te_data_path : str or pathlib.Path, optional
+        Path of the electron temperature file, for ``temperature_fit_method``
+        ``"smoothing-spline-file"`` in a relativistic run
     output_path : str or pathlib.Path, default "."
         Directory for the output file (and the log file); created if it does
         not exist
     output_filename_suffix : str, default ""
         Suffix of the output file name, ``scotty_output{suffix}.h5``
-    shot : int, optional
-        Shot number, for the field files that need one
-    equil_time : float, optional
-        Time of the equilibrium, for the field files that hold several
     find_B_method : str or MagneticField_Cylindrical or MagneticField_Cartesian
-        Required. Source of the magnetic field: a field object, or the name of a file
-        format (``"torbeam"``, ``"omfit"``, ``"test"``, ``"test_notime"``,
-        ``"UDA_saved"``, ``"EFITpp"``) or of an analytical field
-        (``"analytical"``: circular flux surfaces, which needs ``B_T_axis``,
-        ``R_axis``, ``minor_radius_a`` and ``B_p_a``)
+        Required. Source of the magnetic field: a field object, the name of a
+        file format (``"torbeam"`` or ``"omfit"``, which read
+        ``magnetic_data_path``), or ``"analytical"`` (circular flux surfaces,
+        which needs ``B_T_axis``, ``R_axis``, ``minor_radius_a`` and
+        ``B_p_a``). The file formats work only in cylindrical geometry.
+
+        .. deprecated:: 4.0.0
+           ``"test"``, ``"test_notime"``, ``"UDA_saved"`` and ``"EFITpp"``
+           are removed for now, with ``shot`` and ``equil_time``; they raise
+           an error. Give a field object instead
     density_fit_method : str or callable
         Required. Electron density profile (in 10¹⁹ m⁻³) as a function of the
         normalised poloidal flux: a callable (e.g. a
         `scotty.profile_fit.ProfileFit`), or the name of a fit, with
         ``density_fit_parameters``:
 
-        - ``"smoothing-spline-file"``: ``[path, order, smoothing]``; ``order``
-          (default 5) and ``smoothing`` (default 0) can be left out. The path
-          is used as given: a full path, or a path relative to the current
-          folder. ``ne_data_path`` is not used for it. With no parameters,
-          Scotty reads ``ne{input_filename_suffix}.dat`` from
-          ``ne_data_path``, with ``interp_order`` and ``interp_smoothing``.
-          See `scotty.profile_fit.SmoothingSplineFit.from_dat_file` for the
-          file format
+        - ``"smoothing-spline-file"``: no parameters. Scotty reads the file
+          ``ne_data_path`` and fits a spline with ``interp_order_ne`` and
+          ``interp_smoothing_ne``
         - ``"smoothing-spline"``: ``[psi, n_e, order, smoothing]``, the data
           as two arrays
         - ``"quadratic"``, ``"linear"``, ``"tanh"``, ``"poly3"`` (or
@@ -447,19 +450,24 @@ def beam_me_up(
         give a profile object, for example ``QuadraticFit(1.05, 4.0)``
     density_fit_parameters : sequence, optional
         Parameters of the named density fit (see ``density_fit_method``).
-        Not used with a callable
+        Not used with a callable, and not allowed with
+        ``"smoothing-spline-file"``
     temperature_fit_method : str or callable, optional
-        Electron temperature profile (in keV), as ``density_fit_method``.
-        With no parameters, ``"smoothing-spline-file"`` reads
-        ``Te{input_filename_suffix}.dat`` from ``Te_data_path``. Used only
-        with ``relativistic_flag``, and required with it
+        Electron temperature profile (in keV), as ``density_fit_method``;
+        ``"smoothing-spline-file"`` reads the file ``Te_data_path``, with
+        ``interp_order_Te`` and ``interp_smoothing_Te``. Used only with
+        ``relativistic_flag``, and required with it
     temperature_fit_parameters : sequence, optional
         Parameters of the named temperature fit, as ``density_fit_parameters``
-    interp_order : int or str, default 5
-        Order of the field and profile interpolation: 1, 3, 5 or
-        ``"linear"``, ``"cubic"``, ``"quintic"``
-    interp_smoothing : int, default 0
-        Smoothing of the interpolating splines; 0 for none
+    interp_order_magnetic, interp_order_ne, interp_order_Te : int or str, default 5
+        Order of the splines of the magnetic field and poloidal flux (from
+        ``magnetic_data_path``), of the density (from ``ne_data_path``) and
+        of the temperature (from ``Te_data_path``): 1, 3, 5 or ``"linear"``,
+        ``"cubic"``, ``"quintic"``
+    interp_smoothing_magnetic, interp_smoothing_ne, interp_smoothing_Te : float, default 0
+        Smoothing factor of the same splines (``s`` of the SciPy splines); 0
+        for none, so that the spline goes through every data point. The
+        magnetic one is used only in cylindrical geometry
     console_log_level : str or int, default "INFO"
         Level of the log messages printed to the console
     file_log_level : str or int, optional
@@ -491,7 +499,10 @@ def beam_me_up(
         m⁻², complex), both in Cartesian lab-frame components, for
         ``launch_flag="plasma"``; and ``create_magnetic_geometry``, a dict of
         extra arguments for the field. Other keyword arguments are ignored,
-        with a warning that suggests the closest argument name.
+        with a warning that suggests the closest argument name. The arguments
+        removed in 4.0.0 (``interp_order``, ``interp_smoothing``,
+        ``input_filename_suffix``, ``shot``, ``equil_time``) raise an error
+        that names what replaces them.
 
     Returns
     -------
@@ -543,19 +554,20 @@ def beam_me_up(
         magnetic_data_path=magnetic_data_path,
         ne_data_path=ne_data_path,
         Te_data_path=Te_data_path,
-        input_filename_suffix=input_filename_suffix,
         output_path=output_path,
         output_filename_suffix=output_filename_suffix,
-        shot=shot,
-        equil_time=equil_time,
         # Interpolation settings
         find_B_method=find_B_method,
         density_fit_method=density_fit_method,
         density_fit_parameters=density_fit_parameters,
         temperature_fit_method=temperature_fit_method,
         temperature_fit_parameters=temperature_fit_parameters,
-        interp_order=interp_order,
-        interp_smoothing=interp_smoothing,
+        interp_order_magnetic=interp_order_magnetic,
+        interp_smoothing_magnetic=interp_smoothing_magnetic,
+        interp_order_ne=interp_order_ne,
+        interp_smoothing_ne=interp_smoothing_ne,
+        interp_order_Te=interp_order_Te,
+        interp_smoothing_Te=interp_smoothing_Te,
         # Plotting flags
         figure_flag=figure_flag,
         # Analysis flags
@@ -627,7 +639,6 @@ def beam_me_up(
         method=params.density_fit_method,
         poloidal_flux_zero_density=params.poloidal_flux_zero_density,
         parameters=params.density_fit_parameters,
-        filename=params.ne_filename,
     )
     params.set_poloidal_flux_enter(density_fit)
 
@@ -639,7 +650,6 @@ def beam_me_up(
             method=params.temperature_fit_method,
             poloidal_flux_zero_density=params.poloidal_flux_zero_temperature,
             parameters=params.temperature_fit_parameters,
-            filename=params.Te_filename,
             quantity="temperature",
         )
     else:
@@ -664,13 +674,10 @@ def beam_me_up(
     field = create_magnetic_geometry(
         geometry=params.geometry,
         find_B_method=find_B_method,  # not from params because we only store the string/name, but find_B_method is probably already a MagField class
-        interp_order_str=params.interp_order_magnetic_data_str,
-        interp_order_int=params.interp_order_magnetic_data_int,
-        interp_smoothing=params.interp_smoothing,
+        interp_order_str=params.interp_order_magnetic_str,
+        interp_order_int=params.interp_order_magnetic,
+        interp_smoothing=params.interp_smoothing_magnetic,
         magnetic_data_path=params.magnetic_data_path,
-        input_filename_suffix=params.input_filename_suffix,
-        shot=params.shot,
-        equil_time=params.equil_time,
         **field_kwargs,
     )
 
@@ -943,33 +950,3 @@ def beam_me_up(
         return dt, field
     else:
         return dt
-
-
-def make_fit(
-    method: Optional[Union[str, ProfileFitLike]],
-    poloidal_flux_zero_density: float,
-    parameters: Optional[Sequence],
-    filename: Optional[PathLike],
-    quantity: str = "density",
-) -> ProfileFitLike:
-    """Profile fit for the electron density or temperature (``quantity``).
-    ``poloidal_flux_zero_density`` is the flux beyond which the profile is
-    zero, for whichever quantity it is"""
-
-    log = logging.getLogger(__name__)
-    log.debug(f"Making {quantity} fit profile")
-
-    if callable(method):
-        return method
-
-    if not isinstance(method, (str, type(None))):
-        raise TypeError(
-            f"Unexpected method type. Expected callable, str, or None, but got '{type(method)}'"
-        )
-
-    if parameters is None:
-        raise ValueError(
-            f"Passing `{quantity}_fit_method` ({method}) as string or None requires a list or array of parameters"
-        )
-
-    return profile_fit(method, poloidal_flux_zero_density, parameters, filename)

@@ -525,3 +525,35 @@ def profile_fit(
         )
 
     return fit_method(poloidal_flux_zero_profile, *parameters)
+
+
+def make_fit(
+    method: Optional[Union[str, ProfileFitLike]],
+    poloidal_flux_zero_density: float,
+    parameters: Optional[Sequence],
+    quantity: str = "density",
+) -> ProfileFitLike:
+    """Profile fit for the electron density or temperature (``quantity``):
+    ``method`` itself if it is a callable, else the fit it names, made with
+    `profile_fit`. ``poloidal_flux_zero_density`` is the flux beyond which the
+    profile is zero, for whichever quantity it is. `beam_me_up` gives
+    ``"smoothing-spline-file"`` its parameters, ``[path, order, smoothing]``,
+    from ``ne_data_path``, ``interp_order_ne`` and ``interp_smoothing_ne`` (or
+    those of the temperature)"""
+
+    log.debug(f"Making {quantity} fit profile")
+
+    if callable(method):
+        return method
+
+    if not isinstance(method, (str, type(None))):
+        raise TypeError(
+            f"Unexpected method type. Expected callable, str, or None, but got '{type(method)}'"
+        )
+
+    if parameters is None:
+        raise ValueError(
+            f"Passing `{quantity}_fit_method` ({method}) as string or None requires a list or array of parameters"
+        )
+
+    return profile_fit(method, poloidal_flux_zero_density, parameters)

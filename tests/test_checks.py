@@ -2,6 +2,7 @@ import inspect
 import logging
 import pathlib
 
+import numpy as np
 import pytest
 
 from scotty.beam_me_up import beam_me_up
@@ -113,7 +114,13 @@ def test_poloidal_flux_zero_temperature_none_in_a_run(tmp_path):
 @pytest.mark.parametrize(
     ("name", "v3_default"),
     [
-        ("interp_smoothing", 0),
+        # v3's one `interp_smoothing` and `interp_order`, now one for each spline
+        ("interp_smoothing_magnetic", 0),
+        ("interp_smoothing_ne", 0),
+        ("interp_smoothing_Te", 0),
+        ("interp_order_magnetic", 5),
+        ("interp_order_ne", 5),
+        ("interp_order_Te", 5),
     ],
 )
 def test_defaults_are_v3s(name, v3_default):
@@ -169,17 +176,21 @@ def test_boundary_flag_is_now_Psi_BC_flag(tmp_path, caplog):
 
 @pytest.mark.parametrize("as_type", [str, pathlib.Path])
 def test_paths_accept_str_and_Path(tmp_path, as_type):
-    """C4: all four paths can be given as str or pathlib.Path; the output
-    folder is created if it does not exist, and the output written there"""
-    data = tmp_path / "data"
-    data.mkdir()
+    """C4: the paths can be given as str or pathlib.Path (the density file
+    here); the output folder is created if it does not exist, and the output
+    written there"""
+    psi = np.linspace(0.0, 1.0, 101)
+    ne_dat = tmp_path / "data" / "ne.dat"
+    ne_dat.parent.mkdir()
+    with open(ne_dat, "w") as f:
+        f.write(f"{len(psi)}\n")
+        np.savetxt(f, np.column_stack((np.sqrt(psi), 4.0 * (1.0 - psi**2))))
     output = tmp_path / "new" / "output"
     beam_me_up(
         **_synthetic(
             tmp_path,
-            magnetic_data_path=as_type(data),
-            ne_data_path=as_type(data),
-            Te_data_path=as_type(data),
+            density_fit_method="smoothing-spline-file",
+            ne_data_path=as_type(ne_dat),
             output_path=as_type(output),
             output_filename_suffix="_paths",
         )
@@ -190,18 +201,20 @@ def test_paths_accept_str_and_Path(tmp_path, as_type):
 def test_output_folder_creation_is_logged(tmp_path, caplog):
     output = tmp_path / "created"
     with caplog.at_level(logging.INFO, logger="scotty.checks"):
-        Parameters._check_data_path(
-            Parameters.__new__(Parameters), "output", str(output)
-        )
+        Parameters._check_output_path(str(output))
     assert output.is_dir()
     assert "Creating the folder" in caplog.text
 
 
 @pytest.mark.parametrize("name", ["magnetic", "ne", "Te"])
-def test_missing_data_path_raises(tmp_path, name):
-    with pytest.raises(ValueError, match=f"`{name}_data_path`"):
-        Parameters._check_data_path(
-            Parameters.__new__(Parameters), name, str(tmp_path / "missing")
+def test_missing_data_file_raises(tmp_path, name):
+    with pytest.raises(ValueError, match=f"`{name}_data_path`.*no such file"):
+        Parameters.__new__(Parameters)._check_data_file(
+            f"{name}_data_path",
+            str(tmp_path / "missing"),
+            used=True,
+            what="file",
+            unused="",
         )
 
 

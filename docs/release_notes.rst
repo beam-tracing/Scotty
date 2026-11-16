@@ -18,8 +18,8 @@ Results that change
   :math:`\exp(-a_\mathrm{exp}\psi/a_\mathrm{width})` (as in v3).
 - ``SmoothingSplineFit`` holds its end values past its data instead of
   extrapolating (which could give negative densities), and its ``smoothing``
-  defaults to 0, so that it goes through the data. ``beam_me_up`` already passed
-  ``interp_smoothing=0``.
+  defaults to 0, so that it goes through the data. The default smoothing of
+  ``beam_me_up`` was already 0.
 - Every profile is clipped at zero, with a warning the first time.
 - The launch angles are measured from the local :math:`R` direction at the
   antenna, so an antenna at :math:`\zeta \ne 0` (or :math:`Y \ne 0`) gives the
@@ -151,15 +151,43 @@ Inputs
   ``density_fit_method`` for the machine presets when it is given
   ``find_B_method`` (``"smoothing-spline-file"`` for ``"torbeam"``).
   ``from_v3_kwargs`` sets v3's defaults, with a warning.
-- ``density_fit_method="smoothing-spline-file"`` with the file in
-  ``density_fit_parameters``, ``[path, order, smoothing]``, works, and so does
-  its temperature analogue. It always raised "expected filename as second
-  parameter" (as in v3), so only the default file ``ne{suffix}.dat`` in
-  ``ne_data_path`` could be read. The path is used as given (a full path, or a
-  path relative to the current folder), not joined to ``ne_data_path``. A first
-  parameter that is not a path raises a ``TypeError`` that says so. With no
-  fit method, a v3 script whose first parameter is a path now reads that file
-  through ``from_v3_kwargs``; v3 guessed ``"tanh"`` from the three parameters.
+- ``magnetic_data_path``, ``ne_data_path`` and ``Te_data_path`` are the
+  paths of the files themselves (a full path, or a path relative to the
+  current folder), not folders, and ``input_filename_suffix`` is removed. For
+  example ``ne_data_path="C:/data/ne_45000.dat"`` with
+  ``density_fit_method="smoothing-spline-file"``, and
+  ``magnetic_data_path="C:/data/topfile_45000"`` with
+  ``find_B_method="torbeam"`` (``"omfit"`` reads the JSON form). The default
+  is ``None``, and a path is checked only when the run reads it: a folder
+  raises an error that gives an example file name. The output's ``inputs``
+  save the paths of the files that the run read (``"None"`` for none).
+- One spline order and smoothing for each of the magnetic field, the density
+  and the temperature: ``interp_order_magnetic``,
+  ``interp_smoothing_magnetic``, ``interp_order_ne``, ``interp_smoothing_ne``,
+  ``interp_order_Te`` and ``interp_smoothing_Te`` (defaults 5 and 0, as v3's)
+  replace ``interp_order`` and ``interp_smoothing``, which set all three. An
+  invalid order raises; before, it was replaced by 5, with a warning.
+- ``"smoothing-spline-file"`` takes no parameters: its file and spline
+  settings have their own arguments, and ``density_fit_parameters`` with it
+  raises. Before, a file in ``density_fit_parameters`` always raised "expected
+  filename as second parameter" (as in v3).
+- ``find_B_method`` ``"test"``, ``"test_notime"``, ``"UDA_saved"`` and
+  ``"EFITpp"`` are deprecated, and removed for now, with ``shot`` and
+  ``equil_time``, which only they used. They raise an error; give a field
+  object instead. ``"test_notime"``, and ``"UDA_saved"`` with no shot, took
+  the path of a file, which ``beam_me_up`` refused, so they could not run.
+  `scotty.geometry.EFITField` and its readers are kept, but they are not
+  tested, and warn (``DeprecationWarning``).
+- The removed arguments (``interp_order``, ``interp_smoothing``,
+  ``input_filename_suffix``, ``shot``, ``equil_time``) raise an error that
+  names what replaces them, rather than the warning for an unknown keyword:
+  ignoring them would change the run. ``from_v3_kwargs`` converts them: it
+  builds the paths of v3's files (``topfile{suffix}``, ``ne{suffix}.dat``,
+  ``Te{suffix}.dat`` in v3's folders), gives v3's one order and smoothing to
+  each spline, moves a file in ``density_fit_parameters`` to ``ne_data_path``,
+  and drops ``shot`` and ``equil_time``, with warnings.
+- ``make_fit`` is in `scotty.profile_fit` (it was in `scotty.beam_me_up`), and
+  has no ``filename`` argument.
 - New ``analysis_flag`` and ``dbs_analysis_flag``, both ``True`` by default.
   ``analysis_flag=False`` saves only the inputs and the solver output (no
   ``beam`` group); ``dbs_analysis_flag=False`` leaves out the
@@ -173,6 +201,10 @@ Presets
 
 - ``get_parameters_for_Scotty`` takes ``data_path``, the folder of the input
   files, instead of ``user``, which chose folders on particular computers.
+  With ``find_B_method="torbeam"`` it gives the paths of the files in that
+  folder, ``topfile`` and ``ne.dat``. ``shot`` and ``equil_time`` only choose
+  a saved density fit (``find_ne_method``), with any ``find_B_method`` except
+  ``"torbeam"``, and are not passed on to ``beam_me_up``.
 - ``DBS_synthetic`` no longer sets the zero points or the entry point: its
   profile object decides, and the plasma starts where its density does (1.0).
 
