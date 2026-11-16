@@ -151,6 +151,15 @@ Inputs
   ``density_fit_method`` for the machine presets when it is given
   ``find_B_method`` (``"smoothing-spline-file"`` for ``"torbeam"``).
   ``from_v3_kwargs`` sets v3's defaults, with a warning.
+- ``density_fit_method="smoothing-spline-file"`` with the file in
+  ``density_fit_parameters``, ``[path, order, smoothing]``, works, and so does
+  its temperature analogue. It always raised "expected filename as second
+  parameter" (as in v3), so only the default file ``ne{suffix}.dat`` in
+  ``ne_data_path`` could be read. The path is used as given (a full path, or a
+  path relative to the current folder), not joined to ``ne_data_path``. A first
+  parameter that is not a path raises a ``TypeError`` that says so. With no
+  fit method, a v3 script whose first parameter is a path now reads that file
+  through ``from_v3_kwargs``; v3 guessed ``"tanh"`` from the three parameters.
 - New ``analysis_flag`` and ``dbs_analysis_flag``, both ``True`` by default.
   ``analysis_flag=False`` saves only the inputs and the solver output (no
   ``beam`` group); ``dbs_analysis_flag=False`` leaves out the

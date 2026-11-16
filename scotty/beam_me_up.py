@@ -423,15 +423,38 @@ def beam_me_up(
         Required. Electron density profile (in 10¹⁹ m⁻³) as a function of the
         normalised poloidal flux: a callable (e.g. a
         `scotty.profile_fit.ProfileFit`), or the name of a fit, with
-        ``density_fit_parameters``. ``"smoothing-spline-file"`` with no
-        parameters reads ``ne{input_filename_suffix}.dat`` from ``ne_data_path``
+        ``density_fit_parameters``:
+
+        - ``"smoothing-spline-file"``: ``[path, order, smoothing]``; ``order``
+          (default 5) and ``smoothing`` (default 0) can be left out. The path
+          is used as given: a full path, or a path relative to the current
+          folder. ``ne_data_path`` is not used for it. With no parameters,
+          Scotty reads ``ne{input_filename_suffix}.dat`` from
+          ``ne_data_path``, with ``interp_order`` and ``interp_smoothing``.
+          See `scotty.profile_fit.SmoothingSplineFit.from_dat_file` for the
+          file format
+        - ``"smoothing-spline"``: ``[psi, n_e, order, smoothing]``, the data
+          as two arrays
+        - ``"quadratic"``, ``"linear"``, ``"tanh"``, ``"poly3"`` (or
+          ``"polynomial"``) and ``"stefanikova"``: the arguments of
+          `scotty.profile_fit.QuadraticFit`, `scotty.profile_fit.LinearFit`,
+          `scotty.profile_fit.TanhFit`, `scotty.profile_fit.PolynomialFit`
+          and `scotty.profile_fit.StefanikovaFit` after the zero point; for
+          example ``"quadratic"`` with ``[4.0]``
+
+        A named fit has its zero point at 1.0, unless the deprecated
+        ``poloidal_flux_zero_density`` is given. For another zero point,
+        give a profile object, for example ``QuadraticFit(1.05, 4.0)``
     density_fit_parameters : sequence, optional
-        Parameters of the named density fit
+        Parameters of the named density fit (see ``density_fit_method``).
+        Not used with a callable
     temperature_fit_method : str or callable, optional
-        Electron temperature profile (in keV), as ``density_fit_method``;
-        used only with ``relativistic_flag``, and required with it
+        Electron temperature profile (in keV), as ``density_fit_method``.
+        With no parameters, ``"smoothing-spline-file"`` reads
+        ``Te{input_filename_suffix}.dat`` from ``Te_data_path``. Used only
+        with ``relativistic_flag``, and required with it
     temperature_fit_parameters : sequence, optional
-        Parameters of the named temperature fit
+        Parameters of the named temperature fit, as ``density_fit_parameters``
     interp_order : int or str, default 5
         Order of the field and profile interpolation: 1, 3, 5 or
         ``"linear"``, ``"cubic"``, ``"quintic"``
