@@ -520,9 +520,45 @@ def basic_analysis(
             :, 1, 0
         ] = Psi_xy_output_beamframe_cartesian
         Psi_w_output_beamframe_cartesian[:, 1, 1] = Psi_yy_output_beamframe_cartesian
-        curv1, curv2, width1, width2 = find_beam_widths_and_curvs(
-            Psi_w_output_beamframe_cartesian, K_vec_cart, g_hat_cart
+        (
+            curv1,
+            curv2,
+            width1,
+            width2,
+            curv_axes,
+            width_axes,
+            curv_poorly_resolved,
+            width_poorly_resolved,
+        ) = find_beam_widths_and_curvs(
+            Psi_w_output_beamframe_cartesian, K_vec_cart, g_hat_cart, return_axes=True
         )
+        # The axes as Cartesian unit vectors: Psi_w's first row and column
+        # are along x_hat, its second along y_hat
+        curv_directions = (
+            curv_axes[:, 0, np.newaxis, :] * x_hat_cart[:, :, np.newaxis]
+            + curv_axes[:, 1, np.newaxis, :] * y_hat_cart[:, :, np.newaxis]
+        )  # (N, 3, 2)
+        width_directions = (
+            width_axes[:, 0, np.newaxis, :] * x_hat_cart[:, :, np.newaxis]
+            + width_axes[:, 1, np.newaxis, :] * y_hat_cart[:, :, np.newaxis]
+        )
+        for quantity, poorly_resolved in (
+            ("widths", width_poorly_resolved),
+            ("curvatures", curv_poorly_resolved),
+        ):
+            if poorly_resolved.any():
+                log.warning(
+                    f"The principal axes of the beam's {quantity} turn by more "
+                    "than 40 degrees between output points at "
+                    f"{poorly_resolved.sum()} points (tau from "
+                    f"{tau[poorly_resolved].min():.4g} to "
+                    f"{tau[poorly_resolved].max():.4g}), too far to be "
+                    f"followed reliably. `{quantity[:-1]}_1` and "
+                    f"`{quantity[:-1]}_2` keep their order there (as where "
+                    "they come close without crossing) unless they are "
+                    "symmetric enough to cross. Increase `len_tau` to "
+                    "resolve them"
+                )
 
         # Psi is the gradient of K along the beam, so Psi . g = dK/dtau
         dK_dtau_cart = find_dK_dtau_cartesian(
@@ -561,6 +597,10 @@ def basic_analysis(
                 "curvature_2": (["tau"], curv2),
                 "width_1": (["tau"], width1),
                 "width_2": (["tau"], width2),
+                "curvature_1_direction": (["tau", "col_cart"], curv_directions[..., 0]),
+                "curvature_2_direction": (["tau", "col_cart"], curv_directions[..., 1]),
+                "width_1_direction": (["tau", "col_cart"], width_directions[..., 0]),
+                "width_2_direction": (["tau", "col_cart"], width_directions[..., 1]),
                 "dK_dtau_cartesian": (["tau", "col_cart"], dK_dtau_cart),
                 "Psi_g_residual_imag": (["tau"], Psi_g_residual_imag),
                 "Psi_g_residual_real": (["tau"], Psi_g_residual_real),
