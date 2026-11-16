@@ -388,11 +388,11 @@ class SmoothingSplineFit(ProfileFit):
         File should contain electron density/temperature as a function of poloidal
         flux label in units of :math:`10^{19} \mathrm{m}^{-3}`.
 
-        The file holds numbers only. The first number (the number of
-        points, on the first line) is skipped, so a text header or a first
-        line with two numbers shifts the columns. The rest of the file is
-        expected to be in two columns: the first should contain the radial
-        coordinate (:math:`\sqrt{\psi}`), the second the electron
+        The file holds numbers only: it can't have a text header. The
+        first number (the number of points, on the first line) is skipped,
+        so a first line with two numbers shifts the columns. The rest of
+        the file is expected to be in two columns: the first should contain
+        the radial coordinate (:math:`\sqrt{\psi}`), the second the electron
         density/temperature. The columns should be separated by whitespace.
 
         ``filename`` is used as given: a full path, or a path relative to
