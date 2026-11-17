@@ -7,14 +7,18 @@ Beam tracing for tokamak DBS diagnostics
 Scotty v3 and v4
 ----------------
 
-**Scotty v4 is still unstable.** It is the version on the `master` branch, but it
-hasn't been released yet. Its interface and outputs may still change between
-commits, and some of v3's features haven't been ported. For published work, or
-anything you need to reproduce later, use v3.
+**Scotty v4 is at its first release candidate, 4.0.0rc1.** It is the version on
+the `master` branch. The rc freezes the interface (argument names and defaults,
+what the inputs mean, the output variables), so scripts written for it should
+keep working in 4.0.0; only fixes that leave the interface alone go in before
+then. Some of v3's features haven't been ported yet. Until 4.0.0 is released,
+v3 is the stable line: use it for published work, or anything you need to
+reproduce later. Please try v4 and report problems at
+https://github.com/beam-tracing/Scotty/issues.
 
 - **v3** (stable, the released version): beam tracing in cylindrical coordinates
   (R, ζ, Z). The latest release is 3.2.0.
-- **v4** (in development, version 4.0.0.dev0, unstable): the same beam model,
+- **v4** (release candidate 4.0.0rc1): the same beam model,
   with a choice of cylindrical or Cartesian (X, Y, Z) coordinates
   (`geometry="cylindrical"` or `"cartesian"`). Outputs are given in both. It has
   been checked against v3 on the test suite and on DIII-D, MAST-U and MAST
@@ -46,8 +50,9 @@ anything you need to reproduce later, use v3.
     `plot_toroidal_beam_path`), the filter-function widths (`delta_l`,
     `delta_kperp1`), the GUI (`GUI/scottypygui.py`), and the `curvy_slab`
     field, which is deprecated;
-  - until v4 is tagged, its version number is a development version of 3.x (from
-    `setuptools_scm`), so check which one you have with `scotty.__version__`.
+  - check which version you have with `scotty.__version__`. An install from
+    `master` after the rc gives a development version such as
+    `4.0.0rc2.dev5+g1234abc` (from `setuptools_scm`).
 
 
 Install
@@ -68,7 +73,14 @@ or a specific release straight from GitHub:
 pip install git+https://github.com/beam-tracing/Scotty@v3.2.0
 ```
 
-**v4 (unstable).** The development version, straight from GitHub:
+**v4 (release candidate).** From PyPI (pip installs release candidates only
+when asked to):
+
+```
+pip install scotty-beam-tracing==4.0.0rc1
+```
+
+or the latest development version, straight from GitHub:
 
 ```
 pip install git+https://github.com/beam-tracing/Scotty

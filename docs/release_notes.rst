@@ -1,8 +1,14 @@
 Release notes
 =============
 
-Unreleased (for 4.0.0rc)
-------------------------
+v4.0.0rc1
+---------
+
+The first release candidate of Scotty 4.0.0. It freezes the interface: the
+argument names and their defaults, what the inputs mean, and the output
+variables and what they mean. Between the rc and 4.0.0, only fixes that leave
+these alone go in. Please report problems at
+https://github.com/beam-tracing/Scotty/issues.
 
 Fixes from the code audit of November 2026. Several change results, as noted.
 
