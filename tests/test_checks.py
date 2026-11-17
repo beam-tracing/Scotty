@@ -349,9 +349,11 @@ def test_check_Psi_output_removed():
 def test_beam_me_up_docstring_covers_every_argument():
     """Item 19: a numpydoc docstring with every argument, and the launch and
     boundary-condition flags' values"""
-    doc = beam_me_up.__doc__
+    # Python 3.13 strips the indentation of docstrings and earlier versions
+    # keep it, so compare the cleaned docstring
+    doc = inspect.cleandoc(beam_me_up.__doc__)
     assert "INSERT DOC STRING HERE" not in inspect.getsource(beam_me_up)
-    for section in ("Parameters\n    ----------", "Returns\n    -------"):
+    for section in ("Parameters\n----------", "Returns\n-------"):
         assert section in doc
     for name, parameter in inspect.signature(beam_me_up).parameters.items():
         documented = (

@@ -34,11 +34,8 @@ docs = [
     "sphinx-book-theme >= 1.1.0",
 ]
 
-[tool.setuptools]
-packages = ["scotty"]
-
-[tool.setuptools.dynamic]
-version = { attr = "setuptools_scm.get_version" }
+[tool.setuptools.packages.find]
+include = ["scotty*"]
 
 [tool.setuptools_scm]
 write_to = "scotty/_version.py"
