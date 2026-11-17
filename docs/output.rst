@@ -1,60 +1,65 @@
 .. _output:
 
-Output parameters
-=================
+Output
+======
 
-:func:`beam_me_up` returns a `datatree`_ instance which contains the
-simulation inputs under ``inputs``, the immediate results under ``solver``,
-quantities along the beam under ``beam`` (including the consistency checks
-such as ``H_Booker``), and diagnostic-specific results under ``diagnostics``,
-such as ``diagnostics/dbs``. This layout is a proposal and may change.
+`beam_me_up() <scotty.beam_me_up.beam_me_up>` returns an
+`xarray.DataTree`, a tree of `xarray.Dataset` objects with labelled
+coordinates, and saves it to
+``output_path / f"scotty_output{output_filename_suffix}.h5"``. It has four
+groups:
 
-Datatrees are collections of `xarray`_ ``Datasets``, which themselves
-are collections of N-dimensional variables with labelled coordinates.
+``inputs``
+    The inputs of the run, as checked, with the grid of the magnetic field
+    (coordinates ``R`` and ``Z``, or ``X``, ``Y`` and ``Z``). The data paths
+    are those of the files that the run read (``"None"`` for none), and
+    ``magnetic_data_time`` is the time of a field that a constructor read
+    from a file with several times (NaN otherwise).
 
-See `beam_me_up() <scotty.beam_me_up.beam_me_up>` for a detailed
-description of input parameters.
+``solver``
+    What the solvers return, along the beam parameter :math:`\tau`: the
+    position ``q_output_*``, the wavevector ``K_output_*`` and
+    :math:`\Psi` (``Psi_3D_output_labframe_*``), in both coordinate systems
+    (``_cartesian`` and ``_cylindrical``), and their values at the launch,
+    at the plasma entry and where the solvers start (``*_launch``,
+    ``*_entry``, ``*_initial``). In cylindrical coordinates ``K_zeta`` is the
+    toroidal mode number, not the toroidal component of :math:`K`.
 
-All the outputs are in cylindrical coordinates unless otherwise stated
-(``Cartesian`` or with the lower case ``x`` or ``y``).
+``beam``
+    The beam along the ray (`scotty.analysis.basic_analysis`): the beam
+    frame, :math:`\Psi_w` and its components (``Psi_xx``, ``Psi_xy``,
+    ``Psi_yy``), the widths and curvatures along their principal axes
+    (``width_1``, ``curvature_1``, ...), the dielectric tensor, the
+    distances along the beam (``beam_path_length``) and the consistency
+    checks (``H_Booker``, ``H_Cardano``, ``Psi_g_residual_*``). With
+    ``analysis_flag=False`` there is no ``beam`` group.
 
-The ``solver`` group in the output datatree contains:
+``diagnostics/dbs``
+    Doppler backscattering (`scotty.diagnostics.dbs.dbs_analysis`): the
+    backscattered wavenumbers (``k_perp1_bs``, ``k_perp2_bs``), the filter
+    functions (``filterfun_*``) and their integrals along the beam, and a
+    model turbulence spectrum (``delta_ne_sq_*``). With
+    ``dbs_analysis_flag=False`` there is no ``diagnostics/dbs`` group, and
+    the variables of ``beam`` that the DBS analysis computes
+    (`scotty.data_io.BEAM_FROM_DBS`) are left out too.
 
-* ``q_R`` - beam trajectory, :math:`R` component
-* ``q_zeta`` - beam trajectory, :math:`\zeta` component
-* ``q_Z`` - beam trajectory, :math:`Z` component
-* ``K_R`` - :math:`R` component of the wave vector
-* ``K_Z`` - :math:`Z` component of the wave vector
-* ``Psi_3D`` - wave tensor
-
-These variables are all functions of the beam parameter :math:`\tau`.
-
-The ``beam`` group in the output datatree contains lots of derived
-parameters and quantities. Some of these are:
-
-* ``Psi_xx`` - :math:`xx` component of :math:`\Psi_w`
-* ``Psi_xy`` - :math:`xy` component of :math:`\Psi_w`
-* ``Psi_yy`` - :math:`yy` component of :math:`\Psi_w`
+See :ref:`code-layout` for what goes in each group, and
+`beam_me_up() <scotty.beam_me_up.beam_me_up>` for the units and the names
+of the coordinates.
 
 Output files
-============
+------------
 
-Data is saved to netCDF files using `xarray`_ and the `h5netcdf`_
-engine. This allows us to easily save things like :math:`\Psi` which
-is complex. At the time of writing (2023), ``h5netcdf`` writes complex
-numbers using a method which is incompatible which current releases of
-netCDF (although this has been fixed and should be available in the
-next netCDF release). For this reason, the default filename is
-``scotty_output.h5``.
+The output is saved as netCDF with `xarray`_ and the `h5netcdf`_ engine,
+with ``invalid_netcdf=True`` so that complex numbers such as :math:`\Psi`
+can be stored. Read it with `xarray.open_datatree`, with the same engine::
 
-The best way to read these files with `open_datatree`_, specifying the
-``h5netcdf`` engine::
+    import xarray
 
-  import xarray
+    dt = xarray.open_datatree("scotty_output.h5", engine="h5netcdf")
 
-  dt = xarray.open_datatree("scotty_output.h5", engine="h5netcdf")
-
+`scotty.compat.convert_output_file` converts an output file between the
+layouts of Scotty v3 and v4.
 
 .. _xarray: https://xarray.pydata.org
 .. _h5netcdf: https://h5netcdf.org
-.. _DataTree: https://docs.xarray.dev/en/stable/generated/xarray.open_datatree.html#xarray-open-datatree

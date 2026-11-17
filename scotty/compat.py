@@ -11,9 +11,11 @@ each change, so a v3 script needs one line::
     from scotty.compat import from_v3_kwargs
     beam_me_up(**from_v3_kwargs(kwargs_dict))
 
-Arguments given explicitly are never overwritten, and applying it twice
-gives the same result as once. Arguments left unset get v3's defaults, so
-use it for v3 inputs, not v4 ones.
+Arguments given explicitly are kept, except where v4 needs them in another
+form: ``Psi_BC_flag`` with ``"vacuum_numerical"``, an ``output_path`` given
+as a string, and v3's data folders (all below). Applying it twice gives the
+same result as once. Arguments left unset get v3's defaults, so use it for
+v3 inputs, not v4 ones.
 
 What it converts:
 
@@ -29,9 +31,10 @@ What it converts:
   density at the plasma edge, and is not converged at v3's tolerances;
 - ``Psi_BC_flag`` is passed through unchanged (v4 uses the same name and the
   same values; v3's deprecated booleans raise in v4). **If it is not given,
-  ``"continuous"`` is set** for a vacuum launch from the antenna (v3's default
-  was ``None``, which assumes a density that is flat at the edge, and v4
-  refuses it otherwise). With ``"vacuum_numerical"`` it is set to ``None``,
+  ``"continuous"`` is set** for ``launch_flag="vacuum_analytic"`` (v3's
+  default was ``None``, which assumes a density that is flat at the edge,
+  and v4 refuses it otherwise), and ``None`` for the other launch flags.
+  With ``"vacuum_numerical"`` a given flag is set to ``None``,
   with a warning: v3 propagated through the vacuum numerically without
   boundary conditions and ignored the flag, and v4 refuses it there;
 - ``poloidal_flux_enter``, if not given, is left unset, so that v4 starts the
@@ -44,6 +47,27 @@ What it converts:
   zero point, so Scotty can't tell where it starts), and a plasma launch
   (where it is only where the ray stops);
 - ``geometry`` is set to ``"cylindrical"``, the only geometry v3 had;
+- the sources of the field and the profiles, which v4 does not default, get
+  v3's defaults: ``find_B_method="torbeam"``, and for ``density_fit_method``
+  (and ``temperature_fit_method`` in a relativistic run)
+  ``"smoothing-spline-file"`` with no parameters, or the fit v3 guessed from
+  the number of parameters;
+- the data files: v3 read them from folders (``magnetic_data_path``,
+  ``ne_data_path``, ``Te_data_path``, default ``"."``), with names that end
+  in ``input_filename_suffix``, so these become the paths of the files
+  (``topfile{suffix}``, or ``topfile{suffix}.json`` for ``"omfit"``,
+  ``ne{suffix}.dat`` and ``Te{suffix}.dat``). A path that is not an existing
+  folder is kept as given. v3's one ``interp_order`` and ``interp_smoothing``
+  become the order and smoothing of each spline (``interp_order_magnetic``,
+  ``interp_order_ne``, ``interp_order_Te`` and the three
+  ``interp_smoothing_*``), and a file in ``density_fit_parameters``,
+  ``[path, order, smoothing]``, becomes ``ne_data_path``,
+  ``interp_order_ne`` and ``interp_smoothing_ne``. ``shot`` and
+  ``equil_time`` are dropped: v4 removed the ``find_B_method`` names that
+  used them, and reads those files with the field constructors in
+  `scotty.geometry`;
+- ``further_analysis_flag`` and ``detailed_analysis_flag``, which did nothing
+  in v4, are dropped;
 - a plasma launch: ``plasmaLaunch_K`` (cylindrical, as in v3) to the
   Cartesian ``plasmaLaunch_K_cartesian``, and
   ``plasmaLaunch_Psi_3D_lab_Cartesian`` to
@@ -76,9 +100,9 @@ A ``resonance_flag`` that isn't a bool is left in place, and v4 refuses it.
 Output files
 ------------
 
-v4 also reorganised the output: renamed variables, a separate
-``dbs_analysis`` group, lab-frame quantities in both cylindrical and
-Cartesian coordinates, and new dimension names. ``to_v4_output`` and
+v4 also reorganised the output: renamed variables, the groups ``inputs``,
+``solver``, ``beam`` and ``diagnostics/dbs``, lab-frame quantities in both
+cylindrical and Cartesian coordinates, and new dimension names. ``to_v4_output`` and
 ``to_v3_output`` convert an output ``DataTree`` either way, and
 ``convert_output_file`` converts a file, detecting its version::
 
@@ -236,7 +260,20 @@ def _v3_files_to_v4(kw: Dict[str, Any]) -> None:
 
 
 def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
-    """Return a copy of ``kwargs`` with v3 arguments converted to v4"""
+    """Return a copy of ``kwargs`` with v3 arguments converted to v4 (see
+    the module documentation for what it converts). It logs a warning for
+    each change, once per message.
+
+    Parameters
+    ----------
+    kwargs : dict
+        The keyword arguments that a v3 script passed to ``beam_me_up``
+
+    Returns
+    -------
+    dict
+        Keyword arguments for v4's `scotty.beam_me_up.beam_me_up`
+    """
     kw = dict(kwargs)
 
     # Launch from vacuum (propagated analytically or numerically) or from
@@ -469,6 +506,11 @@ def _same(a: np.ndarray, ctx: Dict[str, np.ndarray]) -> np.ndarray:
 
 @dataclass(frozen=True)
 class Rule:
+    r"""How one variable of the output converts between v3 and v4: its group
+    and name in each version, its dimensions where they differ, and the
+    transforms each way (`to_v4`, `to_v3`). ``only_from`` limits a rule to
+    files of one version, for names that only that version had."""
+
     v3: Tuple[str, str]  # (group, name)
     v4: Tuple[str, str]
     v3_dims: Optional[Tuple[str, ...]] = None  # None: same dims as the source
@@ -886,8 +928,21 @@ def to_v3_output(dt: xr.DataTree) -> xr.DataTree:
 def convert_output_file(
     path_in: Union[str, pathlib.Path], path_out: Union[str, pathlib.Path]
 ) -> str:
-    """Convert a Scotty output file to the other version's layout; returns the
-    version written ('v3' or 'v4')"""
+    """Convert a Scotty output file to the other version's layout: a v3 file
+    to v4's, and a v4 file to v3's (`detect_version`)
+
+    Parameters
+    ----------
+    path_in : str or pathlib.Path
+        The output file to convert
+    path_out : str or pathlib.Path
+        The file to write
+
+    Returns
+    -------
+    str
+        The version written, ``"v3"`` or ``"v4"``
+    """
     with xr.open_datatree(path_in, engine="h5netcdf") as dt:
         dt = dt.load()
     version = detect_version(dt)

@@ -149,7 +149,15 @@ def _known_argument_names() -> list:
 
 
 class Parameters:
-    # Initialisating here to stop type checker from complaining
+    r"""The inputs of `scotty.beam_me_up.beam_me_up`, checked, and the
+    quantities that the run works out from them (positions, wavevectors and
+    Psi at the launch, the entry and the initial point, and the solver
+    output). `beam_me_up` makes one, and `scotty.data_io` saves it in the
+    output. Its arguments are those of `beam_me_up` (``launch_position`` is
+    ``q_launch``, and ``mode_flag`` is ``mode_flag_launch``); an argument that
+    is not valid raises a `ValueError` here, before any computation."""
+
+    # Declared here to stop type checker from complaining
     geometry: VALID_GEOMETRIES
     cartesian_flag: bool
     launch_flag: VALID_LAUNCH_FLAGS
@@ -216,7 +224,7 @@ class Parameters:
         Te_data_path: Optional[Union[str, Path]],
         output_path: Union[str, Path],
         output_filename_suffix: str,
-        # Interpolation settings
+        # Sources of the field and the profiles, and interpolation settings
         find_B_method: Union[str, MagneticField_Cylindrical, MagneticField_Cartesian],
         density_fit_method: Union[str, ProfileFitLike],
         density_fit_parameters: Optional[Sequence],
@@ -254,11 +262,10 @@ class Parameters:
         self.geometry = self._check_geometry(geometry=geometry)
         self.cartesian_flag = self.geometry == "cartesian"
 
-        # TORBEAM antenna angles are anti-clockwise from negative X-axis,
-        # so we need to rotate the toroidal angle by pi. This will take
-        # care of the direction of the beam. The poloidal angle is also
-        # reversed from its usual sense, so we can just flip it by adding
-        # a minus sign
+        # The launch angles stay in the TORBEAM convention, measured from the
+        # local -R at the antenna: `launch_direction_cartesian` turns them into
+        # the launch direction. (The commented lines below are an older
+        # conversion, no longer used)
         self.poloidal_launch_angle_deg_Torbeam = poloidal_launch_angle_Torbeam
         self.poloidal_launch_angle_rad_Torbeam = np.deg2rad(
             self.poloidal_launch_angle_deg_Torbeam
@@ -448,22 +455,13 @@ class Parameters:
 
     ##################################################
     #
-    # PRIMARY INPUT CHECKS (for beam_me_up_3D)
-    # For data passed at first call of beam_me_up_3D
+    # PRIMARY INPUT CHECKS (for beam_me_up)
+    # For the inputs given to beam_me_up
     #
-    # TODO:
-    #    1) Need to put data pathway stuff here
-    #
-    #    2a) Put the density_fit_parameters and
-    #        density_fit_method stuff here
-    #
-    #    2b) Put ne_data checks here:
-    #        - rho must be sorted
-    #        - ne must be sorted???
-    #        - must polflux_zero_density be less than
-    #          the last polflux coord in ne.dat?
-    #
-    #    3) Need to put temperature data stuff here
+    # TODO: check the data in the density and temperature files:
+    #    - rho must be sorted
+    #    - must polflux_zero_density be less than the last polflux
+    #      coordinate in ne.dat?
     #
     ##################################################
 
@@ -983,6 +981,10 @@ class Parameters:
             ]
 
     def coordinate_conversions(self):
+        r"""Set the positions, wavevectors and Psi of the run in both
+        coordinate systems (``*_cartesian`` and ``*_cylindrical``), from those in
+        the coordinates of ``geometry``. In cylindrical coordinates, ``K_zeta``
+        is the toroidal mode number."""
         if self.cartesian_flag:
             # position vectors
             self.q_launch_cartesian = self.q_launch  # (3,)
@@ -1160,12 +1162,16 @@ class Parameters:
 
 ##################################################
 #
-# INPUT CHECK BEFORE RAY TRACING
+# OUTPUT CHECKS AFTER RAY AND BEAM TRACING
 #
 ##################################################
 
 
 def check_H_output(H_arr: ArrayLike, H_tol: float = 1e-2) -> None:
+    r"""Check that the dispersion relation holds along the ray: H should be
+    zero. Raises a `ValueError` if max(abs(H)) > 0.1 (for example a ray on
+    the wrong root, which is at about 1), and warns if it is above
+    ``H_tol``."""
     log.debug("Checking `H` output along the ray (it should be zero)")
 
     H_max = np.max(np.abs(H_arr))

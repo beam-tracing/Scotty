@@ -65,7 +65,8 @@ def unpack_beam_parameters(
     q_K_RePsi_ImPsi_arr: FloatArray, transpose_flag: bool = False
 ) -> Tuple[FloatArray, FloatArray, ComplexFloatArray]:
     """Unpacks `q_K_RePsi_ImPsi_arr` of shape `(18, N)` back into
-    `q` (shape `(3, N)`), `K` (shape `(3, N)`), and `Psi` (shape `(N, 3, 3)`)"""
+    `q` (shape `(3, N)`), `K` (shape `(3, N)`), and `Psi` (shape `(N, 3, 3)`).
+    With `transpose_flag`, `q` and `K` have shape `(N, 3)`"""
 
     log.trace(f"Unpacking ray and beam parameters")
     q = q_K_RePsi_ImPsi_arr[0:3]
@@ -94,12 +95,20 @@ def unpack_beam_parameters(
 def d_beam_parameters_d_tau(
     tau: FloatArray, beam_parameters: FloatArray, hamiltonian: Hamiltonian
 ) -> FloatArray:
-    """
-    something
-    """
+    r"""
+    The right-hand side of the beam equations, for `scipy.integrate.solve_ivp`:
+    :math:`dq/d\tau = \nabla_K H`, :math:`dK/d\tau = -\nabla H` and
 
-    # tau is unused here, but solve_ivp is strict about the function signatures and requires something like
-    # f(t, y, y0), so we put the tau here so that it stops complaining
+    .. math::
+
+        \frac{d\Psi}{d\tau} = -\Psi \nabla_K \nabla_K H \Psi
+            - \Psi \nabla_K \nabla H - (\Psi \nabla_K \nabla H)^T
+            - \nabla \nabla H
+
+    `beam_parameters` is `q`, `K` and `Psi` packed by `pack_beam_parameters`,
+    and so is the result. `tau` is not used: `solve_ivp` needs it in the
+    signature.
+    """
 
     q, K, Psi = unpack_beam_parameters(beam_parameters)
 
@@ -146,11 +155,15 @@ def beam_tracing(
     FloatArray,
     ComplexFloatArray,
 ]:
-    """`atol` applies to `q` as given, and to `K` and `Psi` scaled by `|K|` and
-    `max|Psi|` at the initial point.
+    """Integrate the beam (`q`, `K` and `Psi`, with
+    `d_beam_parameters_d_tau`) from the initial point to `tau_leave`, with
+    output at `tau_points`. `atol` applies to `q` as given, and to `K` and
+    `Psi` scaled by `|K|` and `max|Psi|` at the initial point.
 
-    Returns solver status (always 0, since a failure raises), number of evaluations, duration taken by solver,
-    tau` of shape `(N,)`, `q` of shape `(3, N)`, `K` of shape `(3, N)`, `Psi` of shape `(N, 3, 3)`
+    Returns the solver status (always 0, since a failure raises a
+    `RuntimeError`), the number of evaluations, the time the solver took (in
+    s), `tau` of shape `(N,)`, `q` of shape `(N, 3)`, `K` of shape `(N, 3)`
+    and `Psi` of shape `(N, 3, 3)`
     """
 
     # Packing the ray and beam parameters

@@ -6,8 +6,8 @@
 The entry point of Scotty: `beam_me_up` traces the ray, propagates the beam
 and analyses the result, saving everything to one output file.
 
-Notes
-~~~~~
+How a run works
+~~~~~~~~~~~~~~~
 
 - ``geometry`` is ``"cylindrical"`` (axisymmetric fields; :math:`K_\\zeta` is
   conserved, and :math:`K^2 = K_R^2 + (K_\\zeta / R)^2 + K_Z^2`) or
@@ -165,22 +165,22 @@ def beam_me_up(
     second_harmonic_flag: VALID_RESONANCE_FLAGS = "stop",  # at the second cyclotron harmonic: "stop", "raise" or "pass"
     upper_hybrid_flag: VALID_RESONANCE_FLAGS = "stop",  # at the upper hybrid layer (X-mode only): "stop" (1e-2 short of it) or "raise"
     auto_delta_sign: bool = True,  # For flipping signs to maintain forward difference
-    delta_X: float = 1e-5,  # in the same units as data_X_coord
-    delta_Y: float = 1e-5,  # in the same units as data_Y_coord
+    delta_X: float = 1e-5,  # in m, as the other spatial steps
+    delta_Y: float = 1e-5,
     delta_R: float = 1e-5,
-    delta_Z: float = 1e-5,  # in the same units as data_Z_coord
-    delta_K_X: float = 1e-1,  # in the same units as K_X
-    delta_K_Y: float = 1e-1,  # in the same units as K_Y
+    delta_Z: float = 1e-5,
+    delta_K_X: float = 1e-1,  # in m^-1, as the other wavevector steps
+    delta_K_Y: float = 1e-1,
     delta_K_R: float = 1e-1,
-    delta_K_zeta: float = 1e-1,
-    delta_K_Z: float = 1e-1,  # in the same units as K_Z
+    delta_K_zeta: float = 1e-1,  # a step in the toroidal mode number
+    delta_K_Z: float = 1e-1,
     len_tau: int = 4002,
     rtol: float = 1e-4,  # for solve_ivp of the ray/beam solvers
     atol: float = 1e-7,  # for solve_ivp of the ray/beam solvers
     poloidal_flux_enter: Optional[float] = None,  # None: where the density starts
     poloidal_flux_zero_density: Optional[
         float
-    ] = None,  # Deprecated: when polflux >= this, Scotty sets density = 0
+    ] = None,  # Deprecated: when polflux > this, Scotty sets density = 0
     poloidal_flux_zero_temperature: Optional[
         float
     ] = None,  # Deprecated: temperature analogue of poloidal_flux_zero_density
@@ -214,7 +214,7 @@ def beam_me_up(
     dbs_analysis_flag: bool = True,
     # Additional flags
     ray_tracing_flag: bool = False,
-    return_dt_field: bool = False,  # For returning the datatree, field class
+    return_dt_field: bool = False,  # Also return the field object
     # Keeping the extra kwargs for parsing later
     **kwargs,
 ) -> Union[
@@ -644,7 +644,7 @@ def beam_me_up(
     log.debug(f"Setting experimental profiles for density")
     params.set_experimental_profiles()
 
-    # UUsing the electron density data, create a spline fit as a
+    # Using the electron density data, create a spline fit as a
     # function of poloidal flux, i.e.:
     # density_fit(poloidal_flux) = electron_density
     density_fit = make_fit(
@@ -858,7 +858,7 @@ def beam_me_up(
 
     if (
         params.ray_tracing_flag
-    ):  # if ray_tracing_flag, then ray_tracing_result is 2-tuple of (tau_arr, q_K_arrs)
+    ):  # status, evaluations, duration, tau and the (6, N) array of q and K
         (
             params.solver_status,
             params.solver_nfev,
@@ -870,9 +870,9 @@ def beam_me_up(
             ray_tracing_result,
         )
         params.q_output = q_K_output[:3].T  # (N, 3)
-        params.K_output = q_K_output[3:].T  # (N,3 )
+        params.K_output = q_K_output[3:].T  # (N, 3)
         params.Psi_3D_output_labframe = None
-    else:  # otherwise just take the tau_array with tau of terminating event and pass into beam-tracing
+    else:  # otherwise take the tau points and the tau where the ray stops, for the beam solver
         _, _, _, tau_points, tau_terminating_event = cast(
             Tuple[Literal[1, 0, -1], int, float, FloatArray, float], ray_tracing_result
         )

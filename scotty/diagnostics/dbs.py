@@ -38,7 +38,15 @@ def dbs_analysis(
     density_fit: ProfileFitLike,
     temperature_fit: Optional[ProfileFitLike],
 ) -> Tuple[dict, dict]:
+    r"""The Doppler backscattering analysis of a traced beam: the
+    backscattered wavenumbers, the mismatch, the filter functions
+    (``filterfun_*``) and the localisation along the beam, from the inputs,
+    the solver output and the beam analysis (`scotty.analysis.basic_analysis`).
 
+    Returns the variables and the coordinates of the output group
+    ``diagnostics/dbs``, as two dicts for an `xarray.Dataset`. Some of the
+    variables belong to the ``beam`` group (`scotty.data_io.BEAM_FROM_DBS`), and
+    `scotty.data_io.to_output_tree` puts them there."""
     log.info(f"""\n
     ##################################################
     #

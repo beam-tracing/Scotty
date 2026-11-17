@@ -25,11 +25,16 @@ SOLUTION_COMPONENTS = ["solution_1", "solution_2", "solution_3"]
 
 
 def dict_to_dataset(data_dict: dict, data_coords: dict) -> xr.Dataset:
+    r"""An `xarray.Dataset` from a dict of variables and a dict of
+    coordinates, as `inputs_to_dicts` and `solver_output_to_dicts` return."""
     return xr.Dataset(data_dict, data_coords)
 
 
 def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict]:
-
+    r"""The variables and coordinates of the output's ``inputs`` group: the
+    inputs of the run as checked by `scotty.checks.Parameters` (with paths and
+    the field and profile methods as strings, since netCDF can store neither
+    `None` nor objects), and the field's grid."""
     cart = params.cartesian_flag
 
     inputs_dict = {
@@ -132,8 +137,11 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
 
 
 def solver_output_to_dicts(params: Parameters) -> Tuple[dict, dict]:
-    # put in docstring that K_zeta is toroidal mode number not actually the true toroidal component
-
+    r"""The variables and coordinates of the output's ``solver`` group: q, K
+    and Psi along the beam, in both coordinate systems, with the launch, entry
+    and initial values and the solver's status. In cylindrical coordinates,
+    ``K_zeta`` is the toroidal mode number, not the toroidal component of K
+    (which is ``K_zeta / R``)."""
     cart = params.cartesian_flag
     btf = not params.ray_tracing_flag
     solver_output_dict = {

@@ -1,113 +1,133 @@
 Scotty
 ======
 
-Beam tracing for tokamak DBS diagnostics
+Scotty is a beam-tracing code for Doppler backscattering (DBS) synthetic
+diagnostics in tokamaks. It launches a Gaussian beam, traces it through the
+plasma, and computes where along the beam the signal comes from and how
+strong it is: the filter functions of the beam model of DBS [[1]](#1).
 
 
-Scotty v3 and v4
-----------------
+Status
+------
 
-**Scotty v4 is at its first release candidate, 4.0.0rc1.** It is the version on
-the `master` branch. The rc freezes the interface (argument names and defaults,
-what the inputs mean, the output variables), so scripts written for it should
-keep working in 4.0.0; only fixes that leave the interface alone go in before
-then. Some of v3's features haven't been ported yet. Until 4.0.0 is released,
-v3 is the stable line: use it for published work, or anything you need to
-reproduce later. Please try v4 and report problems at
-https://github.com/beam-tracing/Scotty/issues.
+- **v3 is the stable version.** The latest release is 3.2.0. It works in
+  cylindrical coordinates (R, ζ, Z). Use v3 for published work, or for
+  anything that you must reproduce later.
+- **v4 is at its first release candidate, 4.0.0rc1**, on the `master` branch.
+  It has the same beam model, with cylindrical or Cartesian (X, Y, Z)
+  coordinates (`geometry="cylindrical"` or `"cartesian"`), and it gives its
+  outputs in both. The rc freezes the interface (the argument names and
+  defaults, what the inputs mean, and the output variables), so scripts
+  written for it keep working in 4.0.0. It has been checked against v3 on the
+  test suite and on DIII-D, MAST-U and MAST cases. Please try it, and report
+  problems on the [issue tracker](https://github.com/beam-tracing/Scotty/issues).
 
-- **v3** (stable, the released version): beam tracing in cylindrical coordinates
-  (R, ζ, Z). The latest release is 3.2.0.
-- **v4** (release candidate 4.0.0rc1): the same beam model,
-  with a choice of cylindrical or Cartesian (X, Y, Z) coordinates
-  (`geometry="cylindrical"` or `"cartesian"`). Outputs are given in both. It has
-  been checked against v3 on the test suite and on DIII-D, MAST-U and MAST
-  cases. Its known differences from v3 (see the release notes in the
-  documentation, `docs/release_notes.rst`):
-  - some arguments and output names have changed. `scotty.compat.from_v3_kwargs`
-    translates v3's `beam_me_up` arguments, and `scotty.compat.quick_cutoff`
-    replaces v3's `quick_run`;
-  - `launch_flag` replaces v3's `vacuumLaunch_flag` and
-    `vacuum_propagation_flag`: `"vacuum_analytic"` (analytic propagation to the
-    plasma boundary, then `Psi_BC_flag`; v3's `vacuum_propagation_flag=True`),
-    `"vacuum_numerical"` (the solvers start at the antenna; v3's
-    `vacuum_propagation_flag=False`) or `"plasma"`;
-  - a plasma launch (`launch_flag="plasma"`, v3's `vacuumLaunch_flag=False`)
-    checks that the launch point is inside the plasma and that K satisfies the
-    dispersion relation, and takes K and Ψ in Cartesian components. With no
-    launched beam, `filterfun_b` and `filterfun_all` are NaN;
-  - `Psi_BC_flag` is `"continuous"`, `"discontinuous"` or `None`; v3's
-    deprecated `True` and `False` raise an error. `Psi_BC_flag=None` (v3's
-    default) checks that the density is zero and flat at the plasma edge, and
-    raises an error otherwise;
-  - the localisation is called the filter function: v3's `loc_*` are v4's
-    `filter_*`;
-  - the default spatial finite-difference step (`delta_R`, `delta_Z`, ...) is
-    1e-5 (v3: 1e-4), the default solver tolerances are `rtol=1e-4`,
-    `atol=1e-7` (v3: 1e-3, 1e-6), and the default `len_tau` is 4002 (v3: 102);
-  - not yet ported: most of v3's matplotlib plots (`scotty.plotting` has
-    `plot_dispersion_relation`, `plot_poloidal_beam_path` and
-    `plot_toroidal_beam_path`), the filter-function widths (`delta_l`,
-    `delta_kperp1`), the GUI (`GUI/scottypygui.py`), and the `curvy_slab`
-    field, which is deprecated;
-  - check which version you have with `scotty.__version__`. An install from
-    `master` after the rc gives a development version such as
-    `4.0.0rc2.dev5+g1234abc` (from `setuptools_scm`).
+Check which version you have with `scotty.__version__`. An install from
+`master` after the rc gives a development version such as
+`4.0.0rc2.dev5+g1234abc` (from `setuptools_scm`).
 
 
 Install
 -------
 
-The package to install is called `scotty-beam-tracing`, but the Python module is
-just `scotty`.
+The package is called `scotty-beam-tracing`, and the Python module is called
+`scotty`. Scotty needs Python 3.10 or newer.
 
-**v3 (stable).** From PyPI:
+- v3, from PyPI:
 
-```
-pip install scotty-beam-tracing
+  ```
+  pip install scotty-beam-tracing
+  ```
+
+- v4, the release candidate, from PyPI (pip installs a release candidate
+  only when you ask for it):
+
+  ```
+  pip install scotty-beam-tracing==4.0.0rc1
+  ```
+
+- v4, the latest development version, from GitHub:
+
+  ```
+  pip install git+https://github.com/beam-tracing/Scotty
+  ```
+
+- To develop Scotty, from a local clone:
+
+  ```
+  pip install -e ".[tests]"
+  ```
+
+
+Quick start (v4)
+----------------
+
+```python
+from scotty import beam_me_up, get_parameters_for_Scotty
+
+# A DBS beam in an analytical field with circular flux surfaces
+kwargs = get_parameters_for_Scotty("DBS_synthetic")
+dt = beam_me_up(**kwargs)  # also saved as scotty_output.h5
+print(dt["diagnostics/dbs"]["filterfun_all"])
 ```
 
-or a specific release straight from GitHub:
+More examples are in [`Examples/`](Examples/).
 
-```
-pip install git+https://github.com/beam-tracing/Scotty@v3.2.0
-```
 
-**v4 (release candidate).** From PyPI (pip installs release candidates only
-when asked to):
+Moving from v3 to v4
+--------------------
 
-```
-pip install scotty-beam-tracing==4.0.0rc1
-```
+- A v3 script runs with `beam_me_up(**scotty.compat.from_v3_kwargs(kwargs))`.
+  It converts v3's arguments and logs each change.
+- `find_B_method` and `density_fit_method` must be given: they have no
+  defaults.
+- The data files are given by their paths (`magnetic_data_path`,
+  `ne_data_path`, `Te_data_path`). EFIT and saved UDA files are read with the
+  field constructors in `scotty.geometry`, and the field is given to
+  `beam_me_up` as `find_B_method`.
+- The output has the groups `inputs`, `solver`, `beam` and `diagnostics/dbs`.
+  `scotty.compat.convert_output_file` converts output files between the two
+  versions.
+- The release notes list every change, and say which ones change results:
+  [`docs/release_notes.rst`](docs/release_notes.rst).
 
-or the latest development version, straight from GitHub:
-
-```
-pip install git+https://github.com/beam-tracing/Scotty
-```
-
-or from a local clone:
-
-```
-pip install .
-```
-
-when developing, use:
-
-```
-pip install -e .
-```
 
 Documentation
--------
-https://scotty.readthedocs.io/
+-------------
 
-Background
--------
-Description of the Scotty [[1]](#1), derivation of beam tracing given in Appendix A.
+https://scotty.readthedocs.io/: the inputs, the output, the layout of the code,
+the API and the release notes.
 
-## References
-<a id="1">[1]</a> 
-Hall-Chen, V. H., Parra, F. I., & Hillesheim, J. C. (2022). 
-[Beam model of Doppler backscattering](https://iopscience.iop.org/article/10.1088/1361-6587/ac57a1). 
+
+Contribute
+----------
+
+- Source code: https://github.com/beam-tracing/Scotty
+- Issue tracker: https://github.com/beam-tracing/Scotty/issues
+- Run the tests with `pytest`, and format the code with `black` (CI checks
+  both). Open pull requests against `master`.
+
+
+Get help
+--------
+
+Open an issue on the [issue tracker](https://github.com/beam-tracing/Scotty/issues).
+
+
+Cite
+----
+
+If you use Scotty in published work, cite [[1]](#1). It describes the beam
+model, and its Appendix A derives beam tracing.
+
+<a id="1">[1]</a>
+Hall-Chen, V. H., Parra, F. I., & Hillesheim, J. C. (2022).
+[Beam model of Doppler backscattering](https://iopscience.iop.org/article/10.1088/1361-6587/ac57a1).
 *Plasma Physics and Controlled Fusion*, **64**(9), 095002.
+
+
+License
+-------
+
+Scotty is licensed under the GNU General Public License, version 3
+([`LICENSE.md`](LICENSE.md)).

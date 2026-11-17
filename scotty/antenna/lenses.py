@@ -45,16 +45,23 @@ class Lens:
         self.focal_length = focal_length
 
     def output_beam(self, Psi_w_in, freq_GHz):
-        """Return the refracted beam
+        """Return the refracted beam, Psi_w after the lens
 
         - Assumes Psi_w is diagonalised
-        - Doesn't assume that the diagnoalised Re(Psi_w)'s components are equal
+        - Doesn't assume that the diagonalised Re(Psi_w)'s components are equal
           to each other, that is, the curvatures are allowed to be 'elliptical'
 
-        Arguments
-        =========
-        Psi_w_in:
-            Incident beam as a 2x2 matrix
+        Parameters
+        ----------
+        Psi_w_in : (2,2) ComplexFloatArray
+            Psi_w of the incident beam, in m^-2
+        freq_GHz : float
+            Beam frequency, in GHz
+
+        Returns
+        -------
+        (2,2) ComplexFloatArray
+            Psi_w after the lens
         """
 
         raise NotImplementedError
@@ -154,16 +161,21 @@ class ABCD_Lens(Lens):
 def make_my_lens(
     name: str, lens_type: str = "thin", focal_length: Optional[float] = None
 ) -> Lens:
-    """Create one of a pre-existing set of parameterised lenses.
+    """One of a set of known lenses
 
-    Arguments
-    =========
-    name:
-        Name of the known lenses
-    lens_type:
-        One of "thin", "thick", "hyperbolic"
-    focal_length:
-        Focal length for the DBS_UCLA_DIII-D_240 lens
+    Parameters
+    ----------
+    name : str
+        The lens: ``"MAST_V_band"`` or ``"MAST_Q_band"`` (all three types),
+        or ``"DBS_UCLA_DIII-D_240"`` or ``"DBS_UCLA_MAST-U"`` (thin only)
+    lens_type : {"thin", "thick", "hyperbolic"}, default "thin"
+        The model of the lens. An unknown type or name raises a `ValueError`
+    focal_length : float, optional
+        Focal length, in m, for the ``"DBS_UCLA_DIII-D_240"`` lens
+
+    Returns
+    -------
+    Lens
     """
 
     lenses: Dict[str, Dict[str, Lens]] = {
@@ -186,14 +198,14 @@ def make_my_lens(
             "MAST_V_band": ABCD_Lens(
                 "MAST_V_band",
                 A=1.000000000000,
-                B=41.347131119605e-3,  # convert
+                B=41.347131119605e-3,  # 41.3 mm, in m
                 C=-0.006016900790e3,
                 D=0.751218414102,
             ),
             "MAST_Q_band": ABCD_Lens(
                 "MAST_Q_band",
                 A=1.000000000000,
-                B=22.103343171495e-3,  # convert
+                B=22.103343171495e-3,  # 22.1 mm, in m
                 C=-0.003423517875e3,
                 D=0.924328809548,
             ),

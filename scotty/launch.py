@@ -165,10 +165,10 @@ def find_plasma_entry_position(
     start_tau = tau_arr[start_idx]
     stop_tau = tau_arr[stop_idx]
 
-    # With the `tau`s of  the start and endpoints, we now create a
+    # With the `tau`s of the start and endpoints, we now create a
     # refined array, get the corresponding poloidal flux values, and
-    # feed it into a cubic spline to find the root (i.e. `tau` value
-    # where poloidal flux is close to `poloidal_flux_enter`
+    # feed it into a cubic spline to find the roots (the `tau` values
+    # where the poloidal flux is `poloidal_flux_enter`)
 
     tau_arr_refined = np.linspace(start_tau, stop_tau, num_tau)
     polflux_arr_refined = field.polflux_cartesian(*ray_line(*q_launch_cartesian, tau_arr_refined, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam))  # type: ignore
@@ -265,7 +265,10 @@ def find_auto_delta_signs(
     deltas: FloatArray,
     field: VALID_FIELDS,
 ) -> FloatArray:
-
+    r"""The spatial finite-difference steps, with their signs set so that
+    each forward difference points down the poloidal flux, into the plasma, at
+    ``q_initial`` (with their sizes unchanged). If ``auto_delta_sign`` is
+    False, the steps are returned as given."""
     # Now, we also perform auto_delta_sign checks (if the user specifies)
     # If the user does not want to flip the signs, just return them
     # Otherwise, check which geometry is being used and check the signs
@@ -1005,19 +1008,11 @@ def find_plasma_entry_parameters(
                     hamiltonian=hamiltonian,
                 )
 
-    # If mode_flag is 1 or -1, then we just calculate the
-    # quantities for those. If mode_flag is "O" or "X", then
-    # we calculate the quantities for both 1 and -1. After
-    # obtaining the quantities corresponding to H_booker = 0,
-    # we calculate H_Cardano and find the polarisation vector
-    # corresponding to H_booker = H_Cardano = 0 to see if it's
-    # O- or X-mode. We do this, literally, by comparing the
-    # e_hats with the O-mode polarisation vector; specifically,
-    # since the O-mode polarisation vector ~ [0,0,1] (in the u1,
-    # u2, b) basis -- see the paper), we compare the last
-    # component of both vectors. If the last component of
-    # the vector is not close to 1 (i.e. |v[-1] - 1| < tol),
-    # then we say it's X-mode; otherwise, it's O-mode
+    # The plasma quantities at the initial point, which both roots need.
+    # Which root is the O-mode is decided below from the two roots'
+    # polarisations (`_mode_polarisations`, `_O_mode_flag`): the O-mode is the
+    # root more polarised along b. A `mode_flag` of 1 or -1 is traced as given;
+    # "O" or "X" picks the root with that label
     b_hat, epsilon_terms, B_magnitude, electron_density, electron_temperature = (
         _plasma_terms_at(
             q_initial,

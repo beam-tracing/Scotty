@@ -150,36 +150,36 @@ def derivative(
 
     Parameters
     ----------
-    func:
+    func : callable
         Function to take the derivative of
-    dims:
+    dims : str or tuple of str
         The name(s) of the dimension(s) to take the derivative along. ``dims``
         must appear in the keys of ``args``. For second derivatives in one
         dimension, pass a tuple with the argument name repeated, for example
         ``("x", "x")`` for the second derivative in ``x``
-    args:
+    args : dict
         Arguments to ``func`` at the point to evaluate the derivative
-    spacings:
+    spacings : float or dict, default 1e-8
         Step size for derivative. If a single float, used for all dimensions,
         otherwise if a mapping of dimension names to step size then the keys
         must be identical to those of ``dims``
-    stencil:
+    stencil : str, optional
         Stencil name (see `STENCILS` for supported stencils). Defaults to
-        central differences
-    use_cache:
+        second-order central differences
+    use_cache : bool, default True
         If true, then wraps ``func`` with the decorator `cache`
 
     Returns
     -------
     ArrayLike
-        Derivative of ``func`` evaluated at ``location``
+        Derivative of ``func`` evaluated at ``args``
 
     Examples
     --------
     >>> derivative(lambda x: np.sin(x), "x", {"x": 0.0})
     1.0
 
-    >>> derivative(lambda x, y: np.sin(x) * y**2, ("x", "y"), {"x": 0.0, "y": 2.0})
+    >>> round(derivative(lambda x, y: np.sin(x) * y**2, ("x", "y"), {"x": 0.0, "y": 2.0}), 6)
     4.0
 
     """

@@ -69,6 +69,10 @@ def flux_surface_tangents(
 def check_vector_pointing_into_plasma(
     q: FloatArray, vector: FloatArray, field: VALID_FIELDS
 ) -> None:
+    r"""Check that ``vector`` at ``q`` (both in the field's coordinates)
+    points into the plasma, that is, down the poloidal flux, from the flux
+    0.01 m either side of ``q`` along it. Raises a `ValueError` if it points
+    out, and warns if the flux there is not monotonic."""
     if not q.shape == (3,):
         raise ValueError(f"`q` must have shape (3,), but got {q.shape}")
     if not vector.shape == (3,):
@@ -120,7 +124,12 @@ def find_H_bar(
     electron_density: ArrayLike,
     temperature: Optional[ArrayLike] = None,
 ) -> ArrayLike:
-
+    r"""The dispersion relation in units of K^2, K^2 - K_0^2 N^2 (that is,
+    K_0^2 H), for the mode ``mode_flag`` and the wavevector with components
+    ``K_parallel``, ``K_binormal`` and ``K_normal`` along the three given unit
+    vectors, at a point with the field ``(B_X, B_Y, B_Z)`` and the electron
+    density (and temperature) given. `find_K_plasma` finds its root in
+    ``K_normal``."""
     K_0 = angular_frequency_to_wavenumber(launch_angular_frequency)
     K_cartesian = (
         K_parallel * parallel_unitvector
@@ -161,7 +170,14 @@ def find_K_plasma(
     field: VALID_FIELDS,
     hamiltonian: Hamiltonian,
 ) -> FloatArray:
-    """NOTE: if K_vacuum is in cyl (cart), K_plasma is in cyl (cart)"""
+    """K just inside the plasma at the entry point `q_entry`, in the same
+    coordinates as `K_vacuum` (cylindrical or Cartesian).
+
+    For `Psi_BC_flag` "continuous" and None, it is `K_vacuum`. For
+    "discontinuous", the two components of K along the flux surface are kept,
+    and the component normal to it is found from the dispersion relation of
+    `hamiltonian`'s mode, H = 0. It raises a `ValueError` if that mode is cut
+    off just inside the boundary."""
 
     if Psi_BC_flag in ["continuous", None]:
         K_plasma = K_vacuum
@@ -427,7 +443,15 @@ def find_Psi_3D_plasma(
     field: VALID_FIELDS,
     hamiltonian: Hamiltonian,
 ) -> ComplexFloatArray:
+    r"""Psi just inside the plasma at the entry point ``q_entry``, in the
+    lab frame, from Psi in the vacuum there.
 
+    For ``Psi_BC_flag=None``, it is the vacuum Psi. For "continuous" and
+    "discontinuous", six equations give it: three match t.Psi.t across the
+    boundary for three tangents t of the flux surface
+    (`flux_surface_tangents`), and three set Psi . dH/dK = -dH/dq in the
+    plasma. For "discontinuous", the matching includes the jump in K, which
+    is along grad psi, times the curvature of the flux surface."""
     cart = False if isinstance(field, MagneticField_Cylindrical) else True
 
     # No boundary conditions to be applied
@@ -987,7 +1011,7 @@ def apply_boundary_conditions(
     r"""Apply boundary conditions at the plasma-vacuum boundary where
     the electron density profile can be: (i) continuous and differentiable
     (None); (ii) continuous but not differentiable ("continuous"); or
-    (iii) discontinuous and not differentiable ("discontinuous).
+    (iii) discontinuous and not differentiable ("discontinuous").
 
     For (i), no boundary conditions are applied, and the
     `q`, `K`, `Psi_3D` parameters are directly returned (and later fed

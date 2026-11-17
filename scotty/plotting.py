@@ -120,7 +120,19 @@ def _beam_edges(
 def plot_bounding_box(dt: xr.DataTree, ax: Optional[plt.Axes] = None) -> plt.Axes:
     """Plot the (R, Z) bounding box of the magnetic field's grid, from the
     output's inputs. For ``geometry="cartesian"``, the box spans the R of the
-    grid's (X, Y) extent"""
+    grid's (X, Y) extent
+
+    Parameters
+    ----------
+    dt : xarray.DataTree
+        The output of `scotty.beam_me_up.beam_me_up`
+    ax : matplotlib.axes.Axes, optional
+        The axes to plot on; a new figure if None
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
     ax = maybe_make_axis(ax)
     inputs = dt["inputs"]
     Z = inputs["Z"].values
@@ -151,7 +163,27 @@ def plot_flux_surfaces(
 ) -> plt.Axes:
     """Contours of the normalised poloidal flux in the (R, Z) plane at the
     toroidal angle ``zeta`` (used by Cartesian fields only), from 0 to 1 in
-    steps of 0.1 by default, with the last closed flux surface dashed"""
+    steps of 0.1 by default, with the last closed flux surface dashed
+
+    Parameters
+    ----------
+    field : MagneticField_Cylindrical or MagneticField_Cartesian
+        The field
+    ax : matplotlib.axes.Axes, optional
+        The axes to plot on; a new figure if None
+    zeta : float, default 0.0
+        Toroidal angle of the plane, in rad (Cartesian fields only)
+    levels : FloatArray, optional
+        The flux of the contours; 0 to 1 in steps of 0.1 if None
+    highlight_LCFS : bool, default True
+        Draw the last closed flux surface dashed
+    n_points : int, default 201
+        Number of grid points in R and in Z
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
     ax = maybe_make_axis(ax)
     if isinstance(field, MagneticField_Cylindrical):
         R = np.asarray(field.R_coord)
@@ -193,7 +225,21 @@ def plot_dispersion_relation(
     from the cut-off). One of them should be zero all along the path; this
     shows if the root that is zero changes.
 
-    ``dt`` is the output of `beam_me_up`."""
+    ``dt`` is the output of `beam_me_up`.
+
+    Parameters
+    ----------
+    dt : xarray.DataTree
+        The output of `scotty.beam_me_up.beam_me_up`
+    filename : str or pathlib.Path, optional
+        If given, the figure is saved there
+    ax : matplotlib.axes.Axes, optional
+        The axes to plot on; a new figure if None
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
     ax = maybe_make_axis(ax)
     l_lc = beam_group(dt)["beam_path_length_wrt_cutoff"].values
 
@@ -233,7 +279,26 @@ def plot_poloidal_beam_path(
     launch position (in vacuum, dotted) through the solver's points, the beam
     width in that plane (dashed), and the field's bounding box. With
     ``field``, also its flux surfaces. With ``zoom``, the axes are limited to
-    the beam."""
+    the beam.
+
+    Parameters
+    ----------
+    dt : xarray.DataTree
+        The output of `scotty.beam_me_up.beam_me_up`
+    filename : str or pathlib.Path, optional
+        If given, the figure is saved there
+    ax : matplotlib.axes.Axes, optional
+        The axes to plot on; a new figure if None
+    zoom : bool, default False
+        Limit the axes to the beam
+    field : MagneticField_Cylindrical or MagneticField_Cartesian, optional
+        The field, from ``beam_me_up(..., return_dt_field=True)``, to draw the
+        flux surfaces
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
     ax = maybe_make_axis(ax)
 
     R, zeta, Z = beam_path_cylindrical(dt)
@@ -294,7 +359,24 @@ def plot_toroidal_beam_path(
     """Plot the beam path seen from above, in the (X, Y) plane: the central
     ray from the launch position, and the beam width in that plane (dashed).
     With ``field``, also the last closed flux surface on the midplane
-    (Z = 0)."""
+    (Z = 0).
+
+    Parameters
+    ----------
+    dt : xarray.DataTree
+        The output of `scotty.beam_me_up.beam_me_up`
+    filename : str or pathlib.Path, optional
+        If given, the figure is saved there
+    ax : matplotlib.axes.Axes, optional
+        The axes to plot on; a new figure if None
+    field : MagneticField_Cylindrical or MagneticField_Cartesian, optional
+        The field, from ``beam_me_up(..., return_dt_field=True)``, to draw the
+        flux surfaces
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
     ax = maybe_make_axis(ax)
 
     if field is not None:
@@ -350,6 +432,7 @@ def plot_toroidal_beam_path(
 
 
 def make_fig_if_None(existing_fig: Optional[pgo.Figure] = None) -> pgo.Figure:
+    r"""``existing_fig``, or a new plotly figure if it is None."""
     fig = pgo.Figure() if existing_fig is None else existing_fig
     return fig
 
@@ -365,7 +448,34 @@ def plot_3d_flux_surfaces(
     show_in_browser: bool = False,
     show_axes: bool = True,
 ) -> pgo.Figure:
+    r"""Plot the flux surfaces of ``field`` in 3D with plotly, as isosurfaces
+    of the normalised poloidal flux from 0 to 1 (or of its square root, with
+    ``use_rho``), on the grid ``xlims``, ``ylims``, ``zlims``, each
+    ``(min, max, number of points)``. With ``existing_fig``, the surfaces are
+    added to it.
 
+    Parameters
+    ----------
+    field : MagneticField_Cylindrical or MagneticField_Cartesian
+        The field
+    xlims, ylims, zlims : tuple of (float, float, int)
+        The grid of the flux surfaces, each ``(min, max, number of points)``,
+        in m
+    existing_fig : plotly.graph_objects.Figure, optional
+        Add to this figure; a new figure if None
+    use_rho : bool, default False
+        Draw the square root of the normalised flux, not the flux
+    show_graph : bool
+        Show the figure
+    show_in_browser : bool
+        Show it in a web browser, not in the notebook
+    show_axes : bool, default True
+        Show the caps of the isosurfaces at the edges of the grid
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+    """
     Z = field.Z_coord if zlims is None else np.linspace(*zlims)  # type: ignore
 
     if isinstance(field, (MagneticField_Cartesian, InterpolatedField_Cartesian)):
@@ -466,8 +576,8 @@ def plot_3d_beam(
     """
     Vectorised 3D beam visualization using Plotly Mesh3d
 
-    field : MagneticField_Cartesian or MagneticField_Cylindrical
-        Magnetic field class
+    Parameters
+    ----------
     q_X, q_Y, q_Z : (N,) FloatArray
         Central ray coordinates
     widths_N, widths_B : (N,) FloatArray
@@ -476,8 +586,6 @@ def plot_3d_beam(
         N(ormal) and B(inormal) unit vectors
     theta_resolution : int
         Angular resolution in the beam cross-section
-    xlims, ylims, zlims : Tuple
-        Three element tuple containing (`min`, `max`, `num_step`)
     existing_fig : pgo.Figure or None
         If `pgo.Figure`, add the trace there; otherwise, create a new plotly figure
     show_graph : bool
@@ -591,7 +699,9 @@ def plot_3d_beam_in_plasma(
     show_in_browser: bool = True,
     show_axes: bool = True,
 ) -> pgo.Figure:
-
+    r"""The flux surfaces of ``field`` (`plot_3d_flux_surfaces`) and the beam
+    (`plot_3d_beam`) in one plotly figure. The arguments are those of the two
+    functions."""
     fig = make_fig_if_None(existing_fig)
 
     fig = plot_3d_flux_surfaces(

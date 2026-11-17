@@ -25,16 +25,20 @@ def circular_gaussian_Psi_w(
 
 def find_Rayleigh_length(waist: float, wavenumber: float):
     """
-    Finds the Rayleigh length (assumes vacuum propagation and circular beam)
+    Finds the Rayleigh length, ``wavenumber * waist**2 / 2`` (assumes vacuum
+    propagation and circular beam)
 
     Parameters
     ----------
     waist : float
+        Width at the waist, in m
     wavenumber : float
+        Vacuum wavenumber, in m^-1
 
     Returns
-    ----------
+    -------
     rayleigh_length : float
+        In m
     """
     return 0.5 * wavenumber * waist**2
 
@@ -46,31 +50,39 @@ def find_waist(width: float, wavenumber: float, curvature: float):
     Parameters
     ----------
     width : float
+        Width of the beam, in m
     wavenumber : float
+        Vacuum wavenumber, in m^-1
     curvature : float
+        Curvature of the wavefronts, in m^-1 (negative for a converging beam)
 
     Returns
-    ----------
+    -------
     beam_waist : float
+        Width at the waist, in m
     """
     return width / np.sqrt(1 + curvature**2 * width**4 * wavenumber**2 / 4)
 
 
 def find_distance_from_waist(width: float, wavenumber: float, curvature: float):
     """
-    Finds how far (signed distance) you are from the waist (assumes vacuum propagation and circular beam)
+    Finds how far (signed distance) you are from the waist (assumes vacuum
+    propagation and circular beam)
 
     Parameters
     ----------
     width : float
+        Width of the beam, in m
     wavenumber : float
+        Vacuum wavenumber, in m^-1
     curvature : float
+        Curvature of the wavefronts, in m^-1 (negative for a converging beam)
 
     Returns
-    ----------
+    -------
     distance_from_waist : float
-        Signed distance from the waist; negative for distance to, positive for distance
-        after waist
+        Signed distance from the waist, in m: negative before the waist (a
+        converging beam), positive after it
     """
     waist_sq = find_waist(width, wavenumber, curvature) ** 2
     return np.sign(curvature) * np.sqrt(
@@ -81,19 +93,24 @@ def find_distance_from_waist(width: float, wavenumber: float, curvature: float):
 def propagate_beam(
     Psi_w_cartesian: ComplexFloatArray, propagation_distance: float, freq_GHz: float
 ) -> ComplexFloatArray:
-    """
-    Uses the vacuum solution of the beam tracing equations to propagate the beam
-    (works for arbitrary Gaussian beam in vacuum)
+    r"""
+    Uses the vacuum solution of the beam tracing equations,
+    ``inv(Psi_w) += distance / K0``, to propagate the beam (works for
+    arbitrary Gaussian beam in vacuum)
 
     Parameters
     ----------
     Psi_w_cartesian : (2,2) ComplexFloatArray
+        :math:`\Psi_w` in the beam frame, in m^-2
     propagation_distance : float
+        In m
     freq_GHz : float
+        Beam frequency, in GHz
 
     Returns
-    ----------
+    -------
     Psi_w_cartesian_output : (2,2) ComplexFloatArray
+        :math:`\Psi_w` after the propagation
     """
     wavenumber_K0 = freq_GHz_to_wavenumber(freq_GHz)
 
@@ -118,14 +135,20 @@ def propagate_circular_beam(
     Parameters
     ----------
     width : float
+        Width of the beam, in m
     curvature : float
+        Curvature of the wavefronts, in m^-1 (negative for a converging beam)
     propagation_distance : float
-    freq_GHZ : float
+        In m
+    freq_GHz : float
+        Beam frequency, in GHz
 
     Returns
-    ----------
+    -------
     width : float
+        Width after the propagation, in m
     curvature : float
+        Curvature after the propagation, in m^-1
     """
     wavenumber = freq_GHz_to_wavenumber(freq_GHz)
 

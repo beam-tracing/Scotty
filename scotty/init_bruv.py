@@ -39,6 +39,9 @@ log = logging.getLogger()
 
 
 def parameters_DBS_NSTX_MAST(launch_freq_GHz: float) -> dict:
+    r"""The settings of the preset ``"DBS_NSTX_MAST"`` (see `get_parameters_for_Scotty`):
+    the launch position, the launch beam at ``launch_freq_GHz``
+    (`beam_settings`), ``geometry``, ``launch_flag`` and ``Psi_BC_flag``"""
     launch_beam = beam_settings("DBS_NSTX_MAST", launch_freq_GHz, method="data")
 
     return {
@@ -53,6 +56,9 @@ def parameters_DBS_NSTX_MAST(launch_freq_GHz: float) -> dict:
 
 
 def parameters_DBS_UCLA_MAST_U(launch_freq_GHz: float) -> dict:
+    r"""The settings of the preset ``"DBS_UCLA_MAST-U"`` (see `get_parameters_for_Scotty`):
+    the launch position, the launch beam at ``launch_freq_GHz``
+    (`beam_settings`), ``geometry``, ``launch_flag`` and ``Psi_BC_flag``"""
     log.warning("`launch_position` is an estimate")
     # The z-position seems to vary from -9.7mm to -14.6mm, depending on launch angles
     launch_beam = beam_settings("DBS_UCLA_MAST-U", launch_freq_GHz, method="thin_lens")
@@ -70,6 +76,9 @@ def parameters_DBS_UCLA_MAST_U(launch_freq_GHz: float) -> dict:
 
 
 def parameters_DBS_SWIP_MAST_U(launch_freq_GHz: float) -> dict:
+    r"""The settings of the preset ``"DBS_SWIP_MAST-U"`` (see `get_parameters_for_Scotty`):
+    the launch position, the launch beam at ``launch_freq_GHz``
+    (`beam_settings`), ``geometry``, ``launch_flag`` and ``Psi_BC_flag``"""
     log.warning("`launch_position` and the launch beam are estimates")
     launch_beam = beam_settings(
         "DBS_SWIP_MAST-U", launch_freq_GHz, method="estimate_fix_w0"
@@ -89,6 +98,9 @@ def parameters_DBS_SWIP_MAST_U(launch_freq_GHz: float) -> dict:
 
 
 def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
+    r"""The settings of the preset ``"DBS_UCLA_DIII-D_240"`` (see `get_parameters_for_Scotty`):
+    the launch position, the launch beam at ``launch_freq_GHz``
+    (`beam_settings`), ``geometry``, ``launch_flag`` and ``Psi_BC_flag``"""
     launch_beam = beam_settings(
         "DBS_UCLA_DIII-D_240", launch_freq_GHz, method="thin_lens"
     )
@@ -104,6 +116,11 @@ def parameters_DBS_UCLA_DIII_D_240(launch_freq_GHz: float) -> dict:
 
 
 def parameters_DBS_synthetic(launch_freq_GHz: Optional[float]) -> dict:
+    r"""The settings of the preset ``"DBS_synthetic"`` (see
+    `get_parameters_for_Scotty`): a launch into the analytical circular flux
+    surfaces (``find_B_method="analytical"``), with its field, density and
+    temperature profiles, ``geometry``, ``launch_flag`` and ``Psi_BC_flag``.
+    ``launch_freq_GHz`` has a default here"""
     # The profile's zero point (1.0) is where the plasma starts
     ne_fit = QuadraticFit(1.0, 4.0)
     return {
@@ -149,12 +166,15 @@ NOT_IMPLEMENTED_DIAGNOSTICS = ("CPS_UCLA_MAST-U", "hiK_Strath_MAST")
 
 
 def launch_beam_DBS_NSTX_MAST_horn_and_lens(launch_freq_GHz):
+    r"""The launch beam of ``"DBS_NSTX_MAST"``, propagated from its horn
+    through its lens to the steering mirror (the Q band horn up to 52.5 GHz,
+    the V band one above)"""
     if launch_freq_GHz > 52.5:
         name = "MAST_V_band"
         horn_to_lens = 0.139  # V Band
         lens_to_mirror = 0.644  # lens to steering mirror
 
-    else:  # launch_freq_GHz < 52.5:
+    else:  # launch_freq_GHz <= 52.5:
         name = "MAST_Q_band"
         horn_to_lens = 0.270  # Q Band
         lens_to_mirror = 0.6425  # lens to steering mirror
@@ -190,6 +210,8 @@ def launch_beam_DBS_NSTX_MAST_horn_and_lens(launch_freq_GHz):
 
 
 def launch_beam_DBS_NSTX_MAST_data(launch_freq_GHz):
+    r"""The launch beam of ``"DBS_NSTX_MAST"`` from measured widths and
+    curvatures, at the saved frequency nearest ``launch_freq_GHz``"""
     data = np.array(
         [
             (30.0, 46.90319593e-3, -9211.13447598e-3),
@@ -223,6 +245,8 @@ def launch_beam_DBS_NSTX_MAST_data(launch_freq_GHz):
 
 
 def launch_beam_DBS_CIEMAT_JT60A_data(launch_freq_GHz):
+    r"""The launch beam of ``"DBS_CIEMAT_JT60SA"``, measured at 90 GHz
+    (the same at every frequency)"""
     # 90 GHz
     launch_beam_width = 0.06323503329291348
     launch_beam_curvature = -0.5535179506038995
@@ -230,6 +254,9 @@ def launch_beam_DBS_CIEMAT_JT60A_data(launch_freq_GHz):
 
 
 def launch_beam_DBS_UCLA_DIII_D_240_thin_lens(launch_freq_GHz):
+    r"""The launch beam of ``"DBS_UCLA_DIII-D_240"``: from the waveguide
+    through a thin lens, with the focal length saved for the nearest frequency,
+    to the steering mirror"""
     # The lens is directly in front of the waveguide (wg)
     wg_width = 0.025
     wg_curvature = 0.0
@@ -297,6 +324,9 @@ def launch_beam_DBS_UCLA_DIII_D_240_thin_lens(launch_freq_GHz):
 
 
 def launch_beam_DBS_UCLA_MAST_U_thin_lens(launch_freq_GHz):
+    r"""The launch beam of ``"DBS_UCLA_MAST-U"``: from its horn through its
+    thin lens. The dependence of the beam on the lens's y position is
+    ignored, with a warning"""
     log.warning(
         "DBS_UCLA_MAST-U lens known to change output beam properties depending on its y position. Ignoring this effect"
     )
@@ -334,6 +364,10 @@ def launch_beam_DBS_UCLA_MAST_U_thin_lens(launch_freq_GHz):
 # which may not be SWIP's). SWIP's bench measurements (40 and 60 GHz) differ from
 # these waists by about 10% at the window, and put the 40 GHz waist closer to the lens
 def launch_beam_DBS_SWIP_MAST_U_estimate_var_w0(launch_freq_GHz):
+    r"""The launch beam of ``"DBS_SWIP_MAST-U"``, estimated from a waist at
+    the window that varies as the square root of the frequency (Q band up to
+    50 GHz, V band above), propagated back to the steering mirror, which is
+    behind the window"""
     if launch_freq_GHz <= 50.0:  # Q band
         w0 = np.sqrt(launch_freq_GHz / 40) * 0.08
     else:  # V band
@@ -345,6 +379,9 @@ def launch_beam_DBS_SWIP_MAST_U_estimate_var_w0(launch_freq_GHz):
 
 
 def launch_beam_DBS_SWIP_MAST_U_estimate_fix_w0(launch_freq_GHz):
+    r"""The launch beam of ``"DBS_SWIP_MAST-U"``, estimated from a fixed
+    waist at the window (Q band up to 50 GHz, V band above), propagated back
+    to the steering mirror, which is behind the window"""
     if launch_freq_GHz <= 50.0:  # Q band
         w0 = 0.08
     else:  # V band
@@ -477,6 +514,7 @@ def get_parameters_for_Scotty(
         "DBS_NSTX_MAST",
         "DBS_SWIP_MAST-U",
         "DBS_UCLA_MAST-U",
+        "DBS_UCLA_DIII-D_240",
         "CPS_UCLA_MAST-U",
         "hiK_Strath_MAST",
         "DBS_synthetic",
@@ -499,8 +537,9 @@ def get_parameters_for_Scotty(
         - `DBS_NSTX_MAST`: Doppler reflectometry (Neal Crocker, Jon Hillesheim, Tony Peebles). Used on MAST, was on loan from NSTX
         - `DBS_SWIP_MAST-U`: Doppler reflectometry (Peng Shi)
         - `DBS_UCLA_MAST-U`
+        - `DBS_UCLA_DIII-D_240`: UCLA Doppler backscattering on DIII-D (its "240" system)
         - `CPS_UCLA_MAST-U`: This system can either be used in CPS or DBS mode, but not both simultaneously (not yet, anyway). CPS version not yet implemented
-        - `hiK_Strath_MAST-U`: High-k scattering diagnostic, Strathclyde (David Speirs, Kevin Ronald). Not yet implemented
+        - `hiK_Strath_MAST`: High-k scattering diagnostic, Strathclyde (David Speirs, Kevin Ronald). Not yet implemented
         - `DBS_synthetic`: Circular flux surfaces
     launch_freq_GHz : float, optional
         Beam launch frequency in GHz
@@ -538,10 +577,14 @@ def get_parameters_for_Scotty(
     Returns
     ---------
     DBS_parameters : dict
-        Dictionary containing the poloidal and toroidal angles (degrees) in
-        Scotty/TORBEAM convention, the launch frequency (GHz), the mode flag,
-        the launch beam width and curvature, and launch position (of the final
-        quasioptical element)
+        Keyword arguments for `scotty.beam_me_up.beam_me_up`: the poloidal and
+        toroidal angles (degrees) in Scotty/TORBEAM convention, the launch
+        frequency (GHz), the mode flag, the launch beam width and curvature,
+        the launch position (of the final quasioptical element),
+        ``geometry``, ``launch_flag`` and ``Psi_BC_flag``. Also, as asked for:
+        ``find_B_method`` and the data paths (``"torbeam"``), or a saved
+        ``density_fit_method`` (``find_ne_method``). ``"DBS_synthetic"`` also
+        gives its analytical field, its profiles and ``relativistic_flag``
     """
     # TODO: implement the CPS_UCLA_MAST-U and hiK_Strath_MAST presets
     # (future work; they were never implemented, in v3 either)
@@ -614,6 +657,8 @@ def get_parameters_for_Scotty(
 
 
 class LaunchBeamParameters(NamedTuple):
+    r"""The width (in m) and curvature (in m^-1) of a launched beam"""
+
     width: float
     """Width of the beam"""
     curvature: float
@@ -623,15 +668,15 @@ class LaunchBeamParameters(NamedTuple):
 def beam_settings(
     diagnostic: str, launch_freq_GHz: float, method: str = "data"
 ) -> LaunchBeamParameters:
-    """Return the launch beam width and curvature
+    """Return the launch beam width and curvature, from `LAUNCH_BEAM_METHODS`
 
-    Arguments
-    =========
-    diagnostic:
+    Parameters
+    ----------
+    diagnostic : str
         Name of the diagnostic
-    launch_freq_GHz:
-        Frequency of the launch beam in GHz
-    method:
+    launch_freq_GHz : float
+        Frequency of the launch beam, in GHz
+    method : str, default "data"
         One of the following:
 
         - ``"horn_and_lens"``: Uses information about the horn and lens to
@@ -645,7 +690,13 @@ def beam_settings(
           frequency-independent beam waist
 
 
-    .. note:: Not all methods are available for all diagnostics
+    .. note:: Not all methods are available for all diagnostics: an unknown
+       diagnostic or method raises a `ValueError`
+
+    Returns
+    -------
+    LaunchBeamParameters
+        The width (in m) and curvature (in m^-1) of the launched beam
     """
 
     try:
@@ -673,7 +724,8 @@ class DensityFitParameters(NamedTuple):
     fit: Optional[ProfileFit]
     """Fit parameterisation"""
     time_ms: Optional[float]
-    """Actual shot time (in milliseconds) that parameters correspond to"""
+    """Shot time that the fit is for. The saved times are in seconds (for
+    example 0.16), although the name says milliseconds"""
     poloidal_flux_zero_density: Optional[float]
     """Poloidal flux surface label where the density goes to zero"""
 
@@ -684,7 +736,27 @@ def ne_settings(
     time: Optional[float],
     find_ne_method: Optional[str],
 ) -> DensityFitParameters:
-    """Get pre-existing density fit parameters from `DENSITY_FIT_PARAMETERS`"""
+    """A density fit saved in `DENSITY_FIT_PARAMETERS`, at the saved time
+    nearest ``time``
+
+    Parameters
+    ----------
+    diagnostic : str
+        Name of the diagnostic
+    shot : int or None
+        Shot number
+    time : float or None
+        Time, in s
+    find_ne_method : str or None
+        Name of the fit, for example ``"tanh"``
+
+    Returns
+    -------
+    DensityFitParameters
+        The fit, its time and its zero point; all None if ``find_ne_method``,
+        ``shot`` or ``time`` is None. An unknown diagnostic, shot or method
+        raises a `ValueError`
+    """
 
     if find_ne_method is None or shot is None or time is None:
         return DensityFitParameters(None, None, None)
