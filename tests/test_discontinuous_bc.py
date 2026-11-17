@@ -56,7 +56,6 @@ def boundary(request, tmp_path_factory):
     kwargs.update(
         find_B_method=field,
         len_tau=52,
-        interp_smoothing=0,
         Psi_BC_flag="discontinuous",
         # 4 - 4 psi^2 / 1.3, cut to zero at the boundary psi = 1: a jump. (A
         # profile object's own zero point is where it is cut; this was

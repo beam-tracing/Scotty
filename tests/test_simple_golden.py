@@ -1,8 +1,14 @@
-from scotty.beam_me_up import beam_me_up, create_magnetic_geometry, make_fit
+from scotty.beam_me_up import beam_me_up, create_magnetic_geometry
+from scotty.profile_fit import make_fit
 import scotty.derivatives as derivatives
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.torbeam import Torbeam
-from scotty.geometry import CircularFluxSurfaceField, MagneticField_Cylindrical
+from scotty.geometry import (
+    CircularFluxSurfaceField,
+    EFITField,
+    InterpolatedField_Cylindrical,
+    MagneticField_Cylindrical,
+)
 from scotty.fun_general import freq_GHz_to_angular_frequency
 from scotty.profile_fit import QuadraticFit
 from scotty.hamiltonian import initialise_hamiltonians
@@ -30,7 +36,8 @@ def synthetic_parameters() -> dict:
     generated with: no interpolation smoothing, and v3's default spatial
     finite-difference steps (v4's default is 1e-5)"""
     kwargs_dict = get_parameters_for_Scotty("DBS_synthetic")
-    kwargs_dict["interp_smoothing"] = 0
+    kwargs_dict["interp_smoothing_magnetic"] = 0
+    kwargs_dict["interp_smoothing_ne"] = 0
     kwargs_dict["delta_R"] = -1e-4
     kwargs_dict["delta_Z"] = 1e-4
     return kwargs_dict
@@ -43,8 +50,8 @@ def make_field(kwargs_dict: dict):
     return create_magnetic_geometry(
         interp_order_str="quintic",
         interp_order_int=5,
-        interp_smoothing=kwargs_dict.pop("interp_smoothing", 0),
-        magnetic_data_path=kwargs_dict.pop("magnetic_data_path", pathlib.Path(".")),
+        interp_smoothing=kwargs_dict.pop("interp_smoothing_magnetic", 0),
+        magnetic_data_path=kwargs_dict.pop("magnetic_data_path", None),
         **kwargs_dict,
     )
 
@@ -932,7 +939,7 @@ def ne_dat_file(path):
     kwargs_dict["find_B_method"] = "analytical"
     kwargs_dict["density_fit_parameters"] = None
     kwargs_dict["density_fit_method"] = "smoothing-spline-file"
-    kwargs_dict["ne_data_path"] = path
+    kwargs_dict["ne_data_path"] = ne_filename
     return kwargs_dict
 
 
@@ -967,7 +974,7 @@ def torbeam_file(path):
     Torbeam(field.R_coord, field.Z_coord, B_r, B_t, B_z, psi).write(path / "topfile")
 
     kwargs_dict["find_B_method"] = "torbeam"
-    kwargs_dict["magnetic_data_path"] = path
+    kwargs_dict["magnetic_data_path"] = path / "topfile"
     return kwargs_dict
 
 
@@ -991,7 +998,7 @@ def omfit_json(path):
         json.dump(data, f)
 
     kwargs_dict["find_B_method"] = "omfit"
-    kwargs_dict["magnetic_data_path"] = path
+    kwargs_dict["magnetic_data_path"] = path / "topfile.json"
     return kwargs_dict
 
 
@@ -1010,16 +1017,29 @@ def add_timeslices(array):
     return np.stack((zeros, array, zeros))
 
 
-def npz_file(path: pathlib.Path):
-    """find_B_method = "test" """
-
+def flux_function_args():
+    """The synthetic field as EFIT gives it: psi on the axis and the boundary
+    (unnormalised, with the sign of EFIT's), and rBphi on a normalised flux
+    from 0 to 1 (rho / a along the outboard midplane)"""
     kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
+    R_axis = kwargs_dict["R_axis"]
+    scale = unnormalised_flux_scale(kwargs_dict)
+    psi_axis = -field.polflux(R_axis, 0, 0.0) * scale
+    psi_boundary = (
+        -field.polflux(R_axis + kwargs_dict["minor_radius_a"], 0, 0.0) * scale
+    )
+    R_midplane = np.linspace(R_axis, R_axis + kwargs_dict["minor_radius_a"])
+    rBphi = R_midplane * field.B_T(R_midplane, 0, 0.0)
+    psi_norm_1D = np.linspace(0, 1, len(R_midplane))
+    return kwargs_dict, psi, field, psi_axis, psi_boundary, rBphi, psi_norm_1D
 
+
+def npz_file(path: pathlib.Path):
+    """B from saved grids of B, several times: v3's find_B_method="test" """
+    kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
     time = [100, 200, 300]
-
-    shot = 12345
     np.savez(
-        path / f"{shot}_equilibrium_data",
+        path / "12345_equilibrium_data",
         R_EFIT=field.R_coord,
         Z_EFIT=field.Z_coord,
         poloidalFlux_grid=add_timeslices(psi),
@@ -1028,18 +1048,15 @@ def npz_file(path: pathlib.Path):
         Bz_grid=add_timeslices(B_Z),
         time_EFIT=time,
     )
-    kwargs_dict["find_B_method"] = "test"
-    kwargs_dict["magnetic_data_path"] = path
-    kwargs_dict["shot"] = shot
-    kwargs_dict["equil_time"] = time[1]
-
+    kwargs_dict["find_B_method"] = InterpolatedField_Cylindrical.from_npz(
+        path / "12345_equilibrium_data.npz", time[1]
+    )
     return kwargs_dict
 
 
 def npz_notime_file(path: pathlib.Path):
-    """find_B_method = "test_notime" """
+    """B from saved grids of B, one time: v3's find_B_method="test_notime" """
     kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
-
     np.savez(
         path / "12345_equilibrium_data",
         R_EFIT=field.R_coord,
@@ -1049,81 +1066,101 @@ def npz_notime_file(path: pathlib.Path):
         Br_grid=B_R,
         Bz_grid=B_Z,
     )
-    kwargs_dict["find_B_method"] = "test_notime"
-    kwargs_dict["magnetic_data_path"] = path / "12345_equilibrium_data.npz"
+    kwargs_dict["find_B_method"] = InterpolatedField_Cylindrical.from_npz(
+        path / "12345_equilibrium_data.npz"
+    )
     return kwargs_dict
 
 
 def UDA_saved(path: pathlib.Path):
-    """find_B_method = "UDA_saved" with shot = None"""
-    kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
-
-    R_axis = kwargs_dict["R_axis"]
-    minor_radius = kwargs_dict["minor_radius_a"]
-    scale = unnormalised_flux_scale(kwargs_dict)
-    psi_axis = field.polflux(R_axis, 0, 0.0) * scale
-    psi_boundary = field.polflux(R_axis + minor_radius, 0, 0.0) * scale
-
-    R_midplane = np.linspace(R_axis, R_axis + minor_radius)
-    rBphi = R_midplane * field.B_T(R_midplane, 0, 0.0)
-
+    """B from the flux, MAST-U layout with one time: v3's
+    find_B_method="UDA_saved" with no shot"""
+    kwargs_dict, psi, field, psi_axis, psi_boundary, rBphi, _ = flux_function_args()
     np.savez(
         path / "12345_equilibrium_data",
         rBphi=rBphi,
         R_EFIT=field.R_coord,
         Z_EFIT=field.Z_coord,
         poloidalFlux_grid=psi,
-        poloidalFlux_unnormalised_axis=-psi_axis,
-        poloidalFlux_unnormalised_boundary=-psi_boundary,
+        poloidalFlux_unnormalised_axis=psi_axis,
+        poloidalFlux_unnormalised_boundary=psi_boundary,
     )
-    kwargs_dict["find_B_method"] = "UDA_saved"
-    kwargs_dict["magnetic_data_path"] = path / "12345_equilibrium_data.npz"
-    kwargs_dict["shot"] = None
-    kwargs_dict["delta_R"] = -0.0001
-    kwargs_dict["delta_Z"] = 0.0001
+    kwargs_dict["find_B_method"] = EFITField.from_MAST_U_saved(
+        path / "12345_equilibrium_data.npz",
+        delta_R=kwargs_dict["delta_R"],
+        delta_Z=kwargs_dict["delta_Z"],
+    )
     return kwargs_dict
 
 
 def UDA_saved_MAST_U(path: pathlib.Path):
-    """find_B_method = "UDA_saved" with shot = None"""
-    kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
-
-    shot = 55555
-
-    R_axis = kwargs_dict["R_axis"]
-    minor_radius = kwargs_dict["minor_radius_a"]
-    scale = unnormalised_flux_scale(kwargs_dict)
-    psi_axis = field.polflux(R_axis, 0, 0.0) * scale
-    psi_boundary = field.polflux(R_axis + minor_radius, 0, 0.0) * scale
-
-    R_midplane = np.linspace(R_axis, R_axis + minor_radius)
-    rBphi = R_midplane * field.B_T(R_midplane, 0, 0.0)
-    psi_norm_1D = np.linspace(0, 1, len(R_midplane))
-
+    """B from the flux, MAST-U layout with several times: v3's
+    find_B_method="UDA_saved" with a MAST-U shot. As in the MAST-U files
+    saved from UDA, ``poloidalFlux`` goes from 1 to 0 and back to 1; rBphi is
+    on an evenly spaced flux"""
+    kwargs_dict, psi, field, psi_axis, psi_boundary, rBphi, psi_norm_1D = (
+        flux_function_args()
+    )
+    midplane_flux = np.abs(np.linspace(-1, 1, len(psi_norm_1D)))
     time = [100, 200, 300]
-
     np.savez(
-        path / f"{shot}_equilibrium_data",
+        path / "55555_equilibrium_data",
         rBphi=add_timeslices(rBphi),
         R_EFIT=field.R_coord,
         Z_EFIT=field.Z_coord,
         poloidalFlux_grid=add_timeslices(psi),
-        poloidalFlux=add_timeslices(psi_norm_1D),
-        poloidalFlux_unnormalised_axis=add_timeslices(-psi_axis),
-        poloidalFlux_unnormalised_boundary=add_timeslices(-psi_boundary),
+        poloidalFlux=add_timeslices(midplane_flux),
+        poloidalFlux_unnormalised_axis=add_timeslices(psi_axis),
+        poloidalFlux_unnormalised_boundary=add_timeslices(psi_boundary),
         time_EFIT=time,
     )
-    kwargs_dict["find_B_method"] = "UDA_saved"
-    kwargs_dict["magnetic_data_path"] = path
-    kwargs_dict["shot"] = shot
-    kwargs_dict["delta_R"] = -0.0001
-    kwargs_dict["delta_Z"] = 0.0001
-    kwargs_dict["equil_time"] = time[1]
+    kwargs_dict["find_B_method"] = EFITField.from_MAST_U_saved(
+        path / "55555_equilibrium_data.npz",
+        time[1],
+        delta_R=kwargs_dict["delta_R"],
+        delta_Z=kwargs_dict["delta_Z"],
+    )
+    return kwargs_dict
+
+
+def UDA_saved_MAST(path: pathlib.Path):
+    """B from the flux, MAST layout: v3's find_B_method="UDA_saved" with a
+    MAST shot. The unnormalised flux is on time base B, as (time, Z, R); the
+    flux functions are on time base C, which has other times"""
+    kwargs_dict, psi, field, psi_axis, psi_boundary, rBphi, _ = flux_function_args()
+    t_base_B = np.array([100.0, 200.0, 300.0])
+    t_base_C = np.array([50.0, 100.0, 150.0, 200.0, 250.0])
+
+    def on_base_C(value):
+        """``value`` at 200 on time base C, and zeros elsewhere"""
+        stacked = np.zeros((len(t_base_C),) + np.shape(value))
+        stacked[3] = value
+        return stacked
+
+    unnormalised = psi_axis + psi * (psi_boundary - psi_axis)
+    np.savez(
+        path / "29999_equilibrium_data",
+        rBphi=on_base_C(rBphi),
+        t_base_B=t_base_B,
+        t_base_C=t_base_C,
+        R_EFIT=field.R_coord,
+        Z_EFIT=field.Z_coord,
+        poloidal_flux_unnormalised_axis=on_base_C(psi_axis),
+        poloidal_flux_unnormalised_boundary=on_base_C(psi_boundary),
+        poloidal_flux_unnormalised=add_timeslices(unnormalised.T),
+    )
+    kwargs_dict["find_B_method"] = EFITField.from_MAST_saved(
+        path / "29999_equilibrium_data.npz",
+        210.0,
+        delta_R=kwargs_dict["delta_R"],
+        delta_Z=kwargs_dict["delta_Z"],
+    )
     return kwargs_dict
 
 
 def EFITpp_file(path: pathlib.Path):
-    """find_B_method = "EFITpp": a synthetic efitOut.nc with EFIT++'s layout"""
+    """B from the flux, a synthetic efitOut.nc with EFIT++'s layout: v3's
+    find_B_method="EFITpp" """
     import h5py
 
     kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
@@ -1154,11 +1191,12 @@ def EFITpp_file(path: pathlib.Path):
         flux["poloidalFlux"] = add_timeslices(psi_norm_1D * slope)
         flux["rBphi"] = add_timeslices(rBphi)
 
-    kwargs_dict["find_B_method"] = "EFITpp"
-    kwargs_dict["magnetic_data_path"] = path
-    kwargs_dict["equil_time"] = time[1]
-    kwargs_dict["delta_R"] = -0.0001
-    kwargs_dict["delta_Z"] = 0.0001
+    kwargs_dict["find_B_method"] = EFITField.from_EFITpp(
+        path / "efitOut.nc",
+        time[1],
+        delta_R=kwargs_dict["delta_R"],
+        delta_Z=kwargs_dict["delta_Z"],
+    )
     return kwargs_dict
 
 
@@ -1240,9 +1278,6 @@ def assert_ray_matches_golden(output, expected: dict, rtol=1e-2, atol=1e-2):
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
         pytest.param(npz_file, id="test-file"),
-        # Following methods have errors of 30%, despite field being
-        # idential to 1%, needs investigating
-        # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
 def test_integrated_O_mode(tmp_path, generator):
@@ -1282,9 +1317,6 @@ def test_integrated_O_mode(tmp_path, generator):
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
         pytest.param(npz_file, id="test-file"),
-        # Following methods have errors of 30%, despite field being
-        # idential to 1%, needs investigating
-        # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
 def test_integrated_X_mode(tmp_path, generatorneg):
@@ -1322,9 +1354,6 @@ def test_integrated_X_mode(tmp_path, generatorneg):
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
         pytest.param(npz_file, id="test-file"),
-        # Following methods have errors of 30%, despite field being
-        # idential to 1%, needs investigating
-        # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
 def test_relativistic_O_mode(tmp_path, generator_rel):
@@ -1416,9 +1445,6 @@ def test_relativistic_O_mode_final_Psi(tmp_path, generator_relfinal):
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
         pytest.param(npz_file, id="test-file"),
-        # Following methods have errors of 30%, despite field being
-        # idential to 1%, needs investigating
-        # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
 def test_relativistic_X_mode(tmp_path, generator_relneg):
@@ -1460,9 +1486,6 @@ def test_relativistic_X_mode(tmp_path, generator_relneg):
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
         pytest.param(npz_file, id="test-file"),
-        # Following methods have errors of 30%, despite field being
-        # idential to 1%, needs investigating
-        # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
 def test_null_relativistic_O_mode(tmp_path, generator_nullrel):
@@ -1503,9 +1526,6 @@ def test_null_relativistic_O_mode(tmp_path, generator_nullrel):
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
         pytest.param(npz_file, id="test-file"),
-        # Following methods have errors of 30%, despite field being
-        # idential to 1%, needs investigating
-        # pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
 def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
@@ -1599,6 +1619,7 @@ def test_X_mode_cutoff_Psi(tmp_path, generator_cutoff, temperature):
         pytest.param(npz_notime_file, id="test_notime-file"),
         pytest.param(UDA_saved, id="UDA-saved-file"),
         pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file"),
+        pytest.param(UDA_saved_MAST, id="UDA-saved-MAST-file"),
         pytest.param(EFITpp_file, id="EFITpp-file"),
     ],
 )
@@ -1631,9 +1652,55 @@ def test_create_magnetic_geometry(tmp_path, generator):
 
 
 @pytest.mark.parametrize(
+    ("generator", "file_name", "time"),
+    [
+        pytest.param(npz_file, "12345_equilibrium_data.npz", 200, id="test-file"),
+        pytest.param(
+            npz_notime_file, "12345_equilibrium_data.npz", None, id="test_notime-file"
+        ),
+        pytest.param(UDA_saved, "12345_equilibrium_data.npz", None, id="UDA-saved"),
+        pytest.param(
+            UDA_saved_MAST_U, "55555_equilibrium_data.npz", 200, id="UDA-saved-MAST-U"
+        ),
+        # Asked for 210: the time used is the nearest in the file
+        pytest.param(
+            UDA_saved_MAST, "29999_equilibrium_data.npz", 200, id="UDA-saved-MAST"
+        ),
+        pytest.param(EFITpp_file, "efitOut.nc", 200, id="EFITpp-file"),
+    ],
+)
+def test_field_from_a_file_records_the_file_and_time(
+    tmp_path, generator, file_name, time
+):
+    field = generator(tmp_path)["find_B_method"]
+    assert field.data_file == str(tmp_path / file_name)
+    assert field.data_time == time
+
+
+def test_output_records_the_field_file_and_time(tmp_path):
+    """In place of v3's inputs ``shot`` and ``equil_time``"""
+    kwargs_dict = npz_file(tmp_path)
+    kwargs_dict.update(figure_flag=False, len_tau=10, output_path=tmp_path / "out")
+    inputs = beam_me_up(**kwargs_dict)["inputs"]
+    assert str(inputs["magnetic_data_path"].values) == str(
+        tmp_path / "12345_equilibrium_data.npz"
+    )
+    assert float(inputs["magnetic_data_time"].values) == 200
+
+    # A field not read from a file
+    kwargs_dict = simple(tmp_path)
+    kwargs_dict.update(figure_flag=False, len_tau=10, output_path=tmp_path / "out2")
+    inputs = beam_me_up(**kwargs_dict)["inputs"]
+    assert str(inputs["magnetic_data_path"].values) == "None"
+    assert np.isnan(inputs["magnetic_data_time"].values)
+
+
+@pytest.mark.parametrize(
     "generator",
     [
         pytest.param(UDA_saved, id="UDA-saved-file"),
+        pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file"),
+        pytest.param(UDA_saved_MAST, id="UDA-saved-MAST-file"),
         pytest.param(EFITpp_file, id="EFITpp-file"),
     ],
 )
@@ -1648,7 +1715,9 @@ def test_EFIT_geometry(tmp_path, generator):
 
     # Include buffer for gradient near edge
     width = minor_radius_a + 0.05
-    # Different grid sizes to capture transpose errors
+    # Different grid sizes for the evaluation points. The data grid is square
+    # and the field symmetric about its centre, so this can't see a
+    # transposed grid: tests/test_field_files.py::test_from_MAST_saved can
     R = np.linspace(R_axis - width, R_axis + width, 99)
     Z = np.linspace(-width, width, 101)
     R_grid, Z_grid = np.meshgrid(R, Z, indexing="ij")
@@ -1688,8 +1757,6 @@ def test_EFIT_geometry(tmp_path, generator):
         pytest.param(omfit_json, id="omfit-file"),
         pytest.param(npz_file, id="test-file"),
         pytest.param(npz_notime_file, id="test_notime-file"),
-        # pytest.param(UDA_saved, id="UDA-saved-file"),
-        # pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file"),
     ],
 )
 def test_launch_golden_answer(tmp_path, generator):
@@ -1700,18 +1767,12 @@ def test_launch_golden_answer(tmp_path, generator):
     args = generator(tmp_path)
     field = make_field(args)
     ne_data_path = args.get("ne_data_path", None)
-    if ne_data_path:
-        ne_filename = ne_data_path / "ne.dat"
-        parameters = [ne_filename, 5, 0]
-    else:
-        parameters = None
-        ne_filename = None
+    parameters = [ne_data_path, 5, 0] if ne_data_path else None
 
     density_fit = make_fit(
         args["density_fit_method"],
         args.get("poloidal_flux_zero_density", 1.0),
         parameters,
-        ne_filename,
     )
 
     # v3's steps: delta_R = -1e-3 (into the plasma), delta_Z = 1e-3, delta_K = 0.1

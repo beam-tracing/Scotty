@@ -24,6 +24,7 @@ from scotty.fun_general import (
     genray_angles_from_mirror_angles,
     freq_GHz_to_wavenumber,
 )
+from scotty.geometry import REMOVED_FIND_B_METHODS, removed_find_B_method_error
 from scotty.profile_fit import QuadraticFit, TanhFit, PolynomialFit, ProfileFit
 from typing import Callable, Dict, NamedTuple, Optional, Any, Literal
 from scotty.typing import PathLike
@@ -509,24 +510,30 @@ def get_parameters_for_Scotty(
         Angle in degrees (FIXME: clarify)
     find_B_method : str, optional
         Equilibrium magnetic field method. One of:
-        - `torbeam`: Loads data from ne.dat and topfile. I guess I
-          should implement loading for inbeam.dat at some point, too
+        - `torbeam`: reads the files ``topfile`` and ``ne.dat`` in
+          ``data_path`` (it sets ``magnetic_data_path``, ``ne_data_path``
+          and ``density_fit_method="smoothing-spline-file"``)
         - `UDA`: Loads EFIT data directly from uda (not yet implemented)
-        - `EFITpp`: Uses MSE constrained EFIT
-        - `UDA_saved`: Loads EFIT data from file. UDA data must first be saved to said file
+
+        `EFITpp`, `UDA_saved`, `test` and `test_notime` were removed in
+        Scotty 4.0.0, and raise an error: make the field with a constructor
+        in `scotty.geometry` (`EFITField.from_EFITpp`,
+        `EFITField.from_MAST_saved`, `EFITField.from_MAST_U_saved`,
+        `InterpolatedField_Cylindrical.from_npz`) and give it to `beam_me_up`
     find_ne_method : str, optional
-        Density profile method. One of:
-        - `torbeam`
-        - `EFITpp`
-        - `UDA_saved`
+        Name of a density fit saved for the diagnostic and the shot in
+        `DENSITY_FIT_PARAMETERS` (for example ``"tanh"``), at the saved time
+        nearest to ``equil_time``. Not used with ``find_B_method="torbeam"``,
+        which reads ``ne.dat``
     equil_time : float, optional
-        Time in seconds
+        Time in seconds, for ``find_ne_method``
     shot : int, optional
-        Shot number
+        Shot number, for ``find_ne_method``. Neither ``shot`` nor
+        ``equil_time`` is passed to `beam_me_up`
     data_path : str or pathlib.Path, default "."
-        Folder of the input files (``ne.dat``, the topfile, EFIT++ and saved
-        UDA data). It replaces ``user`` (removed in 4.0.0), which chose
-        folders on particular computers
+        Folder of the input files (``topfile`` and ``ne.dat``). It replaces
+        ``user`` (removed in 4.0.0), which chose folders on particular
+        computers
 
     Returns
     ---------
@@ -556,15 +563,13 @@ def get_parameters_for_Scotty(
     }
 
     # Every input file is in `data_path`
-    ne_path = topfile_path = efitpp_path = UDA_saved_path = pathlib.Path(data_path)
+    data_path = pathlib.Path(data_path)
 
     # Assign keys that we already have
     if find_B_method is not None:
+        if find_B_method.lower() in REMOVED_FIND_B_METHODS:
+            raise removed_find_B_method_error(find_B_method)
         parameters["find_B_method"] = find_B_method
-    if equil_time is not None:
-        parameters["equil_time"] = equil_time
-    if shot is not None:
-        parameters["shot"] = shot
 
     # Default settings for each diagnostic
     try:
@@ -591,24 +596,19 @@ def get_parameters_for_Scotty(
         parameters["poloidal_launch_angle_Torbeam"] = -poloidal_launch_angle
         parameters["toroidal_launch_angle_Torbeam"] = -toroidal_launch_angle
 
-    # Density settings
+    # Density settings: a TORBEAM run reads its files, the topfile and ne.dat;
+    # otherwise, a density fit saved for the shot and time, if one is asked for
     if find_B_method == "torbeam":
-        parameters["ne_data_path"] = ne_path
-        parameters["magnetic_data_path"] = topfile_path
+        parameters["magnetic_data_path"] = data_path / "topfile"
+        parameters["ne_data_path"] = data_path / "ne.dat"
         parameters["density_fit_method"] = "smoothing-spline-file"
-    elif find_B_method in ["EFITpp", "UDA_saved", "test"]:
-        parameters["ne_data_path"] = UDA_saved_path
-
+    elif find_ne_method is not None:
         density_fit = ne_settings(diagnostic, shot, equil_time, find_ne_method)
-        parameters["density_fit_method"] = density_fit.fit
+        if density_fit.fit is not None:
+            parameters["density_fit_method"] = density_fit.fit
 
-    # MAST and MAST-U specific B-field and poloidal flux settings
     if find_B_method == "UDA":
         raise NotImplementedError
-    elif find_B_method == "EFITpp":
-        parameters["magnetic_data_path"] = efitpp_path
-    elif find_B_method == "UDA_saved":
-        parameters["magnetic_data_path"] = UDA_saved_path
 
     return parameters
 

@@ -155,6 +155,86 @@ def _v3_fit_method(parameters) -> str:
     return _guess_profile_fit_method(parameters, None)
 
 
+def _v3_file(path, name: str) -> pathlib.Path:
+    """v3's file ``name`` in the folder ``path``. A path that is not a folder
+    is kept: it is already the path of a file (from an earlier conversion),
+    or it is missing, and v4 says so"""
+    path = pathlib.Path(path)
+    return path / name if path.is_dir() else path
+
+
+def _v3_files_to_v4(kw: Dict[str, Any]) -> None:
+    """v3 read its files from folders (``magnetic_data_path``,
+    ``ne_data_path``, ``Te_data_path``, default "."), with names that end in
+    ``input_filename_suffix``, and fitted them with one ``interp_order`` and
+    one ``interp_smoothing``. v4 takes the paths of the files, and an order
+    and a smoothing for each of the magnetic field, ne and Te (v3's defaults,
+    5 and 0, are v4's). ``shot`` and ``equil_time`` are dropped: they were
+    only for the ``find_B_method`` names that v4 removed ("test",
+    "test_notime", "UDA_saved", "EFITpp"), which v4 refuses. Their files are
+    read by the field constructors in `scotty.geometry`, which take the file
+    and the time"""
+    suffix = kw.pop("input_filename_suffix", "")
+    folders = {
+        name: kw.pop(name, ".")
+        for name in ("magnetic_data_path", "ne_data_path", "Te_data_path")
+    }
+    order = kw.pop("interp_order", None)
+    smoothing = kw.pop("interp_smoothing", None)
+    for name in ("shot", "equil_time"):
+        value = kw.pop(name, None)
+        if value is not None:
+            _warn(
+                f"dropped `{name}` = {value!r} (v4 removed it: give `find_B_method` "
+                "a field made by a constructor in `scotty.geometry`, which takes "
+                "the file and the time)"
+            )
+
+    def set_file(name: str, path: pathlib.Path) -> None:
+        kw[name] = path
+        if pathlib.Path(folders[name]) != path:
+            _warn(f"`{name}` -> '{path}' (v3's file)")
+
+    find_B_method = kw.get("find_B_method")
+    if isinstance(find_B_method, str) and find_B_method.lower() in ("torbeam", "omfit"):
+        name = f"topfile{suffix}" + (
+            ".json" if find_B_method.lower() == "omfit" else ""
+        )
+        set_file("magnetic_data_path", _v3_file(folders["magnetic_data_path"], name))
+    if order is not None:
+        kw.setdefault("interp_order_magnetic", order)
+    if smoothing is not None:
+        kw.setdefault("interp_smoothing_magnetic", smoothing)
+
+    for quantity, short, used in (
+        ("density", "ne", True),
+        ("temperature", "Te", bool(kw.get("relativistic_flag"))),
+    ):
+        parameters_name = f"{quantity}_fit_parameters"
+        if not used or kw.get(f"{quantity}_fit_method") != "smoothing-spline-file":
+            continue
+        parameters = kw.pop(parameters_name, None)
+        if parameters is None:
+            # v3's default file, fitted with its interp_order and interp_smoothing
+            path = _v3_file(folders[f"{short}_data_path"], f"{short}{suffix}.dat")
+            file_order, file_smoothing = order, smoothing
+        else:
+            # [path, order, smoothing], with from_dat_file's defaults (v3 refused
+            # this form, but Scotty's docstrings described it)
+            path = pathlib.Path(parameters[0])
+            file_order = parameters[1] if len(parameters) > 1 else 5
+            file_smoothing = parameters[2] if len(parameters) > 2 else 0
+            _warn(
+                f"`{parameters_name}` = {parameters!r} -> `{short}_data_path`, "
+                f"`interp_order_{short}`, `interp_smoothing_{short}`"
+            )
+        set_file(f"{short}_data_path", path)
+        if file_order is not None:
+            kw.setdefault(f"interp_order_{short}", file_order)
+        if file_smoothing is not None:
+            kw.setdefault(f"interp_smoothing_{short}", file_smoothing)
+
+
 def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
     """Return a copy of ``kwargs`` with v3 arguments converted to v4"""
     kw = dict(kwargs)
@@ -229,6 +309,8 @@ def from_v3_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
             f"set `temperature_fit_method` = {kw['temperature_fit_method']!r} "
             "(v3's default)"
         )
+
+    _v3_files_to_v4(kw)
 
     if "geometry" not in kw:
         kw["geometry"] = "cylindrical"
@@ -470,7 +552,17 @@ RULES: List[Rule] = [
         only_from="v4",
     ),
     Rule(("inputs", "quick_run"), ("inputs", "ray_tracing_flag")),
-    Rule(("inputs", "interp_order"), ("inputs", "magnetic_data_interp_order")),
+    Rule(("inputs", "interp_order"), ("inputs", "interp_order_magnetic")),
+    Rule(("inputs", "interp_smoothing"), ("inputs", "interp_smoothing_magnetic")),
+    # v4 files before 4.0.0 had one smoothing, and the order under another name
+    Rule(
+        ("inputs", "interp_order"),
+        ("inputs", "magnetic_data_interp_order"),
+        only_from="v4",
+    ),
+    Rule(
+        ("inputs", "interp_smoothing"), ("inputs", "interp_smoothing"), only_from="v4"
+    ),
     Rule(
         ("inputs", "K_initial"),
         ("solver_output", "K_initial_cylindrical"),
@@ -730,7 +822,9 @@ def _convert(dt: xr.DataTree, source: str) -> xr.DataTree:
     return out
 
 
-# Inputs with the same name and meaning in v3 and v4
+# Inputs with the same name and meaning in v3 and v4. Not v3's `equil_time`
+# and v4's `magnetic_data_time`: v3 saved the time asked for, v4 the time in
+# the file nearest it, which the field was read at
 _SAME_NAME_INPUTS = {
     "atol",
     "rtol",
@@ -740,11 +834,8 @@ _SAME_NAME_INPUTS = {
     "delta_R",
     "delta_Z",
     "density_fit_method",
-    "equil_time",
     "figure_flag",
     "find_B_method",
-    "input_filename_suffix",
-    "interp_smoothing",
     "launch_angular_frequency",
     "launch_beam_curvature",
     "launch_beam_width",
@@ -760,7 +851,6 @@ _SAME_NAME_INPUTS = {
     "poloidal_flux_zero_temperature",
     "poloidal_launch_angle_Torbeam",
     "toroidal_launch_angle_Torbeam",
-    "shot",
     "relativistic_flag",
 }
 

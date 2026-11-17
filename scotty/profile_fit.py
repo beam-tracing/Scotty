@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 import logging
+import os
 import numpy as np
 from scipy.interpolate import UnivariateSpline
 from scotty.typing import PathLike, ArrayLike
@@ -387,10 +388,15 @@ class SmoothingSplineFit(ProfileFit):
         File should contain electron density/temperature as a function of poloidal
         flux label in units of :math:`10^{19} \mathrm{m}^{-3}`.
 
-        The first line is ignored, the rest of the file is expected to
-        be in two columns: the first should contain the radial
-        coordinate (:math:`\sqrt(\psi)`), the second the electron
+        The file holds numbers only: it can't have a text header. The
+        first number (the number of points, on the first line) is skipped,
+        so a first line with two numbers shifts the columns. The rest of
+        the file is expected to be in two columns: the first should contain
+        the radial coordinate (:math:`\sqrt{\psi}`), the second the electron
         density/temperature. The columns should be separated by whitespace.
+
+        ``filename`` is used as given: a full path, or a path relative to
+        the current folder.
 
         .. code-block:: text
 
@@ -436,10 +442,15 @@ PROFILE_FIT_METHODS: Dict[str, Union[type, Callable]] = {
 }
 
 
+def _is_path(value) -> bool:
+    """True for a file path: a `str` or a `os.PathLike` such as `pathlib.Path`"""
+    return isinstance(value, (str, os.PathLike))
+
+
 def _guess_profile_fit_method(
     parameters: Sequence, filename: Optional[PathLike]
 ) -> str:
-    if filename is not None:
+    if filename is not None or (len(parameters) > 0 and _is_path(parameters[0])):
         log.info(f"Loading ne(psi) from input file")
         return "smoothing-spline-file"
 
@@ -476,9 +487,14 @@ def profile_fit(
     poloidal_flux_zero_profile:
         Poloidal flux label where density/temperature goes to zero
     parameters:
-        List of parameters passed to profile fit
+        List of parameters passed to profile fit: the arguments of the fit
+        class after ``poloidal_flux_zero_profile``. For
+        ``"smoothing-spline-file"``, ``[path, order, smoothing]``, where the
+        path is used as given (a full path, or a path relative to the
+        current folder)
     filename:
-
+        Used only when ``method`` is None: a file name means
+        ``"smoothing-spline-file"``
 
     """
 
@@ -491,9 +507,13 @@ def profile_fit(
             DeprecationWarning,
         )
 
-    if method == "smoothing-spline-file" and filename != parameters[0]:
-        raise ValueError(
-            f"For '{method}', expected filename as second parameter, but got '{parameters[0]}'"
+    if method == "smoothing-spline-file" and (
+        len(parameters) == 0 or not _is_path(parameters[0])
+    ):
+        got = repr(parameters[0]) if len(parameters) > 0 else "no parameters"
+        raise TypeError(
+            f"For '{method}', the first parameter must be the path of the file "
+            f"(a str or pathlib.Path), but got {got}"
         )
 
     try:
@@ -505,3 +525,35 @@ def profile_fit(
         )
 
     return fit_method(poloidal_flux_zero_profile, *parameters)
+
+
+def make_fit(
+    method: Optional[Union[str, ProfileFitLike]],
+    poloidal_flux_zero_density: float,
+    parameters: Optional[Sequence],
+    quantity: str = "density",
+) -> ProfileFitLike:
+    """Profile fit for the electron density or temperature (``quantity``):
+    ``method`` itself if it is a callable, else the fit it names, made with
+    `profile_fit`. ``poloidal_flux_zero_density`` is the flux beyond which the
+    profile is zero, for whichever quantity it is. `beam_me_up` gives
+    ``"smoothing-spline-file"`` its parameters, ``[path, order, smoothing]``,
+    from ``ne_data_path``, ``interp_order_ne`` and ``interp_smoothing_ne`` (or
+    those of the temperature)"""
+
+    log.debug(f"Making {quantity} fit profile")
+
+    if callable(method):
+        return method
+
+    if not isinstance(method, (str, type(None))):
+        raise TypeError(
+            f"Unexpected method type. Expected callable, str, or None, but got '{type(method)}'"
+        )
+
+    if parameters is None:
+        raise ValueError(
+            f"Passing `{quantity}_fit_method` ({method}) as string or None requires a list or array of parameters"
+        )
+
+    return profile_fit(method, poloidal_flux_zero_density, parameters)

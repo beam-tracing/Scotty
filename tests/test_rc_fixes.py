@@ -715,8 +715,8 @@ def test_presets_take_one_data_folder(tmp_path):
     kwargs = get_parameters_for_Scotty(
         "DBS_UCLA_MAST-U", 55.0, find_B_method="torbeam", data_path=tmp_path
     )
-    assert kwargs["ne_data_path"] == tmp_path
-    assert kwargs["magnetic_data_path"] == tmp_path
+    assert kwargs["ne_data_path"] == tmp_path / "ne.dat"
+    assert kwargs["magnetic_data_path"] == tmp_path / "topfile"
 
 
 def test_v3_plain_function_keeps_v3s_entry():

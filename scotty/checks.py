@@ -17,10 +17,13 @@ from scotty.fun_general import (
     find_q_labframe_cyl_to_cart,
 )
 from scotty.geometry import (
+    FILE_FIND_B_METHODS,
+    REMOVED_FIND_B_METHODS,
     MagneticField_Cylindrical,
     MagneticField_Cartesian,
     InterpolatedField_Cylindrical,
     InterpolatedField_Cartesian,
+    removed_find_B_method_error,
 )
 from scotty.profile_fit import ProfileFitLike
 from scotty.typing import ArrayLike, FloatArray, ComplexFloatArray
@@ -67,6 +70,42 @@ EXTRA_ARGUMENTS = (
     "plasmaLaunch_Psi_3D_lab_cartesian",
     "create_magnetic_geometry",
 )
+
+#: Arguments removed in 4.0.0, and what replaces them. They raise an error
+#: rather than the warning for an unknown keyword, since ignoring them would
+#: change the run
+REPLACED_ARGUMENTS = {
+    "interp_order": "`interp_order_magnetic`, `interp_order_ne` and `interp_order_Te`",
+    "interp_smoothing": (
+        "`interp_smoothing_magnetic`, `interp_smoothing_ne` and `interp_smoothing_Te`"
+    ),
+    "input_filename_suffix": (
+        "the paths of the files themselves, in `magnetic_data_path`, "
+        "`ne_data_path` and `Te_data_path`"
+    ),
+    "shot": (
+        "a field object in `find_B_method`, made from the file with a "
+        "constructor in `scotty.geometry`, for example "
+        "`EFITField.from_MAST_saved(path, equil_time)`"
+    ),
+    "equil_time": (
+        "a field object in `find_B_method`, made from the file with a "
+        "constructor in `scotty.geometry` that takes the time, for example "
+        "`EFITField.from_MAST_saved(path, equil_time)`"
+    ),
+}
+
+#: An example file name for each data path, for the error when a folder is given
+_EXAMPLE_FILE_NAMES = {
+    "magnetic_data_path": "topfile",
+    "ne_data_path": "ne.dat",
+    "Te_data_path": "Te.dat",
+}
+
+
+def _reads_file(fit_method) -> bool:
+    """Whether a profile method reads a file (``"smoothing-spline-file"``)"""
+    return isinstance(fit_method, str) and fit_method == "smoothing-spline-file"
 
 
 LaunchBeamArgument = Union[float, Tuple[float, float], Tuple[float, float, float]]
@@ -172,22 +211,23 @@ class Parameters:
         poloidal_flux_zero_density: Optional[float],
         poloidal_flux_zero_temperature: Optional[float],
         # Data input and output arguments
-        magnetic_data_path: Union[str, Path],
-        ne_data_path: Union[str, Path],
-        Te_data_path: Union[str, Path],
-        input_filename_suffix: str,
+        magnetic_data_path: Optional[Union[str, Path]],
+        ne_data_path: Optional[Union[str, Path]],
+        Te_data_path: Optional[Union[str, Path]],
         output_path: Union[str, Path],
         output_filename_suffix: str,
-        shot: Optional[int],
-        equil_time: Optional[Union[int, float]],
         # Interpolation settings
         find_B_method: Union[str, MagneticField_Cylindrical, MagneticField_Cartesian],
         density_fit_method: Union[str, ProfileFitLike],
         density_fit_parameters: Optional[Sequence],
         temperature_fit_method: Optional[Union[str, ProfileFitLike]],
         temperature_fit_parameters: Optional[Sequence],
-        interp_order: Union[str, int],
-        interp_smoothing: int,
+        interp_order_magnetic: Union[str, int],
+        interp_smoothing_magnetic: float,
+        interp_order_ne: Union[str, int],
+        interp_smoothing_ne: float,
+        interp_order_Te: Union[str, int],
+        interp_smoothing_Te: float,
         # Plotting flags
         figure_flag: bool,
         # Analysis flags
@@ -302,29 +342,65 @@ class Parameters:
             if isinstance(find_B_method, str)
             else str(type(find_B_method))
         )
-        self.magnetic_data_path = self._check_data_path("magnetic", magnetic_data_path)
-        self.interp_order_magnetic_data_str, self.interp_order_magnetic_data_int = (
-            self._check_interp_order("magnetic", interp_order)
+        # Each data path is the path of a file, checked only if the run reads it
+        self.magnetic_data_path = self._check_data_file(
+            "magnetic_data_path",
+            magnetic_data_path,
+            used=isinstance(find_B_method, str)
+            and find_B_method.lower() in FILE_FIND_B_METHODS,
+            what="magnetic field file (a TORBEAM topfile, or its OMFIT JSON form)",
+            unused="`find_B_method` does not read a file",
+        )
+        self.interp_order_magnetic_str, self.interp_order_magnetic = (
+            self._check_interp_order("interp_order_magnetic", interp_order_magnetic)
+        )
+        self.interp_smoothing_magnetic = self._check_smoothing(
+            "interp_smoothing_magnetic", interp_smoothing_magnetic
         )
 
-        self.ne_data_path = self._check_data_path("ne", ne_data_path)
-        _, self.interp_order_ne_data = self._check_interp_order(
-            "ne", interp_order
-        )  # TODO -- is this needed? or same interp_order for B and ne?
-        self.density_fit_parameters = density_fit_parameters
         self.density_fit_method = density_fit_method
+        self.density_fit_parameters = self._check_file_fit_parameters(
+            "density", density_fit_method, density_fit_parameters
+        )
+        self.ne_data_path = self._check_data_file(
+            "ne_data_path",
+            ne_data_path,
+            used=_reads_file(density_fit_method),
+            what="electron density file",
+            unused="`density_fit_method` is not 'smoothing-spline-file'",
+        )
+        _, self.interp_order_ne = self._check_interp_order(
+            "interp_order_ne", interp_order_ne
+        )
+        self.interp_smoothing_ne = self._check_smoothing(
+            "interp_smoothing_ne", interp_smoothing_ne
+        )
 
-        self.Te_data_path = self._check_data_path("Te", Te_data_path)
-        _, self.interp_order_Te_data = self._check_interp_order("Te", interp_order)
-        self.temperature_fit_parameters = temperature_fit_parameters
+        # The temperature is used only by relativistic runs
         self.temperature_fit_method = temperature_fit_method
+        self.temperature_fit_parameters = (
+            self._check_file_fit_parameters(
+                "temperature", temperature_fit_method, temperature_fit_parameters
+            )
+            if relativistic_flag
+            else temperature_fit_parameters
+        )
+        self.Te_data_path = self._check_data_file(
+            "Te_data_path",
+            Te_data_path,
+            used=relativistic_flag and _reads_file(temperature_fit_method),
+            what="electron temperature file",
+            unused="the run is not relativistic, or `temperature_fit_method` is "
+            "not 'smoothing-spline-file'",
+        )
+        _, self.interp_order_Te = self._check_interp_order(
+            "interp_order_Te", interp_order_Te
+        )
+        self.interp_smoothing_Te = self._check_smoothing(
+            "interp_smoothing_Te", interp_smoothing_Te
+        )
 
-        self.interp_smoothing = interp_smoothing
-        self.shot = shot
-        self.equil_time = equil_time
-
-        self.input_filename_suffix = input_filename_suffix
-        self.output_path = self._check_data_path("output", output_path)
+        self.output_path = self._check_output_path(output_path)
         self.output_filename_suffix = output_filename_suffix
 
         self.figure_flag = figure_flag
@@ -564,37 +640,95 @@ class Parameters:
             self.relativistic_flag,
         )
 
-    def _check_data_path(
-        self, name: Literal["magnetic", "ne", "Te", "output"], path: Union[str, Path]
-    ) -> Path:
+    def _check_data_file(
+        self,
+        name: str,
+        path: Optional[Union[str, Path]],
+        used: bool,
+        what: str,
+        unused: str,
+    ) -> Optional[Path]:
+        """``path`` as a `Path`: the file that the run reads (it must exist),
+        or ``None``. A path that the run does not read gives a warning"""
+        if path is None:
+            if used:
+                raise ValueError(f"`{name}` must be given: the path of the {what}")
+            return None
         path = Path(path)
-        if name in ["magnetic", "ne", "Te"] and not path.is_dir():
-            raise ValueError(f"`{name}_data_path` must be a valid directory")
-        elif name in ["output"] and not path.is_dir():
-            log.info(f"`output_path` = {path} does not exist. Creating the folder")
-            os.makedirs(path)
-
+        if not used:
+            log.warning(f"`{name}` = '{path}' is not used, because {unused}")
+            return path
+        if path.is_dir():
+            raise ValueError(
+                f"`{name}` = '{path}' is a folder. Since Scotty 4.0.0, `{name}` is "
+                f"the path of the {what} itself, for example "
+                f"'{path / _EXAMPLE_FILE_NAMES[name]}'"
+            )
+        if not path.is_file():
+            raise ValueError(f"`{name}` = '{path}': there is no such file ({what})")
         return path
 
-    def _check_interp_order(self, name: str, order: Union[str, int]) -> Tuple[str, int]:
+    @staticmethod
+    def _check_output_path(path: Union[str, Path]) -> Path:
+        """The folder for the output file, created if it does not exist"""
+        path = Path(path)
+        if not path.is_dir():
+            log.info(f"`output_path` = {path} does not exist. Creating the folder")
+            os.makedirs(path)
+        return path
+
+    @staticmethod
+    def _check_file_fit_parameters(
+        quantity: str, fit_method, parameters: Optional[Sequence]
+    ) -> Optional[Sequence]:
+        """``"smoothing-spline-file"`` takes its file and spline settings from
+        their own arguments, so it takes no parameters"""
+        if _reads_file(fit_method) and parameters is not None:
+            short = "ne" if quantity == "density" else "Te"
+            raise ValueError(
+                f"`{quantity}_fit_method` = 'smoothing-spline-file' reads the file "
+                f"`{short}_data_path`, with `interp_order_{short}` and "
+                f"`interp_smoothing_{short}`, so `{quantity}_fit_parameters` must "
+                f"not be given, but got {parameters!r}"
+            )
+        return parameters
+
+    @staticmethod
+    def _check_smoothing(name: str, smoothing) -> float:
+        """A smoothing factor of a spline: a number of at least 0"""
+        if (
+            isinstance(smoothing, (bool, np.bool_))
+            or not isinstance(smoothing, (int, float, np.integer, np.floating))
+            or not np.isfinite(smoothing)
+            or smoothing < 0
+        ):
+            raise ValueError(
+                f"`{name}` must be a number of at least 0 (0 for no smoothing), "
+                f"but got {smoothing!r}"
+            )
+        return float(smoothing)
+
+    @staticmethod
+    def _check_interp_order(name: str, order: Union[str, int]) -> Tuple[str, int]:
+        """The order of a spline, as its name and its number: 1, 3 or 5, or
+        "linear", "cubic" or "quintic"
+        """
         _valid_interp_orders_int = {1: "linear", 3: "cubic", 5: "quintic"}
         _valid_interp_orders_str = dict(
             (v, k) for k, v in _valid_interp_orders_int.items()
         )
 
-        if order in _valid_interp_orders_str:
-            new_orders = order, _valid_interp_orders_str[order]
-        elif order in _valid_interp_orders_int:
-            new_orders = _valid_interp_orders_int[order], order
-        else:
-            new_orders = "quintic", 5
-            log.warning(f"""
-    `interp_order` for `{name}` data must be one of {list(_valid_interp_orders_int) + list(_valid_interp_orders_str)}, but got {order}
-    
-    Ignoring user-specified argument and setting `interp_order` = `quintic`. This may or may not cause issues
-    """)
-
-        return new_orders
+        # `True` would compare equal to 1
+        if not isinstance(order, (bool, np.bool_)):
+            if isinstance(order, str) and order in _valid_interp_orders_str:
+                return order, _valid_interp_orders_str[order]
+            if not isinstance(order, str) and order in _valid_interp_orders_int:
+                return _valid_interp_orders_int[order], int(order)
+        raise ValueError(
+            f"`{name}` must be one of "
+            f"{list(_valid_interp_orders_int) + list(_valid_interp_orders_str)}, "
+            f"but got {order!r}"
+        )
 
     def _check_launch_flag(self, launch_flag) -> VALID_LAUNCH_FLAGS:
         # Any `mode_flag` (checked in `_check_mode_flag`) works with any
@@ -641,6 +775,14 @@ class Parameters:
         # Raised rather than warned about as an unused keyword, since ignoring it
         # would change where the ray stops
         extras = extras["extras"]
+        for name, replacement in REPLACED_ARGUMENTS.items():
+            if name in extras:
+                raise ValueError(
+                    f"`{name}` (got {extras[name]!r}) was removed in Scotty 4.0.0: "
+                    f"use {replacement}. To run a Scotty v3 script, pass its "
+                    "arguments through `scotty.compat.from_v3_kwargs`, which "
+                    "converts them"
+                )
         if "resonance_flag" in extras:
             raise ValueError(
                 f"`resonance_flag` (got {extras['resonance_flag']!r}) has been replaced "
@@ -784,17 +926,22 @@ class Parameters:
                 "`find_B_method` must be given: a field object, or a file "
                 'format such as "torbeam" or "omfit", or "analytical"'
             )
+        if (
+            isinstance(find_B_method, str)
+            and find_B_method.lower() in REMOVED_FIND_B_METHODS
+        ):
+            raise removed_find_B_method_error(find_B_method)
         if density_fit_method is None:
             raise ValueError(
                 "`density_fit_method` must be given: a profile object (see "
                 "`scotty.profile_fit`), the name of a fit, or "
-                '"smoothing-spline-file" to read ne.dat'
+                '"smoothing-spline-file" to read the file `ne_data_path`'
             )
         if self.relativistic_flag and temperature_fit_method is None:
             raise ValueError(
                 "`relativistic_flag=True` needs `temperature_fit_method`: a "
                 "profile object, the name of a fit, or "
-                '"smoothing-spline-file" to read Te.dat'
+                '"smoothing-spline-file" to read the file `Te_data_path`'
             )
 
     @staticmethod
@@ -819,34 +966,21 @@ class Parameters:
     ##################################################
 
     def set_experimental_profiles(self):
-        if (self.density_fit_parameters is None) and (
-            self.density_fit_method == "smoothing-spline-file"
-        ):
-            self.ne_filename = self.ne_data_path / f"ne{self.input_filename_suffix}.dat"
+        """The parameters of ``"smoothing-spline-file"``: the file and the
+        order and smoothing of its spline. The temperature is read only for a
+        relativistic run (as in v3, beam-tracing/Scotty#151)"""
+        if _reads_file(self.density_fit_method):
             self.density_fit_parameters = [
-                self.ne_filename,
-                self.interp_order_ne_data,
-                self.interp_smoothing,
+                self.ne_data_path,
+                self.interp_order_ne,
+                self.interp_smoothing_ne,
             ]
-        else:
-            self.ne_filename = None
-
-        # Temperature, only needed for relativistic corrections. As in v3
-        # (beam-tracing/Scotty#151), a file is read only when no parameters
-        # are given and the method is "smoothing-spline-file"
-        if (
-            self.relativistic_flag
-            and (self.temperature_fit_parameters is None)
-            and (self.temperature_fit_method == "smoothing-spline-file")
-        ):
-            self.Te_filename = self.Te_data_path / f"Te{self.input_filename_suffix}.dat"
+        if self.relativistic_flag and _reads_file(self.temperature_fit_method):
             self.temperature_fit_parameters = [
-                self.Te_filename,
-                self.interp_order_Te_data,
-                self.interp_smoothing,
+                self.Te_data_path,
+                self.interp_order_Te,
+                self.interp_smoothing_Te,
             ]
-        else:
-            self.Te_filename = None
 
     def coordinate_conversions(self):
         if self.cartesian_flag:
