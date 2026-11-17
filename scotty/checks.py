@@ -84,12 +84,14 @@ REPLACED_ARGUMENTS = {
         "`ne_data_path` and `Te_data_path`"
     ),
     "shot": (
-        "nothing: it was removed with the `find_B_method` names that read files "
-        "with several shots or time slices"
+        "a field object in `find_B_method`, made from the file with a "
+        "constructor in `scotty.geometry`, for example "
+        "`EFITField.from_MAST_saved(path, equil_time)`"
     ),
     "equil_time": (
-        "nothing: it was removed with the `find_B_method` names that read files "
-        "with several shots or time slices"
+        "a field object in `find_B_method`, made from the file with a "
+        "constructor in `scotty.geometry` that takes the time, for example "
+        "`EFITField.from_MAST_saved(path, equil_time)`"
     ),
 }
 

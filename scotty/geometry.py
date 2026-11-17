@@ -7,7 +7,6 @@ import json
 from multiprocessing.managers import ValueProxy
 import numpy as np
 import pathlib
-import warnings
 import h5py
 from scipy.interpolate import (
     RectBivariateSpline,
@@ -18,7 +17,7 @@ from scotty.derivatives import derivative
 from scotty.fun_general import find_nearest, find_q_labframe_cart_to_cyl
 from scotty.logger import logging, timer
 from scotty.torbeam import Torbeam
-from scotty.typing import ArrayLike, FloatArray
+from scotty.typing import ArrayLike, FloatArray, PathLike
 from typing import cast, Callable, Literal, Optional, Tuple, Union, List
 
 log = logging.getLogger()
@@ -354,7 +353,35 @@ class MagneticField_Cylindrical(ABC):
         return np.sin(zeta) * self.d_polflux_dR(R, zeta, Z, delta_R)
 
 
+def _time_index(
+    loadfile, time_key: str, equil_time: Optional[float], filename: PathLike
+):
+    """Index of the time nearest ``equil_time`` in ``loadfile[time_key]``,
+    or ``...`` (the whole array) for a file with one time and no
+    ``time_key``, which takes ``equil_time=None``"""
+    if time_key not in loadfile:
+        if equil_time is not None:
+            raise ValueError(
+                f"`equil_time` = {equil_time} was given, but '{filename}' has "
+                f"one time (no '{time_key}'): leave `equil_time` out"
+            )
+        return ...
+    if equil_time is None:
+        raise ValueError(
+            f"'{filename}' has several times ('{time_key}'): give `equil_time`"
+        )
+    times = loadfile[time_key]
+    index = find_nearest(times, equil_time)
+    log.info(f"Field at time {times[index]} (nearest to {equil_time})")
+    return index
+
+
 class InterpolatedField_Cylindrical(MagneticField_Cylindrical):
+    r"""Field interpolated from grids of :math:`B_R`, :math:`B_T`,
+    :math:`B_Z` and the normalised poloidal flux on an (R, Z) grid. Give it
+    to `beam_me_up` as ``find_B_method``. `from_npz` reads one from a
+    ``.npz`` file"""
+
     def __init__(
         self,
         R_coord: FloatArray,
@@ -399,6 +426,37 @@ class InterpolatedField_Cylindrical(MagneticField_Cylindrical):
         )
 
         self._set_poloidal_flux_derivatives(self._spline_polflux)
+
+    @classmethod
+    def from_npz(
+        cls,
+        filename: PathLike,
+        equil_time: Optional[float] = None,
+        interp_order: int = 5,
+        interp_smoothing: int = 0,
+    ) -> "InterpolatedField_Cylindrical":
+        """The field in a ``.npz`` file with grids of B and the normalised
+        poloidal flux: ``R_EFIT`` and ``Z_EFIT`` (the R and Z coordinates),
+        and ``Br_grid``, ``Bphi_grid``, ``Bz_grid`` and ``poloidalFlux_grid``
+        on them, for example a MAST-U file saved from UDA.
+
+        A file with several times also has ``time_EFIT``, and the grids have
+        time as their first axis: give ``equil_time`` (in the file's units),
+        and the field is taken at the nearest time. A file with one time has
+        no ``time_EFIT``: leave ``equil_time`` out. These were v3's
+        ``find_B_method`` ``"test"`` and ``"test_notime"``"""
+        with np.load(filename) as loadfile:
+            index = _time_index(loadfile, "time_EFIT", equil_time, filename)
+            return cls(
+                R_coord=loadfile["R_EFIT"],
+                Z_coord=loadfile["Z_EFIT"],
+                B_R=loadfile["Br_grid"][index],
+                B_T=loadfile["Bphi_grid"][index],
+                B_Z=loadfile["Bz_grid"][index],
+                psi=loadfile["poloidalFlux_grid"][index],
+                interp_order=interp_order,
+                interp_smoothing=interp_smoothing,
+            )
 
     def _set_poloidal_flux_derivatives(self, psi_spline):
         try:
@@ -466,11 +524,12 @@ class EFITField(InterpolatedField_Cylindrical):
     :math:`B_Z` are computed from the flux gradient, and :math:`B_T` from
     :math:`R B_\phi`, rather than interpolated from grids
 
-    .. deprecated:: 4.0.0
-       ``find_B_method`` no longer takes ``"UDA_saved"`` or ``"EFITpp"``, so
-       `beam_me_up` does not build this field. The class and its readers
-       (`from_EFITpp`, `from_MAST_saved`, `from_MAST_U_saved`) are kept for
-       now, but they are not tested. Give a field object to ``find_B_method``
+    Make one from a file with `from_MAST_saved`, `from_MAST_U_saved` or
+    `from_EFITpp`, and give it to `beam_me_up` as ``find_B_method``. They
+    replace v3's ``find_B_method`` ``"UDA_saved"`` and ``"EFITpp"``: the file
+    and the time are their arguments, rather than ``magnetic_data_path``,
+    ``shot`` and ``equil_time``. For a field interpolated from saved grids
+    of B, see `InterpolatedField_Cylindrical.from_npz`
     """
 
     def __init__(
@@ -487,12 +546,6 @@ class EFITField(InterpolatedField_Cylindrical):
         interp_order: int = 5,
         interp_smoothing: int = 0,
     ):
-        warnings.warn(
-            "`EFITField` is deprecated: `find_B_method` no longer takes "
-            "'UDA_saved' or 'EFITpp', and this class is not tested",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         self.R_coord = R_grid
         self.Z_coord = Z_grid
         self.poloidalFlux_grid = psi_norm_2D
@@ -536,13 +589,16 @@ class EFITField(InterpolatedField_Cylindrical):
     @classmethod
     def from_EFITpp(
         cls,
-        filename: pathlib.Path,
+        filename: PathLike,
         equil_time: float,
-        delta_R: Optional[float],
-        delta_Z: Optional[float],
-        interp_order: int,
-        interp_smoothing: int,
-    ):
+        delta_R: Optional[float] = 0.0001,
+        delta_Z: Optional[float] = 0.0001,
+        interp_order: int = 5,
+        interp_smoothing: int = 0,
+    ) -> "EFITField":
+        """The field at the time nearest ``equil_time`` (in the file's
+        units) in an EFIT++ output file (``efitOut.nc``, for example the
+        MSE-constrained EFIT++ of MAST). v3's ``find_B_method="EFITpp"``"""
         # Read with h5py: h5netcdf's legacy API (1.8.x) builds variable paths
         # from the group's short name, so it cannot open variables two groups
         # deep, such as output/profiles2D/poloidalFlux
@@ -587,13 +643,18 @@ class EFITField(InterpolatedField_Cylindrical):
     @classmethod
     def from_MAST_saved(
         cls,
-        filename: pathlib.Path,
+        filename: PathLike,
         equil_time: float,
-        delta_R: Optional[float],
-        delta_Z: Optional[float],
-        interp_order: int,
-        interp_smoothing: int,
-    ):
+        delta_R: Optional[float] = 0.0001,
+        delta_Z: Optional[float] = 0.0001,
+        interp_order: int = 5,
+        interp_smoothing: int = 0,
+    ) -> "EFITField":
+        """The field at the time nearest ``equil_time`` (in the file's
+        units) in a MAST EFIT file saved from UDA (``.npz``, as
+        ``{shot}_equilibrium_data.npz``, with time bases ``t_base_B`` and
+        ``t_base_C``). v3's ``find_B_method="UDA_saved"`` for MAST shots
+        (up to 30471)"""
         with np.load(filename) as loadfile:
             # On time base C
             rBphi_all_times = loadfile["rBphi"]
@@ -639,27 +700,34 @@ class EFITField(InterpolatedField_Cylindrical):
     @classmethod
     def from_MAST_U_saved(
         cls,
-        filename: pathlib.Path,
-        equil_time: float,
-        delta_R: Optional[float],
-        delta_Z: Optional[float],
-        interp_order: int,
-        interp_smoothing: int,
-    ):
+        filename: PathLike,
+        equil_time: Optional[float] = None,
+        delta_R: Optional[float] = 0.0001,
+        delta_Z: Optional[float] = 0.0001,
+        interp_order: int = 5,
+        interp_smoothing: int = 0,
+    ) -> "EFITField":
+        """The field in a MAST-U EFIT file saved from UDA (``.npz``, as
+        ``{shot}_equilibrium_data.npz``): at the time nearest ``equil_time``
+        (in the file's units, ``time_EFIT``), or, for a file with one time
+        and no ``time_EFIT``, ``equil_time=None``. v3's
+        ``find_B_method="UDA_saved"`` for MAST-U shots, and with no shot.
+
+        Without ``time_EFIT``, the arrays have no time axis, and ``rBphi`` is
+        on a normalised flux evenly spaced from 0 to 1, as in v3. With
+        ``time_EFIT``, ``rBphi`` is on ``poloidalFlux``, as in v3"""
         with np.load(filename) as loadfile:
-            time_EFIT = loadfile["time_EFIT"]
-            t_idx = find_nearest(time_EFIT, equil_time)
-            log.info(f"EFIT time {time_EFIT[t_idx]}")
+            index = _time_index(loadfile, "time_EFIT", equil_time, filename)
 
             return cls(
                 R_grid=loadfile["R_EFIT"],
                 Z_grid=loadfile["Z_EFIT"],
-                rBphi=loadfile["rBphi"][t_idx, :],
-                psi_norm_2D=loadfile["poloidalFlux_grid"][t_idx, :, :],
-                psi_norm_1D=loadfile["poloidalFlux"][t_idx, :],
-                psi_unnorm_axis=loadfile["poloidalFlux_unnormalised_axis"][t_idx],
+                rBphi=loadfile["rBphi"][index],
+                psi_norm_2D=loadfile["poloidalFlux_grid"][index],
+                psi_norm_1D=(None if index is ... else loadfile["poloidalFlux"][index]),
+                psi_unnorm_axis=loadfile["poloidalFlux_unnormalised_axis"][index],
                 psi_unnorm_boundary=loadfile["poloidalFlux_unnormalised_boundary"][
-                    t_idx
+                    index
                 ],
                 delta_R=delta_R,
                 delta_Z=delta_Z,
@@ -1231,11 +1299,19 @@ class InterpolatedField_Cartesian(MagneticField_Cartesian):
 ##################################################
 
 
-#: `find_B_method` names removed in 4.0.0 (lower case). They read files with
-#: several shots or time slices (``shot``, ``equil_time``), or a file that
-#: `beam_me_up` could not accept (``"test_notime"``, and ``"UDA_saved"`` with
-#: no shot). They may come back later
-REMOVED_FIND_B_METHODS = ("test", "test_notime", "uda_saved", "efitpp")
+#: `find_B_method` names removed in 4.0.0 (lower case), with ``shot`` and
+#: ``equil_time``, and the field constructors that replace them: the file and
+#: the time are their arguments
+REMOVED_FIND_B_METHODS = {
+    "test": "`InterpolatedField_Cylindrical.from_npz(path, equil_time)`",
+    "test_notime": "`InterpolatedField_Cylindrical.from_npz(path)`",
+    "uda_saved": (
+        "`EFITField.from_MAST_saved(path, equil_time)` for a MAST shot, or "
+        "`EFITField.from_MAST_U_saved(path, equil_time)` for a MAST-U shot "
+        "(with no `equil_time` for a file with one time)"
+    ),
+    "efitpp": "`EFITField.from_EFITpp(path, equil_time)`",
+}
 
 #: `find_B_method` names that read the file ``magnetic_data_path``
 FILE_FIND_B_METHODS = ("torbeam", "omfit")
@@ -1243,12 +1319,11 @@ FILE_FIND_B_METHODS = ("torbeam", "omfit")
 
 def removed_find_B_method_error(find_B_method: str) -> ValueError:
     """The error for a `find_B_method` in `REMOVED_FIND_B_METHODS`"""
+    replacement = REMOVED_FIND_B_METHODS[find_B_method.lower()]
     return ValueError(
-        f"`find_B_method` = '{find_B_method}' is deprecated, and removed for now "
-        "(Scotty 4.0.0), with `shot` and `equil_time`. Give a field object (for "
-        "example a `scotty.geometry.InterpolatedField_Cylindrical` made from your "
-        "data), a TORBEAM topfile (`find_B_method` = 'torbeam' or 'omfit', with "
-        "the path of the file in `magnetic_data_path`), or 'analytical'"
+        f"`find_B_method` = '{find_B_method}' was removed in Scotty 4.0.0, with "
+        f"`shot` and `equil_time`. Make the field with {replacement} (from "
+        "`scotty.geometry`), and give it to `find_B_method`"
     )
 
 

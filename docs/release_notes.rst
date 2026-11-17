@@ -172,12 +172,26 @@ Inputs
   raises. Before, a file in ``density_fit_parameters`` always raised "expected
   filename as second parameter" (as in v3).
 - ``find_B_method`` ``"test"``, ``"test_notime"``, ``"UDA_saved"`` and
-  ``"EFITpp"`` are deprecated, and removed for now, with ``shot`` and
-  ``equil_time``, which only they used. They raise an error; give a field
-  object instead. ``"test_notime"``, and ``"UDA_saved"`` with no shot, took
-  the path of a file, which ``beam_me_up`` refused, so they could not run.
-  `scotty.geometry.EFITField` and its readers are kept, but they are not
-  tested, and warn (``DeprecationWarning``).
+  ``"EFITpp"`` are removed, with ``shot`` and ``equil_time``, which only they
+  used. Their files are read by field constructors, which take the file and
+  the time, and whose field is given to ``find_B_method``:
+
+  - ``"UDA_saved"``: `scotty.geometry.EFITField.from_MAST_saved` (MAST) and
+    `scotty.geometry.EFITField.from_MAST_U_saved` (MAST-U; with no
+    ``equil_time`` for a file with one time, v3's ``"UDA_saved"`` with no
+    shot)
+  - ``"EFITpp"``: `scotty.geometry.EFITField.from_EFITpp`
+  - ``"test"`` and ``"test_notime"``: the new
+    `scotty.geometry.InterpolatedField_Cylindrical.from_npz`, with and
+    without ``equil_time``
+
+  Each name raises an error that names its constructor. Before, one name
+  chose between file layouts by the shot number (MAST up to 30471, else
+  MAST-U), and ``"test_notime"``, and ``"UDA_saved"`` with no shot, took the
+  path of a file, which ``beam_me_up`` refused, so they could not run. The
+  constructors' spline and step arguments now have defaults (those of
+  `scotty.geometry.EFITField`), and a constructor given a file with several
+  times and no ``equil_time``, or the reverse, raises.
 - The removed arguments (``interp_order``, ``interp_smoothing``,
   ``input_filename_suffix``, ``shot``, ``equil_time``) raise an error that
   names what replaces them, rather than the warning for an unknown keyword:

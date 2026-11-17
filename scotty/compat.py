@@ -170,8 +170,10 @@ def _v3_files_to_v4(kw: Dict[str, Any]) -> None:
     one ``interp_smoothing``. v4 takes the paths of the files, and an order
     and a smoothing for each of the magnetic field, ne and Te (v3's defaults,
     5 and 0, are v4's). ``shot`` and ``equil_time`` are dropped: they were
-    only for the field files that v4 removed (``find_B_method`` "test",
-    "UDA_saved", "EFITpp"), which v4 refuses"""
+    only for the ``find_B_method`` names that v4 removed ("test",
+    "test_notime", "UDA_saved", "EFITpp"), which v4 refuses. Their files are
+    read by the field constructors in `scotty.geometry`, which take the file
+    and the time"""
     suffix = kw.pop("input_filename_suffix", "")
     folders = {
         name: kw.pop(name, ".")
@@ -183,8 +185,9 @@ def _v3_files_to_v4(kw: Dict[str, Any]) -> None:
         value = kw.pop(name, None)
         if value is not None:
             _warn(
-                f"dropped `{name}` = {value!r} (v4 removed it, with the field files "
-                "that need it)"
+                f"dropped `{name}` = {value!r} (v4 removed it: give `find_B_method` "
+                "a field made by a constructor in `scotty.geometry`, which takes "
+                "the file and the time)"
             )
 
     def set_file(name: str, path: pathlib.Path) -> None:

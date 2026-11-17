@@ -3,7 +3,12 @@ from scotty.profile_fit import make_fit
 import scotty.derivatives as derivatives
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.torbeam import Torbeam
-from scotty.geometry import CircularFluxSurfaceField, MagneticField_Cylindrical
+from scotty.geometry import (
+    CircularFluxSurfaceField,
+    EFITField,
+    InterpolatedField_Cylindrical,
+    MagneticField_Cylindrical,
+)
 from scotty.fun_general import freq_GHz_to_angular_frequency
 from scotty.profile_fit import QuadraticFit
 from scotty.hamiltonian import initialise_hamiltonians
@@ -17,6 +22,7 @@ from scotty.typing import FloatArray
 import json
 import numpy as np
 from numpy.testing import assert_allclose
+import pathlib
 import pytest
 import xarray as xr
 from typing import Optional, cast
@@ -996,6 +1002,201 @@ def omfit_json(path):
     return kwargs_dict
 
 
+def unnormalised_flux_scale(kwargs_dict: dict) -> float:
+    """The unnormalised poloidal flux per unit normalised flux of
+    CircularFluxSurfaceField, B_p_a a R_axis / 2, so that
+    B_p = |grad(Psi)| / R"""
+    return (
+        kwargs_dict["B_p_a"] * kwargs_dict["minor_radius_a"] * kwargs_dict["R_axis"] / 2
+    )
+
+
+def add_timeslices(array):
+    """Add a new dimension at the front, with 'array' at index 1"""
+    zeros = np.zeros_like(array)
+    return np.stack((zeros, array, zeros))
+
+
+def flux_function_args():
+    """The synthetic field as EFIT gives it: psi on the axis and the boundary
+    (unnormalised, with the sign of EFIT's), and rBphi on a normalised flux
+    from 0 to 1 (rho / a along the outboard midplane)"""
+    kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
+    R_axis = kwargs_dict["R_axis"]
+    scale = unnormalised_flux_scale(kwargs_dict)
+    psi_axis = -field.polflux(R_axis, 0, 0.0) * scale
+    psi_boundary = (
+        -field.polflux(R_axis + kwargs_dict["minor_radius_a"], 0, 0.0) * scale
+    )
+    R_midplane = np.linspace(R_axis, R_axis + kwargs_dict["minor_radius_a"])
+    rBphi = R_midplane * field.B_T(R_midplane, 0, 0.0)
+    psi_norm_1D = np.linspace(0, 1, len(R_midplane))
+    return kwargs_dict, psi, field, psi_axis, psi_boundary, rBphi, psi_norm_1D
+
+
+def npz_file(path: pathlib.Path):
+    """B from saved grids of B, several times: v3's find_B_method="test" """
+    kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
+    time = [100, 200, 300]
+    np.savez(
+        path / "12345_equilibrium_data",
+        R_EFIT=field.R_coord,
+        Z_EFIT=field.Z_coord,
+        poloidalFlux_grid=add_timeslices(psi),
+        Bphi_grid=add_timeslices(B_t),
+        Br_grid=add_timeslices(B_R),
+        Bz_grid=add_timeslices(B_Z),
+        time_EFIT=time,
+    )
+    kwargs_dict["find_B_method"] = InterpolatedField_Cylindrical.from_npz(
+        path / "12345_equilibrium_data.npz", time[1]
+    )
+    return kwargs_dict
+
+
+def npz_notime_file(path: pathlib.Path):
+    """B from saved grids of B, one time: v3's find_B_method="test_notime" """
+    kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
+    np.savez(
+        path / "12345_equilibrium_data",
+        R_EFIT=field.R_coord,
+        Z_EFIT=field.Z_coord,
+        poloidalFlux_grid=psi,
+        Bphi_grid=B_t,
+        Br_grid=B_R,
+        Bz_grid=B_Z,
+    )
+    kwargs_dict["find_B_method"] = InterpolatedField_Cylindrical.from_npz(
+        path / "12345_equilibrium_data.npz"
+    )
+    return kwargs_dict
+
+
+def UDA_saved(path: pathlib.Path):
+    """B from the flux, MAST-U layout with one time: v3's
+    find_B_method="UDA_saved" with no shot"""
+    kwargs_dict, psi, field, psi_axis, psi_boundary, rBphi, _ = flux_function_args()
+    np.savez(
+        path / "12345_equilibrium_data",
+        rBphi=rBphi,
+        R_EFIT=field.R_coord,
+        Z_EFIT=field.Z_coord,
+        poloidalFlux_grid=psi,
+        poloidalFlux_unnormalised_axis=psi_axis,
+        poloidalFlux_unnormalised_boundary=psi_boundary,
+    )
+    kwargs_dict["find_B_method"] = EFITField.from_MAST_U_saved(
+        path / "12345_equilibrium_data.npz",
+        delta_R=kwargs_dict["delta_R"],
+        delta_Z=kwargs_dict["delta_Z"],
+    )
+    return kwargs_dict
+
+
+def UDA_saved_MAST_U(path: pathlib.Path):
+    """B from the flux, MAST-U layout with several times: v3's
+    find_B_method="UDA_saved" with a MAST-U shot"""
+    kwargs_dict, psi, field, psi_axis, psi_boundary, rBphi, psi_norm_1D = (
+        flux_function_args()
+    )
+    time = [100, 200, 300]
+    np.savez(
+        path / "55555_equilibrium_data",
+        rBphi=add_timeslices(rBphi),
+        R_EFIT=field.R_coord,
+        Z_EFIT=field.Z_coord,
+        poloidalFlux_grid=add_timeslices(psi),
+        poloidalFlux=add_timeslices(psi_norm_1D),
+        poloidalFlux_unnormalised_axis=add_timeslices(psi_axis),
+        poloidalFlux_unnormalised_boundary=add_timeslices(psi_boundary),
+        time_EFIT=time,
+    )
+    kwargs_dict["find_B_method"] = EFITField.from_MAST_U_saved(
+        path / "55555_equilibrium_data.npz",
+        time[1],
+        delta_R=kwargs_dict["delta_R"],
+        delta_Z=kwargs_dict["delta_Z"],
+    )
+    return kwargs_dict
+
+
+def UDA_saved_MAST(path: pathlib.Path):
+    """B from the flux, MAST layout: v3's find_B_method="UDA_saved" with a
+    MAST shot. The unnormalised flux is on time base B, as (time, Z, R); the
+    flux functions are on time base C, which has other times"""
+    kwargs_dict, psi, field, psi_axis, psi_boundary, rBphi, _ = flux_function_args()
+    t_base_B = np.array([100.0, 200.0, 300.0])
+    t_base_C = np.array([50.0, 100.0, 150.0, 200.0, 250.0])
+
+    def on_base_C(value):
+        """``value`` at 200 on time base C, and zeros elsewhere"""
+        stacked = np.zeros((len(t_base_C),) + np.shape(value))
+        stacked[3] = value
+        return stacked
+
+    unnormalised = psi_axis + psi * (psi_boundary - psi_axis)
+    np.savez(
+        path / "29999_equilibrium_data",
+        rBphi=on_base_C(rBphi),
+        t_base_B=t_base_B,
+        t_base_C=t_base_C,
+        R_EFIT=field.R_coord,
+        Z_EFIT=field.Z_coord,
+        poloidal_flux_unnormalised_axis=on_base_C(psi_axis),
+        poloidal_flux_unnormalised_boundary=on_base_C(psi_boundary),
+        poloidal_flux_unnormalised=add_timeslices(unnormalised.T),
+    )
+    kwargs_dict["find_B_method"] = EFITField.from_MAST_saved(
+        path / "29999_equilibrium_data.npz",
+        210.0,
+        delta_R=kwargs_dict["delta_R"],
+        delta_Z=kwargs_dict["delta_Z"],
+    )
+    return kwargs_dict
+
+
+def EFITpp_file(path: pathlib.Path):
+    """B from the flux, a synthetic efitOut.nc with EFIT++'s layout: v3's
+    find_B_method="EFITpp" """
+    import h5py
+
+    kwargs_dict, B_R, B_t, B_Z, psi, field = synthetic_args()
+
+    R_axis = kwargs_dict["R_axis"]
+    minor_radius = kwargs_dict["minor_radius_a"]
+
+    # A physically consistent file: the unnormalised flux is psi_unnorm =
+    # (psi_boundary - psi_axis) psi_norm, with psi_boundary - psi_axis =
+    # -unnormalised_flux_scale as in UDA_saved, so from_EFITpp's linear fit
+    # gives dpsi_norm/dpsi = 1/slope
+    slope = -unnormalised_flux_scale(kwargs_dict)
+    R_midplane = np.linspace(R_axis, R_axis + minor_radius)
+    psi_norm_1D = np.linspace(0, 1, len(R_midplane))
+    rBphi = R_midplane * field.B_T(R_midplane, 0, 0.0)
+    time = [100, 200, 300]
+
+    # Written with h5py: h5netcdf's legacy API cannot write (or read)
+    # variables two groups deep. EFIT++ output is netCDF4, i.e. HDF5
+    with h5py.File(path / "efitOut.nc", "w") as efitpp:
+        efitpp["time"] = time
+        profiles2D = efitpp.create_group("output/profiles2D")
+        profiles2D["poloidalFlux"] = add_timeslices(psi * slope)
+        profiles2D["r"] = add_timeslices(field.R_coord)
+        profiles2D["z"] = add_timeslices(field.Z_coord)
+        flux = efitpp.create_group("output/fluxFunctionProfiles")
+        flux["normalizedPoloidalFlux"] = psi_norm_1D
+        flux["poloidalFlux"] = add_timeslices(psi_norm_1D * slope)
+        flux["rBphi"] = add_timeslices(rBphi)
+
+    kwargs_dict["find_B_method"] = EFITField.from_EFITpp(
+        path / "efitOut.nc",
+        time[1],
+        delta_R=kwargs_dict["delta_R"],
+        delta_Z=kwargs_dict["delta_Z"],
+    )
+    return kwargs_dict
+
+
 def assert_is_symmetric(array: FloatArray) -> None:
     assert_allclose(array, array.T)
 
@@ -1073,6 +1274,7 @@ def assert_ray_matches_golden(output, expected: dict, rtol=1e-2, atol=1e-2):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
     ],
 )
 def test_integrated_O_mode(tmp_path, generator):
@@ -1111,6 +1313,7 @@ def test_integrated_O_mode(tmp_path, generator):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
     ],
 )
 def test_integrated_X_mode(tmp_path, generatorneg):
@@ -1147,6 +1350,7 @@ def test_integrated_X_mode(tmp_path, generatorneg):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
     ],
 )
 def test_relativistic_O_mode(tmp_path, generator_rel):
@@ -1191,6 +1395,7 @@ def test_relativistic_O_mode(tmp_path, generator_rel):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
     ],
 )
 def test_relativistic_O_mode_final_Psi(tmp_path, generator_relfinal):
@@ -1236,6 +1441,7 @@ def test_relativistic_O_mode_final_Psi(tmp_path, generator_relfinal):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
     ],
 )
 def test_relativistic_X_mode(tmp_path, generator_relneg):
@@ -1276,6 +1482,7 @@ def test_relativistic_X_mode(tmp_path, generator_relneg):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
     ],
 )
 def test_null_relativistic_O_mode(tmp_path, generator_nullrel):
@@ -1315,6 +1522,7 @@ def test_null_relativistic_O_mode(tmp_path, generator_nullrel):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
     ],
 )
 def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
@@ -1362,6 +1570,7 @@ def test_null_relativistic_X_mode(tmp_path, generator_nullrelneg):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
     ],
 )
 def test_X_mode_cutoff_Psi(tmp_path, generator_cutoff, temperature):
@@ -1403,6 +1612,12 @@ def test_X_mode_cutoff_Psi(tmp_path, generator_cutoff, temperature):
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
         pytest.param(omfit_json, id="omfit-file"),
+        pytest.param(npz_file, id="test-file"),
+        pytest.param(npz_notime_file, id="test_notime-file"),
+        pytest.param(UDA_saved, id="UDA-saved-file"),
+        pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file"),
+        pytest.param(UDA_saved_MAST, id="UDA-saved-MAST-file"),
+        pytest.param(EFITpp_file, id="EFITpp-file"),
     ],
 )
 def test_create_magnetic_geometry(tmp_path, generator):
@@ -1436,10 +1651,65 @@ def test_create_magnetic_geometry(tmp_path, generator):
 @pytest.mark.parametrize(
     "generator",
     [
+        pytest.param(UDA_saved, id="UDA-saved-file"),
+        pytest.param(UDA_saved_MAST_U, id="UDA-saved-MAST-U-file"),
+        pytest.param(UDA_saved_MAST, id="UDA-saved-MAST-file"),
+        pytest.param(EFITpp_file, id="EFITpp-file"),
+    ],
+)
+def test_EFIT_geometry(tmp_path, generator):
+    kwargs_dict = generator(tmp_path)
+    field = cast(MagneticField_Cylindrical, make_field(kwargs_dict))
+    field_golden = cast(MagneticField_Cylindrical, make_field(simple(tmp_path)))
+
+    R_axis = kwargs_dict["R_axis"]
+    minor_radius_a = kwargs_dict["minor_radius_a"]
+    scale = unnormalised_flux_scale(kwargs_dict)
+
+    # Include buffer for gradient near edge
+    width = minor_radius_a + 0.05
+    # Different grid sizes for the evaluation points. The data grid is square
+    # and the field symmetric about its centre, so this can't see a
+    # transposed grid: tests/test_field_files.py::test_from_MAST_saved can
+    R = np.linspace(R_axis - width, R_axis + width, 99)
+    Z = np.linspace(-width, width, 101)
+    R_grid, Z_grid = np.meshgrid(R, Z, indexing="ij")
+    B_R = field.B_R(R_grid, 0, Z_grid)
+    B_Z = field.B_Z(R_grid, 0, Z_grid)
+
+    psi = field.polflux(R_grid, 0, Z_grid)
+    grad_psi = np.gradient(psi, R, Z)
+    calculated_B_R = grad_psi[1] * scale / R_grid
+    calculated_B_Z = -grad_psi[0] * scale / R_grid
+
+    mask = (psi > 0.1) & (psi <= 1)
+
+    assert_allclose(B_R[mask], calculated_B_R[mask], 2e-3, 2e-3)
+    assert_allclose(B_Z[mask], calculated_B_Z[mask], 2e-3, 2e-3)
+
+    # Inside the plasma only, as for B_R and B_Z: outside, the readers' spline
+    # of rBphi(psi) is extrapolated (2e-7 relative at psi ~ 2.4)
+    assert_allclose(
+        field.B_T(R_grid, 0, Z_grid)[mask], field_golden.B_T(R_grid, 0, Z_grid)[mask]
+    )
+
+    # Check that poloidal field rotates in the correct direction
+    total_sign = np.sign(B_R) * np.sign(B_Z)
+    assert total_sign[0, 0] == -1, "Top left"
+    assert total_sign[0, -1] == 1, "Top right"
+    assert total_sign[-1, 0] == 1, "Bottom left"
+    assert total_sign[-1, -1] == -1, "Bottom right"
+
+
+@pytest.mark.parametrize(
+    "generator",
+    [
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
         pytest.param(omfit_json, id="omfit-file"),
+        pytest.param(npz_file, id="test-file"),
+        pytest.param(npz_notime_file, id="test_notime-file"),
     ],
 )
 def test_launch_golden_answer(tmp_path, generator):
@@ -1582,6 +1852,8 @@ def launch_parameters(start_point, end_point_poloidal_coords):
         pytest.param(simple, id="simple"),
         pytest.param(ne_dat_file, id="density-fit-file"),
         pytest.param(torbeam_file, id="torbeam-file"),
+        pytest.param(npz_file, id="test-file"),
+        pytest.param(UDA_saved, id="UDA-saved-file"),
     ],
 )
 @pytest.mark.parametrize(

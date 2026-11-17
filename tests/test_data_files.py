@@ -6,7 +6,8 @@ folders, the file names ended in ``input_filename_suffix``, and one
 ``interp_order`` and one ``interp_smoothing`` set all three splines. A file
 given in ``density_fit_parameters`` always raised "expected filename as second
 parameter" (B15, as in v3). ``find_B_method`` "test", "test_notime",
-"UDA_saved" and "EFITpp" are removed for now, with ``shot`` and ``equil_time``.
+"UDA_saved" and "EFITpp" are removed, with ``shot`` and ``equil_time``: field
+constructors read their files (tests/test_field_files.py).
 """
 
 import importlib
@@ -18,7 +19,7 @@ import pytest
 
 from scotty.beam_me_up import beam_me_up
 from scotty.compat import from_v3_kwargs
-from scotty.geometry import CircularFluxSurfaceField, EFITField, REMOVED_FIND_B_METHODS
+from scotty.geometry import CircularFluxSurfaceField, REMOVED_FIND_B_METHODS
 from scotty.init_bruv import get_parameters_for_Scotty
 from scotty.profile_fit import SmoothingSplineFit, TanhFit
 from scotty.torbeam import Torbeam
@@ -307,21 +308,24 @@ def test_removed_arguments_raise(tmp_path, name, value, replacement):
     assert "from_v3_kwargs" in str(error.value)
 
 
-@pytest.mark.parametrize("name", ["test", "test_notime", "UDA_saved", "EFITpp"])
-def test_removed_find_B_methods_raise(tmp_path, name):
+@pytest.mark.parametrize(
+    ("name", "constructor"),
+    [
+        ("test", "InterpolatedField_Cylindrical.from_npz(path, equil_time)"),
+        ("test_notime", "InterpolatedField_Cylindrical.from_npz(path)"),
+        ("UDA_saved", "EFITField.from_MAST_U_saved(path, equil_time)"),
+        ("EFITpp", "EFITField.from_EFITpp(path, equil_time)"),
+    ],
+)
+def test_removed_find_B_methods_name_their_constructor(tmp_path, name, constructor):
     assert name.lower() in REMOVED_FIND_B_METHODS
-    with pytest.raises(ValueError, match="is deprecated, and removed for now"):
+    message = "was removed in Scotty 4.0.0"
+    with pytest.raises(ValueError, match=message) as error:
         run(tmp_path, find_B_method=name)
-    with pytest.raises(ValueError, match="is deprecated, and removed for now"):
+    assert constructor in str(error.value)
+    with pytest.raises(ValueError, match=message) as error:
         get_parameters_for_Scotty("DBS_NSTX_MAST", 55.0, find_B_method=name)
-
-
-def test_EFITField_is_deprecated():
-    R = np.linspace(1.0, 2.0, 11)
-    Z = np.linspace(-0.5, 0.5, 11)
-    psi = np.add.outer((R - 1.5) ** 2, Z**2) / 0.25
-    with pytest.warns(DeprecationWarning, match="EFITField"):
-        EFITField(R, Z, np.ones(11), psi, 0.0, 1.0)
+    assert constructor in str(error.value)
 
 
 def test_make_fit_moved_to_profile_fit():

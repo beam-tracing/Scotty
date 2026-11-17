@@ -515,8 +515,11 @@ def get_parameters_for_Scotty(
           and ``density_fit_method="smoothing-spline-file"``)
         - `UDA`: Loads EFIT data directly from uda (not yet implemented)
 
-        `EFITpp`, `UDA_saved` and `test` are deprecated, and removed for now
-        (Scotty 4.0.0): they raise an error
+        `EFITpp`, `UDA_saved`, `test` and `test_notime` were removed in
+        Scotty 4.0.0, and raise an error: make the field with a constructor
+        in `scotty.geometry` (`EFITField.from_EFITpp`,
+        `EFITField.from_MAST_saved`, `EFITField.from_MAST_U_saved`,
+        `InterpolatedField_Cylindrical.from_npz`) and give it to `beam_me_up`
     find_ne_method : str, optional
         Name of a density fit saved for the diagnostic and the shot in
         `DENSITY_FIT_PARAMETERS` (for example ``"tanh"``), at the saved time

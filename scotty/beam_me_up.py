@@ -423,10 +423,19 @@ def beam_me_up(
         which needs ``B_T_axis``, ``R_axis``, ``minor_radius_a`` and
         ``B_p_a``). The file formats work only in cylindrical geometry.
 
-        .. deprecated:: 4.0.0
+        Other files are read by constructors in `scotty.geometry`, which take
+        the file and, for a file with several times, the time:
+        `scotty.geometry.EFITField.from_MAST_saved`,
+        `scotty.geometry.EFITField.from_MAST_U_saved` and
+        `scotty.geometry.EFITField.from_EFITpp` (B from the poloidal flux),
+        and `scotty.geometry.InterpolatedField_Cylindrical.from_npz` (B from
+        saved grids of B). For example, ``find_B_method =
+        EFITField.from_MAST_saved("29908_equilibrium_data.npz", 0.24)``.
+
+        .. versionchanged:: 4.0.0
            ``"test"``, ``"test_notime"``, ``"UDA_saved"`` and ``"EFITpp"``
-           are removed for now, with ``shot`` and ``equil_time``; they raise
-           an error. Give a field object instead
+           are removed, with ``shot`` and ``equil_time``; they raise an
+           error that names the constructor that replaces each
     density_fit_method : str or callable
         Required. Electron density profile (in 10¹⁹ m⁻³) as a function of the
         normalised poloidal flux: a callable (e.g. a
