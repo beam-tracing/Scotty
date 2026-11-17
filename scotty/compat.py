@@ -822,7 +822,9 @@ def _convert(dt: xr.DataTree, source: str) -> xr.DataTree:
     return out
 
 
-# Inputs with the same name and meaning in v3 and v4
+# Inputs with the same name and meaning in v3 and v4. Not v3's `equil_time`
+# and v4's `magnetic_data_time`: v3 saved the time asked for, v4 the time in
+# the file nearest it, which the field was read at
 _SAME_NAME_INPUTS = {
     "atol",
     "rtol",

@@ -210,7 +210,8 @@ class MagneticField_Cylindrical(ABC):
     data_file: Optional[str] = None
     #: The time of the field in ``data_file`` (in the file's units): the time
     #: in the file nearest the one asked for. Saved in the output as the input
-    #: ``magnetic_data_time``. None for a file with one time
+    #: ``magnetic_data_time``. None for a file with one time, or a field not
+    #: read from a file
     data_time: Optional[float] = None
 
     @abstractmethod
@@ -366,7 +367,7 @@ def _record_source(field, filename: PathLike, time: Optional[float]):
     """Set ``field.data_file`` and ``field.data_time`` (the time used, or None
     for a file with one time), so that the output records them; returns
     ``field``"""
-    field.data_file = str(filename)
+    field.data_file = str(pathlib.Path(filename))
     field.data_time = None if time is None else float(time)
     return field
 
@@ -749,9 +750,10 @@ class EFITField(InterpolatedField_Cylindrical):
         file's ``poloidalFlux`` is not that flux: in the MAST-U files saved
         from UDA, it goes from 1 to 0 and back to 1. v3 used it for
         ``rBphi`` with several times, which failed on those files ("x must
-        be strictly increasing"). On shot 45290 at 0.15 s, ``rBphi`` on the
-        evenly spaced flux agrees with R times the file's ``Bphi_grid`` to
-        about 1e-3"""
+        be strictly increasing"). On shot 45290 at 0.15 s, with ``rBphi`` on
+        the evenly spaced flux, B_T agrees with the file's ``Bphi_grid`` to
+        3e-5 of its largest value inside the plasma (normalised flux below
+        0.9)"""
         with np.load(filename) as loadfile:
             index = _time_index(loadfile, "time_EFIT", equil_time, filename)
 
