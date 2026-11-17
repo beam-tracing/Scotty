@@ -204,6 +204,15 @@ class MagneticField_Cylindrical(ABC):
     poloidalFlux_grid: FloatArray  #: Value of the poloidal magnetic flux, :math:`\psi`, on ``(R_coord, Z_coord)``
     # TODO: Include B_R grid, B_T grid, B_Z grids
 
+    #: The file the field was read from, by a constructor such as
+    #: `EFITField.from_MAST_saved`; saved in the output as the input
+    #: ``magnetic_data_path``. None for a field not read from a file
+    data_file: Optional[str] = None
+    #: The time of the field in ``data_file`` (in the file's units): the time
+    #: in the file nearest the one asked for. Saved in the output as the input
+    #: ``magnetic_data_time``. None for a file with one time
+    data_time: Optional[float] = None
+
     @abstractmethod
     def B_R(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike:
         raise NotImplementedError
@@ -353,6 +362,15 @@ class MagneticField_Cylindrical(ABC):
         return np.sin(zeta) * self.d_polflux_dR(R, zeta, Z, delta_R)
 
 
+def _record_source(field, filename: PathLike, time: Optional[float]):
+    """Set ``field.data_file`` and ``field.data_time`` (the time used, or None
+    for a file with one time), so that the output records them; returns
+    ``field``"""
+    field.data_file = str(filename)
+    field.data_time = None if time is None else float(time)
+    return field
+
+
 def _time_index(
     loadfile, time_key: str, equil_time: Optional[float], filename: PathLike
 ):
@@ -447,15 +465,19 @@ class InterpolatedField_Cylindrical(MagneticField_Cylindrical):
         ``find_B_method`` ``"test"`` and ``"test_notime"``"""
         with np.load(filename) as loadfile:
             index = _time_index(loadfile, "time_EFIT", equil_time, filename)
-            return cls(
-                R_coord=loadfile["R_EFIT"],
-                Z_coord=loadfile["Z_EFIT"],
-                B_R=loadfile["Br_grid"][index],
-                B_T=loadfile["Bphi_grid"][index],
-                B_Z=loadfile["Bz_grid"][index],
-                psi=loadfile["poloidalFlux_grid"][index],
-                interp_order=interp_order,
-                interp_smoothing=interp_smoothing,
+            return _record_source(
+                cls(
+                    R_coord=loadfile["R_EFIT"],
+                    Z_coord=loadfile["Z_EFIT"],
+                    B_R=loadfile["Br_grid"][index],
+                    B_T=loadfile["Bphi_grid"][index],
+                    B_Z=loadfile["Bz_grid"][index],
+                    psi=loadfile["poloidalFlux_grid"][index],
+                    interp_order=interp_order,
+                    interp_smoothing=interp_smoothing,
+                ),
+                filename,
+                None if index is ... else loadfile["time_EFIT"][index],
             )
 
     def _set_poloidal_flux_derivatives(self, psi_spline):
@@ -626,18 +648,22 @@ class EFITField(InterpolatedField_Cylindrical):
         polflux_const_m, polflux_const_c = np.polyfit(unorm_psi_1D, norm_psi_1D, 1)
         norm_psi_2D = unnorm_psi_2D * polflux_const_m + polflux_const_c
 
-        return cls(
-            R_grid=data_R_coord,
-            Z_grid=data_Z_coord,
-            rBphi=rBphi,
-            psi_norm_2D=norm_psi_2D,
-            psi_norm_1D=norm_psi_1D,
-            psi_unnorm_axis=-polflux_const_c / polflux_const_m,
-            psi_unnorm_boundary=(1 - polflux_const_c) / polflux_const_m,
-            delta_R=delta_R,
-            delta_Z=delta_Z,
-            interp_order=interp_order,
-            interp_smoothing=interp_smoothing,
+        return _record_source(
+            cls(
+                R_grid=data_R_coord,
+                Z_grid=data_Z_coord,
+                rBphi=rBphi,
+                psi_norm_2D=norm_psi_2D,
+                psi_norm_1D=norm_psi_1D,
+                psi_unnorm_axis=-polflux_const_c / polflux_const_m,
+                psi_unnorm_boundary=(1 - polflux_const_c) / polflux_const_m,
+                delta_R=delta_R,
+                delta_Z=delta_Z,
+                interp_order=interp_order,
+                interp_smoothing=interp_smoothing,
+            ),
+            filename,
+            efitpp_times[time_idx],
         )
 
     @classmethod
@@ -683,18 +709,22 @@ class EFITField(InterpolatedField_Cylindrical):
         poloidalFlux = np.linspace(0, 1.0, len(rBphi))
         poloidalFlux_grid = (unnorm_psi_2D - psi_axis) / (psi_boundary - psi_axis)
 
-        return cls(
-            R_grid=data_R_coord,
-            Z_grid=data_Z_coord,
-            rBphi=rBphi,
-            psi_norm_2D=poloidalFlux_grid,
-            psi_norm_1D=poloidalFlux,
-            psi_unnorm_axis=psi_axis,
-            psi_unnorm_boundary=psi_boundary,
-            delta_R=delta_R,
-            delta_Z=delta_Z,
-            interp_order=interp_order,
-            interp_smoothing=interp_smoothing,
+        return _record_source(
+            cls(
+                R_grid=data_R_coord,
+                Z_grid=data_Z_coord,
+                rBphi=rBphi,
+                psi_norm_2D=poloidalFlux_grid,
+                psi_norm_1D=poloidalFlux,
+                psi_unnorm_axis=psi_axis,
+                psi_unnorm_boundary=psi_boundary,
+                delta_R=delta_R,
+                delta_Z=delta_Z,
+                interp_order=interp_order,
+                interp_smoothing=interp_smoothing,
+            ),
+            filename,
+            t_base_B[t_base_B_idx],
         )
 
     @classmethod
@@ -725,19 +755,23 @@ class EFITField(InterpolatedField_Cylindrical):
         with np.load(filename) as loadfile:
             index = _time_index(loadfile, "time_EFIT", equil_time, filename)
 
-            return cls(
-                R_grid=loadfile["R_EFIT"],
-                Z_grid=loadfile["Z_EFIT"],
-                rBphi=loadfile["rBphi"][index],
-                psi_norm_2D=loadfile["poloidalFlux_grid"][index],
-                psi_unnorm_axis=loadfile["poloidalFlux_unnormalised_axis"][index],
-                psi_unnorm_boundary=loadfile["poloidalFlux_unnormalised_boundary"][
-                    index
-                ],
-                delta_R=delta_R,
-                delta_Z=delta_Z,
-                interp_order=interp_order,
-                interp_smoothing=interp_smoothing,
+            return _record_source(
+                cls(
+                    R_grid=loadfile["R_EFIT"],
+                    Z_grid=loadfile["Z_EFIT"],
+                    rBphi=loadfile["rBphi"][index],
+                    psi_norm_2D=loadfile["poloidalFlux_grid"][index],
+                    psi_unnorm_axis=loadfile["poloidalFlux_unnormalised_axis"][index],
+                    psi_unnorm_boundary=loadfile["poloidalFlux_unnormalised_boundary"][
+                        index
+                    ],
+                    delta_R=delta_R,
+                    delta_Z=delta_Z,
+                    interp_order=interp_order,
+                    interp_smoothing=interp_smoothing,
+                ),
+                filename,
+                None if index is ... else loadfile["time_EFIT"][index],
             )
 
 

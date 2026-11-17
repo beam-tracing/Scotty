@@ -431,6 +431,9 @@ def beam_me_up(
         and `scotty.geometry.InterpolatedField_Cylindrical.from_npz` (B from
         saved grids of B). For example, ``find_B_method =
         EFITField.from_MAST_saved("29908_equilibrium_data.npz", 0.24)``.
+        The output's inputs record the file, as ``magnetic_data_path``, and
+        the time the constructor took (the nearest in the file), as
+        ``magnetic_data_time``.
 
         .. versionchanged:: 4.0.0
            ``"test"``, ``"test_notime"``, ``"UDA_saved"`` and ``"EFITpp"``

@@ -76,7 +76,17 @@ def inputs_to_dicts(params: Parameters, field: VALID_FIELDS) -> Tuple[dict, dict
         "find_B_method": str(params.find_B_method),
         # The paths of the files that the run read, as strings ("None" for
         # none), since netCDF cannot store `None`
-        "magnetic_data_path": str(params.magnetic_data_path),
+        # A field object read from a file by a constructor (for example
+        # `EFITField.from_MAST_saved`) records the file and the time it took
+        "magnetic_data_path": str(
+            getattr(field, "data_file", None) or params.magnetic_data_path
+        ),
+        # NaN for a file with one time, or no file
+        "magnetic_data_time": float(
+            np.nan
+            if getattr(field, "data_time", None) is None
+            else getattr(field, "data_time")
+        ),
         "interp_order_magnetic": params.interp_order_magnetic,  # int
         "interp_smoothing_magnetic": params.interp_smoothing_magnetic,
         "ne_data_path": str(params.ne_data_path),

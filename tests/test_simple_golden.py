@@ -1652,6 +1652,50 @@ def test_create_magnetic_geometry(tmp_path, generator):
 
 
 @pytest.mark.parametrize(
+    ("generator", "file_name", "time"),
+    [
+        pytest.param(npz_file, "12345_equilibrium_data.npz", 200, id="test-file"),
+        pytest.param(
+            npz_notime_file, "12345_equilibrium_data.npz", None, id="test_notime-file"
+        ),
+        pytest.param(UDA_saved, "12345_equilibrium_data.npz", None, id="UDA-saved"),
+        pytest.param(
+            UDA_saved_MAST_U, "55555_equilibrium_data.npz", 200, id="UDA-saved-MAST-U"
+        ),
+        # Asked for 210: the time used is the nearest in the file
+        pytest.param(
+            UDA_saved_MAST, "29999_equilibrium_data.npz", 200, id="UDA-saved-MAST"
+        ),
+        pytest.param(EFITpp_file, "efitOut.nc", 200, id="EFITpp-file"),
+    ],
+)
+def test_field_from_a_file_records_the_file_and_time(
+    tmp_path, generator, file_name, time
+):
+    field = generator(tmp_path)["find_B_method"]
+    assert field.data_file == str(tmp_path / file_name)
+    assert field.data_time == time
+
+
+def test_output_records_the_field_file_and_time(tmp_path):
+    """In place of v3's inputs ``shot`` and ``equil_time``"""
+    kwargs_dict = npz_file(tmp_path)
+    kwargs_dict.update(figure_flag=False, len_tau=10, output_path=tmp_path / "out")
+    inputs = beam_me_up(**kwargs_dict)["inputs"]
+    assert str(inputs["magnetic_data_path"].values) == str(
+        tmp_path / "12345_equilibrium_data.npz"
+    )
+    assert float(inputs["magnetic_data_time"].values) == 200
+
+    # A field not read from a file
+    kwargs_dict = simple(tmp_path)
+    kwargs_dict.update(figure_flag=False, len_tau=10, output_path=tmp_path / "out2")
+    inputs = beam_me_up(**kwargs_dict)["inputs"]
+    assert str(inputs["magnetic_data_path"].values) == "None"
+    assert np.isnan(inputs["magnetic_data_time"].values)
+
+
+@pytest.mark.parametrize(
     "generator",
     [
         pytest.param(UDA_saved, id="UDA-saved-file"),

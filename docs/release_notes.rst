@@ -161,6 +161,12 @@ Inputs
   is ``None``, and a path is checked only when the run reads it: a folder
   raises an error that gives an example file name. The output's ``inputs``
   save the paths of the files that the run read (``"None"`` for none).
+  For a field read from a file by one of the constructors below,
+  ``magnetic_data_path`` is that file, and the new ``magnetic_data_time`` is
+  the time the constructor took (the time in the file nearest the one asked
+  for; NaN for a file with one time, or no file). They replace v3's inputs
+  ``shot`` and ``equil_time``. The constructors set them on the field as
+  ``data_file`` and ``data_time``.
 - One spline order and smoothing for each of the magnetic field, the density
   and the temperature: ``interp_order_magnetic``,
   ``interp_smoothing_magnetic``, ``interp_order_ne``, ``interp_smoothing_ne``,
