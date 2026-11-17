@@ -1095,10 +1095,13 @@ def UDA_saved(path: pathlib.Path):
 
 def UDA_saved_MAST_U(path: pathlib.Path):
     """B from the flux, MAST-U layout with several times: v3's
-    find_B_method="UDA_saved" with a MAST-U shot"""
+    find_B_method="UDA_saved" with a MAST-U shot. As in the MAST-U files
+    saved from UDA, ``poloidalFlux`` goes from 1 to 0 and back to 1; rBphi is
+    on an evenly spaced flux"""
     kwargs_dict, psi, field, psi_axis, psi_boundary, rBphi, psi_norm_1D = (
         flux_function_args()
     )
+    midplane_flux = np.abs(np.linspace(-1, 1, len(psi_norm_1D)))
     time = [100, 200, 300]
     np.savez(
         path / "55555_equilibrium_data",
@@ -1106,7 +1109,7 @@ def UDA_saved_MAST_U(path: pathlib.Path):
         R_EFIT=field.R_coord,
         Z_EFIT=field.Z_coord,
         poloidalFlux_grid=add_timeslices(psi),
-        poloidalFlux=add_timeslices(psi_norm_1D),
+        poloidalFlux=add_timeslices(midplane_flux),
         poloidalFlux_unnormalised_axis=add_timeslices(psi_axis),
         poloidalFlux_unnormalised_boundary=add_timeslices(psi_boundary),
         time_EFIT=time,

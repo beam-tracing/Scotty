@@ -39,17 +39,17 @@ def B_grids_file(path, with_time):
     return path / "field.npz"
 
 
-def MAST_U_file(path, with_time, with_poloidalFlux=True):
+def MAST_U_file(path, with_time):
+    """A file in the layout of the MAST-U files saved from UDA, whose
+    ``poloidalFlux`` goes from 1 to 0 and back to 1"""
     rBphi = np.linspace(1.5, 1.4, 11)
     data = dict(
         rBphi=rBphi,
         poloidalFlux_grid=PSI,
+        poloidalFlux=np.abs(np.linspace(-1, 1, 11)),
         poloidalFlux_unnormalised_axis=np.array(0.0),
         poloidalFlux_unnormalised_boundary=np.array(-0.1),
     )
-    if with_poloidalFlux:
-        # Not evenly spaced. With several times, rBphi is on it (as in v3)
-        data["poloidalFlux"] = np.linspace(0, 1, 11) ** 2
     if with_time:
         # The normalised fluxes are the same at each time; rBphi and the
         # unnormalised flux, so B_T and B_p, scale with the time index
@@ -86,18 +86,13 @@ def test_from_MAST_U_saved_takes_the_nearest_time(tmp_path):
     assert_allclose(three.B_T(R0, 0, Z0), 3 * one.B_T(R0, 0, Z0), rtol=1e-10)
 
 
-@pytest.mark.parametrize("with_poloidalFlux", [True, False])
-def test_from_MAST_U_saved_with_one_time(tmp_path, with_poloidalFlux):
-    """v3's "UDA_saved" with no shot: rBphi is on a flux evenly spaced from 0
-    to 1, as in v3. A ``poloidalFlux`` in the file is not used: in the MAST-U
-    files saved from UDA it is the flux along the midplane (1 -> 0 -> 1), not
-    the flux of rBphi"""
-    filename = MAST_U_file(tmp_path, False, with_poloidalFlux=False)
-    if with_poloidalFlux:
-        data = dict(np.load(filename))
-        data["poloidalFlux"] = np.abs(np.linspace(-1, 1, 11))
-        np.savez(filename, **data)
-    field = EFITField.from_MAST_U_saved(filename)
+@pytest.mark.parametrize("with_time", [True, False], ids=["times", "one-time"])
+def test_from_MAST_U_saved_puts_rBphi_on_an_evenly_spaced_flux(tmp_path, with_time):
+    """Not on the file's ``poloidalFlux``, which in the MAST-U files saved
+    from UDA goes from 1 to 0 and back to 1. v3 used it with several times,
+    and failed on those files ("x must be strictly increasing")"""
+    filename = MAST_U_file(tmp_path, with_time)
+    field = EFITField.from_MAST_U_saved(filename, 0.1 if with_time else None)
     psi = float(field.polflux(1.7, 0, 0.1))
     rBphi = np.interp(psi, np.linspace(0, 1, 11), np.linspace(1.5, 1.4, 11))
     assert_allclose(field.B_T(1.7, 0, 0.1), rBphi / 1.7, rtol=1e-3)

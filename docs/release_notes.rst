@@ -192,6 +192,11 @@ Inputs
   constructors' spline and step arguments now have defaults (those of
   `scotty.geometry.EFITField`), and a constructor given a file with several
   times and no ``equil_time``, or the reverse, raises.
+- `scotty.geometry.EFITField.from_MAST_U_saved` puts ``rBphi`` on a
+  normalised flux evenly spaced from 0 to 1 at every time. It used the file's
+  ``poloidalFlux``, which in the MAST-U files saved from UDA goes from 1 to 0
+  and back to 1, so it failed on them ("x must be strictly increasing"); a
+  file with one time already used the evenly spaced flux.
 - The removed arguments (``interp_order``, ``interp_smoothing``,
   ``input_filename_suffix``, ``shot``, ``equil_time``) raise an error that
   names what replaces them, rather than the warning for an unknown keyword:

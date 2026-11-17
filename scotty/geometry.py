@@ -713,9 +713,15 @@ class EFITField(InterpolatedField_Cylindrical):
         and no ``time_EFIT``, ``equil_time=None``. v3's
         ``find_B_method="UDA_saved"`` for MAST-U shots, and with no shot.
 
-        Without ``time_EFIT``, the arrays have no time axis, and ``rBphi`` is
-        on a normalised flux evenly spaced from 0 to 1, as in v3. With
-        ``time_EFIT``, ``rBphi`` is on ``poloidalFlux``, as in v3"""
+        Without ``time_EFIT``, the arrays have no time axis.
+
+        ``rBphi`` is on a normalised flux evenly spaced from 0 to 1. The
+        file's ``poloidalFlux`` is not that flux: in the MAST-U files saved
+        from UDA, it goes from 1 to 0 and back to 1. v3 used it for
+        ``rBphi`` with several times, which failed on those files ("x must
+        be strictly increasing"). On shot 45290 at 0.15 s, ``rBphi`` on the
+        evenly spaced flux agrees with R times the file's ``Bphi_grid`` to
+        about 1e-3"""
         with np.load(filename) as loadfile:
             index = _time_index(loadfile, "time_EFIT", equil_time, filename)
 
@@ -724,7 +730,6 @@ class EFITField(InterpolatedField_Cylindrical):
                 Z_grid=loadfile["Z_EFIT"],
                 rBphi=loadfile["rBphi"][index],
                 psi_norm_2D=loadfile["poloidalFlux_grid"][index],
-                psi_norm_1D=(None if index is ... else loadfile["poloidalFlux"][index]),
                 psi_unnorm_axis=loadfile["poloidalFlux_unnormalised_axis"][index],
                 psi_unnorm_boundary=loadfile["poloidalFlux_unnormalised_boundary"][
                     index
