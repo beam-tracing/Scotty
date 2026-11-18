@@ -574,7 +574,7 @@ def plot_3d_beam(
     show_in_browser: bool = True,
 ) -> pgo.Figure:
     """
-    Vectorised 3D beam visualization using Plotly Mesh3d
+    Vectorised 3D beam visualisation using Plotly Mesh3d
 
     Parameters
     ----------

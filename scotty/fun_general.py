@@ -649,26 +649,28 @@ def find_epsilon_terms(
         is still the same
     """
     toreturn = []
-    normalised_plasma_ang_freq = find_normalised_plasma_ang_freq(
+    normalised_plasma_angular_frequency = find_normalised_plasma_ang_freq(
         launch_angular_freq, electron_density, temperature
     )
-    normalised_gyro_ang_freq = find_normalised_gyro_ang_freq(
+    normalised_gyro_angular_frequency = find_normalised_gyro_ang_freq(
         launch_angular_freq, B_total, temperature
     )
 
     if para:
-        toreturn.append(1 - normalised_plasma_ang_freq**2)
+        toreturn.append(1 - normalised_plasma_angular_frequency**2)
     if perp:
         toreturn.append(
-            1 - normalised_plasma_ang_freq**2 / (1 - normalised_gyro_ang_freq**2)
+            1
+            - normalised_plasma_angular_frequency**2
+            / (1 - normalised_gyro_angular_frequency**2)
         )
     if g:
         # -Omega_pe^2 Omega_ce / (Omega (Omega^2 - Omega_ce^2)), as in
         # `hamiltonian.DielectricTensor`
         toreturn.append(
-            -(normalised_plasma_ang_freq**2)
-            * normalised_gyro_ang_freq
-            / (1 - normalised_gyro_ang_freq**2)
+            -(normalised_plasma_angular_frequency**2)
+            * normalised_gyro_angular_frequency
+            / (1 - normalised_gyro_angular_frequency**2)
         )
     return toreturn
 
@@ -1393,9 +1395,9 @@ def find_beam_widths_and_curvs(
     else:
         curv_poor = width_poor = np.zeros(1, dtype=bool)
 
-    K_mag = np.linalg.norm(K_vec, axis=-1)
-    K_g_mag = np.sum(K_vec * g_hat, axis=-1)
-    curvs = (np.asarray(K_g_mag**2 / K_mag**3)[..., np.newaxis]) * Re_Psi_w_eigvals
+    K_magnitude = np.linalg.norm(K_vec, axis=-1)
+    K_g = np.sum(K_vec * g_hat, axis=-1)
+    curvs = (np.asarray(K_g**2 / K_magnitude**3)[..., np.newaxis]) * Re_Psi_w_eigvals
     widths = np.sqrt(2 / Im_Psi_w_eigvals)
 
     values = (curvs[..., 0], curvs[..., 1], widths[..., 0], widths[..., 1])
@@ -1578,33 +1580,35 @@ def poloidal_flux_along_ray_line(
     # If there are NaNs, then replace those with the first non-NaN instance
     # in the array (i.e. the poloidal flux of the first point in the field)
     if positions.ndim == 1:
-        polflux = _field_cart_polflux(*positions)
-        if np.isnan(polflux):
+        poloidal_flux = _field_cart_polflux(*positions)
+        if np.isnan(poloidal_flux):
             log.warning(
                 f"Poloidal flux is NaN at [X,Y,Z] = [{arr2str(positions)}]. Returning NaN"
             )
-            polflux = np.nan
+            poloidal_flux = np.nan
 
     elif positions.ndim == 2:
-        polflux = _field_cart_polflux(positions[:, 0], positions[:, 1], positions[:, 2])
-        if np.all(np.isnan(polflux)):
+        poloidal_flux = _field_cart_polflux(
+            positions[:, 0], positions[:, 1], positions[:, 2]
+        )
+        if np.all(np.isnan(poloidal_flux)):
             _printmsg = "\n".join(
                 f"            - [{position}]" for position in positions
             )
             log.warning(f"""
         Poloidal fluxes are NaNs at all points queried: [X,Y,Z] = \n{_printmsg}
         """)
-            polflux = np.nan
+            poloidal_flux = np.nan
         else:
-            NaN_replacement_value = polflux[~np.isnan(polflux)][0]
-            polflux = np.nan_to_num(polflux, nan=NaN_replacement_value)
+            NaN_replacement_value = poloidal_flux[~np.isnan(poloidal_flux)][0]
+            poloidal_flux = np.nan_to_num(poloidal_flux, nan=NaN_replacement_value)
 
     else:
         raise ValueError(
             f"Ray line positions must have only 1 or 2 dimensions but got {positions.ndim}"
         )
 
-    return polflux  # type: ignore
+    return poloidal_flux  # type: ignore
 
 
 def poloidal_flux_difference_along_ray_line(
@@ -1646,7 +1650,7 @@ def poloidal_flux_difference_along_ray_line(
         outside the field
     """
 
-    polflux = poloidal_flux_along_ray_line(
+    poloidal_flux = poloidal_flux_along_ray_line(
         q_X_launch,
         q_Y_launch,
         q_Z_launch,
@@ -1657,10 +1661,10 @@ def poloidal_flux_difference_along_ray_line(
     )
 
     # If NaN, then just return NaN
-    if polflux is np.nan:
-        return polflux
+    if poloidal_flux is np.nan:
+        return poloidal_flux
     else:
-        return polflux - poloidal_flux_enter
+        return poloidal_flux - poloidal_flux_enter
 
 
 def dot(arr_a: Array, arr_b: Array) -> Array:
@@ -1815,7 +1819,7 @@ def find_g_cartesian(
     -------
     g_vec : ArrayLike
         Group velocity, in Cartesian coordinates
-    g_mag : ArrayLike
+    g_magnitude : ArrayLike
         Magnitude of the group velocity
     g_hat : ArrayLike
         Unit vector of the group velocity, in Cartesian coordinates

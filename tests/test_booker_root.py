@@ -80,7 +80,7 @@ def hamiltonian(mode_flag):
         mode_flag=mode_flag,
         deltas=np.array([1e-3, 1e-3, 1e-3, 0.1, 0.1, 0.1]),
         field=uniform_field(),
-        density_fit=lambda polflux: polflux * N_CUTOFF,
+        density_fit=lambda poloidal_flux: poloidal_flux * N_CUTOFF,
     )
 
 

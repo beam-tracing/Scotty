@@ -39,10 +39,12 @@ How a run works
   ``Psi_BC_flag`` has no effect. :math:`K` must satisfy the dispersion
   relation of the mode asked for (``mode_flag`` 1, -1, ``"O"`` or ``"X"``).
   With no launched beam, ``beam_waist``, ``filterfun_b`` and ``filterfun_all`` are NaN.
-- Positions along the way: *launch* is where the beam starts in vacuum,
-  *entry* is where it reaches the plasma boundary, and *initial* is where the
-  solvers start: the first point in the plasma, or the antenna for
-  ``launch_flag="vacuum_numerical"`` (e.g. ``q_launch``,
+- Positions along the way: *launch* is where the beam starts in vacuum;
+  *entry* is at the plasma boundary, before the boundary conditions
+  (``Psi_BC_flag``) are applied; *initial* is at the plasma boundary after
+  the boundary conditions, where the solvers start. For
+  ``launch_flag="vacuum_numerical"`` the solvers start at the antenna, and
+  for ``launch_flag="plasma"`` at ``launch_position`` (e.g. ``q_launch``,
   ``Psi_3D_entry_labframe``, ``q_initial``).
 - ``mode_flag`` picks a root of the Booker quadratic: 1 or -1 directly, or
   ``"O"`` / ``"X"``. The O-mode is the root more polarised along

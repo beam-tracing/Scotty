@@ -426,7 +426,7 @@ def test_quick_cutoff_reproduces_v3_quick_run(tmp_path):
         abs(float(dt["inputs"]["delta_Z"])) == 1e-4
     )  # v3's step, sign from auto_delta_sign
 
-    q_R, q_Z, K_norm, polflux, theta_m = quick_cutoff(dt)
+    q_R, q_Z, K_magnitude, poloidal_flux, theta_m = quick_cutoff(dt)
     v3 = (
         1.7901640559487946,
         -0.16710217160140856,
@@ -434,7 +434,7 @@ def test_quick_cutoff_reproduces_v3_quick_run(tmp_path):
         0.4484732604742471,
         0.06686830330882636,
     )
-    assert_allclose([q_R, q_Z, K_norm, polflux, theta_m], v3, rtol=2e-4)
+    assert_allclose([q_R, q_Z, K_magnitude, poloidal_flux, theta_m], v3, rtol=2e-4)
     assert (
         quick_cutoff(dt).theta_m == theta_m
     )  # attribute access, as for v3's K_cutoff_data

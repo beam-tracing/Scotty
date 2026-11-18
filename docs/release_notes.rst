@@ -33,6 +33,12 @@ Documentation
   version from the installed package, links to ``beam-tracing/Scotty``, and
   makes a name between single backquotes a link to the Python object of that
   name, if there is one, with no warning if there is none.
+- A new page, :ref:`naming`, gives the rules for the names of arguments,
+  outputs and variables, and lists the public names that do not follow them
+  yet (v4.0.0rc1 froze them; #90). Internal variables now follow the rules:
+  for example ``B_mag`` and ``K_mag`` are ``B_magnitude`` and
+  ``K_magnitude``, and ``polflux`` is ``poloidal_flux``. No argument, output
+  or result changes. Comments and messages use British spelling.
 
 v4.0.0rc1
 ---------

@@ -15,7 +15,7 @@ from typing import Dict
 
 
 def inch2m(length_inches):
-    """Converts inches to meters"""
+    """Converts inches to metres"""
     return length_inches * 25.4 / 1000
 
 
@@ -97,7 +97,7 @@ class SpeirsAsymmetricConicalHorn(Conical_Horn):
     def output_beam(self, freq_GHz):
         # Beam waist widths don't change very much, it seems
         # From horn simulation's electric field (35 GHz)
-        # in meters
+        # in metres
         w0_E = 0.012948291561049162
         w0_H = 0.01731096934084839
 
@@ -168,10 +168,10 @@ def _MAST_V_band_aperature_radius() -> float:
     # myHorn.far_field_divergence_angle = FWHM_angle / 1.18 % Estimate, from Goldsmith
 
     # I assume the horn is aperture-limited, so the width at the output is
-    # independent of freq
-    mid_band_freq = (75.0 + 50.0) * 10**9 / 2
+    # independent of frequency
+    mid_band_frequency = (75.0 + 50.0) * 10**9 / 2
     w_0 = constants.c / (
-        np.pi * mid_band_freq * np.tan(np.deg2rad(far_field_divergence_angle))
+        np.pi * mid_band_frequency * np.tan(np.deg2rad(far_field_divergence_angle))
     )
     # w_0 = 0.003855191833541916 # This is what the calculation gives me
     # w_0 = 0.004054462688018294 # This is what Neal gets

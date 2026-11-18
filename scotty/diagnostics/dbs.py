@@ -95,12 +95,12 @@ def dbs_analysis(
     dpolflux_dX = np.array(analysis["dpolflux_dX"][()])  # (N,)
     dpolflux_dY = np.array(analysis["dpolflux_dY"][()])  # (N,)
     dpolflux_dZ = np.array(analysis["dpolflux_dZ"][()])  # (N,)
-    K_mag = np.array(solver_output["K_output_magnitude"][()])  # (N,)
+    K_magnitude = np.array(solver_output["K_output_magnitude"][()])  # (N,)
     normal_vec = np.stack((dpolflux_dX, dpolflux_dY, dpolflux_dZ), axis=1)  # (N,3)
-    normal_mag = np.linalg.norm(normal_vec, axis=1)  # (N,)
-    normal_hat = normal_vec / normal_mag[:, np.newaxis]  # (N,3)
+    normal_magnitude = np.linalg.norm(normal_vec, axis=1)  # (N,)
+    normal_hat = normal_vec / normal_magnitude[:, np.newaxis]  # (N,3)
     binormal_hat = make_unit_vector_from_cross_product(b_hat_cart, normal_hat)  # (N,3)
-    k_perp1_bs = -2 * K_mag * np.cos(theta + theta_m) / cos_theta  # (N,)
+    k_perp1_bs = -2 * K_magnitude * np.cos(theta + theta_m) / cos_theta  # (N,)
     # normal_hat and binormal_hat span the plane perpendicular to b_hat, which
     # contains k_perp1_hat, so these add in quadrature to k_perp1_bs; tested in
     # tests/test_analysis_outputs.py
@@ -160,7 +160,9 @@ def dbs_analysis(
         # integrand, -2 Im(M_xy^-1) K theta_m k_perp2 + Im(M_yy^-1) k_perp2^2 / 2,
         # peaks; zero at zero mismatch. It's along u2 = b_hat x g_hat / |b_hat x
         # g_hat|, which is y_hat, as k_perp1 is along k_perp1_hat (u1)
-        k_perp2_bs = 2 * K_mag * theta_m * np.imag(M_w_inv_xy) / np.imag(M_w_inv_yy)
+        k_perp2_bs = (
+            2 * K_magnitude * theta_m * np.imag(M_w_inv_xy) / np.imag(M_w_inv_yy)
+        )
         k_perp2_bs_normal = k_perp2_bs * dot(y_hat_cart, normal_hat)
         k_perp2_bs_binormal = k_perp2_bs * dot(y_hat_cart, binormal_hat)
 
@@ -236,8 +238,8 @@ def dbs_analysis(
     log.debug(f"Finding the ray piece (filterfun_r)")
     ##################################################
 
-    g_mag_Cardano = np.array(analysis["g_magnitude_Cardano"][()])
-    filterfun_r = (2 * const.c / w_launch) ** 2 / g_mag_Cardano**2
+    g_magnitude_Cardano = np.array(analysis["g_magnitude_Cardano"][()])
+    filterfun_r = (2 * const.c / w_launch) ** 2 / g_magnitude_Cardano**2
     # needed by filterfun_b and delta_ne_sq; delta_ne_sq is also computed for ray tracing only
     launch_wavenumber = hamiltonian.wavenumber
 
@@ -297,7 +299,7 @@ def dbs_analysis(
                     - np.imag(M_w_inv_xx) * np.imag(M_w_inv_yy)
                 )
             )
-            / K_mag
+            / K_magnitude
         )
         filterfun_m = np.exp(-2 * (theta_m / delta_theta_m) ** 2)
 

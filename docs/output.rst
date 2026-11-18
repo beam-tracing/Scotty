@@ -21,8 +21,9 @@ groups:
     position ``q_output_*``, the wavevector ``K_output_*`` and
     :math:`\Psi` (``Psi_3D_output_labframe_*``), in both coordinate systems
     (``_cartesian`` and ``_cylindrical``), and their values at the launch,
-    at the plasma entry and where the solvers start (``*_launch``,
-    ``*_entry``, ``*_initial``). In cylindrical coordinates ``K_zeta`` is the
+    at the plasma boundary before the boundary conditions, and after them
+    where the solvers start (``*_launch``, ``*_entry``, ``*_initial``; see
+    :ref:`naming`). In cylindrical coordinates ``K_zeta`` is the
     toroidal mode number, not the toroidal component of :math:`K`.
 
 ``beam``

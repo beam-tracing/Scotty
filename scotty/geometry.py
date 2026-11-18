@@ -287,12 +287,12 @@ class MagneticField_Cylindrical(ABC):
         if vector:
             toreturn.append(B_vec.T)
         if unitvector or magnitude:
-            B_mag = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
+            B_magnitude = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
             if unitvector:
-                b_hat = B_vec / B_mag
+                b_hat = B_vec / B_magnitude
                 toreturn.append(b_hat.T)
             if magnitude:
-                toreturn.append(B_mag)
+                toreturn.append(B_magnitude)
 
         return toreturn
 
@@ -670,8 +670,8 @@ class EFITField(InterpolatedField_Cylindrical):
         return -dpolflux_dZ * self.poloidal_flux_gradient / np.asarray(R)
 
     def B_T(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike:
-        polflux = self.polflux(R, _, Z)
-        return self._interp_rBphi(polflux) / np.asarray(R)
+        poloidal_flux = self.polflux(R, _, Z)
+        return self._interp_rBphi(poloidal_flux) / np.asarray(R)
 
     def B_Z(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike:
         dpolflux_dR = self.d_polflux_dR(R, _, Z, self.delta_R)
@@ -728,8 +728,10 @@ class EFITField(InterpolatedField_Cylindrical):
         # psi_norm = m psi + c, so psi is -c/m on axis and (1 - c)/m at the
         # boundary: EFITField needs psi_boundary - psi_axis = dpsi/dpsi_norm =
         # 1/m (passing m made B_p wrong by a factor m^2)
-        polflux_const_m, polflux_const_c = np.polyfit(unorm_psi_1D, norm_psi_1D, 1)
-        norm_psi_2D = unnorm_psi_2D * polflux_const_m + polflux_const_c
+        poloidal_flux_const_m, poloidal_flux_const_c = np.polyfit(
+            unorm_psi_1D, norm_psi_1D, 1
+        )
+        norm_psi_2D = unnorm_psi_2D * poloidal_flux_const_m + poloidal_flux_const_c
 
         return _record_source(
             cls(
@@ -738,8 +740,8 @@ class EFITField(InterpolatedField_Cylindrical):
                 rBphi=rBphi,
                 psi_norm_2D=norm_psi_2D,
                 psi_norm_1D=norm_psi_1D,
-                psi_unnorm_axis=-polflux_const_c / polflux_const_m,
-                psi_unnorm_boundary=(1 - polflux_const_c) / polflux_const_m,
+                psi_unnorm_axis=-poloidal_flux_const_c / poloidal_flux_const_m,
+                psi_unnorm_boundary=(1 - poloidal_flux_const_c) / poloidal_flux_const_m,
                 delta_R=delta_R,
                 delta_Z=delta_Z,
                 interp_order=interp_order,
@@ -786,7 +788,7 @@ class EFITField(InterpolatedField_Cylindrical):
             data_R_coord = loadfile["R_EFIT"]
             data_Z_coord = loadfile["Z_EFIT"]
             # Time base C
-            polflux_axis_all_times = loadfile["poloidal_flux_unnormalised_axis"]
+            poloidal_flux_axis_all_times = loadfile["poloidal_flux_unnormalised_axis"]
             # Time base C
             psi_boundary_all_times = loadfile["poloidal_flux_unnormalised_boundary"]
             # On time base B
@@ -798,7 +800,7 @@ class EFITField(InterpolatedField_Cylindrical):
         log.info(f"EFIT time {t_base_B[t_base_B_idx]}")
 
         rBphi = rBphi_all_times[t_base_C_idx, :]
-        psi_axis = polflux_axis_all_times[t_base_C_idx]
+        psi_axis = poloidal_flux_axis_all_times[t_base_C_idx]
         psi_boundary = psi_boundary_all_times[t_base_C_idx]
         unnorm_psi_2D = unnorm_psi_all_times[t_base_B_idx, :, :].T
 
@@ -1232,12 +1234,12 @@ class MagneticField_Cartesian(ABC):
         if vector:
             toreturn.append(B_vec.T)
         if unitvector or magnitude:
-            B_mag = np.sqrt(B_X**2 + B_Y**2 + B_Z**2)
+            B_magnitude = np.sqrt(B_X**2 + B_Y**2 + B_Z**2)
             if unitvector:
-                b_hat = B_vec / B_mag
+                b_hat = B_vec / B_magnitude
                 toreturn.append(b_hat.T)
             if magnitude:
-                toreturn.append(B_mag)
+                toreturn.append(B_magnitude)
 
         return toreturn
 
@@ -1342,10 +1344,10 @@ class InterpolatedField_Cartesian(MagneticField_Cartesian):
 
         (
             (self._interp_polflux, self._spline_polflux),
-            duration_polflux_interpolation,
+            duration_poloidal_flux_interpolation,
         ) = _make_cuboid_spline(X_coord, Y_coord, Z_coord, psi, interp_order)
         log.debug(
-            f"Interpolating 3D poloidal flux profile took {duration_polflux_interpolation} s"
+            f"Interpolating 3D poloidal flux profile took {duration_poloidal_flux_interpolation} s"
         )
 
         self.grid_coords = self._spline_B_X.grid

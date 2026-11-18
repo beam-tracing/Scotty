@@ -460,8 +460,8 @@ class Parameters:
     #
     # TODO: check the data in the density and temperature files:
     #    - rho must be sorted
-    #    - must polflux_zero_density be less than the last polflux
-    #      coordinate in ne.dat?
+    #    - must poloidal_flux_zero_density be less than the last poloidal
+    #      flux in ne.dat?
     #
     ##################################################
 

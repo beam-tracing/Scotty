@@ -238,9 +238,9 @@ def launch_beam_DBS_NSTX_MAST_data(launch_freq_GHz):
         ],
     )
 
-    freq_idx = find_nearest(data["freqs"], launch_freq_GHz)
-    launch_beam_width = data["widths"][freq_idx]
-    launch_beam_curvature = 1 / data["curvature"][freq_idx]
+    frequency_idx = find_nearest(data["freqs"], launch_freq_GHz)
+    launch_beam_width = data["widths"][frequency_idx]
+    launch_beam_curvature = 1 / data["curvature"][frequency_idx]
     return launch_beam_width, launch_beam_curvature
 
 
@@ -300,8 +300,8 @@ def launch_beam_DBS_UCLA_DIII_D_240_thin_lens(launch_freq_GHz):
         dtype=[("freqs_GHz", np.float64), ("focal_length", np.float64)],
     )
     # fmt: on
-    nearest_freq_idx = find_nearest(data["freqs_GHz"], launch_freq_GHz)
-    focal_length = data["focal_length"][nearest_freq_idx]
+    nearest_frequency_idx = find_nearest(data["freqs_GHz"], launch_freq_GHz)
+    focal_length = data["focal_length"][nearest_frequency_idx]
 
     myLens = make_my_lens(
         name="DBS_UCLA_DIII-D_240", lens_type="thin", focal_length=focal_length

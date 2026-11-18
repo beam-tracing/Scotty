@@ -479,7 +479,7 @@ def quick_cutoff(dt: xr.DataTree) -> CutoffData:
     a v4 run (typically one with ``ray_tracing_flag=True``, which is what
     ``from_v3_kwargs`` turns ``quick_run`` into)::
 
-        q_R, q_Z, K_norm, polflux, theta_m = quick_cutoff(beam_me_up(**from_v3_kwargs(kwargs)))
+        q_R, q_Z, K_magnitude, poloidal_flux, theta_m = quick_cutoff(beam_me_up(**from_v3_kwargs(kwargs)))
     """
     so, an = dt["solver"].ds, beam_group(dt).ds
     K = np.asarray(so["K_output_magnitude"])

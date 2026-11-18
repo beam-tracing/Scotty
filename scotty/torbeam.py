@@ -184,7 +184,7 @@ def write_inbeam(
         "nrel": 0,
         "ncdroutine": 2,
         "nrela": 0,
-        "xf": 5.5e10,  # Launch freq (GHz)
+        "xf": 5.5e10,  # Launch frequency (Hz)
         "xpoldeg": poloidal_launch_angle,  # poloidal launch angle
         "xtordeg": toroidal_launch_angle,  # toroidal launch angle
         "xxb": launch_position_x,  # x-coordinate of the launch position
@@ -419,7 +419,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--aspect_ratio", default=1.5, type=float, help="major_radius/minor_radius"
     )
-    parser.add_argument("--minor_radius", default=0.5, type=float, help="in meters")
+    parser.add_argument("--minor_radius", default=0.5, type=float, help="in metres")
     parser.add_argument("--torbeam_directory_path", default=pathlib.Path("."))
     parser.add_argument("--nedata_length", default=101, type=int)
     parser.add_argument("--Tedata_length", default=101, type=int)

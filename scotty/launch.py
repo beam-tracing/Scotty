@@ -105,11 +105,11 @@ def find_plasma_entry_position(
         log.debug(
             f"`launch_flag` = {launch_flag}, so skipping plasma entry position calculations"
         )
-        polflux_launch = float(field.polflux(*q_launch))
-        if not polflux_launch <= poloidal_flux_enter:
+        poloidal_flux_launch = float(field.polflux(*q_launch))
+        if not poloidal_flux_launch <= poloidal_flux_enter:
             raise ValueError(
                 f"`launch_flag` = 'plasma', but `launch_position` = {q_launch} is "
-                f"outside the plasma (poloidal flux {polflux_launch:.6g} > "
+                f"outside the plasma (poloidal flux {poloidal_flux_launch:.6g} > "
                 f"`poloidal_flux_enter` = {poloidal_flux_enter}). Use "
                 "`launch_flag` = 'vacuum_analytic' or 'vacuum_numerical' to launch "
                 "from outside the plasma"
@@ -150,17 +150,17 @@ def find_plasma_entry_position(
     # If the entire array is `NaN`s, then raise error
 
     X_arr, Y_arr, Z_arr = ray_line(*q_launch_cartesian, tau_arr, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam)  # type: ignore
-    polflux_arr = field.polflux_cartesian(X_arr, Y_arr, Z_arr)
+    poloidal_flux_arr = field.polflux_cartesian(X_arr, Y_arr, Z_arr)
 
-    if np.isnan(polflux_arr).all():
+    if np.isnan(poloidal_flux_arr).all():
         raise RuntimeError(
             "The ray does not intersect the plasma. Check the launch position and the "
             "launch angles: with both angles zero, the beam is launched "
             "horizontally towards the axis"
         )
 
-    start_idx = np.where(~np.isnan(polflux_arr))[0][0]
-    stop_idx = np.nanargmin(polflux_arr)
+    start_idx = np.where(~np.isnan(poloidal_flux_arr))[0][0]
+    stop_idx = np.nanargmin(poloidal_flux_arr)
 
     start_tau = tau_arr[start_idx]
     stop_tau = tau_arr[stop_idx]
@@ -171,13 +171,15 @@ def find_plasma_entry_position(
     # where the poloidal flux is `poloidal_flux_enter`)
 
     tau_arr_refined = np.linspace(start_tau, stop_tau, num_tau)
-    polflux_arr_refined = field.polflux_cartesian(*ray_line(*q_launch_cartesian, tau_arr_refined, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam))  # type: ignore
+    poloidal_flux_arr_refined = field.polflux_cartesian(*ray_line(*q_launch_cartesian, tau_arr_refined, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam))  # type: ignore
 
-    if np.isnan(polflux_arr_refined).all():
+    if np.isnan(poloidal_flux_arr_refined).all():
         log.warning(f"NaNs should not occur in the refined `tau` array search")
 
     spline = CubicSpline(
-        tau_arr_refined, polflux_arr_refined - poloidal_flux_enter, extrapolate=False
+        tau_arr_refined,
+        poloidal_flux_arr_refined - poloidal_flux_enter,
+        extrapolate=False,
     )
     spline_roots = np.array(spline.roots())
 
@@ -447,13 +449,13 @@ def find_O_mode_flag(
     along `K` at `q` (in the field's coordinates), judged by polarisation.
     Works at zero density too, from the polarisations' zero-density limits."""
     cart = not isinstance(field, MagneticField_Cylindrical)
-    polflux = field.polflux(*q)
+    poloidal_flux = field.polflux(*q)
     polarisations = _mode_polarisations(
         launch_angular_freq,
         float(field.magnitude(*q)),
         _theta_m(q, K, field, cart),
-        float(density_fit(polflux)),
-        float(temperature_fit(polflux)) if temperature_fit else None,
+        float(density_fit(poloidal_flux)),
+        float(temperature_fit(poloidal_flux)) if temperature_fit else None,
     )
     return _O_mode_flag(polarisations)
 
@@ -469,9 +471,9 @@ def _plasma_terms_at(
     r"""Returns `b_hat`, the dielectric terms `(epsilon_para, epsilon_perp,
     epsilon_g)` (as used by `_mode_solution`), |B|, n_e and T_e at
     `q_initial`"""
-    polflux = field.polflux(*q_initial)
-    electron_density = density_fit(polflux)
-    electron_temperature = temperature_fit(polflux) if temperature_fit else None
+    poloidal_flux = field.polflux(*q_initial)
+    electron_density = density_fit(poloidal_flux)
+    electron_temperature = temperature_fit(poloidal_flux) if temperature_fit else None
 
     B_magnitude = field.magnitude(*q_initial)
     b_hat = field.unitvector(*q_initial)
@@ -483,7 +485,7 @@ def _plasma_terms_at(
         ##################################################
         #
         # Calculated values at [X,Y,Z] = {arr2str(q_initial_cartesian)}:
-        #   - poloidal flux = {polflux}
+        #   - poloidal flux = {poloidal_flux}
         #   - n_e = {electron_density} (e19)
         #   - T_e = {electron_temperature}
         #   - |B| = {B_magnitude}

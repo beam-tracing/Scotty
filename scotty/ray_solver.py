@@ -98,11 +98,13 @@ def _find_UH_ratio(q, launch_angular_frequency, field, hamiltonian) -> float:
     """The upper hybrid frequency over the beam frequency at `q`, with the
     relativistic mass correction if there is a temperature profile"""
     q0, q1, q2 = q
-    polflux = field.polflux(q0, q1, q2)
-    temperature = hamiltonian.temperature(polflux) if hamiltonian.temperature else None
+    poloidal_flux = field.polflux(q0, q1, q2)
+    temperature = (
+        hamiltonian.temperature(poloidal_flux) if hamiltonian.temperature else None
+    )
     gyro_ratio = _find_gyro_ratio(q, launch_angular_frequency, field, hamiltonian)
     plasma_ratio = find_normalised_plasma_ang_freq(
-        launch_angular_frequency, hamiltonian.density(polflux), temperature
+        launch_angular_frequency, hamiltonian.density(poloidal_flux), temperature
     )
     return np.sqrt(gyro_ratio**2 + plasma_ratio**2)
 
@@ -174,17 +176,17 @@ def make_solver_events(
     @_event(terminal=True, direction=1.0)
     def event_leave_plasma(tau, ray_parameters, hamiltonian):
         q0, q1, q2, _, _, _ = ray_parameters
-        polflux = field.polflux(q0, q1, q2)
-        return polflux - poloidal_flux_enter
+        poloidal_flux = field.polflux(q0, q1, q2)
+        return poloidal_flux - poloidal_flux_enter
 
     # Triggers when the beam leaves the LCFS
     #   -ve -> +ve when leaving LCFS
     @_event(terminal=False, direction=1.0)
     def event_leave_LCFS(tau, ray_parameters, hamiltonian):
         q0, q1, q2, _, _, _ = ray_parameters
-        polflux = field.polflux(q0, q1, q2)
-        polflux_LCFS = 1.0
-        return polflux - polflux_LCFS
+        poloidal_flux = field.polflux(q0, q1, q2)
+        poloidal_flux_LCFS = 1.0
+        return poloidal_flux - poloidal_flux_LCFS
 
     # Capture the bounding box of the magnetic field to check if
     # the beam has left the field's grid (the simulation region)

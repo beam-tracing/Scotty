@@ -63,29 +63,29 @@ class DielectricTensor:
         temperature: Optional[ArrayLike] = None,
     ):
 
-        plasma_freq_2 = (
+        plasma_frequency_2 = (
             find_normalised_plasma_ang_freq(
                 launch_angular_freq, electron_density, temperature
             )
             ** 2
         )
-        gyro_freq = find_normalised_gyro_ang_freq(
+        gyro_frequency = find_normalised_gyro_ang_freq(
             launch_angular_freq, B_magnitude, temperature
         )
-        gyro_freq_2 = gyro_freq**2
+        gyro_frequency_2 = gyro_frequency**2
 
-        self._epsilon_bb = 1 - plasma_freq_2
-        self._epsilon_11 = 1 - plasma_freq_2 / (1 - gyro_freq_2)
+        self._epsilon_bb = 1 - plasma_frequency_2
+        self._epsilon_11 = 1 - plasma_frequency_2 / (1 - gyro_frequency_2)
         # With fields ~ exp(-i Omega t) and electrons of charge -e (e > 0, so
         # that Omega_ce = e B / m_e > 0), the dielectric tensor contains
         # -i [Omega_pe^2 Omega_ce / (Omega (Omega^2 - Omega_ce^2))] b_hat x I.
         # D (in `find_H_Cardano_eigh`) is written with +i epsilon_12 b_hat x I,
         # so epsilon_12 = -Omega_pe^2 Omega_ce / (Omega (Omega^2 - Omega_ce^2)),
-        # negative for Omega > Omega_ce. (Here plasma_freq_2 is
-        # Omega_pe^2 / Omega^2 and gyro_freq is Omega_ce / Omega.)
+        # negative for Omega > Omega_ce. (Here plasma_frequency_2 is
+        # Omega_pe^2 / Omega^2 and gyro_frequency is Omega_ce / Omega.)
         # Hall-Chen, Parra & Hillesheim (2022) define it with the opposite
         # sign, eqs. (2) and (35)
-        self._epsilon_12 = -plasma_freq_2 * gyro_freq / (1 - gyro_freq_2)
+        self._epsilon_12 = -plasma_frequency_2 * gyro_frequency / (1 - gyro_frequency_2)
 
     @property
     def e_bb(self) -> ArrayLike:
@@ -278,9 +278,9 @@ class Hamiltonian:
                 f"Expected either 2 or 6 arguments but got {sum(a is None for a in [q0, q1, q2, K0, K1, K2])}"
             )
 
-        polflux = self.field.polflux(q0, q1, q2)
-        electron_density = self.density(polflux)
-        temperature = self.temperature(polflux) if self.temperature else None
+        poloidal_flux = self.field.polflux(q0, q1, q2)
+        electron_density = self.density(poloidal_flux)
+        temperature = self.temperature(poloidal_flux) if self.temperature else None
 
         # One evaluation of the field components for both |B| and b_hat
         _, b_hat, B_magnitude = self.field.all(q0, q1, q2)  # type: ignore
@@ -331,7 +331,7 @@ class Hamiltonian:
             #   - {"[K_R, K_zeta, K_Z]" if isinstance(self.field, MagneticField_Cylindrical) else "[K_X, K_Y, K_Z]"} = {K0, K1, K2}
             #
             # Calculated values:
-            #   - pol. flux = {polflux}
+            #   - pol. flux = {poloidal_flux}
             #   - n_e = {electron_density}
             #   - T_e = {temperature}
             #   - {"[B_R, B_T, B_Z]" if isinstance(self.field, MagneticField_Cylindrical) else "[B_X, B_Y, B_Z]"} = {B_magnitude*b_hat.T}

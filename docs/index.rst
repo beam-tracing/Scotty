@@ -29,6 +29,7 @@ in development). The source code and the issue tracker are on
 
    input
    output
+   naming
    code_layout
    references
    release_notes
