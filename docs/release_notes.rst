@@ -1,6 +1,21 @@
 Release notes
 =============
 
+Unreleased
+----------
+
+Packaging
+~~~~~~~~~
+
+- A source archive without ``.git`` (such as GitHub's source zip of a
+  release) installs: ``.git_archival.txt`` gives ``setuptools_scm`` the
+  version. Installing 4.0.0rc1 from its source zip failed.
+- Builds no longer warn: the version comes from ``setuptools_scm`` alone, and
+  the subpackages ``scotty.antenna`` and ``scotty.diagnostics`` are listed.
+  The installed files are the same.
+- Tested on Python 3.13 too. ``test_beam_me_up_docstring_covers_every_argument``
+  failed there, because Python 3.13 strips the indentation of docstrings.
+
 v4.0.0rc1
 ---------
 

@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# setuptools_scm reads the version from this file in a source archive with no .git
+.git_archival.txt  export-subst
