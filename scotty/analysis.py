@@ -106,9 +106,9 @@ def basic_analysis(
     q_vec_cyld = np.array(solver_output["q_output_cylindrical"][()])  # (N,3)
     K_vec_cart = np.array(solver_output["K_output_cartesian"][()])  # (N,3)
     K_vec_cyld = np.array(solver_output["K_output_cylindrical"][()])  # (N,3)
-    K_mag = np.array(solver_output["K_output_magnitude"][()])  # (N,)
+    K_magnitude = np.array(solver_output["K_output_magnitude"][()])  # (N,)
 
-    coidx = np.argmin(K_mag)
+    coidx = np.argmin(K_magnitude)
     q_X, q_Y, q_Z = q_vec_cart.T
     dL_along_beam_path = np.sqrt(
         np.diff(q_X) ** 2 + np.diff(q_Y) ** 2 + np.diff(q_Z) ** 2
@@ -157,7 +157,7 @@ def basic_analysis(
         B_X = field.B_X(*q_vec_T)  # (N,)
         B_Y = field.B_Y(*q_vec_T)  # (N,)
         B_Z = field.B_Z(*q_vec_T)  # (N,)
-        B_mag = field.magnitude(*q_vec_T)  # (N,)
+        B_magnitude = field.magnitude(*q_vec_T)  # (N,)
         b_hat_cart = field.unitvector(*q_vec_T)  # (N,3)
         dbhat_dX = derivative(
             field.unitvector_cartesian,
@@ -179,7 +179,7 @@ def basic_analysis(
         )  # (N,3)
         grad_bhat_cart = np.stack((dbhat_dX, dbhat_dY, dbhat_dZ), axis=1)  # (N,3,3)
 
-        polflux = field.polflux(*q_vec_T)  # (N,)
+        poloidal_flux = field.polflux(*q_vec_T)  # (N,)
         dp_dX = field.d_polflux_dX(*q_vec_T, hamiltonian.delta_X)  # (N,) # type: ignore
         dp_dY = field.d_polflux_dY(*q_vec_T, hamiltonian.delta_Y)  # (N,) # type: ignore
         dp_dZ = field.d_polflux_dZ(*q_vec_T, hamiltonian.delta_Z)  # (N,) # type: ignore
@@ -187,19 +187,19 @@ def basic_analysis(
         # B_R = field.B_R(*q_vec_T)
         # B_T = field.B_T(*q_vec_T)
         # B_Z = field.B_Z(*q_vec_T)
-        # B_mag = field.magnitude(*q_vec_T)
+        # B_magnitude = field.magnitude(*q_vec_T)
         # b_hat = field.unitvector(*q_vec_T)
         # dbhat_dR = derivative(field.unitvector, dims="R", args={"R": q_vec_T[0], "_": q_vec_T[1], "Z": q_vec_T[2]}, spacings=hamiltonian.delta_R)
         # dbhat_dZ = derivative(field.unitvector, dims="Z", args={"R": q_vec_T[0], "_": q_vec_T[1], "Z": q_vec_T[2]}, spacings=hamiltonian.delta_Z)
         # grad_bhat = np.zeros([len_tau, 3, 3])
         # grad_bhat[:,0,:] = dbhat_dR
         # grad_bhat[:,2,:] = dbhat_dZ
-        # grad_bhat[:,1,0] = -B_T / (B_mag * q_vec_T[0])
-        # grad_bhat[:,1,1] = B_R / (B_mag * q_vec_T[0])
+        # grad_bhat[:,1,0] = -B_T / (B_magnitude * q_vec_T[0])
+        # grad_bhat[:,1,1] = B_R / (B_magnitude * q_vec_T[0])
         B_X = field.B_X(*q_vec_T)
         B_Y = field.B_Y(*q_vec_T)
         B_Z = field.B_Z(*q_vec_T)
-        B_mag = field.magnitude(*q_vec_T)
+        B_magnitude = field.magnitude(*q_vec_T)
         # unitvector_cartesian takes Cartesian (X, Y, Z), not the
         # cylindrical (R, zeta, Z) in q_vec_T
         b_hat_cart = field.unitvector_cartesian(*q_vec_cart.T)
@@ -223,7 +223,7 @@ def basic_analysis(
         )
         grad_bhat_cart = np.stack((dbhat_dX, dbhat_dY, dbhat_dZ), axis=1)
 
-        polflux = field.polflux(*q_vec_T)
+        poloidal_flux = field.polflux(*q_vec_T)
         dp_dX = field.d_polflux_dX(*q_vec_T, hamiltonian.delta_R)  # type: ignore
         dp_dY = field.d_polflux_dY(*q_vec_T, hamiltonian.delta_R)  # type: ignore
         dp_dZ = field.d_polflux_dZ(*q_vec_T, hamiltonian.delta_Z)  # type: ignore
@@ -233,13 +233,13 @@ def basic_analysis(
             "B_X": (["tau"], B_X),
             "B_Y": (["tau"], B_Y),
             "B_Z": (["tau"], B_Z),
-            "B_magnitude": (["tau"], B_mag),
+            "B_magnitude": (["tau"], B_magnitude),
             "b_hat_cartesian": (["tau", "col_cart"], b_hat_cart),
             "dbhat_dX": (["tau", "row_cart"], dbhat_dX),
             "dbhat_dY": (["tau", "row_cart"], dbhat_dY),
             "dbhat_dZ": (["tau", "row_cart"], dbhat_dZ),
             "grad_bhat_cartesian": (["tau", "row_cart", "col_cart"], grad_bhat_cart),
-            "polflux": (["tau"], polflux),
+            "polflux": (["tau"], poloidal_flux),
             "dpolflux_dX": (["tau"], dp_dX),
             "dpolflux_dY": (["tau"], dp_dY),
             "dpolflux_dZ": (["tau"], dp_dZ),
@@ -250,12 +250,12 @@ def basic_analysis(
     log.debug("Plasma properties along path")
     ##################################################
 
-    n_e = density_fit(polflux)  # (N,)
-    T_e = temperature_fit(polflux) if temperature_fit else None
+    n_e = density_fit(poloidal_flux)  # (N,)
+    T_e = temperature_fit(poloidal_flux) if temperature_fit else None
     omega_launch = float(inputs["launch_angular_frequency"][()])
     epsilon = DielectricTensor(
         launch_angular_freq=omega_launch,
-        B_magnitude=B_mag,
+        B_magnitude=B_magnitude,
         electron_density=n_e,
         temperature=T_e,
     )
@@ -268,7 +268,7 @@ def basic_analysis(
         norm_omega_UH,
     ) = find_normalised_angular_freqs(
         launch_angular_freq=omega_launch,
-        B_total=B_mag,
+        B_total=B_magnitude,
         electron_density=n_e,
         temperature=T_e,
     )
@@ -292,17 +292,17 @@ def basic_analysis(
     log.debug("Ray properties along path")
     ##################################################
 
-    sin_theta_m = np.sum(b_hat_cart * K_vec_cart / K_mag[:, np.newaxis], axis=1)
+    sin_theta_m = np.sum(b_hat_cart * K_vec_cart / K_magnitude[:, np.newaxis], axis=1)
     theta_m = np.sign(sin_theta_m) * np.arcsin(np.abs(sin_theta_m))
 
-    g_vec_cart, g_mag, g_hat_cart = find_g_cartesian(cart, *q_vec_T, dH)  # type: ignore
+    g_vec_cart, g_magnitude, g_hat_cart = find_g_cartesian(cart, *q_vec_T, dH)  # type: ignore
     y_hat_cart = make_unit_vector_from_cross_product(b_hat_cart, g_hat_cart)
     x_hat_cart = make_unit_vector_from_cross_product(y_hat_cart, g_hat_cart)
     d_xhat_d_tau = np.gradient(x_hat_cart, tau, axis=0)
     d_xhat_d_tau_dot_yhat = dot(d_xhat_d_tau, y_hat_cart)
 
     d_ghat_d_tau = np.gradient(g_hat_cart, tau, axis=0)
-    ray_curvature_kappa = d_ghat_d_tau / g_mag[:, None]
+    ray_curvature_kappa = d_ghat_d_tau / g_magnitude[:, None]
     kappa_dot_xhat = dot(ray_curvature_kappa, x_hat_cart)
     kappa_dot_yhat = dot(ray_curvature_kappa, y_hat_cart)
     kappa_dot_ghat = dot(
@@ -314,7 +314,7 @@ def basic_analysis(
             "sin_theta_m": (["tau"], sin_theta_m),
             "theta_m": (["tau"], theta_m),
             "g_vector_cartesian": (["tau", "col_cart"], g_vec_cart),
-            "g_magnitude": (["tau"], g_mag),
+            "g_magnitude": (["tau"], g_magnitude),
             "g_hat_cartesian": (["tau", "col_cart"], g_hat_cart),
             "y_hat_cartesian": (["tau", "col_cart"], y_hat_cart),
             "x_hat_cartesian": (["tau", "col_cart"], x_hat_cart),
@@ -338,7 +338,7 @@ def basic_analysis(
 
     H_Cardano_1, H_Cardano_2, H_Cardano_3 = find_H_Cardano_formula(
         launch_angular_freq=omega_launch,
-        K_magnitude=K_mag,
+        K_magnitude=K_magnitude,
         epsilon_para=epsilon.e_bb,
         epsilon_perp=epsilon.e_11,
         epsilon_g=epsilon.e_12,
@@ -433,7 +433,7 @@ def basic_analysis(
 
     H_eigvals, e_eigvecs = find_H_Cardano_eigh(
         launch_angular_freq=omega_launch,
-        K_magnitude=K_mag,
+        K_magnitude=K_magnitude,
         epsilon_para=epsilon.e_bb,
         epsilon_perp=epsilon.e_11,
         epsilon_g=epsilon.e_12,

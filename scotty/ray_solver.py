@@ -45,15 +45,13 @@ class _Event(Protocol):
 
 def _event(terminal: bool, direction: float):
     """Decorator to add the attributes required for
-    `scipy.integrate.solve_ivp while keeping the `mypy` type checker
+    `scipy.integrate.solve_ivp` while keeping the `mypy` type checker
     happy
     """
 
     def decorator_event(func: Any) -> _Event:
-        func.terminal = terminal  # Terminate solver when beam leaves plasma
-        func.direction = (
-            direction  # +ve value when function result goes from -ve to +ve
-        )
+        func.terminal = terminal  # True: the solver stops at this event
+        func.direction = direction  # +1: fires where the function goes from - to +; -1: + to -; 0: both
         return func
 
     return decorator_event
@@ -100,11 +98,13 @@ def _find_UH_ratio(q, launch_angular_frequency, field, hamiltonian) -> float:
     """The upper hybrid frequency over the beam frequency at `q`, with the
     relativistic mass correction if there is a temperature profile"""
     q0, q1, q2 = q
-    polflux = field.polflux(q0, q1, q2)
-    temperature = hamiltonian.temperature(polflux) if hamiltonian.temperature else None
+    poloidal_flux = field.polflux(q0, q1, q2)
+    temperature = (
+        hamiltonian.temperature(poloidal_flux) if hamiltonian.temperature else None
+    )
     gyro_ratio = _find_gyro_ratio(q, launch_angular_frequency, field, hamiltonian)
     plasma_ratio = find_normalised_plasma_ang_freq(
-        launch_angular_frequency, hamiltonian.density(polflux), temperature
+        launch_angular_frequency, hamiltonian.density(poloidal_flux), temperature
     )
     return np.sqrt(gyro_ratio**2 + plasma_ratio**2)
 
@@ -176,20 +176,20 @@ def make_solver_events(
     @_event(terminal=True, direction=1.0)
     def event_leave_plasma(tau, ray_parameters, hamiltonian):
         q0, q1, q2, _, _, _ = ray_parameters
-        polflux = field.polflux(q0, q1, q2)
-        return polflux - poloidal_flux_enter
+        poloidal_flux = field.polflux(q0, q1, q2)
+        return poloidal_flux - poloidal_flux_enter
 
     # Triggers when the beam leaves the LCFS
     #   -ve -> +ve when leaving LCFS
     @_event(terminal=False, direction=1.0)
     def event_leave_LCFS(tau, ray_parameters, hamiltonian):
         q0, q1, q2, _, _, _ = ray_parameters
-        polflux = field.polflux(q0, q1, q2)
-        polflux_LCFS = 1.0
-        return polflux - polflux_LCFS
+        poloidal_flux = field.polflux(q0, q1, q2)
+        poloidal_flux_LCFS = 1.0
+        return poloidal_flux - poloidal_flux_LCFS
 
     # Capture the bounding box of the magnetic field to check if
-    # the beam has left the plasma
+    # the beam has left the field's grid (the simulation region)
     def _minmax(arr) -> Tuple[float, float]:
         return min(arr), max(arr)
 
@@ -294,40 +294,38 @@ def handle_terminating_event(
     tau_events: Dict[str, FloatArray],
     ray_parameters_events: FloatArray,
 ) -> float:
-    """Handle events detected by `scipy.integrate.solve_ivp`. This
-    only handles events due to the ray leaving the plasma or
-    simulation:
+    """The ``tau`` where the ray stops, from the events that
+    `scipy.integrate.solve_ivp` detected (see `make_solver_events`), in this
+    order:
 
-    TODO # TO REMOVE does it actually *only* handle ray leaving plasma or sim?
-    doesnt seem like it
-
-    - ``"leave_plasma"``: the ray has left the plasma
-    - ``"leave_LCFS"``: the ray has left the last-closed flux
-      surface. For most simulations, this is likely identical to
-      leaving the plasma
-    - ``"leave_simulation"``: the ray has left the simulated area
-      (essentially the bounding box of the plasma)
     - ``"first_harmonic"``, ``"second_harmonic"``, ``"upper_hybrid"``: the ray
       has reached a resonance layer (the first one reached, if several fired)
+    - ``"leave_plasma"``: the ray has left the plasma, at
+      ``poloidal_flux_enter``
+    - ``"leave_LCFS"``, if the ray did not leave the plasma: it has left the
+      last closed flux surface (normalised poloidal flux 1)
+    - ``"leave_simulation"``, if none of these: the ray has left the grid of
+      the field, which logs a warning
 
     Parameters
     ----------
     tau_events : Dict[str, FloatArray]
         A mapping between event names and the solver ``t_events``
-    ray_parameters_events :
+    ray_parameters_events : FloatArray
+        The solver ``y_events``. Not used
 
     Returns
     -------
-    FloatArray
-        The value of ``tau`` when the detected event first occurred
+    float
+        The value of ``tau`` when the event that stops the ray first occurred
     """
 
     def detected(event):
         """True if ``event`` was detected"""
         return len(tau_events[event]) != 0
 
-    # Event names here must match those in the `solver_ray_events`
-    # dict defined outside this function
+    # Event names here must match those in the dict that
+    # `make_solver_events` returns
     # if detected("leave_plasma") and not detected("leave_LCFS"):
     #     log.info(f"Ray has left plasma")
     #     return tau_events["leave_plasma"][0]
@@ -372,8 +370,10 @@ def handle_terminating_event(
 def d_ray_parameters_d_tau(
     tau: FloatArray, ray_parameters: FloatArray, hamiltonian: Hamiltonian
 ) -> FloatArray:
-    # tau is unused here, but solve_ivp is strict about the function signatures and requires something like
-    # f(t, y, y0), so we put the tau here so that it stops complaining
+    """The right-hand side of the ray equations, for `scipy.integrate.solve_ivp`:
+    dq/dtau = dH/dK and dK/dtau = -dH/dq. `ray_parameters` is
+    ``(q0, q1, q2, K0, K1, K2)``, and so is the result. `tau` is not used:
+    `solve_ivp` needs it in the signature."""
     dH = hamiltonian.derivatives(ray_parameters[:3], ray_parameters[-3:])
     q_keys, K_keys = FIRST_ORDER_KEYS[
         (
@@ -434,12 +434,18 @@ def ray_tracing(
         (a) ray leaves the LCFS (i.e. when the ray reaches `poloidal_flux` == 1.0); or
         (b) dK/dtau = 0 (i.e. a cut-off is reached).
 
-    If `ray_tracing_flag == True`, then this returns a 2-tuple where the first item is an
-    array of equally-spaced `tau` points, and the second is an array of shape `(6, len(tau_points))`
-    corresponding to `q0`, `q1`, `q2`, `K0`, `K1`, `K2` in the same order as the first.
+    Returns a 5-tuple: the solver's status, its number of evaluations of the
+    right-hand side, the time it took (in s), the output `tau` points, and
 
-    If `ray_tracing_flag == False`, it returns a 2-tuple with the same first item, but the second
-    item is the `tau` value when the ray encounters a terminating condition.
+    - with `ray_tracing_flag`: an array of shape `(6, len(tau))`, `q0`, `q1`,
+      `q2`, `K0`, `K1`, `K2` at those points;
+    - otherwise: the `tau` where the ray stops (the beam solver then
+      integrates up to it).
+
+    The output `tau` points are `len_tau - 1` points spaced evenly from 0
+    up to (but not including) the `tau` where the ray stops, and, if the ray
+    reached no resonance, also the `tau` of the cut-off (the minimum of
+    `|K|`), so `len_tau` points in all.
     """
 
     log.trace(f"Packing ray parameters: q = {q_initial}, K = {K_initial}")
@@ -492,7 +498,7 @@ def ray_tracing(
     )
     solver_arguments = (hamiltonian,)
 
-    # Propagating q, K by solving the ray-tracing equatoins
+    # Propagating q, K by solving the ray-tracing equations
     log.info(f"Starting the ray solver")
 
     solver_ray_output, duration_ray_tracing = timer(solve_ivp)(
@@ -624,8 +630,9 @@ def ray_tracing(
             start=0, stop=tau_terminating_event, num=len_tau - 1, endpoint=False
         )
 
-    # For ray-tracing runs, return `tau` and `result` (containing `q`, `K`)
-    # Otherwise return `tau_terminating_event` and `tau_arr_resampled` (since the beam solver calculates everything again)
+    # For ray-tracing runs, return `tau` and `result` (containing `q`, `K`).
+    # Otherwise return `tau_arr_resampled` and `tau_terminating_event` (since
+    # the beam solver calculates everything again)
     if ray_tracing_flag:
         return (
             solver_ray_output.status,

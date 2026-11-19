@@ -649,26 +649,28 @@ def find_epsilon_terms(
         is still the same
     """
     toreturn = []
-    normalised_plasma_ang_freq = find_normalised_plasma_ang_freq(
+    normalised_plasma_angular_frequency = find_normalised_plasma_ang_freq(
         launch_angular_freq, electron_density, temperature
     )
-    normalised_gyro_ang_freq = find_normalised_gyro_ang_freq(
+    normalised_gyro_angular_frequency = find_normalised_gyro_ang_freq(
         launch_angular_freq, B_total, temperature
     )
 
     if para:
-        toreturn.append(1 - normalised_plasma_ang_freq**2)
+        toreturn.append(1 - normalised_plasma_angular_frequency**2)
     if perp:
         toreturn.append(
-            1 - normalised_plasma_ang_freq**2 / (1 - normalised_gyro_ang_freq**2)
+            1
+            - normalised_plasma_angular_frequency**2
+            / (1 - normalised_gyro_angular_frequency**2)
         )
     if g:
         # -Omega_pe^2 Omega_ce / (Omega (Omega^2 - Omega_ce^2)), as in
         # `hamiltonian.DielectricTensor`
         toreturn.append(
-            -(normalised_plasma_ang_freq**2)
-            * normalised_gyro_ang_freq
-            / (1 - normalised_gyro_ang_freq**2)
+            -(normalised_plasma_angular_frequency**2)
+            * normalised_gyro_angular_frequency
+            / (1 - normalised_gyro_angular_frequency**2)
         )
     return toreturn
 
@@ -1393,9 +1395,9 @@ def find_beam_widths_and_curvs(
     else:
         curv_poor = width_poor = np.zeros(1, dtype=bool)
 
-    K_mag = np.linalg.norm(K_vec, axis=-1)
-    K_g_mag = np.sum(K_vec * g_hat, axis=-1)
-    curvs = (np.asarray(K_g_mag**2 / K_mag**3)[..., np.newaxis]) * Re_Psi_w_eigvals
+    K_magnitude = np.linalg.norm(K_vec, axis=-1)
+    K_g = np.sum(K_vec * g_hat, axis=-1)
+    curvs = (np.asarray(K_g**2 / K_magnitude**3)[..., np.newaxis]) * Re_Psi_w_eigvals
     widths = np.sqrt(2 / Im_Psi_w_eigvals)
 
     values = (curvs[..., 0], curvs[..., 1], widths[..., 0], widths[..., 1])
@@ -1538,17 +1540,19 @@ def poloidal_flux_along_ray_line(
     _field_cart_polflux: Callable,
 ) -> FloatArray:
     """
-    Calculates the poloidal flux values along a straight-line trajectory
-    parametrised by `tau` from a launch position `(q_X_launch, q_Y_launch,
-    q_Z_launch)` with launch angles `poloidal_launch_angle_deg_Torbeam`
-    and `toroidal_launch_angle_deg_Torbeam`
+    The poloidal flux at the point `tau` of the straight line from the
+    launch position `(q_X_launch, q_Y_launch, q_Z_launch)` along the launch
+    angles (`ray_line`). Outside the field, where the flux is NaN, it
+    returns NaN, with a warning.
 
     Parameters
     ----------
     q_X_launch, q_Y_launch, q_Z_launch : float
-        Position of the launch position
-    tau : float, int, FloatArray
-        Parameter of the ray trajectory
+        Launch position, in Cartesian coordinates
+    tau : float
+        Distance along the line from the launch position, in m. Only a
+        number gives the right value: an array of `tau` gives wrong values,
+        so call it once for each point
     poloidal_launch_angle_deg_Torbeam : float
         Poloidal launch angle, in the TORBEAM convention, in degrees
     toroidal_launch_angle_deg_Torbeam : float
@@ -1558,10 +1562,9 @@ def poloidal_flux_along_ray_line(
         poloidal flux at those points
 
     Returns
-    ----------
-    output : (3,) or (3,N) FloatArray
-        Poloidal flux values along the ray trajectory at points `tau`,
-        with the same length as `tau`
+    -------
+    float
+        Normalised poloidal flux at `tau`, or NaN outside the field
     """
 
     positions = ray_line(
@@ -1577,33 +1580,35 @@ def poloidal_flux_along_ray_line(
     # If there are NaNs, then replace those with the first non-NaN instance
     # in the array (i.e. the poloidal flux of the first point in the field)
     if positions.ndim == 1:
-        polflux = _field_cart_polflux(*positions)
-        if np.isnan(polflux):
+        poloidal_flux = _field_cart_polflux(*positions)
+        if np.isnan(poloidal_flux):
             log.warning(
-                f"Poloidal flux is NaN at [X,Y,Z] = [{arr2str(positions)}]. Returning None instead"
+                f"Poloidal flux is NaN at [X,Y,Z] = [{arr2str(positions)}]. Returning NaN"
             )
-            polflux = np.nan
+            poloidal_flux = np.nan
 
     elif positions.ndim == 2:
-        polflux = _field_cart_polflux(positions[:, 0], positions[:, 1], positions[:, 2])
-        if np.all(np.isnan(polflux)):
+        poloidal_flux = _field_cart_polflux(
+            positions[:, 0], positions[:, 1], positions[:, 2]
+        )
+        if np.all(np.isnan(poloidal_flux)):
             _printmsg = "\n".join(
                 f"            - [{position}]" for position in positions
             )
             log.warning(f"""
         Poloidal fluxes are NaNs at all points queried: [X,Y,Z] = \n{_printmsg}
         """)
-            polflux = np.nan
+            poloidal_flux = np.nan
         else:
-            NaN_replacement_value = polflux[~np.isnan(polflux)][0]
-            polflux = np.nan_to_num(polflux, nan=NaN_replacement_value)
+            NaN_replacement_value = poloidal_flux[~np.isnan(poloidal_flux)][0]
+            poloidal_flux = np.nan_to_num(poloidal_flux, nan=NaN_replacement_value)
 
     else:
         raise ValueError(
             f"Ray line positions must have only 1 or 2 dimensions but got {positions.ndim}"
         )
 
-    return polflux  # type: ignore
+    return poloidal_flux  # type: ignore
 
 
 def poloidal_flux_difference_along_ray_line(
@@ -1617,18 +1622,17 @@ def poloidal_flux_difference_along_ray_line(
     poloidal_flux_enter: float,
 ) -> FloatArray:
     """
-    Calculates the poloidal flux difference, relative to the
-    `poloidal_flux_enter`, along a straight-line trajectory
-    parametrised by `tau` from a launch position `(q_X_launch, q_Y_launch,
-    q_Z_launch)` with launch angles `poloidal_launch_angle_deg_Torbeam`
-    and `toroidal_launch_angle_deg_Torbeam`
+    The poloidal flux at the point `tau` of the launch line, minus
+    `poloidal_flux_enter` (see `poloidal_flux_along_ray_line`): zero where
+    the line reaches the plasma boundary
 
     Parameters
     ----------
     q_X_launch, q_Y_launch, q_Z_launch : float
-        Position of the launch position
-    tau : float, int, FloatArray
-        Parameter of the ray trajectory
+        Launch position, in Cartesian coordinates
+    tau : float
+        Distance along the line from the launch position, in m (a number
+        only, as for `poloidal_flux_along_ray_line`)
     poloidal_launch_angle_deg_Torbeam : float
         Poloidal launch angle, in the TORBEAM convention, in degrees
     toroidal_launch_angle_deg_Torbeam : float
@@ -1637,16 +1641,16 @@ def poloidal_flux_difference_along_ray_line(
         Function which takes in Cartesian coordinates and returns the
         poloidal flux at those points
     poloidal_flux_enter : float
-        Poloidal flux value to begin the ray-/beam-tracing calculations at
+        Normalised poloidal flux of the plasma boundary
 
     Returns
-    ----------
-    output : (3,) or (3,N) FloatArray
-        Poloidal flux difference, relative to `poloidal_flux_enter` along
-        the ray trajectory at points `tau`, with the same length as `tau`
+    -------
+    float
+        The poloidal flux at `tau` minus `poloidal_flux_enter`, or NaN
+        outside the field
     """
 
-    polflux = poloidal_flux_along_ray_line(
+    poloidal_flux = poloidal_flux_along_ray_line(
         q_X_launch,
         q_Y_launch,
         q_Z_launch,
@@ -1657,29 +1661,35 @@ def poloidal_flux_difference_along_ray_line(
     )
 
     # If NaN, then just return NaN
-    if polflux is np.nan:
-        return polflux
+    if poloidal_flux is np.nan:
+        return poloidal_flux
     else:
-        return polflux - poloidal_flux_enter
+        return poloidal_flux - poloidal_flux_enter
 
 
-# TODO -- rewrite using Einstein summation convention?
 def dot(arr_a: Array, arr_b: Array) -> Array:
     """
-    Dot product of arrays of vectors or matrices, which covers the case
-    that `matmul` and `dot` don't do very elegantly, and avoids having to
-    use a for loop to iterate over the array slices. Replaces the
-    deprecated `contract_special`
+    Dot product at each of T points of arrays of vectors or matrices,
+    without a Python loop over the points. It replaces the removed
+    ``contract_special``
 
     Parameters
     ----------
-    arg_a, arg_b:
+    arr_a, arr_b : Array
         One of:
-        - matrix with shape TxMxN and a vector with TxN or TxM
-        - two vectors of shape TxN
 
-        For each T, independently compute the dot product of the
-        matrices/vectors
+        - a matrix of shape (T, M, N) and a vector of shape (T, N), or a
+          vector of shape (T, M) and a matrix of shape (T, M, N);
+        - two vectors of shape (T, N);
+        - two matrices of shape (T, M, N) and (T, N, P).
+
+        At each of the T points, the dot product of the two is computed
+        independently
+
+    Returns
+    -------
+    Array
+        Shape (T, M), (T, N), (T,) or (T, M, P)
     """
     arr_a, arr_b = np.asarray(arr_a), np.asarray(arr_b)
     if arr_a.ndim in (2, 3) and arr_b.ndim in (2, 3) and len(arr_a) == len(arr_b):
@@ -1734,21 +1744,17 @@ def make_unit_vector_from_cross_product(
     vector_a: FloatArray, vector_b: FloatArray
 ) -> FloatArray:
     """
-    Take the cross product of two vectors and then normalise
-
-    Old documentation:
-        Assume np.shape(vector_a) = np.shape(vector_b) = (n,3)
-        or
-        np.shape(vector_a) = (n,3) , np.shape(vector_b) = (3)
+    The cross product of two vectors, normalised to unit length
 
     Parameters
     ----------
-    vector_a : (3,) or (N,3) FloatArray
-    vector_b : (3,) or (N,3) FloatArray
+    vector_a : (N,3) FloatArray
+    vector_b : (N,3) or (3,) FloatArray
+        A (3,) vector is crossed with each row of `vector_a`
 
     Returns
-    ----------
-    output_unit_vector : (3,) or (N,3) FloatArray
+    -------
+    output_unit_vector : (N,3) FloatArray
     """
     output_vector = np.cross(vector_a, vector_b)
     output_vector_magnitude = np.linalg.norm(output_vector, axis=-1)
@@ -1759,8 +1765,9 @@ def make_unit_vector_from_cross_product(
 
 def find_inverse_2D(matrix_2D: Array) -> Array:
     """
-    Find the inverse M^-1 of a 2x2 matrix M; i.e. M x M^-1 = I. If matrix
-    M is close to singular, then raise an error; i.e. when | det(M) | < 1e-5
+    The inverse M^-1 of a 2x2 matrix M, so that M M^-1 = I. If M is close
+    to singular, with abs(det(M)) < 1e-5, it logs a warning and still
+    returns the inverse (infinite or NaN if det(M) is 0)
 
     Parameters
     ----------
@@ -1787,7 +1794,7 @@ def find_inverse_2D(matrix_2D: Array) -> Array:
 def find_g_cartesian(
     cartesian: bool, q0: ArrayLike, q1: ArrayLike, q2: ArrayLike, dH: dict
 ) -> Tuple[ArrayLike, ArrayLike, ArrayLike]:
-    """
+    r"""
     Find, in Cartesian coordinates:
     (1) the group velocity vector, `g`;
     (2) its magnitude, `|g|`; and
@@ -1803,20 +1810,16 @@ def find_g_cartesian(
         `q_Y` for Cartesian geometry and `q_zeta` for cylindrical
     q2 : ArrayLike
         `q_Z` for both Cartesian and cylindrical geometry
-    K0 : ArrayLike
-        `K_X` for Cartesian geometry and `K_R` for cylindrical
-    K1 : ArrayLike
-        `K_Y` for Cartesian geometry and `K_zeta` for cylindrical
-    K2 : ArrayLike
-        `K_Z` for both Cartesian and cylindrical geometry
     dH : dict
-        Dictionary of derivatives of the Hamiltonian, i.e. `dH = hamiltonian.derivatives(...)`
+        Dictionary of derivatives of the Hamiltonian, from
+        `scotty.hamiltonian.Hamiltonian.derivatives`. The group velocity is
+        :math:`\mathbf{g} = \nabla_K H`
 
     Returns
-    ----------
+    -------
     g_vec : ArrayLike
         Group velocity, in Cartesian coordinates
-    g_mag : ArrayLike
+    g_magnitude : ArrayLike
         Magnitude of the group velocity
     g_hat : ArrayLike
         Unit vector of the group velocity, in Cartesian coordinates
@@ -2002,8 +2005,8 @@ def reflector_make_from_mirrornorm(mirrornorm: FloatArray) -> FloatArray:
 
     Parameters
     ----------
-    mirror_norm : (3,) FloatArray
-        Mirror normal vector
+    mirrornorm : (3,) FloatArray
+        Mirror normal vector, of unit length
 
     Returns
     ----------

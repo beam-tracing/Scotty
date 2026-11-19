@@ -15,11 +15,14 @@ from typing import Dict
 
 
 def inch2m(length_inches):
-    """Converts inches to meters"""
+    """Converts inches to metres"""
     return length_inches * 25.4 / 1000
 
 
 class Horn:
+    """Abstract base class for horns: each gives the Gaussian beam it
+    launches with `output_beam`"""
+
     def output_beam(self, freq=None):
         """Return the width and curvature at the mouth of the horn
         for a given frequency.
@@ -30,19 +33,17 @@ class Horn:
 
 
 class Conical_Horn(Horn):
-    """
-    Properties:
+    """A conical horn: smooth walled, with a circular cross-section
 
-    - smooth walled
-    - circular cross-section
-
-    Attributes
-    ==========
-    name:
+    Parameters
+    ----------
+    name : str
         Horn name
-    aperture_radius:
-        Radius of aperture in metres
-    semiflare_angle:
+    aperture_radius : float
+        Radius of the aperture, in m
+    semiflare_angle : float
+        Half the flare angle of the cone, in radians (Goldsmith calls the
+        full angle the flare angle)
     """
 
     def __init__(self, name: str, aperture_radius: float, semiflare_angle: float):
@@ -52,6 +53,8 @@ class Conical_Horn(Horn):
 
     @property
     def inverse_slant_length(self):
+        """The inverse of the slant length of the cone, in m^-1: ``1 / L =
+        sin(semiflare_angle) / aperture_radius``"""
         return np.sin(self.semiflare_angle) / self.aperture_radius
 
     def __repr__(self):
@@ -63,7 +66,8 @@ class Conical_Horn(Horn):
 
 
 class GoldsmithSymmetricConicalHorn(Conical_Horn):
-    """Uses Goldsmith's *Quasioptics* textbook"""
+    """Uses Goldsmith's *Quasioptics* textbook: the width is 0.76 of the
+    aperture radius, and the curvature is the inverse of the slant length"""
 
     def output_beam(self, freq_GHz=None):
         width = 0.76 * self.aperture_radius
@@ -72,7 +76,9 @@ class GoldsmithSymmetricConicalHorn(Conical_Horn):
 
 
 class GoldsmithAsymmetricConicalHorn(Conical_Horn):
-    """Uses Goldsmith's *Quasioptics* textbook"""
+    """Uses Goldsmith's *Quasioptics* textbook: the widths are 0.88 and 0.64
+    of the aperture radius, in the E and H planes, and the curvature is the
+    inverse of the slant length"""
 
     def output_beam(self, freq_GHz=None):
         # w_E > w_H seems to be the opposite of what Jon measures, though
@@ -91,7 +97,7 @@ class SpeirsAsymmetricConicalHorn(Conical_Horn):
     def output_beam(self, freq_GHz):
         # Beam waist widths don't change very much, it seems
         # From horn simulation's electric field (35 GHz)
-        # in meters
+        # in metres
         w0_E = 0.012948291561049162
         w0_H = 0.01731096934084839
 
@@ -120,10 +126,13 @@ class SpeirsAsymmetricConicalHorn(Conical_Horn):
 
 
 class SpeirsSymmetricConicalHorn(Conical_Horn):
-    """Uses average of David Speirs' CST simulation data"""
+    """Meant to use the average of David Speirs' CST simulation data, but not
+    implemented yet: for now it gives the same beam as
+    `GoldsmithAsymmetricConicalHorn` (widths 0.88 and 0.64 of the aperture
+    radius, in the E and H planes)"""
 
     def output_beam(self, freq_GHz):
-        # Not yet implemented
+        # Not yet implemented: Goldsmith's asymmetric widths for now
 
         width_E = 0.88 * self.aperture_radius
         width_H = 0.64 * self.aperture_radius
@@ -159,10 +168,10 @@ def _MAST_V_band_aperature_radius() -> float:
     # myHorn.far_field_divergence_angle = FWHM_angle / 1.18 % Estimate, from Goldsmith
 
     # I assume the horn is aperture-limited, so the width at the output is
-    # independent of freq
-    mid_band_freq = (75.0 + 50.0) * 10**9 / 2
+    # independent of frequency
+    mid_band_frequency = (75.0 + 50.0) * 10**9 / 2
     w_0 = constants.c / (
-        np.pi * mid_band_freq * np.tan(np.deg2rad(far_field_divergence_angle))
+        np.pi * mid_band_frequency * np.tan(np.deg2rad(far_field_divergence_angle))
     )
     # w_0 = 0.003855191833541916 # This is what the calculation gives me
     # w_0 = 0.004054462688018294 # This is what Neal gets
@@ -180,12 +189,17 @@ KNOWN_HORNS: Dict[str, Horn] = {
 
 
 def make_my_horn(name: str) -> Horn:
-    """Create one of a pre-existing set of parameterised horns
+    """One of the horns in `KNOWN_HORNS`
 
-    Arguments
-    =========
-    name:
-        One of "MAST_V_band", "MAST_Q_band"
+    Parameters
+    ----------
+    name : str
+        ``"MAST_V_band"`` or ``"MAST_Q_band"``. Another name raises a
+        `ValueError`
+
+    Returns
+    -------
+    Horn
     """
 
     try:

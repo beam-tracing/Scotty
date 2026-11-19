@@ -31,6 +31,30 @@ log = logging.getLogger(__name__)
 
 
 class DielectricTensor:
+    r"""The cold-plasma dielectric tensor in the frame of the field,
+    :math:`(\hat{u}_1, \hat{u}_2, \hat{b})`, from its three independent
+    elements. With :math:`X = \Omega_{pe}^2 / \Omega^2` and
+    :math:`Y = \Omega_{ce} / \Omega` (with the relativistic electron mass
+    if ``temperature`` is given):
+
+    .. math::
+
+        \epsilon_{bb} = 1 - X, \qquad
+        \epsilon_{11} = 1 - \frac{X}{1 - Y^2}, \qquad
+        \epsilon_{12} = -\frac{X Y}{1 - Y^2}
+
+    Parameters
+    ----------
+    launch_angular_freq : float
+        Angular frequency of the beam, :math:`\Omega`, in rad/s
+    B_magnitude : ArrayLike
+        Magnitude of the magnetic field, in T
+    electron_density : ArrayLike
+        Electron density, in 10^19 m^-3
+    temperature : ArrayLike, optional
+        Electron temperature, in keV
+    """
+
     def __init__(
         self,
         launch_angular_freq: float,
@@ -39,40 +63,44 @@ class DielectricTensor:
         temperature: Optional[ArrayLike] = None,
     ):
 
-        plasma_freq_2 = (
+        plasma_frequency_2 = (
             find_normalised_plasma_ang_freq(
                 launch_angular_freq, electron_density, temperature
             )
             ** 2
         )
-        gyro_freq = find_normalised_gyro_ang_freq(
+        gyro_frequency = find_normalised_gyro_ang_freq(
             launch_angular_freq, B_magnitude, temperature
         )
-        gyro_freq_2 = gyro_freq**2
+        gyro_frequency_2 = gyro_frequency**2
 
-        self._epsilon_bb = 1 - plasma_freq_2
-        self._epsilon_11 = 1 - plasma_freq_2 / (1 - gyro_freq_2)
+        self._epsilon_bb = 1 - plasma_frequency_2
+        self._epsilon_11 = 1 - plasma_frequency_2 / (1 - gyro_frequency_2)
         # With fields ~ exp(-i Omega t) and electrons of charge -e (e > 0, so
         # that Omega_ce = e B / m_e > 0), the dielectric tensor contains
         # -i [Omega_pe^2 Omega_ce / (Omega (Omega^2 - Omega_ce^2))] b_hat x I.
         # D (in `find_H_Cardano_eigh`) is written with +i epsilon_12 b_hat x I,
         # so epsilon_12 = -Omega_pe^2 Omega_ce / (Omega (Omega^2 - Omega_ce^2)),
-        # negative for Omega > Omega_ce. (Here plasma_freq_2 is
-        # Omega_pe^2 / Omega^2 and gyro_freq is Omega_ce / Omega.)
+        # negative for Omega > Omega_ce. (Here plasma_frequency_2 is
+        # Omega_pe^2 / Omega^2 and gyro_frequency is Omega_ce / Omega.)
         # Hall-Chen, Parra & Hillesheim (2022) define it with the opposite
         # sign, eqs. (2) and (35)
-        self._epsilon_12 = -plasma_freq_2 * gyro_freq / (1 - gyro_freq_2)
+        self._epsilon_12 = -plasma_frequency_2 * gyro_frequency / (1 - gyro_frequency_2)
 
     @property
     def e_bb(self) -> ArrayLike:
+        r"""The element along the field, :math:`\epsilon_{bb}`"""
         return self._epsilon_bb
 
     @property
     def e_11(self) -> ArrayLike:
+        r"""The element across the field, :math:`\epsilon_{11} = \epsilon_{22}`"""
         return self._epsilon_11
 
     @property
     def e_12(self) -> ArrayLike:
+        r"""The gyrotropic element, :math:`\epsilon_{12} = -\epsilon_{21}`
+        (negative for :math:`\Omega > \Omega_{ce}`)"""
         return self._epsilon_12
 
 
@@ -106,18 +134,47 @@ class Hamiltonian:
     choosing our stencils and evaluating all of the derivatives at once, we can
     reuse evaluations of :math:`H` between derivatives, saving a lot of computation.
 
-    The stencils are defined as a `dict` with a `tuple` of offsets as keys and `float`
-    weights as values. For example, the `CFD1_stencil`::
-        {(1,): 0.5, (-1,): -0.5}
+    The stencils (`scotty.derivatives.STENCILS`) are defined as a `dict` with a
+    `tuple` of offsets as keys and `float` weights as values. For example, the
+    stencil ``"d1_CFD2"``::
 
-    defines the second-order first central-difference:
+        {(-1,): -0.5, (1,): 0.5}
+
+    defines the second-order first central difference:
+
+    .. math::
+
         f' = \frac{f(x + \delta_x) - f(x - \delta_x)}{2\delta_x}
 
     The keys are tuples so that we can iterate over the offsets for the mixed
     second derivatives.
 
     The stencils have been chosen to maximise the reuse of Hamiltonian
-    evaluations without sacrificing accuracy.
+    evaluations without sacrificing accuracy. The derivatives in the spatial
+    coordinates use one-sided forward stencils (``"d1_FFD2"``, ``"d2_FFD2"``),
+    so the signs of the spatial steps decide which side of a point is
+    sampled (see ``auto_delta_sign`` in `scotty.beam_me_up.beam_me_up`).
+
+    Parameters
+    ----------
+    launch_angular_freq : float
+        Angular frequency of the beam, in rad/s
+    mode_flag : {1, -1}
+        Which root of the Booker quadratic this Hamiltonian is
+    deltas : FloatArray
+        The finite-difference steps: ``(delta_R, delta_Z, delta_K_R,
+        delta_K_zeta, delta_K_Z)`` for a cylindrical field, and ``(delta_X,
+        delta_Y, delta_Z, delta_K_X, delta_K_Y, delta_K_Z)`` for a Cartesian
+        one
+    field : MagneticField_Cylindrical or MagneticField_Cartesian
+        The magnetic field
+    density_fit : callable
+        Electron density (in 10^19 m^-3) as a function of the normalised
+        poloidal flux
+    temperature_fit : callable, optional
+        Electron temperature (in keV) as a function of the normalised
+        poloidal flux, for the relativistic mass correction; ``None`` for
+        none
     """
 
     wavenumber: float
@@ -221,9 +278,9 @@ class Hamiltonian:
                 f"Expected either 2 or 6 arguments but got {sum(a is None for a in [q0, q1, q2, K0, K1, K2])}"
             )
 
-        polflux = self.field.polflux(q0, q1, q2)
-        electron_density = self.density(polflux)
-        temperature = self.temperature(polflux) if self.temperature else None
+        poloidal_flux = self.field.polflux(q0, q1, q2)
+        electron_density = self.density(poloidal_flux)
+        temperature = self.temperature(poloidal_flux) if self.temperature else None
 
         # One evaluation of the field components for both |B| and b_hat
         _, b_hat, B_magnitude = self.field.all(q0, q1, q2)  # type: ignore
@@ -233,7 +290,7 @@ class Hamiltonian:
 
         sin_theta_m = (
             np.dot(b_hat, K_hat) if np.size(q0) == 1 else dot(b_hat, K_hat.T)
-        )  # when given multiple points, b_hat.shape is (len_tau, N) while K_hat.shape (N, len_tau)
+        )  # for N points, b_hat has shape (N, 3) and K_hat (3, N)
         sin_theta_m_sq = cast(ArrayLike, sin_theta_m**2)
 
         Booker_alpha, Booker_beta, Booker_gamma = find_Booker_terms(
@@ -274,7 +331,7 @@ class Hamiltonian:
             #   - {"[K_R, K_zeta, K_Z]" if isinstance(self.field, MagneticField_Cylindrical) else "[K_X, K_Y, K_Z]"} = {K0, K1, K2}
             #
             # Calculated values:
-            #   - pol. flux = {polflux}
+            #   - pol. flux = {poloidal_flux}
             #   - n_e = {electron_density}
             #   - T_e = {temperature}
             #   - {"[B_R, B_T, B_Z]" if isinstance(self.field, MagneticField_Cylindrical) else "[B_X, B_Y, B_Z]"} = {B_magnitude*b_hat.T}
@@ -424,6 +481,8 @@ def initialise_hamiltonians(
     density_fit: ProfileFitLike,
     temperature_fit: Optional[ProfileFitLike] = None,
 ) -> Tuple[Hamiltonian, Hamiltonian]:
+    """The two `Hamiltonian` objects, for `mode_flag` = +1 and -1, with the
+    same field, profiles and finite-difference steps"""
 
     log.info(f"Initialising Hamiltonians for `mode_flag` = +1 and -1")
 
@@ -456,6 +515,9 @@ def assign_hamiltonians(
     K_initial: FloatArray,
     tol_H: float = 1e-5,
 ) -> Tuple[Hamiltonian, Hamiltonian]:
+    """The Hamiltonian of the traced mode, `mode_flag_initial`, and the other
+    one, as ``(H, H_other)``. It logs a warning if, at the initial point, H
+    is above `tol_H` and above H_other"""
 
     log.debug(
         f"Assigning the correct Hamiltonian corresponding to `mode_flag_initial` = {mode_flag_initial}"
@@ -481,7 +543,7 @@ def assign_hamiltonians(
 def hessians(dH: dict, cartesian: bool) -> Tuple[FloatArray, FloatArray, FloatArray]:
     r"""
     Given a dictionary containing the second derivatives of the Hamiltonian (from
-    hamiltonian.derivatives with second_order = True), compute the elements of the
+    `Hamiltonian.derivatives` with ``second_order=True``), compute the elements of the
     Hessian of the Hamiltonian:
 
     .. math::
@@ -494,8 +556,8 @@ def hessians(dH: dict, cartesian: bool) -> Tuple[FloatArray, FloatArray, FloatAr
     Parameters
     ----------
     dH : dict
-        Dictionary of first and second derivatives, generated via the derivative()
-        function in the Hamiltonian() class
+        Dictionary of first and second derivatives, from
+        `Hamiltonian.derivatives` with ``second_order=True``
     cartesian : bool
         `False` returns cylindrical derivatives; `True` returns Cartesian derivatives
 
@@ -558,8 +620,8 @@ def hessians(dH: dict, cartesian: bool) -> Tuple[FloatArray, FloatArray, FloatAr
             )
         )
 
-    # equivalent to elif isinstance(self.field, MagneticField_Cartesian):
-    # but written as else to stop the type checker complaining
+    # equivalent to `elif cartesian:`, but written as else to stop the
+    # type checker complaining
     else:
         d2H_dX2 = dH["d2H_dX2"]
         d2H_dY2 = dH["d2H_dY2"]

@@ -69,6 +69,10 @@ def flux_surface_tangents(
 def check_vector_pointing_into_plasma(
     q: FloatArray, vector: FloatArray, field: VALID_FIELDS
 ) -> None:
+    r"""Check that ``vector`` at ``q`` (both in the field's coordinates)
+    points into the plasma, that is, down the poloidal flux, from the flux
+    0.01 m either side of ``q`` along it. Raises a `ValueError` if it points
+    out, and warns if the flux there is not monotonic."""
     if not q.shape == (3,):
         raise ValueError(f"`q` must have shape (3,), but got {q.shape}")
     if not vector.shape == (3,):
@@ -84,13 +88,13 @@ def check_vector_pointing_into_plasma(
     q_XYZ_minus = q_XYZ - 0.01 * unitv_XYZ
     q_XYZ_plus = q_XYZ + 0.01 * unitv_XYZ
 
-    polflux_at_q_minus = field.polflux_cartesian(*q_XYZ_minus)
-    polflux_at_q = field.polflux_cartesian(*q_XYZ)
-    polflux_at_q_plus = field.polflux_cartesian(*q_XYZ_plus)
+    poloidal_flux_at_q_minus = field.polflux_cartesian(*q_XYZ_minus)
+    poloidal_flux_at_q = field.polflux_cartesian(*q_XYZ)
+    poloidal_flux_at_q_plus = field.polflux_cartesian(*q_XYZ_plus)
 
-    if polflux_at_q_minus < polflux_at_q < polflux_at_q_plus:
+    if poloidal_flux_at_q_minus < poloidal_flux_at_q < poloidal_flux_at_q_plus:
         raise ValueError(f"K_plasma is pointing out of the plasma!")
-    elif polflux_at_q_plus < polflux_at_q < polflux_at_q_minus:
+    elif poloidal_flux_at_q_plus < poloidal_flux_at_q < poloidal_flux_at_q_minus:
         pass
     else:
         log.warning(
@@ -120,7 +124,12 @@ def find_H_bar(
     electron_density: ArrayLike,
     temperature: Optional[ArrayLike] = None,
 ) -> ArrayLike:
-
+    r"""The dispersion relation in units of K^2, K^2 - K_0^2 N^2 (that is,
+    K_0^2 H), for the mode ``mode_flag`` and the wavevector with components
+    ``K_parallel``, ``K_binormal`` and ``K_normal`` along the three given unit
+    vectors, at a point with the field ``(B_X, B_Y, B_Z)`` and the electron
+    density (and temperature) given. `find_K_plasma` finds its root in
+    ``K_normal``."""
     K_0 = angular_frequency_to_wavenumber(launch_angular_frequency)
     K_cartesian = (
         K_parallel * parallel_unitvector
@@ -161,7 +170,14 @@ def find_K_plasma(
     field: VALID_FIELDS,
     hamiltonian: Hamiltonian,
 ) -> FloatArray:
-    """NOTE: if K_vacuum is in cyl (cart), K_plasma is in cyl (cart)"""
+    """K just inside the plasma at the entry point `q_entry`, in the same
+    coordinates as `K_vacuum` (cylindrical or Cartesian).
+
+    For `Psi_BC_flag` "continuous" and None, it is `K_vacuum`. For
+    "discontinuous", the two components of K along the flux surface are kept,
+    and the component normal to it is found from the dispersion relation of
+    `hamiltonian`'s mode, H = 0. It raises a `ValueError` if that mode is cut
+    off just inside the boundary."""
 
     if Psi_BC_flag in ["continuous", None]:
         K_plasma = K_vacuum
@@ -187,13 +203,13 @@ def find_K_plasma(
             dp_dY = field.d_polflux_dY(*q_entry, delta_Y=delta_Y)
             dp_dZ = field.d_polflux_dZ(*q_entry, delta_Z=delta_Z)
 
-        polflux_at_boundary = field.polflux(*q_entry)
+        poloidal_flux_at_boundary = field.polflux(*q_entry)
         mode_flag = hamiltonian.mode_flag
-        angular_freq = hamiltonian.angular_frequency
+        angular_frequency = hamiltonian.angular_frequency
         K0 = hamiltonian.wavenumber
-        electron_density_p = hamiltonian.density(polflux_at_boundary)
+        electron_density_p = hamiltonian.density(poloidal_flux_at_boundary)
         temperature = (
-            hamiltonian.temperature(polflux_at_boundary)
+            hamiltonian.temperature(poloidal_flux_at_boundary)
             if hamiltonian.temperature
             else None
         )
@@ -203,13 +219,13 @@ def find_K_plasma(
 
         # Check plasma cutoff and hybrid frequencies
         (
-            normalised_plasma_freq,
-            normalised_gyro_freq,
-            normalised_LH_cutoff_freq,
-            normalised_RH_cutoff_freq,
-            normalised_UH_freq,
+            normalised_plasma_frequency,
+            normalised_gyro_frequency,
+            normalised_LH_cutoff_frequency,
+            normalised_RH_cutoff_frequency,
+            normalised_UH_frequency,
         ) = find_normalised_angular_freqs(
-            angular_freq, B_magnitude, electron_density_p, temperature
+            angular_frequency, B_magnitude, electron_density_p, temperature
         )
 
         log.debug(f"""
@@ -221,11 +237,11 @@ def find_K_plasma(
         #   - b_hat = {b_hat}
         #   - |B| = {B_magnitude}
         #
-        #   - w_pe / w_launch = {normalised_plasma_freq}
-        #   - w_ce / w_launch = {normalised_gyro_freq}
-        #   - w_L  / w_launch = {normalised_LH_cutoff_freq}
-        #   - w_R  / w_launch = {normalised_RH_cutoff_freq}
-        #   - w_UH / w_launch = {normalised_UH_freq}
+        #   - w_pe / w_launch = {normalised_plasma_frequency}
+        #   - w_ce / w_launch = {normalised_gyro_frequency}
+        #   - w_L  / w_launch = {normalised_LH_cutoff_frequency}
+        #   - w_R  / w_launch = {normalised_RH_cutoff_frequency}
+        #   - w_UH / w_launch = {normalised_UH_frequency}
         #
         #   - {"d(polflux)/dX" if cart else "d(polflux)/dR"} = {dp_dX}
         #   - {"d(polflux)/dY" if cart else "d(polflux)/dzeta"} = {dp_dY}
@@ -246,7 +262,7 @@ def find_K_plasma(
                 q_entry,
                 K_vacuum,
                 field,
-                angular_freq,
+                angular_frequency,
                 hamiltonian.density,
                 hamiltonian.temperature,
             )
@@ -260,17 +276,21 @@ def find_K_plasma(
 
         # The O-mode is cut off where w_pe >= w; the X-mode where w_L >= w,
         # or where w_UH <= w <= w_R
-        if O_mode and normalised_plasma_freq >= 1:
+        if O_mode and normalised_plasma_frequency >= 1:
             raise ValueError(
-                f"Cut-off freq higher than beam freq on plasma side of plasma-vacuum boundary for the O-mode (`mode_flag` = {mode_flag}): w_plasma / w_launch = {normalised_plasma_freq} >= 1"
+                f"Cut-off frequency higher than beam frequency on plasma side of plasma-vacuum boundary for the O-mode (`mode_flag` = {mode_flag}): w_plasma / w_launch = {normalised_plasma_frequency} >= 1"
             )
-        elif not O_mode and normalised_LH_cutoff_freq >= 1:
+        elif not O_mode and normalised_LH_cutoff_frequency >= 1:
             raise ValueError(
-                f"Cut-off freq higher than beam freq on plasma side of plasma-vacuum boundary for the X-mode (`mode_flag` = {mode_flag}): w_L / w_launch = {normalised_LH_cutoff_freq} >= 1"
+                f"Cut-off frequency higher than beam frequency on plasma side of plasma-vacuum boundary for the X-mode (`mode_flag` = {mode_flag}): w_L / w_launch = {normalised_LH_cutoff_frequency} >= 1"
             )
-        elif not O_mode and normalised_RH_cutoff_freq >= 1 and normalised_UH_freq <= 1:
+        elif (
+            not O_mode
+            and normalised_RH_cutoff_frequency >= 1
+            and normalised_UH_frequency <= 1
+        ):
             raise ValueError(
-                f"Cut-off freq higher than beam freq on plasma side of plasma-vacuum boundary for the X-mode (`mode_flag` = {mode_flag}): w_R / w_launch = {normalised_RH_cutoff_freq} >= 1 and w_UH / w_launch = {normalised_UH_freq} <= 1"
+                f"Cut-off frequency higher than beam frequency on plasma side of plasma-vacuum boundary for the X-mode (`mode_flag` = {mode_flag}): w_R / w_launch = {normalised_RH_cutoff_frequency} >= 1 and w_UH / w_launch = {normalised_UH_frequency} <= 1"
             )
 
         # K_plasma keeps K_vacuum's two components along the flux surface,
@@ -291,8 +311,8 @@ def find_K_plasma(
         # and flipping the sign (if necessary) to ensure it always points
         # inward
         q_check = q_entry + 0.01 * normal_unitvector
-        polflux_check = field.polflux(*q_check)
-        if polflux_at_boundary < polflux_check:
+        poloidal_flux_check = field.polflux(*q_check)
+        if poloidal_flux_at_boundary < poloidal_flux_check:
             normal_unitvector = -normal_unitvector
 
         # Now we convert `K_v` properly (because in our convention, `K_zeta`
@@ -315,7 +335,7 @@ def find_K_plasma(
         sin_theta_m_sq = sin_theta_m**2
 
         Booker_alpha, Booker_beta, Booker_gamma = find_Booker_terms(
-            launch_angular_freq=angular_freq,
+            launch_angular_freq=angular_frequency,
             B_total=B_magnitude,
             sin_theta_m_sq=sin_theta_m_sq,
             electron_density=electron_density_p,
@@ -331,7 +351,7 @@ def find_K_plasma(
         K_binormal_actual = np.dot(K_vacuum_actual, binormal_unitvector)
 
         H_discriminant = find_Booker_discriminant(
-            launch_angular_freq=angular_freq,
+            launch_angular_freq=angular_frequency,
             B_total=B_magnitude,
             sin_theta_m_sq=sin_theta_m_sq,
             electron_density=electron_density_p,
@@ -360,7 +380,7 @@ def find_K_plasma(
                 B_X=B_vec[0],
                 B_Y=B_vec[1],
                 B_Z=B_vec[2],
-                launch_angular_frequency=angular_freq,
+                launch_angular_frequency=angular_frequency,
                 electron_density=electron_density_p,
                 temperature=temperature,
             )
@@ -398,7 +418,7 @@ def find_K_plasma(
             B_X=B_vec[0],
             B_Y=B_vec[1],
             B_Z=B_vec[2],
-            launch_angular_frequency=angular_freq,
+            launch_angular_frequency=angular_frequency,
             electron_density=electron_density_p,
             temperature=temperature,
         )
@@ -427,7 +447,15 @@ def find_Psi_3D_plasma(
     field: VALID_FIELDS,
     hamiltonian: Hamiltonian,
 ) -> ComplexFloatArray:
+    r"""Psi just inside the plasma at the entry point ``q_entry``, in the
+    lab frame, from Psi in the vacuum there.
 
+    For ``Psi_BC_flag=None``, it is the vacuum Psi. For "continuous" and
+    "discontinuous", six equations give it: three match t.Psi.t across the
+    boundary for three tangents t of the flux surface
+    (`flux_surface_tangents`), and three set Psi . dH/dK = -dH/dq in the
+    plasma. For "discontinuous", the matching includes the jump in K, which
+    is along grad psi, times the curvature of the flux surface."""
     cart = False if isinstance(field, MagneticField_Cylindrical) else True
 
     # No boundary conditions to be applied
@@ -987,7 +1015,7 @@ def apply_boundary_conditions(
     r"""Apply boundary conditions at the plasma-vacuum boundary where
     the electron density profile can be: (i) continuous and differentiable
     (None); (ii) continuous but not differentiable ("continuous"); or
-    (iii) discontinuous and not differentiable ("discontinuous).
+    (iii) discontinuous and not differentiable ("discontinuous").
 
     For (i), no boundary conditions are applied, and the
     `q`, `K`, `Psi_3D` parameters are directly returned (and later fed

@@ -3,46 +3,29 @@
 # Copyright 2017 - 2023, Valerian Hall-Chen and the Scotty contributors
 # SPDX-License-Identifier: GPL-3.0
 
-"""Utilities for reading/writing TORBEAM geometry files
+r"""Read and write TORBEAM input files.
 
-Notes
------
+- `Torbeam` reads and writes the magnetic geometry file, the topfile, which
+  `scotty.beam_me_up.beam_me_up` reads with ``find_B_method="torbeam"``.
+- `main` writes a synthetic set of files for circular flux surfaces: the
+  topfile (`write_torbeam_file`), ``ne.dat``, ``Te.dat`` and ``inbeam.dat``
+  (`write_inbeam`). Run it as a script: ``python -m scotty.torbeam --help``.
 
-- Bear in mind that Te currently uses the same function as ne. Not
-  important for me since I don't care about temperature
-- I've checked (CompareTopfiles) that B_z and B_r does indeed have the
-  correct symmetry
-
-Version history
-
-- v3:
-
-  - Added a function for the generation of density (n_e) profiles.
-    Used this function to make the profiles linear in rho rather than psi
-
-- v4:
-
-  - Fixed bug with B_z and B_r
-  - Made B_poloidal = B_poloidal max outside the last closed flux surface
-  - Changed the way B_z, B_r, and B_poloidal are written, such that they use
-    for loops. Not elegant, but at least I've made them work.
-  - Cleaned up the transposes and the order part of reshape to be more understandable
-
-- v5:
-
-  - B_toroidal now has correct units
-
-- v6:
-
-  - Added two different methods of selecting the launch position
-
-- v7:
-
-  - Fixed an issue where psi was transposed (shape(psi) =
-    transpose(shape(B))) because meshgrid was using 'xy' by default,
-    instead of ik
-
+The first column of ``ne.dat`` and ``Te.dat`` is :math:`\sqrt{\psi}`, as
+TORBEAM and `scotty.profile_fit.SmoothingSplineFit.from_dat_file` expect.
 """
+
+# History of the script this module came from (its own versions, not Scotty's):
+# - v3: a function for the density profiles, to make them linear in rho
+#   rather than psi
+# - v4: fixed B_z and B_r; B_poloidal = B_poloidal_max outside the last closed
+#   flux surface; B_z, B_r and B_poloidal written with loops; clearer
+#   transposes and reshapes
+# - v5: B_toroidal has the correct units
+# - v6: two methods to choose the launch position
+# - v7: psi was transposed (meshgrid used 'xy' instead of 'ij')
+# B_z and B_r were checked against reference topfiles (CompareTopfiles) for
+# the correct symmetry
 
 from __future__ import annotations
 import argparse
@@ -53,22 +36,23 @@ from scotty.typing import PathLike
 
 
 class Torbeam:
-    """Utility class for reading/writing TORBEAM geometry files
+    """The magnetic geometry of a TORBEAM topfile: read one with
+    `from_file`, write one with `write`
 
-    Arguments
-    ---------
-    R_grid:
-        Major radius grid points in metres
-    Z_grid:
-        Vertical coordinate grid points in metres
-    B_R:
-        Major-radial magnetic field component in Tesla
-    B_T:
-        Toroidal magnetic field component in Tesla
-    B_Z:
-        Vertical magnetic field component in Tesla
-    psi:
-        Poloidal flux
+    Parameters
+    ----------
+    R_grid : (N_R,) FloatArray
+        Major radius grid points, in m
+    Z_grid : (N_Z,) FloatArray
+        Vertical coordinate grid points, in m
+    B_R : (N_R, N_Z) FloatArray
+        Major-radial magnetic field component, in T
+    B_T : (N_R, N_Z) FloatArray
+        Toroidal magnetic field component, in T
+    B_Z : (N_R, N_Z) FloatArray
+        Vertical magnetic field component, in T
+    psi : (N_R, N_Z) FloatArray
+        Normalised poloidal flux
     """
 
     def __init__(self, R_grid, Z_grid, B_R, B_T, B_Z, psi):
@@ -200,7 +184,7 @@ def write_inbeam(
         "nrel": 0,
         "ncdroutine": 2,
         "nrela": 0,
-        "xf": 5.5e10,  # Launch freq (GHz)
+        "xf": 5.5e10,  # Launch frequency (Hz)
         "xpoldeg": poloidal_launch_angle,  # poloidal launch angle
         "xtordeg": toroidal_launch_angle,  # toroidal launch angle
         "xxb": launch_position_x,  # x-coordinate of the launch position
@@ -247,6 +231,10 @@ def write_inbeam(
 
 
 def n_e_fun(nedata_psi, core_ne):
+    r"""``core_ne * (1 - x**2)`` at the points ``x = nedata_psi``, with the
+    last value set to 0.001. `main` uses it for both ``ne.dat`` and
+    ``Te.dat``, where ``x`` is :math:`\sqrt{\psi}`, so the profile is
+    ``core_ne * (1 - psi)``"""
     nedata_length = len(nedata_psi)
     nedata_ne = np.zeros(nedata_length)
 
@@ -309,39 +297,41 @@ def main(
     x_grid_length: int = 130,
     z_grid_length: int = 65,
 ):
-    """Create TORBEAM input files
+    """Write a set of TORBEAM input files for circular flux surfaces:
+    ``ne.dat``, ``Te.dat``, ``inbeam.dat`` and ``topfile``
 
-    Arguments
-    ---------
-    poloidal_launch_angle:
+    Parameters
+    ----------
+    poloidal_launch_angle : float, default 0.0
         In degrees
-    toroidal_launch_angle:
+    toroidal_launch_angle : float, default 0.0
         In degrees
-    tau_step:
-        Was 0.05, making it smaller to speed up runs
-    B_toroidal_max:
-        In Tesla
-    B_poloidal_max:
-        In Tesla
-    core_ne:
-        In 10^19 m-3 (IDL files, discussion w/ Jon)
-    core_Te:
-
-    aspect_ratio:
-        major_radius/minor_radius
-    minor_radius:
-        In meters
-    torbeam_directory_path:
-        Directory to save output files, defaults to working directory
-    nedata_length:
-        Number of grid points for density
-    Tedata_length:
-        Number of grid points for temperature
-    buffer_factor:
+    tau_step : float, default 0.05
+        TORBEAM's integration step in vacuum (``xstep`` in ``inbeam.dat``),
+        in cm
+    B_toroidal_max : float, default 1.0
+        In T
+    B_poloidal_max : float, default 0.0
+        In T
+    core_ne : float, default 4.0
+        In 10^19 m^-3
+    core_Te : float, default 0.01
+        In keV
+    aspect_ratio : float, default 1.5
+        major_radius / minor_radius
+    minor_radius : float, default 0.5
+        In m
+    torbeam_directory_path : str or pathlib.Path, default "."
+        Folder for the files
+    nedata_length : int, default 101
+        Number of points in ``ne.dat``
+    Tedata_length : int, default 101
+        Number of points in ``Te.dat``
+    buffer_factor : float, default 1.1
         Size of buffer in ``x`` as a factor of ``minor_radius``
-    x_grid_length:
+    x_grid_length : int, default 130
         Size of ``x`` grid
-    z_grid_length:
+    z_grid_length : int, default 65
         Size of ``z`` grid (should be a multiple of 5)
     """
 
@@ -349,7 +339,9 @@ def main(
     launch_position_x = (major_radius + minor_radius) * 100 + 20.0
     launch_position_z = 0
 
-    # Generate ne and Te
+    # Generate ne and Te. The first column of ne.dat and Te.dat is sqrt(psi),
+    # as TORBEAM and `SmoothingSplineFit.from_dat_file` expect, although the
+    # names here say psi
     nedata_psi = np.linspace(0, 1, nedata_length)
     Tedata_psi = np.linspace(0, 1, Tedata_length)
 
@@ -427,7 +419,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--aspect_ratio", default=1.5, type=float, help="major_radius/minor_radius"
     )
-    parser.add_argument("--minor_radius", default=0.5, type=float, help="in meters")
+    parser.add_argument("--minor_radius", default=0.5, type=float, help="in metres")
     parser.add_argument("--torbeam_directory_path", default=pathlib.Path("."))
     parser.add_argument("--nedata_length", default=101, type=int)
     parser.add_argument("--Tedata_length", default=101, type=int)

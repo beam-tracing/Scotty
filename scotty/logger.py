@@ -79,7 +79,11 @@ def config_logger(
     output_path: pathlib.Path,
     output_filename_suffix: str,
 ):
-
+    r"""Set up the root logger for a run: messages at ``console_log_level``
+    and above go to the console, and, if ``file_log_level`` is given, those at
+    that level and above go to ``output_path / f"scotty_log{output_filename_suffix}.log"``
+    (appended to). It also adds the level ``"trace"`` (5), below ``"debug"``.
+    Handlers left by an earlier run are removed."""
     log = logging.getLogger()
 
     # If there are any existing handles (from previous runs), clear them
@@ -130,6 +134,9 @@ R = TypeVar("R")
 
 
 def timer(func: Callable[P, R]) -> Callable[P, Tuple[R, float]]:
+    r"""Decorator: the wrapped function returns ``(result, duration)``, with
+    the time it took in s."""
+
     @wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> Tuple[Any, float]:
         start = time.perf_counter()
@@ -145,6 +152,8 @@ def timer(func: Callable[P, R]) -> Callable[P, Tuple[R, float]]:
 def arr2str(
     arr: Union[list, np.ndarray], precision: int = 7, separator: str = ", "
 ) -> str:
+    r"""An array (or list) as a string with ``separator`` between the
+    elements, for log messages."""
     if isinstance(arr, list):
         arr = np.array(arr)
     msg = np.array2string(arr, precision=precision, separator=separator)

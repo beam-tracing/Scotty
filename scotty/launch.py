@@ -105,11 +105,11 @@ def find_plasma_entry_position(
         log.debug(
             f"`launch_flag` = {launch_flag}, so skipping plasma entry position calculations"
         )
-        polflux_launch = float(field.polflux(*q_launch))
-        if not polflux_launch <= poloidal_flux_enter:
+        poloidal_flux_launch = float(field.polflux(*q_launch))
+        if not poloidal_flux_launch <= poloidal_flux_enter:
             raise ValueError(
                 f"`launch_flag` = 'plasma', but `launch_position` = {q_launch} is "
-                f"outside the plasma (poloidal flux {polflux_launch:.6g} > "
+                f"outside the plasma (poloidal flux {poloidal_flux_launch:.6g} > "
                 f"`poloidal_flux_enter` = {poloidal_flux_enter}). Use "
                 "`launch_flag` = 'vacuum_analytic' or 'vacuum_numerical' to launch "
                 "from outside the plasma"
@@ -150,34 +150,36 @@ def find_plasma_entry_position(
     # If the entire array is `NaN`s, then raise error
 
     X_arr, Y_arr, Z_arr = ray_line(*q_launch_cartesian, tau_arr, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam)  # type: ignore
-    polflux_arr = field.polflux_cartesian(X_arr, Y_arr, Z_arr)
+    poloidal_flux_arr = field.polflux_cartesian(X_arr, Y_arr, Z_arr)
 
-    if np.isnan(polflux_arr).all():
+    if np.isnan(poloidal_flux_arr).all():
         raise RuntimeError(
             "The ray does not intersect the plasma. Check the launch position and the "
             "launch angles: with both angles zero, the beam is launched "
             "horizontally towards the axis"
         )
 
-    start_idx = np.where(~np.isnan(polflux_arr))[0][0]
-    stop_idx = np.nanargmin(polflux_arr)
+    start_idx = np.where(~np.isnan(poloidal_flux_arr))[0][0]
+    stop_idx = np.nanargmin(poloidal_flux_arr)
 
     start_tau = tau_arr[start_idx]
     stop_tau = tau_arr[stop_idx]
 
-    # With the `tau`s of  the start and endpoints, we now create a
+    # With the `tau`s of the start and endpoints, we now create a
     # refined array, get the corresponding poloidal flux values, and
-    # feed it into a cubic spline to find the root (i.e. `tau` value
-    # where poloidal flux is close to `poloidal_flux_enter`
+    # feed it into a cubic spline to find the roots (the `tau` values
+    # where the poloidal flux is `poloidal_flux_enter`)
 
     tau_arr_refined = np.linspace(start_tau, stop_tau, num_tau)
-    polflux_arr_refined = field.polflux_cartesian(*ray_line(*q_launch_cartesian, tau_arr_refined, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam))  # type: ignore
+    poloidal_flux_arr_refined = field.polflux_cartesian(*ray_line(*q_launch_cartesian, tau_arr_refined, poloidal_launch_angle_deg_Torbeam, toroidal_launch_angle_deg_Torbeam))  # type: ignore
 
-    if np.isnan(polflux_arr_refined).all():
+    if np.isnan(poloidal_flux_arr_refined).all():
         log.warning(f"NaNs should not occur in the refined `tau` array search")
 
     spline = CubicSpline(
-        tau_arr_refined, polflux_arr_refined - poloidal_flux_enter, extrapolate=False
+        tau_arr_refined,
+        poloidal_flux_arr_refined - poloidal_flux_enter,
+        extrapolate=False,
     )
     spline_roots = np.array(spline.roots())
 
@@ -265,7 +267,10 @@ def find_auto_delta_signs(
     deltas: FloatArray,
     field: VALID_FIELDS,
 ) -> FloatArray:
-
+    r"""The spatial finite-difference steps, with their signs set so that
+    each forward difference points down the poloidal flux, into the plasma, at
+    ``q_initial`` (with their sizes unchanged). If ``auto_delta_sign`` is
+    False, the steps are returned as given."""
     # Now, we also perform auto_delta_sign checks (if the user specifies)
     # If the user does not want to flip the signs, just return them
     # Otherwise, check which geometry is being used and check the signs
@@ -444,13 +449,13 @@ def find_O_mode_flag(
     along `K` at `q` (in the field's coordinates), judged by polarisation.
     Works at zero density too, from the polarisations' zero-density limits."""
     cart = not isinstance(field, MagneticField_Cylindrical)
-    polflux = field.polflux(*q)
+    poloidal_flux = field.polflux(*q)
     polarisations = _mode_polarisations(
         launch_angular_freq,
         float(field.magnitude(*q)),
         _theta_m(q, K, field, cart),
-        float(density_fit(polflux)),
-        float(temperature_fit(polflux)) if temperature_fit else None,
+        float(density_fit(poloidal_flux)),
+        float(temperature_fit(poloidal_flux)) if temperature_fit else None,
     )
     return _O_mode_flag(polarisations)
 
@@ -466,9 +471,9 @@ def _plasma_terms_at(
     r"""Returns `b_hat`, the dielectric terms `(epsilon_para, epsilon_perp,
     epsilon_g)` (as used by `_mode_solution`), |B|, n_e and T_e at
     `q_initial`"""
-    polflux = field.polflux(*q_initial)
-    electron_density = density_fit(polflux)
-    electron_temperature = temperature_fit(polflux) if temperature_fit else None
+    poloidal_flux = field.polflux(*q_initial)
+    electron_density = density_fit(poloidal_flux)
+    electron_temperature = temperature_fit(poloidal_flux) if temperature_fit else None
 
     B_magnitude = field.magnitude(*q_initial)
     b_hat = field.unitvector(*q_initial)
@@ -480,7 +485,7 @@ def _plasma_terms_at(
         ##################################################
         #
         # Calculated values at [X,Y,Z] = {arr2str(q_initial_cartesian)}:
-        #   - poloidal flux = {polflux}
+        #   - poloidal flux = {poloidal_flux}
         #   - n_e = {electron_density} (e19)
         #   - T_e = {electron_temperature}
         #   - |B| = {B_magnitude}
@@ -1005,19 +1010,11 @@ def find_plasma_entry_parameters(
                     hamiltonian=hamiltonian,
                 )
 
-    # If mode_flag is 1 or -1, then we just calculate the
-    # quantities for those. If mode_flag is "O" or "X", then
-    # we calculate the quantities for both 1 and -1. After
-    # obtaining the quantities corresponding to H_booker = 0,
-    # we calculate H_Cardano and find the polarisation vector
-    # corresponding to H_booker = H_Cardano = 0 to see if it's
-    # O- or X-mode. We do this, literally, by comparing the
-    # e_hats with the O-mode polarisation vector; specifically,
-    # since the O-mode polarisation vector ~ [0,0,1] (in the u1,
-    # u2, b) basis -- see the paper), we compare the last
-    # component of both vectors. If the last component of
-    # the vector is not close to 1 (i.e. |v[-1] - 1| < tol),
-    # then we say it's X-mode; otherwise, it's O-mode
+    # The plasma quantities at the initial point, which both roots need.
+    # Which root is the O-mode is decided below from the two roots'
+    # polarisations (`_mode_polarisations`, `_O_mode_flag`): the O-mode is the
+    # root more polarised along b. A `mode_flag` of 1 or -1 is traced as given;
+    # "O" or "X" picks the root with that label
     b_hat, epsilon_terms, B_magnitude, electron_density, electron_temperature = (
         _plasma_terms_at(
             q_initial,

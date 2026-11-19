@@ -21,16 +21,18 @@ class ProfileFit:
 
     Subclasses should implement ``_fit_impl`` which takes a 1D array
     of the poloidal flux and returns the density or temperature at those points. This
-    base class will handle setting the profile to zero outside the
-    plasma, and clipping it at zero: a negative density or temperature
+    base class will handle setting the profile to zero beyond its zero
+    point, and clipping it at zero: a negative density or temperature
     has no meaning, and a negative density makes the plasma frequency
     NaN. A warning is logged the first time a profile is clipped.
 
     Parameters
-    ==========
-    poloidal_flux_zero_profile:
-        Flux at edge of plasma. Profile is zero outside this flux label.
-
+    ----------
+    poloidal_flux_zero_profile : float
+        The zero point: the profile is zero beyond this normalised poloidal
+        flux. The plasma itself starts at ``poloidal_flux_enter``
+        of `scotty.beam_me_up.beam_me_up`, by default where the density
+        starts
     """
 
     def __init__(self, poloidal_flux_zero_profile: float):
@@ -38,11 +40,12 @@ class ProfileFit:
         self._warned_negative = False
 
     def __call__(self, poloidal_flux: ArrayLike) -> ArrayLike:
-        """Returns the interpolated profile at ``poloidal_flux`` points."""
+        """Returns the profile at ``poloidal_flux`` points: zero beyond the
+        zero point, and clipped at zero."""
 
         poloidal_flux = np.asarray(poloidal_flux, dtype=float)
         profile = np.asarray(self._fit_impl(poloidal_flux), dtype=float)
-        # Mask density inside plasma
+        # Zero beyond the zero point
         is_inside = poloidal_flux <= self.poloidal_flux_zero_profile
         profile = is_inside * profile
         is_negative = profile < 0
@@ -63,12 +66,29 @@ class ProfileFit:
 
 
 class LinearFit(ProfileFit):
-    r""" "Linear fit
+    r"""Linear fit
 
-    Currently implemented as a test profile for temperature.
+    .. math::
+
+        n_e(\psi) = n_{e0} \left(1 - \frac{\psi}{\psi_0}\right)
+
+    so that the profile is zero at :math:`\psi_0`. Currently implemented as
+    a test profile for temperature.
 
     For the sake of convenience, the variable ne_0 is named for electron
     density but the class works for electron temperature as well.
+
+    Parameters
+    ----------
+    poloidal_flux_zero_profile : float
+        Poloidal flux where profile goes to zero (:math:`\psi_0` above)
+    ne_0 : float
+        Profile value at magnetic axis (:math:`n_{e0}` above)
+    psi_0 : float, optional
+        If passed, this must be the same as ``poloidal_flux_zero_profile``
+
+        .. deprecated:: 2.4.0
+           ``psi_0`` can be safely dropped
     """
 
     def __init__(
@@ -104,7 +124,7 @@ class LinearFit(ProfileFit):
 class QuadraticFit(ProfileFit):
     r"""Quadratic fit
 
-    Given the densit on the magnetic axis, :math:`n_{e0}`, and the
+    Given the density on the magnetic axis, :math:`n_{e0}`, and the
     poloidal flux where the density goes to zero, :math:`\psi_0`, the
     density is given by:
 
@@ -124,12 +144,12 @@ class QuadraticFit(ProfileFit):
     density but the class works for electron temperature as well.
 
     Parameters
-    ==========
-    poloidal_flux_zero_profile:
+    ----------
+    poloidal_flux_zero_profile : float
         Poloidal flux where profile goes to zero (:math:`\psi_0` above)
-    ne_0:
+    ne_0 : float
         Profile value at magnetic axis (e.g. for density, :math:`n_{e0} \equiv n_e(\psi = 0)`)
-    psi_0:
+    psi_0 : float, optional
         If passed, this must be the same as ``poloidal_flux_zero_profile``
 
         .. deprecated:: 2.4.0
@@ -172,15 +192,15 @@ class TanhFit(ProfileFit):
         n_e(\psi) = n_{e0} \tanh\left(n_{e1} (\psi - \psi_0)\right)
 
     Parameters
-    ==========
-    poloidal_flux_zero_profile:
+    ----------
+    poloidal_flux_zero_profile : float
         Poloidal flux where profile goes to zero (:math:`\psi_0` above)
-    ne_0:
+    ne_0 : float
         Asymptotic magnitude of the profile (:math:`n_{e0} \ge |n_e(\psi = 0)|`)
-    ne_1:
+    ne_1 : float
         Second fitting parameter. It must be negative for the profile to be
         positive inside :math:`\psi_0` (with a positive ``ne_0``)
-    psi_0:
+    psi_0 : float, optional
         If passed, this must be the same as ``poloidal_flux_zero_profile``
 
         .. deprecated:: 2.4.0
@@ -232,11 +252,13 @@ class PolynomialFit(ProfileFit):
     in `numpy.polyval`
 
     Parameters
-    ==========
-    poloidal_flux_zero_profile:
-        Poloidal flux where solver starts and/or boundary conditions are applied; density has to be zero in the current implementation (:math:`\psi_0` above)
-    coefficients:
-        List of polynomial coefficients, from highest degree to the constant term
+    ----------
+    poloidal_flux_zero_profile : float
+        Poloidal flux beyond which the profile is zero. The polynomial does
+        not have to be zero there: if it is not, the profile jumps to zero
+    *coefficients : float
+        The polynomial coefficients, as separate arguments, from the highest
+        degree to the constant term
     """
 
     def __init__(self, poloidal_flux_zero_profile: float, *coefficients):
@@ -256,14 +278,14 @@ class StefanikovaFit(ProfileFit):
 
     .. math::
 
-        F_\mathrm{ped}(r, b) &= \frac{b_\mathrm{height} − b_\mathrm{SOL}}{2}
+        F_\mathrm{ped}(r, b) &= \frac{b_\mathrm{height} - b_\mathrm{SOL}}{2}
             \left[
                 \mathrm{mtanh}\left(
-                    \frac{b_\mathrm{pos} − r}{2 b_\mathrm{width}}, b_\mathrm{slope}
+                    \frac{b_\mathrm{pos} - r}{2 b_\mathrm{width}}, b_\mathrm{slope}
                 \right) + 1
             \right] + b_\mathrm{SOL} \\
         \mathrm{mtanh}(x, b_\mathrm{slope}) &=
-            \frac{(1+b_\mathrm{slope}x)e^x - e^{−x}}{e^x+e^{−x}} \\
+            \frac{(1+b_\mathrm{slope}x)e^x - e^{-x}}{e^x+e^{-x}} \\
         F_\mathrm{full}(r, a, b) &= F_\mathrm{ped}(r, b)
             + \left[ a_\mathrm{height} - F_\mathrm{ped}(r, b) \right]
             \cdot \exp\left(-(\frac{r}{a_\mathrm{width}})^{a_\mathrm{exp}}\right)
@@ -277,6 +299,27 @@ class StefanikovaFit(ProfileFit):
        instead of the formula above. Results with this profile change.
 
     Adapted from code by Simon Freethy
+
+    Parameters
+    ----------
+    poloidal_flux_zero_profile : float
+        Poloidal flux beyond which the profile is zero
+    a_height : float
+        Profile value on the magnetic axis, :math:`F_\mathrm{full}(0)`
+    a_width : float
+        Width, in :math:`\psi`, of the core term
+    a_exp : float
+        Exponent of the core term
+    b_height : float
+        Height of the pedestal
+    b_SOL : float
+        Value outside the pedestal, in the scrape-off layer
+    b_width : float
+        Half the width, in :math:`\psi`, of the pedestal
+    b_slope : float
+        Slope of the top of the pedestal
+    b_pos : float
+        Position of the pedestal, in :math:`\psi`
 
     .. rubric:: Footnotes
 
@@ -336,7 +379,7 @@ class StefanikovaFit(ProfileFit):
 
 
 class SmoothingSplineFit(ProfileFit):
-    """1D smoothing spline using `scipy.interpolate.UnivariateSpline`
+    r"""1D smoothing spline using `scipy.interpolate.UnivariateSpline`
 
     Past the ends of its data the spline holds the end values (``ext=3``)
     rather than extrapolating, which could give negative densities. Between
@@ -351,6 +394,21 @@ class SmoothingSplineFit(ProfileFit):
        ``smoothing`` defaults to 0, so that the spline goes through the
        data (it was SciPy's default, the number of points), and the
        spline no longer extrapolates past its data.
+
+    Parameters
+    ----------
+    poloidal_flux_zero_profile : float
+        Poloidal flux beyond which the profile is zero
+    poloidal_flux : ArrayLike
+        The normalised poloidal flux of the data points, increasing
+    fitting_data : ArrayLike
+        The density (in :math:`10^{19} \mathrm{m}^{-3}`) or temperature (in
+        keV) at those points
+    order : int, default 5
+        Order of the spline, from 1 to 5
+    smoothing : float, default 0
+        Smoothing factor (``s`` of `scipy.interpolate.UnivariateSpline`); 0
+        for none, so that the spline goes through every data point
     """
 
     def __init__(
@@ -385,8 +443,9 @@ class SmoothingSplineFit(ProfileFit):
         r"""Create a `SmoothingSplineFit` using parameters from text
         file.
 
-        File should contain electron density/temperature as a function of poloidal
-        flux label in units of :math:`10^{19} \mathrm{m}^{-3}`.
+        The file holds the electron density (in :math:`10^{19}
+        \mathrm{m}^{-3}`) or temperature (in keV) as a function of
+        :math:`\sqrt{\psi}`.
 
         The file holds numbers only: it can't have a text header. The
         first number (the number of points, on the first line) is skipped,
@@ -481,21 +540,27 @@ def profile_fit(
     """Create a density/temperature profile parameterisation
 
     Parameters
-    ==========
-    method:
-        Name of profile fit parameterisation
-    poloidal_flux_zero_profile:
+    ----------
+    method : str or None
+        Name of the fit, one of `PROFILE_FIT_METHODS`. ``None`` is deprecated:
+        the fit is then guessed from the parameters, with a
+        `DeprecationWarning`
+    poloidal_flux_zero_profile : float
         Poloidal flux label where density/temperature goes to zero
-    parameters:
+    parameters : sequence
         List of parameters passed to profile fit: the arguments of the fit
         class after ``poloidal_flux_zero_profile``. For
         ``"smoothing-spline-file"``, ``[path, order, smoothing]``, where the
         path is used as given (a full path, or a path relative to the
         current folder)
-    filename:
+    filename : str or pathlib.Path, optional
         Used only when ``method`` is None: a file name means
         ``"smoothing-spline-file"``
 
+    Returns
+    -------
+    ProfileFit
+        The profile, a callable of the normalised poloidal flux
     """
 
     if method is None:

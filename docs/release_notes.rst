@@ -16,6 +16,30 @@ Packaging
 - Tested on Python 3.13 too. ``test_beam_me_up_docstring_covers_every_argument``
   failed there, because Python 3.13 strips the indentation of docstrings.
 
+Documentation
+~~~~~~~~~~~~~
+
+- The docstrings and comments were checked against the code, and those that
+  were wrong were fixed: for example, `scotty.ray_solver.ray_tracing` returns
+  5 values, not 2, and `scotty.fun_general.find_inverse_2D` warns but does not
+  raise. The public functions and classes that had no docstring have one, and
+  every docstring uses the numpydoc style (``Parameters`` / ``----------`` /
+  ``name : type``).
+- The README says what Scotty does, its status, how to install and run it,
+  how to move from v3, how to contribute and get help, how to cite it, and
+  its license.
+- The API pages list every module (9 were missing), and the input page shows
+  the docstring of `scotty.beam_me_up.beam_me_up`. The documentation takes its
+  version from the installed package, links to ``beam-tracing/Scotty``, and
+  makes a name between single backquotes a link to the Python object of that
+  name, if there is one, with no warning if there is none.
+- A new page, :ref:`naming`, gives the rules for the names of arguments,
+  outputs and variables, and lists the public names that do not follow them
+  yet (v4.0.0rc1 froze them; #90). Internal variables now follow the rules:
+  for example ``B_mag`` and ``K_mag`` are ``B_magnitude`` and
+  ``K_magnitude``, and ``polflux`` is ``poloidal_flux``. No argument, output
+  or result changes. Comments and messages use British spelling.
+
 v4.0.0rc1
 ---------
 

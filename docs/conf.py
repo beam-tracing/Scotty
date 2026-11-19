@@ -17,12 +17,19 @@
 
 # -- Project information -----------------------------------------------------
 
+from importlib.metadata import PackageNotFoundError, version as _version
+
 project = "Scotty"
-copyright = "2023, Valerian Hall-Chen and the Scotty contributors"
+copyright = "2018 - 2026, Valerian Hall-Chen and the Scotty contributors"
 author = "Valerian Hall-Chen"
 
-# The full version, including alpha/beta/rc tags
-release = "2.3.0"
+# The full version, including alpha/beta/rc tags, from the installed package
+# (Read the Docs installs it, see .readthedocs.yaml)
+try:
+    release = _version("scotty-beam-tracing")
+except PackageNotFoundError:
+    release = "unknown"
+version = ".".join(release.split(".")[:2])
 
 
 # -- General configuration ---------------------------------------------------
@@ -38,15 +45,18 @@ extensions = [
 ]
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ["_templates"]
+# (There are none: a missing folder here makes Sphinx warn)
+templates_path = []
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
-# The default role for text marked up `like this`
-default_role = "any"
+# The default role for text marked up `like this`: a link to the Python object
+# of that name if there is one, else code, without a warning (with "any", every
+# name that is not an object, such as an argument, gave a warning)
+default_role = "py:obj"
 
 # Tell sphinx what the primary language being documented is.
 primary_domain = "py"
@@ -61,22 +71,22 @@ html_theme = "sphinx_book_theme"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ["_static"]
+html_static_path = []
 
 html_context = {
-    "github_user": "valerian-chen",
+    "github_user": "beam-tracing",
     "github_repo": "Scotty",
     "github_version": "master",
     "doc_path": "docs",
 }
 
-# Theme options are theme-specific and customize the look and feel of a theme
+# Theme options are theme-specific and customise the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 html_theme_options = dict(
     # analytics_id=''  this is configured in rtfd.io
     # canonical_url="",
-    repository_url="https://github.com/valerian-chen/Scotty",
+    repository_url="https://github.com/beam-tracing/Scotty",
     repository_branch="master",
     path_to_docs="docs",
     use_edit_page_button=True,
@@ -92,7 +102,7 @@ html_theme_options = dict(
 autodoc_typehints = "description"
 autodoc_type_aliases = {
     "ArrayLike": "numpy.typing.ArrayLike",
-    "DensityFitLike": "scotty.density_fit.DensityFitLike",
+    "ProfileFitLike": "scotty.profile_fit.ProfileFitLike",
 }
 
 # -- Options for intersphinx extension ---------------------------------------

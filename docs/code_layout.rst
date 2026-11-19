@@ -105,3 +105,20 @@ of ``scotty.fun_general`` (``find_waist``, ``find_Rayleigh_length``,
 ``propagate_circular_beam``) are those of `scotty.antenna.gaussian`. The
 exception is ``scotty.analysis.dbs_analysis``: import it from
 `scotty.diagnostics.dbs`.
+
+Build the documentation
+-----------------------
+
+The documentation is built with Sphinx from the docstrings and the pages in
+``docs/``. Install the tools with ``pip install -e ".[docs]"``, then build the
+HTML in ``docs/_build`` with:
+
+.. code-block:: bash
+
+    sphinx-build -W --keep-going -n docs docs/_build
+
+``-W`` makes each warning an error, so that a broken reference or bad markup is
+found before Read the Docs builds the pages. See `Sphinx
+<https://www.sphinx-doc.org/en/master/tutorial/index.html>`_ and its guide to
+`reStructuredText
+<https://www.sphinx-doc.org/en/master/usage/restructuredtext/index.html>`_.

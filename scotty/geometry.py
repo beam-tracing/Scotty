@@ -216,48 +216,57 @@ class MagneticField_Cylindrical(ABC):
 
     @abstractmethod
     def B_R(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike:
+        """B_R, the major-radial component of the field, in T. The field is axisymmetric, so the toroidal angle (the second argument) is not used"""
         raise NotImplementedError
 
     @abstractmethod
     def B_T(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike:
+        """B_T, the toroidal component of the field, in T"""
         raise NotImplementedError
 
     @abstractmethod
     def B_Z(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike:
+        """B_Z, the vertical component of the field, in T"""
         raise NotImplementedError
 
     @abstractmethod
     def polflux(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike:
+        """The normalised poloidal flux"""
         raise NotImplementedError
 
     @abstractmethod
     def d_polflux_dR(
         self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float
     ) -> ArrayLike:
+        """d(polflux)/dR, with the step ``delta_R`` where the derivative is taken by finite differences"""
         raise NotImplementedError
 
     @abstractmethod
     def d_polflux_dZ(
         self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_Z: float
     ) -> ArrayLike:
+        """d(polflux)/dZ, with the step ``delta_Z`` where the derivative is taken by finite differences"""
         raise NotImplementedError
 
     @abstractmethod
     def d2_polflux_dR2(
         self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float
     ) -> ArrayLike:
+        """d2(polflux)/dR2, with the step ``delta_R`` where the derivative is taken by finite differences"""
         raise NotImplementedError
 
     @abstractmethod
     def d2_polflux_dZ2(
         self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_Z: float
     ) -> ArrayLike:
+        """d2(polflux)/dZ2, with the step ``delta_Z`` where the derivative is taken by finite differences"""
         raise NotImplementedError
 
     @abstractmethod
     def d2_polflux_dRdZ(
         self, R: ArrayLike, _: ArrayLike, Z: ArrayLike, delta_R: float, delta_Z: float
     ) -> ArrayLike:
+        """d2(polflux)/dRdZ, with the steps ``delta_R`` and ``delta_Z`` where the derivative is taken by finite differences"""
         raise NotImplementedError
 
     def _calculate_incyl_outcyl(
@@ -278,12 +287,12 @@ class MagneticField_Cylindrical(ABC):
         if vector:
             toreturn.append(B_vec.T)
         if unitvector or magnitude:
-            B_mag = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
+            B_magnitude = np.sqrt(B_R**2 + B_T**2 + B_Z**2)
             if unitvector:
-                b_hat = B_vec / B_mag
+                b_hat = B_vec / B_magnitude
                 toreturn.append(b_hat.T)
             if magnitude:
-                toreturn.append(B_mag)
+                toreturn.append(B_magnitude)
 
         return toreturn
 
@@ -332,9 +341,11 @@ class MagneticField_Cylindrical(ABC):
 
     # For abstraction purposes
     def B_X(self, R: ArrayLike, zeta: ArrayLike, Z: ArrayLike) -> ArrayLike:
+        """B_X, the Cartesian X component of the field, in T, at (R, zeta, Z)"""
         return self.B_R(R, zeta, Z) * np.cos(zeta) - self.B_T(R, zeta, Z) * np.sin(zeta)
 
     def B_Y(self, R: ArrayLike, zeta: ArrayLike, Z: ArrayLike) -> ArrayLike:
+        """B_Y, the Cartesian Y component of the field, in T, at (R, zeta, Z)"""
         return self.B_R(R, zeta, Z) * np.sin(zeta) + self.B_T(R, zeta, Z) * np.cos(zeta)
 
     def unitvector_cartesian(
@@ -350,16 +361,19 @@ class MagneticField_Cylindrical(ABC):
         return unitvector
 
     def polflux_cartesian(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
+        """The normalised poloidal flux at the Cartesian point (X, Y, Z)"""
         return self.polflux(np.sqrt(X**2 + Y**2), 0, Z)
 
     def d_polflux_dX(
         self, R: ArrayLike, zeta: ArrayLike, Z: ArrayLike, delta_R: float
     ) -> ArrayLike:
+        """d(polflux)/dX at (R, zeta, Z), from d(polflux)/dR"""
         return np.cos(zeta) * self.d_polflux_dR(R, zeta, Z, delta_R)
 
     def d_polflux_dY(
         self, R: ArrayLike, zeta: ArrayLike, Z: ArrayLike, delta_R: float
     ) -> ArrayLike:
+        """d(polflux)/dY at (R, zeta, Z), from d(polflux)/dR"""
         return np.sin(zeta) * self.d_polflux_dR(R, zeta, Z, delta_R)
 
 
@@ -399,7 +413,23 @@ class InterpolatedField_Cylindrical(MagneticField_Cylindrical):
     r"""Field interpolated from grids of :math:`B_R`, :math:`B_T`,
     :math:`B_Z` and the normalised poloidal flux on an (R, Z) grid. Give it
     to `beam_me_up` as ``find_B_method``. `from_npz` reads one from a
-    ``.npz`` file"""
+    ``.npz`` file
+
+    Parameters
+    ----------
+    R_coord : (N_R,) FloatArray
+        Major radius of the grid, in m, increasing
+    Z_coord : (N_Z,) FloatArray
+        Vertical coordinate of the grid, in m, increasing
+    B_R, B_T, B_Z : (N_R, N_Z) FloatArray
+        The components of the field on the grid, in T
+    psi : (N_R, N_Z) FloatArray
+        The normalised poloidal flux on the grid
+    interp_order : int, default 5
+        Order of the splines (`scipy.interpolate.RectBivariateSpline`)
+    interp_smoothing : float, default 0
+        Smoothing factor of the splines; 0 for none
+    """
 
     def __init__(
         self,
@@ -463,7 +493,21 @@ class InterpolatedField_Cylindrical(MagneticField_Cylindrical):
         time as their first axis: give ``equil_time`` (in the file's units),
         and the field is taken at the nearest time. A file with one time has
         no ``time_EFIT``: leave ``equil_time`` out. These were v3's
-        ``find_B_method`` ``"test"`` and ``"test_notime"``"""
+        ``find_B_method`` ``"test"`` and ``"test_notime"``.
+
+        Parameters
+        ----------
+        filename : str or pathlib.Path
+            The ``.npz`` file
+        equil_time : float, optional
+            The time to take, in the file's units. It must be given for a
+            file with several times, and left out for a file with one; else
+            it raises a `ValueError`
+        interp_order : int, default 5
+            Order of the splines
+        interp_smoothing : float, default 0
+            Smoothing factor of the splines; 0 for none
+        """
         with np.load(filename) as loadfile:
             index = _time_index(loadfile, "time_EFIT", equil_time, filename)
             return _record_source(
@@ -493,8 +537,9 @@ class InterpolatedField_Cylindrical(MagneticField_Cylindrical):
 
         except AttributeError:
             # Older versions of SciPy don't have
-            # `RectBivariateSpline.partial_derivative`, so fall back
-            # to base class implementation of flux derivatives
+            # `RectBivariateSpline.partial_derivative`. The base class has no
+            # flux derivatives, so these raise NotImplementedError; Scotty needs
+            # SciPy >= 1.13, which has partial_derivative, so they are not used
             self._dpsi_dR = super().d_polflux_dR
             self._dpsi_dZ = super().d_polflux_dZ
             self._d2psi_dR2 = super().d2_polflux_dR2
@@ -553,6 +598,29 @@ class EFITField(InterpolatedField_Cylindrical):
     and the time are their arguments, rather than ``magnetic_data_path``,
     ``shot`` and ``equil_time``. For a field interpolated from saved grids
     of B, see `InterpolatedField_Cylindrical.from_npz`
+
+    Parameters
+    ----------
+    R_grid : (N_R,) FloatArray
+        Major radius of the grid, in m
+    Z_grid : (N_Z,) FloatArray
+        Vertical coordinate of the grid, in m
+    rBphi : (M,) FloatArray
+        :math:`R B_\phi`, in T m, at the normalised flux ``psi_norm_1D``
+    psi_norm_2D : (N_R, N_Z) FloatArray
+        The normalised poloidal flux on the grid
+    psi_unnorm_axis, psi_unnorm_boundary : float
+        The poloidal flux (not normalised) on the axis and on the boundary,
+        which scale :math:`B_R` and :math:`B_Z`
+    psi_norm_1D : (M,) FloatArray, optional
+        The normalised flux of ``rBphi``; by default M points evenly spaced
+        from 0 to 1
+    delta_R, delta_Z : float, default 1e-4
+        Not used: the flux derivatives come from the spline
+    interp_order : int, default 5
+        Order of the splines
+    interp_smoothing : float, default 0
+        Smoothing factor of the splines; 0 for none
     """
 
     def __init__(
@@ -602,8 +670,8 @@ class EFITField(InterpolatedField_Cylindrical):
         return -dpolflux_dZ * self.poloidal_flux_gradient / np.asarray(R)
 
     def B_T(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike:
-        polflux = self.polflux(R, _, Z)
-        return self._interp_rBphi(polflux) / np.asarray(R)
+        poloidal_flux = self.polflux(R, _, Z)
+        return self._interp_rBphi(poloidal_flux) / np.asarray(R)
 
     def B_Z(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> ArrayLike:
         dpolflux_dR = self.d_polflux_dR(R, _, Z, self.delta_R)
@@ -621,7 +689,21 @@ class EFITField(InterpolatedField_Cylindrical):
     ) -> "EFITField":
         """The field at the time nearest ``equil_time`` (in the file's
         units) in an EFIT++ output file (``efitOut.nc``, for example the
-        MSE-constrained EFIT++ of MAST). v3's ``find_B_method="EFITpp"``"""
+        MSE-constrained EFIT++ of MAST). v3's ``find_B_method="EFITpp"``
+
+        Parameters
+        ----------
+        filename : str or pathlib.Path
+            The file
+        equil_time : float
+            The time to take, in the file's units
+        delta_R, delta_Z : float, default 1e-4
+            Not used: the flux derivatives come from the spline
+        interp_order : int, default 5
+            Order of the splines
+        interp_smoothing : float, default 0
+            Smoothing factor of the splines; 0 for none
+        """
         # Read with h5py: h5netcdf's legacy API (1.8.x) builds variable paths
         # from the group's short name, so it cannot open variables two groups
         # deep, such as output/profiles2D/poloidalFlux
@@ -646,8 +728,10 @@ class EFITField(InterpolatedField_Cylindrical):
         # psi_norm = m psi + c, so psi is -c/m on axis and (1 - c)/m at the
         # boundary: EFITField needs psi_boundary - psi_axis = dpsi/dpsi_norm =
         # 1/m (passing m made B_p wrong by a factor m^2)
-        polflux_const_m, polflux_const_c = np.polyfit(unorm_psi_1D, norm_psi_1D, 1)
-        norm_psi_2D = unnorm_psi_2D * polflux_const_m + polflux_const_c
+        poloidal_flux_const_m, poloidal_flux_const_c = np.polyfit(
+            unorm_psi_1D, norm_psi_1D, 1
+        )
+        norm_psi_2D = unnorm_psi_2D * poloidal_flux_const_m + poloidal_flux_const_c
 
         return _record_source(
             cls(
@@ -656,8 +740,8 @@ class EFITField(InterpolatedField_Cylindrical):
                 rBphi=rBphi,
                 psi_norm_2D=norm_psi_2D,
                 psi_norm_1D=norm_psi_1D,
-                psi_unnorm_axis=-polflux_const_c / polflux_const_m,
-                psi_unnorm_boundary=(1 - polflux_const_c) / polflux_const_m,
+                psi_unnorm_axis=-poloidal_flux_const_c / poloidal_flux_const_m,
+                psi_unnorm_boundary=(1 - poloidal_flux_const_c) / poloidal_flux_const_m,
                 delta_R=delta_R,
                 delta_Z=delta_Z,
                 interp_order=interp_order,
@@ -681,7 +765,21 @@ class EFITField(InterpolatedField_Cylindrical):
         units) in a MAST EFIT file saved from UDA (``.npz``, as
         ``{shot}_equilibrium_data.npz``, with time bases ``t_base_B`` and
         ``t_base_C``). v3's ``find_B_method="UDA_saved"`` for MAST shots
-        (up to 30471)"""
+        (up to 30471)
+
+        Parameters
+        ----------
+        filename : str or pathlib.Path
+            The file
+        equil_time : float
+            The time to take, in the file's units
+        delta_R, delta_Z : float, default 1e-4
+            Not used: the flux derivatives come from the spline
+        interp_order : int, default 5
+            Order of the splines
+        interp_smoothing : float, default 0
+            Smoothing factor of the splines; 0 for none
+        """
         with np.load(filename) as loadfile:
             # On time base C
             rBphi_all_times = loadfile["rBphi"]
@@ -690,7 +788,7 @@ class EFITField(InterpolatedField_Cylindrical):
             data_R_coord = loadfile["R_EFIT"]
             data_Z_coord = loadfile["Z_EFIT"]
             # Time base C
-            polflux_axis_all_times = loadfile["poloidal_flux_unnormalised_axis"]
+            poloidal_flux_axis_all_times = loadfile["poloidal_flux_unnormalised_axis"]
             # Time base C
             psi_boundary_all_times = loadfile["poloidal_flux_unnormalised_boundary"]
             # On time base B
@@ -702,7 +800,7 @@ class EFITField(InterpolatedField_Cylindrical):
         log.info(f"EFIT time {t_base_B[t_base_B_idx]}")
 
         rBphi = rBphi_all_times[t_base_C_idx, :]
-        psi_axis = polflux_axis_all_times[t_base_C_idx]
+        psi_axis = poloidal_flux_axis_all_times[t_base_C_idx]
         psi_boundary = psi_boundary_all_times[t_base_C_idx]
         unnorm_psi_2D = unnorm_psi_all_times[t_base_B_idx, :, :].T
 
@@ -753,7 +851,23 @@ class EFITField(InterpolatedField_Cylindrical):
         be strictly increasing"). On shot 45290 at 0.15 s, with ``rBphi`` on
         the evenly spaced flux, B_T agrees with the file's ``Bphi_grid`` to
         3e-5 of its largest value inside the plasma (normalised flux below
-        0.9)"""
+        0.9)
+
+        Parameters
+        ----------
+        filename : str or pathlib.Path
+            The file
+        equil_time : float, optional
+            The time to take, in the file's units. It must be given for a file with several times
+            (``time_EFIT``), and left out for a file with one; else it
+            raises a `ValueError`
+        delta_R, delta_Z : float, default 1e-4
+            Not used: the flux derivatives come from the spline
+        interp_order : int, default 5
+            Order of the splines
+        interp_smoothing : float, default 0
+            Smoothing factor of the splines; 0 for none
+        """
         with np.load(filename) as loadfile:
             index = _time_index(loadfile, "time_EFIT", equil_time, filename)
 
@@ -811,6 +925,7 @@ class CircularFieldBase(MagneticField_Cylindrical):
         self.derivative_method = derivative_method
 
     def rho(self, R: ArrayLike, _: ArrayLike, Z: ArrayLike) -> FloatArray:
+        """The minor radius, sqrt((R - R_axis)^2 + Z^2), in m"""
         R, Z = np.asarray(R, dtype=np.float64), np.asarray(Z, dtype=np.float64)
         return np.sqrt((R - self.R_axis) ** 2 + Z**2)
 
@@ -909,13 +1024,14 @@ class CircularFluxSurfaceField(CircularFieldBase):
     B_p_a : float
         Poloidal magnetic field on the last closed flux surface at
         ``R = R_axis`` (Tesla)
-    R_points : int
-    Z_points : int
-        Number of points for sample ``(R, Z)`` grid
-    grid_buffer_factor : float
-        Multiplicative factor to increase size of sample grid by
-    derivative_method : str
-        ``"analytic"`` (default) for exact poloidal flux derivatives, or
+    R_points, Z_points : int, default 101
+        Number of points of the sample ``(R, Z)`` grid (``R_coord``,
+        ``Z_coord``), which spans ``grid_buffer_factor * minor_radius_a`` on
+        each side of the axis
+    grid_buffer_factor : float, default 1.0
+        Size of the sample grid, as a multiple of the minor radius
+    derivative_method : {"analytic", "numerical"}, default "analytic"
+        ``"analytic"`` for exact poloidal flux derivatives, or
         ``"numerical"`` for finite differences
     """
 
@@ -1019,72 +1135,85 @@ class MagneticField_Cartesian(ABC):
 
     @abstractmethod
     def B_X(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
+        """B_X, the X component of the field, in T"""
         raise NotImplementedError
 
     @abstractmethod
     def B_Y(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
+        """B_Y, the Y component of the field, in T"""
         raise NotImplementedError
 
     @abstractmethod
     def B_Z(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
+        """B_Z, the Z component of the field, in T"""
         raise NotImplementedError
 
     @abstractmethod
     def polflux(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
+        """The normalised poloidal flux"""
         raise NotImplementedError
 
     @abstractmethod
     def d_polflux_dX(
         self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float
     ) -> ArrayLike:
+        """d(polflux)/dX, with the step ``delta_X`` where the derivative is taken by finite differences"""
         raise NotImplementedError
 
     @abstractmethod
     def d_polflux_dY(
         self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float
     ) -> ArrayLike:
+        """d(polflux)/dY, with the step ``delta_Y`` where the derivative is taken by finite differences"""
         raise NotImplementedError
 
     @abstractmethod
     def d_polflux_dZ(
         self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Z: float
     ) -> ArrayLike:
+        """d(polflux)/dZ, with the step ``delta_Z`` where the derivative is taken by finite differences"""
         raise NotImplementedError
 
     @abstractmethod
     def d2_polflux_dX2(
         self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float
     ) -> ArrayLike:
+        """d2(polflux)/dX2, with the step ``delta_X`` where the derivative is taken by finite differences"""
         raise NotImplementedError
 
     @abstractmethod
     def d2_polflux_dY2(
         self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float
     ) -> ArrayLike:
+        """d2(polflux)/dY2, with the step ``delta_Y`` where the derivative is taken by finite differences"""
         raise NotImplementedError
 
     @abstractmethod
     def d2_polflux_dZ2(
         self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Z: float
     ) -> ArrayLike:
+        """d2(polflux)/dZ2, with the step ``delta_Z`` where the derivative is taken by finite differences"""
         raise NotImplementedError
 
     @abstractmethod
     def d2_polflux_dXdY(
         self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float, delta_Y: float
     ) -> ArrayLike:
+        """d2(polflux)/dXdY, with the steps ``delta_X`` and ``delta_Y`` where the derivative is taken by finite differences"""
         raise NotImplementedError
 
     @abstractmethod
     def d2_polflux_dXdZ(
         self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_X: float, delta_Z: float
     ) -> ArrayLike:
+        """d2(polflux)/dXdZ, with the steps ``delta_X`` and ``delta_Z`` where the derivative is taken by finite differences"""
         raise NotImplementedError
 
     @abstractmethod
     def d2_polflux_dYdZ(
         self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike, delta_Y: float, delta_Z: float
     ) -> ArrayLike:
+        """d2(polflux)/dYdZ, with the steps ``delta_Y`` and ``delta_Z`` where the derivative is taken by finite differences"""
         raise NotImplementedError
 
     def _calculate_incart_outcart(
@@ -1105,12 +1234,12 @@ class MagneticField_Cartesian(ABC):
         if vector:
             toreturn.append(B_vec.T)
         if unitvector or magnitude:
-            B_mag = np.sqrt(B_X**2 + B_Y**2 + B_Z**2)
+            B_magnitude = np.sqrt(B_X**2 + B_Y**2 + B_Z**2)
             if unitvector:
-                b_hat = B_vec / B_mag
+                b_hat = B_vec / B_magnitude
                 toreturn.append(b_hat.T)
             if magnitude:
-                toreturn.append(B_mag)
+                toreturn.append(B_magnitude)
 
         return toreturn
 
@@ -1161,13 +1290,21 @@ class MagneticField_Cartesian(ABC):
     def unitvector_cartesian(
         self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike
     ) -> FloatArray:
+        """The unit vector of the field, B/|B|, the same as `unitvector`"""
         return self.unitvector(X, Y, Z)
 
     def polflux_cartesian(self, X: ArrayLike, Y: ArrayLike, Z: ArrayLike) -> ArrayLike:
+        """The normalised poloidal flux, the same as `polflux`"""
         return self.polflux(X, Y, Z)
 
 
 class InterpolatedField_Cartesian(MagneticField_Cartesian):
+    """Field interpolated from grids of B_X, B_Y, B_Z and the normalised
+    poloidal flux on an (X, Y, Z) grid, with
+    `scipy.interpolate.RegularGridInterpolator`
+    (``interp_order``: "linear", "cubic" or "quintic"). Give it to
+    `beam_me_up` as ``find_B_method`` with ``geometry="cartesian"``"""
+
     def __init__(
         self,
         X_coord: FloatArray,
@@ -1207,10 +1344,10 @@ class InterpolatedField_Cartesian(MagneticField_Cartesian):
 
         (
             (self._interp_polflux, self._spline_polflux),
-            duration_polflux_interpolation,
+            duration_poloidal_flux_interpolation,
         ) = _make_cuboid_spline(X_coord, Y_coord, Z_coord, psi, interp_order)
         log.debug(
-            f"Interpolating 3D poloidal flux profile took {duration_polflux_interpolation} s"
+            f"Interpolating 3D poloidal flux profile took {duration_poloidal_flux_interpolation} s"
         )
 
         self.grid_coords = self._spline_B_X.grid
