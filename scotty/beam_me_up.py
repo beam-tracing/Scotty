@@ -351,10 +351,11 @@ def beam_me_up(
         Wavevector finite-difference steps, in m⁻¹ (``delta_K_zeta`` is a
         step in the toroidal mode number)
     len_tau : int, default 4002
-        Number of points along the ray in the output. The filter function is
-        integrated on these points. Where the beam focuses sharply at the
-        cut-off, its peak can be narrower than their spacing if there are far
-        fewer of them. v3's default was 102
+        Number of points along the ray in the output, or one fewer if the
+        ray stops at a resonance layer (see :ref:`output`). The filter
+        function is integrated on these points. Where the beam focuses
+        sharply at the cut-off, its peak can be narrower than their spacing
+        if there are far fewer of them. v3's default was 102
     rtol, atol : float, default 1e-4, 1e-7
         Relative and absolute tolerances of the ray and beam solvers
         (`scipy.integrate.solve_ivp`). Use tighter ones (e.g. 1e-6, 1e-9) for

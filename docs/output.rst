@@ -25,6 +25,15 @@ groups:
     where the solvers start (``*_launch``, ``*_entry``, ``*_initial``; see
     :ref:`naming`). In cylindrical coordinates ``K_zeta`` is the
     toroidal mode number, not the toroidal component of :math:`K`.
+    The output has ``len_tau - 1`` points spaced evenly in :math:`\tau`,
+    from :math:`\tau = 0` (the ``*_initial`` point) up to (not including)
+    where the ray stops, plus the point where :math:`|K|` is smallest (the
+    cut-off), so ``len_tau`` points in all. If the ray stopped at a
+    resonance layer, that point is not added and the output has
+    ``len_tau - 1`` points. If :math:`|K|` has no minimum inside the ray,
+    as for a plasma launch moving outwards, the added point lies at one end,
+    almost on top of an existing one (about ``atol`` away in :math:`\tau`). ``beam`` and ``diagnostics/dbs`` use the same
+    :math:`\tau`.
 
 ``beam``
     The beam along the ray (`scotty.analysis.basic_analysis`): the beam
